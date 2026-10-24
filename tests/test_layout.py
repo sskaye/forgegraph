@@ -1,0 +1,627 @@
+"""Layouts: GraphSpecs on a grid per tab, their plot boxes aligned, with separators between
+them, saved per tab (images), as one PDF and as one HTML page; and the layout file's rules."""
+
+from __future__ import annotations
+
+import base64
+import json
+import re
+from typing import Any
+
+import numpy as np
+import pytest
+from matplotlib.lines import Line2D
+from pack_helpers import allow, write_pack
+from PIL import Image
+from render_helpers import BASE, polarization
+from ruamel.yaml import YAML
+from typer.testing import CliRunner
+
+import forgegraph as fg
+from forgegraph.cli import app
+from forgegraph.layout import Layout, explain_layout
+from forgegraph.render.figure import WATERMARK, visible_extent
+from forgegraph.spec.documents import builtin, validate
+from forgegraph.spec.layout import slug
+
+runner = CliRunner()
+FORMAT = {"width": 200, "height": "auto", "base_size": 10}
+
+
+def _dump(doc: dict[str, Any], path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        YAML().dump(doc, f)
+
+
+def _format(name: str, **figure: Any) -> dict[str, Any]:
+    return {
+        "name": name,
+        "version": 0,
+        "description": "test",
+        "extends": "forgegraph_base/base_format",
+        "fixed_parameters": {"figure": {**FORMAT, **figure}},
+        "variable_parameters": {"output": {"file_types": ["png"]}},
+    }
+
+
+@pytest.fixture
+def project(tmp_path, monkeypatch):
+    """A project: the example data, GraphSpecs whose y tick labels differ in width, a theme
+    with other colors, and formats with an auto and a fixed height."""
+    polarization().to_parquet(tmp_path / "p.parquet")
+    for name, y, extra in (
+        ("volt", "cell_voltage", {}),
+        ("power", "power_density", {}),
+        ("bright", "cell_voltage", {}),
+    ):
+        settings = {**BASE, "axis.y.data.column": y, **extra}
+        doc = fg.graphspec(
+            name,
+            "xy",
+            theme="house/bright" if name == "bright" else "forgegraph_base/base_theme",
+            data_file="p.parquet",
+            settings=settings,
+        )
+        _dump(doc, tmp_path / f"{name}.yaml")
+    _dump(
+        {
+            "name": "bright",
+            "version": 0,
+            "description": "test",
+            "extends": "forgegraph_base/base_theme",
+            "fixed_parameters": "None",
+            "variable_parameters": {"series": {"colors": "tol_bright"}},
+        },
+        tmp_path / "house" / "themes" / "bright.yaml",
+    )
+    _dump(_format("auto"), tmp_path / "house" / "formats" / "auto.yaml")
+    _dump(_format("fixed", height=150), tmp_path / "house" / "formats" / "fixed.yaml")
+    write_pack(tmp_path)
+    allow(tmp_path, "forgegraph_base", "./house")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
+    return tmp_path
+
+
+def write_layout(
+    folder, tabs: dict[str, Any], name: str = "fig", fmt: str = "house/auto", **variable: Any
+) -> Any:
+    doc = {
+        "name": name,
+        "version": 0,
+        "description": "test",
+        "extends": "forgegraph_base/base_layout",
+        "fixed_parameters": "None",
+        "variable_parameters": {"specifications": {"format": fmt}, **variable, "tabs": tabs},
+    }
+    path = folder / f"{name}.layout.yaml"
+    _dump(doc, path)
+    return path
+
+
+def tab(areas: list[list[str]], **tiles: str) -> dict[str, Any]:
+    return {"grid": {"areas": areas}, "tiles": tiles}
+
+
+def boxes(layout: Layout, tab_index: int = 0) -> dict[str, Any]:
+    t = layout.tabs[tab_index]
+    return {name: tile.axes.get_window_extent() for name, tile in t.tiles.items()}
+
+
+def record_of(path) -> dict[str, Any]:
+    record = fg.load(path)
+    assert record is not None
+    return record
+
+
+def problems(path) -> list[str]:
+    with pytest.raises(fg.SpecError) as e:
+        fg.layout(path)
+    return e.value.problems
+
+
+# The grid
+
+
+def test_plot_boxes_line_up_whatever_their_tick_labels(project):
+    path = write_layout(
+        project,
+        {
+            "Figure": tab(
+                [["volt", "bright"], ["power", "bright"]],
+                volt="volt.yaml",
+                power="power.yaml",
+                bright="bright.yaml",
+            )
+        },
+    )
+    b = boxes(fg.layout(path))
+    assert b["volt"].x0 == pytest.approx(b["power"].x0, abs=0.5)  # labels differ in width
+    assert b["volt"].x1 == pytest.approx(b["power"].x1, abs=0.5)
+    assert b["bright"].y1 == pytest.approx(b["volt"].y1, abs=0.5)  # the span: top to bottom
+    assert b["bright"].y0 == pytest.approx(b["power"].y0, abs=0.5)
+
+
+def test_column_widths_are_ratios_of_plot_boxes(project):
+    grid = {"areas": [["volt", "power"]], "column_widths": [1, 2]}
+    path = write_layout(
+        project, {"T": {"grid": grid, "tiles": {"volt": "volt.yaml", "power": "power.yaml"}}}
+    )
+    b = boxes(fg.layout(path))
+    assert b["power"].width / b["volt"].width == pytest.approx(2, rel=1e-3)
+
+
+def test_a_span_runs_across_the_margins_and_gap_inside_it(project):
+    path = write_layout(
+        project,
+        {
+            "T": tab(
+                [["volt", "volt"], ["power", "bright"]],
+                volt="volt.yaml",
+                power="power.yaml",
+                bright="bright.yaml",
+            )
+        },
+    )
+    b = boxes(fg.layout(path))
+    assert b["volt"].x0 == pytest.approx(b["power"].x0, abs=0.5)
+    assert b["volt"].x1 == pytest.approx(b["bright"].x1, abs=0.5)
+
+
+def test_with_height_auto_each_plot_keeps_its_aspect_or_more(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    layout = fg.layout(path)
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    for box in boxes(layout).values():
+        assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
+
+
+def test_with_width_auto_each_plot_keeps_its_aspect_too(project):
+    _dump(_format("tall", width="auto", height=150), project / "house" / "formats" / "tall.yaml")
+    path = write_layout(
+        project,
+        {"T": tab([["volt"], ["power"]], volt="volt.yaml", power="power.yaml")},
+        fmt="house/tall",
+    )
+    layout = fg.layout(path)
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    for box in boxes(layout).values():
+        assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
+    height = layout.tabs[0].figure.get_size_inches()[1] * 25.4
+    assert height == pytest.approx(150, abs=0.01)
+
+
+def test_a_fixed_size_is_the_figures_size(project):
+    path = write_layout(
+        project,
+        {"T": tab([["volt"], ["power"]], volt="volt.yaml", power="power.yaml")},
+        fmt="house/fixed",
+    )
+    fig = fg.layout(path).tabs[0].figure
+    assert tuple(fig.get_size_inches() * 25.4) == pytest.approx((200, 150), abs=0.01)
+
+
+def test_tiles_are_a_gap_apart(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    layout = fg.layout(path)
+    t = layout.tabs[0]
+    renderer = t.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    a = visible_extent(t.tiles["volt"].axes, renderer)
+    b = visible_extent(t.tiles["power"].axes, renderer)
+    gap_px = 1.5 * 10 / 72 * t.figure.dpi
+    assert b.x0 - a.x1 == pytest.approx(gap_px, abs=0.5)
+
+
+def test_a_blank_cell_is_left_empty(project):
+    path = write_layout(
+        project,
+        {
+            "T": tab(
+                [["volt", "power"], ["bright", "."]],
+                volt="volt.yaml",
+                power="power.yaml",
+                bright="bright.yaml",
+            )
+        },
+    )
+    b = boxes(fg.layout(path))
+    assert b["bright"].x1 == pytest.approx(b["volt"].x1, abs=0.5)  # one column wide
+
+
+def test_too_small_a_format_names_the_tiles_that_dont_fit(project):
+    _dump(_format("tiny", width=40), project / "house" / "formats" / "tiny.yaml")
+    path = write_layout(
+        project,
+        {
+            "T": tab(
+                [["volt", "power", "bright"]],
+                volt="volt.yaml",
+                power="power.yaml",
+                bright="bright.yaml",
+            )
+        },
+        fmt="house/tiny",
+    )
+    [problem] = problems(path)
+    assert problem.startswith("tabs.T: size: too small") and "'volt'" in problem
+
+
+# Each tile as its GraphSpec says
+
+
+def test_each_tile_keeps_its_own_theme(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "bright"]], volt="volt.yaml", bright="bright.yaml")}
+    )
+    t = fg.layout(path).tabs[0]
+    first = {tile: t.tiles[tile].axes.get_lines()[0].get_color() for tile in ("volt", "bright")}
+    assert first == {"volt": "#0072B2", "bright": "#4477AA"}  # okabe_ito, tol_bright
+
+
+def test_the_layouts_format_replaces_each_tiles(project):
+    path = write_layout(project, {"T": tab([["volt"]], volt="volt.yaml")})
+    tile = fg.layout(path).tabs[0].tiles["volt"]
+    assert tile.values["format"]["figure.base_size"] == 10  # the GraphSpec names default
+    label = tile.axes.xaxis.get_major_ticks()[0].label1
+    tick = float(tile.style.theme["axis.tick.label.size"]) * 10
+    assert label.get_fontsize() == pytest.approx(tick)
+
+
+def test_a_tile_can_be_drawn_from_a_dataframe(project):
+    doc = fg.graphspec("frame", "xy", settings=BASE)
+    _dump(doc, project / "frame.yaml")
+    path = write_layout(project, {"T": tab([["f"]], f="frame.yaml")})
+    assert fg.layout(path, data={"f": polarization()}).tabs[0].tiles["f"].data.rows_read == 96
+    with pytest.raises(fg.SpecError, match="data: no tile 'g'"):
+        fg.layout(path, data={"g": polarization()})
+
+
+def test_lint_names_the_tile(project):
+    frame = polarization()
+    frame.loc[0, "cell_voltage"] = np.nan
+    frame.to_parquet(project / "gaps.parquet")
+    doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=BASE)
+    _dump(doc, project / "gaps.yaml")
+    path = write_layout(project, {"T": tab([["volt", "gaps"]], volt="volt.yaml", gaps="gaps.yaml")})
+    messages = fg.layout(path).warnings
+    assert any(m.startswith("tile 'gaps': ") and "left out" in m for m in messages), messages
+
+
+# Separators
+
+
+def test_lines_run_between_tiles_but_not_through_a_span(project):
+    path = write_layout(
+        project,
+        {
+            "T": tab(
+                [["volt", "bright"], ["power", "bright"]],
+                volt="volt.yaml",
+                power="power.yaml",
+                bright="bright.yaml",
+            )
+        },
+        separators={"line": {"show": True}},
+    )
+    t = fg.layout(path).tabs[0]
+    lines = [a for a in t.figure.artists if isinstance(a, Line2D)]
+    vertical = [ln for ln in lines if np.ptp(np.asarray(ln.get_xdata())) == 0]
+    horizontal = [ln for ln in lines if np.ptp(np.asarray(ln.get_ydata())) == 0]
+    assert len(vertical) == 2 and len(horizontal) == 1  # beside each row; under volt only
+    bright = t.tiles["bright"].axes.get_position()
+    assert max(np.asarray(horizontal[0].get_xdata())) < bright.x0
+
+
+def test_a_blank_cell_counts_as_a_tile_for_lines(project):
+    areas = [["volt", "power"], ["bright", "."]]
+    tiles = {"volt": "volt.yaml", "power": "power.yaml", "bright": "bright.yaml"}
+    path = write_layout(project, {"T": tab(areas, **tiles)}, separators={"line": {"show": True}})
+    t = fg.layout(path).tabs[0]
+    lines = [a for a in t.figure.artists if isinstance(a, Line2D)]
+    vertical = [ln for ln in lines if np.ptp(np.asarray(ln.get_xdata())) == 0]
+    horizontal = [ln for ln in lines if np.ptp(np.asarray(ln.get_ydata())) == 0]
+    assert len(vertical) == 2 and len(horizontal) == 2  # beside and above the blank cell too
+
+
+def test_a_border_runs_round_the_tiles_a_gap_from_the_edge(project):
+    path = write_layout(
+        project,
+        {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
+        separators={"line": {"border": True}},
+    )
+    t = fg.layout(path).tabs[0]
+    [border] = [a for a in t.figure.artists if isinstance(a, Line2D)]  # no lines between
+    xs = np.asarray(border.get_xdata())
+    gap = 1.5 * 10 / 72  # inches
+    width = t.figure.get_size_inches()[0]
+    assert len(xs) == 5 and min(xs) * width == pytest.approx(gap / 2)
+    renderer = t.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    left = visible_extent(t.tiles["volt"].axes, renderer).x0 / t.figure.dpi
+    assert left == pytest.approx(gap, abs=0.01)
+
+
+def test_the_separator_color_fills_the_gaps(project):
+    path = write_layout(
+        project,
+        {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
+        separators={"color": "#FF0000"},
+    )
+    [png] = fg.layout(path).save(project / "out" / "fig.png")
+    pixels: np.ndarray = np.asarray(Image.open(png).convert("RGB"))
+    assert tuple(pixels[0, 0]) == (255, 0, 0)  # the figure's edge
+    assert tuple(pixels[pixels.shape[0] // 2, pixels.shape[1] // 2]) == (255, 0, 0)  # the gap
+
+
+# Tabs and output
+
+
+def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
+    types = {"output": {"file_types": ["png", "pdf", "html"]}}
+    _dump(
+        {**_format("all"), "variable_parameters": types}, project / "house" / "formats" / "all.yaml"
+    )
+    path = write_layout(
+        project,
+        {
+            "Overview": tab([["volt"]], volt="volt.yaml"),
+            "By cell": tab([["power"]], power="power.yaml"),
+        },
+        fmt="house/all",
+    )
+    saved = fg.layout(path).save_all(project / "out" / "fig")
+    names = [p.name for p in saved]
+    assert names == ["fig-overview.png", "fig-by-cell.png", "fig.pdf", "fig.html"]
+    pdf = (project / "out" / "fig.pdf").read_bytes()
+    assert len(re.findall(rb"/Type /Page\b", pdf)) == 2
+    page = (project / "out" / "fig.html").read_text()
+    assert '<a role="tab" href="#overview">Overview</a>' in page
+    assert '<section id="by-cell"><h2>By cell</h2><img' in page
+    for p in saved:
+        record = record_of(p)
+        assert record["layout"]["name"] == "fig"
+    assert list(record_of(project / "out" / "fig-by-cell.png")["tabs"]) == ["By cell"]
+    assert sorted(record_of(project / "out" / "fig.html")["tabs"]) == ["By cell", "Overview"]
+
+
+def test_a_layout_sets_its_formats_variable_parameters(project):
+    path = write_layout(
+        project,
+        {"Overview": tab([["volt"]], volt="volt.yaml")},
+        fmt="house/auto",
+        output={"file_types": ["html", "png"]},
+    )
+    saved = fg.layout(path).save_all(project / "out" / "fig")
+    assert sorted(p.name for p in saved) == ["fig.html", "fig.png"]
+    tile = explain_layout(path)["tabs.Overview.tiles.volt.format"]["output.file_types"]
+    assert tile.value == ["html", "png"] and tile.origin == "layout 'fig'"
+
+
+def test_a_layout_cant_set_its_formats_fixed_parameters():
+    [found] = _check({"figure": {"width": 200}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
+    assert (
+        found
+        == "variable_parameters.figure.width: fixed by format 'forgegraph_base/base_layout_format'"
+    )
+
+
+def test_with_a_border_the_tab_bars_line_is_its_top(project):
+    _dump(
+        {**_format("page"), "variable_parameters": {"output": {"file_types": ["html"]}}},
+        project / "house" / "formats" / "page.yaml",
+    )
+    path = write_layout(
+        project,
+        {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")},
+        fmt="house/page",
+        separators={"line": {"border": True}},
+    )
+    layout = fg.layout(path)
+    [page_file] = layout.save_all(project / "out" / "fig")
+    text = page_file.read_text()
+    figure = layout.tabs[0].figure
+    width_pt = figure.get_size_inches()[0] * 72
+    out, half = 1.5 * 10 / 2, 0.05 * 10 / 2  # the border's centre and half its width, pt
+    svg = base64.b64decode(re.findall(r"base64,([^\"]+)", text)[0])
+    box = re.search(rb'viewBox="([^"]+)"', svg)
+    assert box is not None
+    left, top, width, _ = (float(v) for v in box[1].split())
+    assert (left, top) == pytest.approx((out - half, out + half), abs=1e-3)  # top side cut off
+    assert width == pytest.approx(width_pt - 2 * out + 2 * half, abs=1e-3)
+    assert f"main {{ max-width: {width:g}pt; }}" in text
+    assert "border-bottom: 0.5pt solid #D9D9D9" in text  # the tab bar's line, as the border
+
+
+def test_one_tab_is_saved_without_its_name(project):
+    path = write_layout(project, {"Figure": tab([["volt"]], volt="volt.yaml")})
+    [png] = fg.layout(path).save_all(project / "out" / "fig")
+    assert png.name == "fig.png"
+    [page] = fg.layout(path).save(project / "out" / "fig.html")
+    assert "<nav" not in page.read_text()
+
+
+def test_tab_names_become_file_names_and_links():
+    assert slug("By instrument") == "by-instrument"
+    assert slug("  Cells: A/C ") == "cells-ac"
+
+
+def test_the_record_holds_each_tiles_graphspec_and_data(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    [png] = fg.layout(path).save(project / "out" / "fig.png")
+    tiles = record_of(png)["tabs"]["T"]
+    assert tiles["power"]["file"] == "power.yaml"
+    assert tiles["power"]["graphspec"]["name"] == "power"
+    assert tiles["power"]["data"] == "p.parquet"
+    assert tiles["power"]["resolved"]["format"]["figure.base_size"] == 10
+    assert tiles["power"]["specs"]["format"]["name"] == "house/auto"  # the layout's, not its own
+
+
+def test_rendering_twice_gives_the_same_file(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    [a] = fg.layout(path).save(project / "a.png")
+    [b] = fg.layout(path).save(project / "b.png")
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_drawing_on_a_tab_watermarks_every_tile(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    layout = fg.layout(path)
+    t = layout.tabs[0]
+    t.tiles["volt"].axes.axhline(0.7)
+    [png] = layout.save(project / "out" / "fig.png")
+    assert record_of(png)["nonstandard"] is True
+    for tile in t.tiles.values():
+        assert any(a.get_gid() == WATERMARK for a in tile.axes.get_children())
+
+
+# A GraphSpec's page
+
+
+def test_a_graphspec_saves_as_a_page(project):
+    g = fg.render(project / "volt.yaml")
+    [page] = g.save(project / "out" / "volt.html")
+    text = page.read_text()
+    assert text.count("<img") == 1 and "<nav" not in text
+    assert record_of(page)["graphspec"]["name"] == "volt"
+
+
+# The layout file's rules
+
+
+def _check(variable: dict[str, Any]) -> list[str]:
+    doc = {
+        "name": "t",
+        "version": 0,
+        "description": "test",
+        "extends": "forgegraph_base/base_layout",
+        "fixed_parameters": "None",
+        "variable_parameters": variable,
+    }
+    return validate("layout", doc, builtin().copy())
+
+
+@pytest.mark.parametrize(
+    ("grid", "tiles", "message"),
+    [
+        ([["a", "b"], ["c"]], ["a", "b", "c"], "every row needs the same number of cells"),
+        ([["a", "b"], ["b", "a"]], ["a", "b"], "'a' must fill a rectangle"),
+        ([["a"], ["."]], ["a"], "row 2 is all blank"),
+        ([["a", "."]], ["a"], "column 2 is all blank"),
+        ([["a", "b"]], ["a"], "no tile for 'b'"),
+        ([["a"]], ["a", "z"], "tiles.z: not in grid.areas"),
+    ],
+)
+def test_grid_rules(grid, tiles, message):
+    found = _check(
+        {"tabs": {"T": {"grid": {"areas": grid}, "tiles": {t: f"{t}.yaml" for t in tiles}}}}
+    )
+    assert any(message in p for p in found), found
+
+
+def test_sizes_need_one_per_column_or_row():
+    grid = {"areas": [["a", "b"]], "column_widths": [1, 2, 3]}
+    found = _check({"tabs": {"T": {"grid": grid, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}})
+    assert found == [
+        "variable_parameters.tabs.T.grid.column_widths: 3 sizes, but the grid has 2 columns"
+    ]
+
+
+def test_row_heights_with_height_auto_is_an_error():
+    grid = {"areas": [["a"], ["b"]], "row_heights": [1, 2]}
+    [found] = _check({"tabs": {"T": {"grid": grid, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}})
+    assert "format 'forgegraph_base/base_layout_format' has figure.height auto" in found
+
+
+def test_tile_names_are_unique_and_tab_names_give_distinct_files():
+    found = _check({"tabs": {"One": tab([["a"]], a="a.yaml"), "one": tab([["a"]], a="b.yaml")}})
+    assert any("gives the same file names and links as tab 'One'" in p for p in found)
+    assert any("tiles.a: also a tile in tab 'One'" in p for p in found)
+
+
+def test_a_layouts_tabs_replace_those_it_inherits(project):
+    _dump(
+        {
+            "name": "base",
+            "version": 0,
+            "description": "test",
+            "extends": "forgegraph_base/base_layout",
+            "fixed_parameters": "None",
+            "variable_parameters": {
+                "specifications": {"format": "house/auto"},
+                "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
+            },
+        },
+        project / "house" / "layouts" / "base.yaml",
+    )
+    doc = {
+        "name": "child",
+        "version": 0,
+        "description": "test",
+        "extends": "house/base",
+        "fixed_parameters": "None",
+        "variable_parameters": {"tabs": {"New": tab([["power"]], power="power.yaml")}},
+    }
+    _dump(doc, project / "child.layout.yaml")
+    layout = fg.layout(project / "child.layout.yaml")
+    assert [t.name for t in layout.tabs] == ["New"]
+
+
+def test_unset_and_missing_tiles_are_errors(project):
+    path = write_layout(
+        project, {"T": tab([["a", "b", "c"]], a="None", b="nowhere.yaml", c="fig.layout.yaml")}
+    )
+    found = problems(path)
+    assert found == ["tabs.T.tiles.a: must be set before the layout can be drawn: a GraphSpec file"]
+    path = write_layout(project, {"T": tab([["b", "c"]], b="nowhere.yaml", c="fig.layout.yaml")})
+    found = problems(path)
+    assert found[0].startswith("tabs.T.tiles.b: no GraphSpec file at")
+    assert found[1] == "tabs.T.tiles.c: 'fig.layout.yaml' is a layout; a tile is a GraphSpec file"
+
+
+def test_a_tiles_problems_say_where_they_are(project):
+    (project / "bad.yaml").write_text(
+        (project / "volt.yaml").read_text().replace("cell_voltage", "nope")
+    )
+    path = write_layout(project, {"T": tab([["bad"]], bad="bad.yaml")})
+    [found] = problems(path)
+    assert found.startswith("tabs.T.tiles.bad (bad.yaml): ")
+
+
+# The command line
+
+
+def test_cli_renders_explains_and_loads_a_layout(project):
+    path = write_layout(
+        project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    )
+    result = runner.invoke(app, ["render", str(path), "--json"])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["saved"] == [str(project / "fig.png")]
+    assert set(report["labelling"]) == {"T.volt", "T.power"}
+    result = runner.invoke(app, ["explain", str(path), "--json"])
+    rows = json.loads(result.output)["values"]
+    base = next(
+        r
+        for r in rows
+        if r["kind"] == "tabs.T.tiles.power.format" and r["parameter"] == "figure.base_size"
+    )
+    assert base["value"] == 10 and base["set_by"] == "format 'house/auto', from layout 'fig'"
+    result = runner.invoke(app, ["load", str(project / "fig.png")])
+    assert (
+        "layout: fig" in result.output
+        and "tab T: power (power.yaml), volt (volt.yaml)" in result.output
+    )
+    result = runner.invoke(app, ["schema", "layout", "--json"])
+    params = [p["parameter"] for p in json.loads(result.output)["layout"]]
+    assert "tabs.<tab>.grid.areas" in params and "tabs.<tab>.tiles.<tile>" in params

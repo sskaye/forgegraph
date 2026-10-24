@@ -1,0 +1,23 @@
+name: provenance          # [text]; The name of the record.
+version: 0          # [int]; The version number of the specification.
+description: The record ForgeGraph writes into every saved file, at the format's provenance.level.          # [text]; The description of the record.
+
+off:          # Written at off: no metadata.
+
+minimal:          # Written at minimal and full.
+    provenance_level: minimal          # [full, minimal]; The provenance level at which the record was written.
+    forgegraph_version: 0.6.0          # [text]; The ForgeGraph version that drew the file.
+    created: "2026-10-24T09:00:00Z"          # [text]; When the file was drawn, ISO 8601 in UTC; from SOURCE_DATE_EPOCH when that's set.
+    graphspec: {}          # [mapping]; The GraphSpec as written, without data.file and data.preprocessing; none for a blank canvas.
+    specs: {}          # [mapping]; Each spec used, by kind: its name and version, and its pack's version if it's in a pack.
+    nonstandard: false          # [true, false]; Whether something was drawn outside the specs the config permits, so the graph is watermarked.
+    nonstandard_packs: []          # [texts]; The packs used that the main config doesn't list, which make it non-standard; left out if there are none.
+
+full:          # Written at full only, as well as everything in minimal.
+    resolved: {}          # [mapping]; Every value the graph was drawn with, by kind: GraphSpec, graph type, theme, format and layers.
+    data: polarization.parquet          # [None, text]; The data's file as listed in the GraphSpec, or None if a DataFrame was passed in.
+    preprocessing: None          # [None, text]; data.preprocessing as listed in the GraphSpec: where the code that made the data is.
+
+layout:          # Written for a layout instead of graphspec, resolved, data and preprocessing, at the layout's level.
+    layout: {}          # [mapping]; The layout file as written.
+    tabs: {}          # [mapping]; For each tab the file shows, each tile's GraphSpec file and its entries above, at the layout's level.

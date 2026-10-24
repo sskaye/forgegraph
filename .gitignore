@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Confidential example graphs: kept locally only, never committed
+docs/examples/*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+.cache/

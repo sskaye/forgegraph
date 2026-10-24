@@ -1,0 +1,727 @@
+# Skill evals: the cases in review/phase-04/skill-evals.md, review/phase-05/skill-evals.md and
+# review/phase-08/skill-evals.md, each scored by
+# scripts/run_skill_evals.py. A case's folder holds its `data` files from examples/sample-data;
+# its `turns` are sent one after another in one conversation, the last one followed by
+# `closing`.
+#
+# expect:
+#   graph: true            a graph was made with ForgeGraph (every image in the project has
+#                          a ForgeGraph record), the agent looked at an image after making it
+#                          (in every turn, or the turns in look_turns: [n, ...]),
+#                          and the GraphSpec, its Parquet file and the image are in the folder
+#   lint: [checks...]      re-rendering the final GraphSpec raises no lint issues except these
+#   values: {kind:path: v} resolved values of the final GraphSpec (axis.*: either axis); v is a value, or
+#                          {in: [...]}, {contains: x} (a list containing x),
+#                          {matches: regex} (case-insensitive; a list matches if any item does),
+#                          {lt: n}
+#   lines: n               the final graph draws at least n series
+#   rows_plotted: n | {max: n}   rows the final graph plots
+#   x_dates: true          the final graph's x column is dates
+#   x_between: [a, b]      ...and every x value is between these dates
+#   y_above: n             every y value plotted is above n
+#   only: {column: [values]}    the final Parquet file's column, if it has one, holds only these
+#   categorical_color: true     encoding.color is categorical: color_type categorical, or a
+#                          column that isn't numbers
+#   themes: [names]        themes the agent may create (default: none)
+#   files: [globs]         files that must exist in the project afterwards
+#   one_graphspec: true    the conversation kept editing one GraphSpec
+#   no_graph: true         no image was made
+#   no_other_tool: true    any image made was made with ForgeGraph
+#   says: [[words...]...]  the final reply contains, for each inner list, one of its words
+#                          (case-insensitive)
+#   layers: [{param: v}]   for each, the final GraphSpec has a layer, under any name, whose
+#                          resolved parameters match (type included; v as for values)
+#   tick_labels: {x: [..]} the final graph's tick labels on that axis, in order
+#   layout: {tabs: n, tiles: n, span: true, blank: true, widths: [a, b]}
+#                          the final .layout.yaml draws, with these tabs and tiles, a tile
+#                          spanning cells, a blank cell, column widths in this ratio; and its
+#                          lint is clean (except `lint`)
+#   nonstandard: true      an image is recorded as non-standard: drawn on a blank canvas
+#   nonstandard_pack: true an image is recorded as drawn with a pack the main config doesn't
+#                          list, and the GraphSpec is still checked
+#   schedule: {runs: [...], over: day | week | year, ran: true}
+#                          the final .schedule.yaml loads; its runs over a day, a week from a
+#                          Monday, or a year, as "Mon 07:00" ("Jan 01 06:00" over a year);
+#                          and it was run once with `forgegraph job run`
+# A case's `packs` are copied into its folder from examples/packs or packs/, and `config`
+# writes its folder config, forgegraph.toml. Its main config, outside the folder, lists
+# `main` (default: forgegraph_base and the case's packs).
+# A case with closing: false sends its last turn without the closing line (a question).
+# Every case also checks that the data files are unchanged and that no theme or format was
+# created beyond `themes`.
+
+closing: " After you finish, please share the graph and any notes on issues that came up or you had to work around."
+
+cases:
+  - id: iris-scatter
+    data: [iris.csv]
+    turns: ["Make a scatter plot of petal length vs. petal width from iris.csv, with species as the color."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.x.data.column: {matches: "petal.?(width|length)"}  # "A vs. B" either way
+        graph_type:axis.y.data.column: {matches: "petal.?(width|length)"}
+        graph_type:encoding.color: {matches: "species"}
+        graph_type:mark.line.show: false
+
+  - id: co2-record
+    data: [co2_monthly.csv]
+    turns: ["Plot the full monthly CO₂ record in co2_monthly.csv as a line over time."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      y_above: 300
+      values:
+        graph_type:mark.line.show: true
+
+  - id: penguins-shapes
+    data: [penguins.csv]
+    turns:
+      - "Using penguins.csv, put bill depth on the x-axis and bill length on the y-axis, points only, one color per species."
+      - "Distinguish males and females with different symbols."
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      one_graphspec: true
+      values:
+        graph_type:axis.x.data.column: {matches: "depth"}
+        graph_type:axis.y.data.column: {matches: "length"}
+        graph_type:encoding.color: {matches: "species"}
+        graph_type:encoding.marker_shape: {matches: "sex"}
+        graph_type:mark.line.show: false
+
+  - id: growth-diet
+    data: [growth.csv]
+    turns: ["Plot chick weight as a function of age (day) from growth.csv. Draw each chick as its own line and color the lines by diet; there are four diets, so give each a distinct color."]
+    expect:
+      graph: true
+      lint: []
+      categorical_color: true
+      values:
+        graph_type:axis.x.data.column: {matches: "day|age"}
+        graph_type:axis.y.data.column: {matches: "weight"}
+        graph_type:encoding.color: {matches: "diet"}
+        graph_type:encoding.detail: {matches: "animal|chick"}
+
+  - id: fmri-traces
+    data: [fmri.csv]
+    turns: ["From fmri.csv, take just the parietal rows and show signal across timepoints as individual subject traces, colored stim vs. cue."]
+    expect:
+      graph: true
+      lint: []
+      only: {region: [parietal]}
+      values:
+        graph_type:axis.x.data.column: {matches: "time"}
+        graph_type:axis.y.data.column: {matches: "signal"}
+        graph_type:encoding.color: {matches: "event"}
+        graph_type:encoding.detail: {matches: "subject|trace"}
+
+  - id: stocks
+    data: [stocks.csv]
+    turns: ["Can you chart each ticker's price through time from stocks.csv?"]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      lines: 5
+      values:
+        graph_type:encoding.color: {matches: "symbol|ticker|stock"}
+
+  - id: gapminder-logx
+    data: [gapminder.csv]
+    turns: ["Can you plot lifeExp vs gdpPercap from gapminder.csv with a log-scaled GDP axis, colored by continent?"]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.x.data.column: {matches: "gdp"}
+        graph_type:axis.y.data.column: {matches: "life"}
+        graph_type:axis.x.scale: log
+        graph_type:encoding.color: {matches: "continent"}
+
+  - id: diamonds-dense
+    data: [diamonds.csv]
+    turns: ["Make a log-log plot of price versus carat from diamonds.csv, color-coded by cut quality."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.x.data.column: {matches: "carat"}
+        graph_type:axis.y.data.column: {matches: "price"}
+        graph_type:axis.x.scale: log
+        graph_type:axis.y.scale: log
+        graph_type:encoding.color: {matches: "cut"}
+        graph_type:mark.line.show: false
+        theme:series.marker.size: {lt: 0.5}
+
+  - id: dose-response
+    data: [dose_response.csv]
+    turns: ["I'd like the dose-response data in dose_response.csv plotted with % response on y and concentration in µM on a logarithmic x axis, one curve per compound."]
+    expect:
+      graph: true
+      lint: [dropped-rows, log-axis-values, outside-limits]  # dose 0 left to ForgeGraph is fine
+      values:
+        graph_type:axis.x.scale: log
+        graph_type:encoding.color: {matches: "compound"}
+      says: [["zero", " 0 ", "0 µM", "dose 0", "0 dose", "= 0", "dose-0", "dose of 0"]]
+
+  - id: seaice-gaps
+    data: [seaice.csv]
+    turns: ["Plot a time series of sea-ice extent from seaice.csv. Where readings are missing, leave a gap in the line rather than joining across it."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      x_dates: true
+      values:
+        graph_type:mark.line.missing_values: gap
+
+  - id: geyser-limits
+    data: [geyser.csv]
+    turns: ["Using the Old Faithful data in geyser.csv, plot x = eruption duration and y = waiting time to the next eruption, as points. Fix the y range at 40–100 min."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.x.data.column: {matches: "duration|eruption"}
+        graph_type:axis.y.data.column: {matches: "wait"}
+        graph_type:axis.y.min: 40
+        graph_type:axis.y.max: 100
+        graph_type:mark.line.show: false
+
+  - id: weather-excel
+    data: [weather.xlsx]
+    turns: ["Show daily temp_max and temp_min from weather.xlsx as two lines on one plot, with the date along the bottom."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      lines: 2
+
+  - id: lab-export
+    data: [lab_export.xlsx]
+    turns: ["Can you plot conductivity (mS/cm) vs. temperature (°C) for the samples in lab_export.xlsx, with no connecting lines?"]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      rows_plotted: {max: 40}
+      values:
+        graph_type:axis.x.data.column: {matches: "temp"}
+        graph_type:axis.y.data.column: {matches: "conduct"}
+        graph_type:mark.line.show: false
+
+  - id: sensor-eu
+    data: [sensor_log_eu.csv]
+    turns: ["Graph the temperature readings in sensor_log_eu.csv over the logging period."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      x_between: ["2026-03-01", "2026-03-31"]
+      values:
+        graph_type:axis.y.data.column: {matches: "temp"}
+
+  - id: passengers-wide
+    data: [air_passengers_by_month.csv]
+    turns: ["air_passengers_by_month.csv has one row per year and a column per month. I'd like it as a single monthly time series, Jan 1949 through Dec 1960, with passengers on a log scale."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      rows_plotted: 144
+      values:
+        graph_type:axis.y.scale: log
+
+  - id: tips-turns
+    data: [tips.csv]
+    turns:
+      - "From tips.csv, plot tip (y) versus total bill (x), with the dots colored by lunch/dinner."
+      - "Retitle it: Tips at lunch and dinner"
+      - "Export SVG and PDF copies too."
+    expect:
+      graph: true
+      look_turns: [1, 2]  # the third only adds file types: nothing new to look at
+      lint: []
+      one_graphspec: true
+      files: ["**/*.svg", "**/*.pdf", "**/*.png"]
+      values:
+        graph_type:axis.x.data.column: {matches: "total"}
+        graph_type:axis.y.data.column: {matches: "tip"}
+        graph_type:encoding.color: {matches: "time"}
+        graph_type:mark.line.show: false
+        graphspec:text.title: {matches: "^tips at lunch and dinner$"}
+
+  - id: serif-font
+    data: [iris.csv]
+    turns: ["Plot sepal length vs. sepal width from iris.csv, with the points colored by species. Please set it in a serif typeface."]
+    expect:
+      graph: true
+      lint: []
+      says: [["fixed", "theme"]]
+
+  - id: theme-asked
+    data: [iris.csv]
+    turns: ["Set up a new theme, big_labels, based on the default but with tick labels at 1.3× the default size. Then use it for a scatter from iris.csv: sepal width on x, sepal length on y, one color per species."]
+    expect:
+      graph: true
+      lint: []
+      themes: [big_labels]
+      values:
+        graphspec:specifications.theme: {matches: "(^|/)big_labels$"}
+        theme:axis.tick.label.size: 1.17  # 1.3 × the default 0.9
+
+  - id: box-plot
+    data: [tips.csv]
+    turns: ["Could you make a box plot of tip by day from tips.csv, please?"]
+    expect:
+      no_other_tool: true
+      says: [["support", "can't", "cannot", "couldn't", "could not", "unable", "not able", "no way", "has no", "doesn't have", "does not have"]]
+
+  - id: bubble-size
+    data: [gapminder.csv]
+    turns: ["Make a bubble chart of 2007 life expectancy vs. GDP per capita from gapminder.csv, with bubble size showing population."]
+    expect:
+      says: [["support", "can't", "cannot", "couldn't", "could not", "unable", "not able", "no way", "has no", "doesn't have", "does not have"]]
+      no_other_tool: true
+
+  # --- phase 5: bars ---------------------------------------------------------------------
+
+  - id: tips-by-day
+    data: [tips.csv]
+    turns: ["Make a bar chart of the average tip on each day in tips.csv, with the days in calendar order: Thur, Fri, Sat, Sun."]
+    expect:
+      graph: true
+      lint: []
+      tick_labels: {x: [Thur, Fri, Sat, Sun]}
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:mark.line.show: false
+        graph_type:axis.x.data.column: {matches: "day"}
+        graph_type:axis.y.data.column: {matches: "tip"}
+
+  - id: penguins-grouped
+    data: [penguins.csv]
+    turns: ["From penguins.csv, count the birds of each species on each island and plot it as grouped bars, with islands along x and species side by side."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:series.offset: side_by_side
+        graph_type:axis.x.data.column: {matches: "island"}
+        graph_type:encoding.color: {matches: "species"}
+
+  - id: tips-stacked
+    data: [tips.csv]
+    turns: ["Using tips.csv, show the total tips per day as stacked bars, with lunch and dinner stacked, and write each day's total above its bar."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:series.aggregation: sum
+        graph_type:series.value_label.total: true
+        graph_type:encoding.color: {matches: "time|meal"}
+
+  - id: diamonds-shares
+    data: [diamonds.csv]
+    turns: ["For each color grade in diamonds.csv, show the share of each cut as a 100% stacked bar."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:series.aggregation: percent
+        graph_type:encoding.color: {matches: "cut"}
+        graph_type:axis.*.data.column: {matches: "color"}  # vertical or horizontal bars
+
+  - id: americas-horizontal
+    data: [gapminder.csv]
+    turns: ["Draw horizontal bars of life expectancy in 2007 for the 12 countries in the Americas, sorted so the longest bar is at the top, with each value printed at the end of its bar."]
+    expect:
+      graph: true
+      lint: []
+      only: {continent: [Americas], year: ["2007"]}
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:series.base_axis: y
+        graph_type:axis.y.data.column: {matches: "country"}
+        graph_type:axis.x.data.column: {matches: "life"}
+        graph_type:axis.y.data.order.method: value
+        graph_type:axis.y.data.order.direction: ascending
+        graph_type:series.value_label.show: true
+
+  - id: reference-compound
+    data: [dose_response.csv]
+    turns: ["Plot bars of mean % response at 10 µM for each compound in dose_response.csv. Compound A is the reference — set it apart from the two test compounds and put it last."]
+    expect:
+      graph: true
+      lint: []
+      only: {dose_uM: ["10", "10.0"]}
+      values:  # set apart by the benchmark or by a color column, either is fine (Steven)
+        graph_type:mark.bar.show: true
+
+  # --- phase 5: axes and ticks -------------------------------------------------------------
+
+  - id: passengers-yearly-ticks
+    data: [air_passengers.csv]
+    turns: ["Make a line plot of monthly passengers from air_passengers.csv, with x ticks every two years, labelled with the year only."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      values:
+        graph_type:axis.x.tick.algorithm: manual
+        graph_type:axis.x.tick.step: {matches: "^2 years?$"}
+        graph_type:axis.x.tick.label.format: "%Y"
+
+  - id: unemployment-separators
+    data: [economics.csv]
+    turns: ["Please plot unemployment (the unemploy column, in thousands) over time from economics.csv, and format the y tick labels with thousands separators."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.y.data.column: {matches: "unemploy"}
+        graph_type:axis.y.tick.label.format: {matches: ","}
+
+  # --- phase 5: layers -----------------------------------------------------------------------
+
+  - id: half-maximal-line
+    data: [dose_response.csv]
+    turns: ["Plot % response vs. dose (µM, log x) for each compound from dose_response.csv, with a horizontal line at 50 % labelled 'half-maximal'."]
+    expect:
+      graph: true
+      lint: [dropped-rows, log-axis-values, outside-limits]  # dose 0 left to ForgeGraph is fine
+      values:
+        graph_type:axis.x.scale: log
+      layers:
+        - {type: reference_line, axis: y, value: 50, label.text: {matches: "half"}}
+
+  - id: savings-mean-line
+    data: [economics.csv]
+    turns: ["Plot psavert, the personal savings rate, by date from economics.csv. Add a line across at its mean, labelled with the mean's value."]
+    expect:
+      graph: true
+      lint: []
+      layers:
+        - {type: reference_line, axis: y, value: {matches: "psavert|sav"}, aggregation.function: mean, label.text: {in: [value, aggregation_value]}}
+
+  - id: enzyme-max-lines
+    data: [enzyme_kinetics.csv]
+    turns: ["Plot reaction rate against substrate concentration for treated vs. untreated samples (enzyme_kinetics.csv), as points only. Mark each group's maximum observed rate with a horizontal line in that group's color."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.line.show: false
+        graph_type:encoding.color: {matches: "state"}
+      layers:
+        - {type: reference_line, value: {matches: "rate"}, aggregation.function: max, per_series: true}
+
+  - id: co2-corner-note
+    data: [co2_monthly.csv]
+    turns: ["Please plot co2_monthly.csv as a time series, with the note 'Mauna Loa Observatory' in the upper left corner of the plot."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      y_above: 300
+      layers:
+        - {type: note, text: {matches: "Mauna Loa"}, position: top_left, inside: true}
+
+  - id: iris-source-line
+    data: [iris.csv]
+    turns: ["Using the iris data, plot petal length vs. petal width with the points colored by species. Under the x-axis title, add a source line: 'Source: Fisher (1936), synthetic look-alike'."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.line.show: false
+      layers:
+        - {type: note, text: {matches: "Fisher"}, inside: false, position: {matches: "^bottom"}}
+
+  - id: replicates-sd
+    data: [dose_response.csv]
+    turns: ["Could you plot the mean ± SD of the three replicates at each dose, with one line per compound and dose on a log scale (dose_response.csv)?"]
+    expect:
+      graph: true
+      lint: [dropped-rows, log-axis-values, outside-limits]  # dose 0 left to ForgeGraph is fine
+      values:
+        graph_type:axis.y.data.aggregation: mean
+        graph_type:axis.x.scale: log
+        graph_type:encoding.color: {matches: "compound"}
+      layers:
+        - {type: error_bar, value.aggregation.function: stddev}
+
+  - id: fmri-ci
+    data: [fmri.csv]
+    turns: ["From fmri.csv, using the parietal region only, plot the mean signal over time for stim and cue, averaged across the 14 subjects, with 95% confidence-interval error bars."]
+    expect:
+      graph: true
+      lint: []
+      only: {region: [parietal]}
+      values:
+        graph_type:axis.y.data.aggregation: mean
+        graph_type:encoding.color: {matches: "event"}
+      layers:
+        - {type: error_bar, value.aggregation.function: ci}
+
+  - id: bill-by-size-se
+    data: [tips.csv]
+    turns: ["Make a bar plot of mean total bill by party size from tips.csv, with standard-error bars."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:axis.y.data.aggregation: mean
+        graph_type:axis.x.data.column: {matches: "size"}
+      layers:
+        - {type: error_bar, value.aggregation.function: stderr}
+
+  - id: summary-sd-column
+    data: [assay_summary.csv]
+    turns: ["assay_summary.csv already has the mean and SD for each compound and dose. Plot mean response against dose for each compound, with error bars from the sd column."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.y.data.aggregation: none
+      layers:
+        - {type: error_bar, value.lower: {matches: "sd"}, value.upper: {matches: "sd"}, value.aggregation.function: "None"}
+
+  - id: body-mass-mean-line
+    data: [penguins.csv]
+    turns: ["Show the average body mass per species in penguins.csv as bars, plus a dashed line at the overall average across all birds."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      values:
+        graph_type:mark.bar.show: true
+        graph_type:axis.y.data.column: {matches: "body.?mass"}
+      layers:
+        - {type: reference_line, axis: y}
+
+  # --- phase 5: questions about ForgeGraph ------------------------------------------------
+
+  - id: q-graph-kinds
+    data: []
+    closing: false
+    turns: ["What kinds of graphs can ForgeGraph make at the moment?"]
+    expect:
+      no_graph: true
+      says: [["xy"], ["bar"]]
+
+  - id: q-theme-settings
+    data: []
+    closing: false
+    turns: ["Which settings in the default theme can I change from a GraphSpec, and which are locked by the theme?"]
+    expect:
+      no_graph: true
+      says: [["fixed", "locked"], ["variable", "can be changed", "can change", "changeable"], ["font"]]
+
+  - id: q-default-size
+    data: []
+    closing: false
+    turns: ["What size and resolution are graphs saved at by default, and what other file types can I get?"]
+    expect:
+      no_graph: true
+      says: [["150"], ["600"], ["svg"], ["pdf"], ["tiff", "tif"], ["jpg", "jpeg"]]
+
+  - id: q-annotations
+    data: []
+    closing: false
+    turns: ["Can I annotate a graph — say a target line or a short text note — and how?"]
+    expect:
+      no_graph: true
+      says: [["reference_line", "reference line"], ["note"], ["layers"]]
+
+  - id: q-error-bars
+    data: []
+    closing: false
+    turns: ["I have replicate measurements. What can ForgeGraph's error bars show?"]
+    expect:
+      no_graph: true
+      says: [["standard deviation", "stddev"], ["standard error", "stderr", "sem"], ["confidence", "ci"], ["multipl"], ["column"]]
+
+  - id: q-palette-font
+    data: []
+    closing: false
+    turns: ["Is there a way to change the colour palette or the font?"]
+    expect:
+      no_graph: true
+      says: [["fixed", "lock"], ["okabe", "tol_bright", "tol_muted", "tableau"], ["theme"]]
+
+  # --- phase 8: layouts, date axes, scheduled jobs ---------------------------------------------
+
+  - id: cell-panels
+    data: [cell_durability.csv, cell_polarization.csv]
+    turns: ["For the paper, put two panels side by side: cell voltage over the durability test on the left (cell_durability.csv) and the polarization curves on the right (cell_polarization.csv), each cell in its own color."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      layout: {tabs: 1, tiles: 2}
+
+  - id: cell-three-panels
+    data: [cell_durability.csv, cell_polarization.csv]
+    turns: ["I need a three-panel figure: voltage vs. hours and HFR vs. hours stacked in the left column (cell_durability.csv), and the polarization plot from cell_polarization.csv filling the whole right column."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      layout: {tiles: 3, span: true}
+
+  - id: iris-blank-cell
+    data: [iris.csv]
+    turns: ["Plot iris.csv as a 2×2 grid of scatter plots colored by species: sepal length vs sepal width, petal length vs petal width, and sepal length vs petal length, with the fourth cell left empty."]
+    expect:
+      graph: true
+      lint: []
+      layout: {tiles: 3, blank: true}
+
+  - id: economics-dashboard
+    data: [economics.csv]
+    turns: ["Build a dashboard from economics.csv as an HTML page, with unemployment over time across the full top row and, below it, the personal savings rate and median unemployment duration side by side."]
+    expect:
+      graph: true
+      lint: []
+      layout: {tiles: 3, span: true}
+      files: ["*.html"]
+
+  - id: lab-dashboard-tabs
+    data: [lab_runs.xlsx]
+    turns: ["lab_runs.xlsx is our LIMS export. I'd like a dashboard with two tabs: Overview, with completed runs per week for each instrument, and Failures, with failed or aborted runs per week for each instrument."]
+    expect:
+      graph: true
+      lint: []
+      layout: {tabs: 2}
+
+  - id: panels-wider
+    data: [tips.csv]
+    turns:
+      - "Put two plots side by side from tips.csv: tip vs. total bill as points on the left, and average tip per day as bars on the right."
+      - "Make the left panel twice as wide as the right."
+    expect:
+      graph: true
+      lint: []
+      layout: {tiles: 2, widths: [2, 1]}
+
+  - id: lab-weekly-bars
+    data: [lab_runs.xlsx]
+    turns: ["Show weekly throughput from lab_runs.xlsx as one bar per week: the number of completed runs across all instruments."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      values:
+        graph_type:mark.bar.show: true
+
+  - id: seaice-weekly-ticks
+    data: [seaice.csv]
+    turns: ["I need sea-ice extent for January 2019 from seaice.csv plotted with an x tick every week."]
+    expect:
+      graph: true
+      lint: []
+      x_dates: true
+      x_between: ["2019-01-01", "2019-01-31"]
+      values:
+        graph_type:axis.x.tick.algorithm: manual
+        graph_type:axis.x.tick.step: {matches: "^1 week$|^7 day$"}
+
+  - id: schedule-weekdays
+    data: [co2_monthly.csv]
+    turns: ["Make a line chart of the monthly CO₂ record in co2_monthly.csv, plus a schedule file that re-renders it every weekday at 7am."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      schedule:
+        runs: [Mon 07:00, Tue 07:00, Wed 07:00, Thu 07:00, Fri 07:00]
+
+  - id: schedule-hourly
+    data: [seaice.csv]
+    turns: ["Chart sea-ice extent from seaice.csv, and write me a schedule file to refresh it every two hours, at a quarter past."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      schedule:
+        over: day
+        runs: ["Mon 00:15", "Mon 02:15", "Mon 04:15", "Mon 06:15", "Mon 08:15", "Mon 10:15", "Mon 12:15", "Mon 14:15", "Mon 16:15", "Mon 18:15", "Mon 20:15", "Mon 22:15"]
+
+  - id: schedule-monthly-run
+    data: [dose_response.csv]
+    turns: ["Plot the dose-response curves from dose_response.csv (log dose axis, one line per compound), with a schedule file for 06:00 on the 1st of every month and the output going to a reports folder. Do one run now so I can check it works."]
+    expect:
+      graph: true
+      lint: [log-axis-values, outside-limits]
+      schedule:
+        over: year
+        runs: ["Nov 01 06:00", "Dec 01 06:00", "Jan 01 06:00", "Feb 01 06:00", "Mar 01 06:00", "Apr 01 06:00", "May 01 06:00", "Jun 01 06:00", "Jul 01 06:00", "Aug 01 06:00", "Sep 01 06:00", "Oct 01 06:00"]
+        ran: true
+      files: ["reports/*.png"]
+
+  - id: q-several-graphs
+    data: []
+    closing: false
+    turns: ["Can ForgeGraph put several graphs into one figure, like a multi-panel figure in a paper?"]
+    expect:
+      no_graph: true
+      says: [[layout]]
+
+  - id: q-scheduling
+    data: []
+    closing: false
+    turns: ["Can a ForgeGraph dashboard re-render by itself every morning?"]
+    expect:
+      no_graph: true
+      says: [[schedule], [job run]]
+
+  # --- phases 6 and 9: packs, configs, the blank canvas -------------------------------------
+
+  - id: acme-house-style
+    data: [cell_polarization.csv]
+    packs: [acme]
+    config: ["./acme"]
+    turns: ["Can you plot the polarization curves in cell_polarization.csv for my slides? Please use our house style."]
+    expect:
+      graph: true
+      values:
+        graphspec:specifications.theme: acme/acme
+        graphspec:specifications.format: acme/slide
+
+  - id: acme-only-config
+    data: [iris.csv]
+    packs: [acme]
+    config: ["./acme"]
+    turns: ["Make a scatter plot of sepal length vs. sepal width from iris.csv, colored by species, using ForgeGraph's base theme."]
+    expect:
+      no_other_tool: true
+      says: [["forgegraph.toml", "config"]]
+
+  - id: project-theme
+    data: [tips.csv]
+    config: ["forgegraph_base"]
+    turns: ["Make a theme called lab for this project with Paul Tol's muted palette, then use it to plot tip against total bill from tips.csv, colored by time."]
+    expect:
+      graph: true
+      nonstandard_pack: true
+      says: [["non-standard", "nonstandard", "watermark"]]
+      themes: [lab]
+      values:
+        theme:series.colors: tol_muted
+
+  - id: forgegraph-base-2-style
+    data: [co2_monthly.csv]
+    packs: [forgegraph_base_2]
+    config: ["forgegraph_base", "./forgegraph_base_2"]
+    turns: ["Please draw the monthly CO₂ record in co2_monthly.csv as a line chart, using a theme from the forgegraph_base_2 pack."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      values:
+        graphspec:specifications.theme: {matches: "^forgegraph_base_2/"}
+
+  - id: violin-anyway
+    data: [tips.csv]
+    turns: ["I'd like a violin plot of tip by day from tips.csv. If ForgeGraph can't make one, draw it anyway."]
+    expect:
+      graph: true
+      nonstandard: true

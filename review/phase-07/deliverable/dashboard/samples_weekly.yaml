@@ -1,0 +1,27 @@
+name: samples_weekly
+version: 0
+description: Samples in completed runs per week, all instruments.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: Samples per week
+    data:
+        file: weekly_samples.parquet
+        preprocessing: prep_lab_dashboard.py (lab_runs.xlsx, Runs sheet; Status normalized; in-progress runs left out)
+    axis:
+        x:
+            data:
+                column: Week
+            title: Week starting
+        y:
+            data:
+                column: Samples
+            title: Samples
+            min: 0
+    grid:
+        show: true

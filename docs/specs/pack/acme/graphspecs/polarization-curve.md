@@ -1,0 +1,35 @@
+# Pack example: acme/polarization-curve, a GraphSpec to extend
+
+This page mirrors examples/packs/acme/graphspecs/polarization-curve.yaml, which is the specification. A test fails if they ever differ.
+
+name: polarization-curve          *# \[text\]; The name of the GraphSpec.*\
+version: 0          *# \[int\]; The version number of the specification.*\
+description: Acme's polarization curve, cell voltage against current density, one line per cell.          *# \[text\]; The description of the GraphSpec.*\
+extends: None          *# \[None, graphspec\]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.*\
+ \
+fixed_parameters: None          *# List of fixed parameters for the GraphSpec, None if none.*\
+ \
+variable_parameters:          *# List of variable parameters for the GraphSpec, None if none.*\
+    specifications:\
+        graph_type: xy          *# \[graph type\]; The graph type.*\
+        theme: acme/acme          *# \[theme\]; The theme.*\
+        format: acme/slide          *# \[format\]; The format.*\
+    text:\
+        title: None          *# \[None, text\]; Graph title. None: none.*\
+    data:\
+        file: None          *# \[None, text\]; Parquet file holding the DataFrame to draw. None: passed through the Python API.*\
+        preprocessing: None          *# \[None, text\]; Where the code that made the data is. None: not given.*\
+    axis:\
+        x:\
+            data:\
+                column: Current density (mA/cm²)          *# \[column\]; Horizontal axis column.*\
+            title: "Current density (mA/cm^2)"          *# \[None, column_name, text\]; Axis title.*\
+        y:\
+            data:\
+                column: Cell voltage (V)          *# \[columns\]; Vertical axis column.*\
+            title: column_name          *# \[None, column_name, text\]; Axis title.*\
+    encoding:\
+        color: Cell          *# \[None, column_name, column\]; A color per value of this column.*\
+    mark:\
+        marker:\
+            show: true          *# \[true, false\]; Draw markers.*

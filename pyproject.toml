@@ -1,0 +1,76 @@
+[project]
+name = "forgegraph"
+version = "0.0.1"
+description = "Consistent, high-quality graphs from pandas DataFrames, for people and AI agents. Early development."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "src/forgegraph/themes/fonts/OFL-SourceSans3.md", "src/forgegraph/themes/fonts/OFL-IBMPlexSerif.txt", "src/forgegraph/themes/fonts/OFL-Roboto.txt"]
+authors = [{ name = "Steven Kaye" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "matplotlib>=3.9",
+    "pandas>=2.2",
+    "pydantic>=2.7",
+    "ruamel.yaml>=0.18",
+    "pyarrow>=17",
+    "typer>=0.12",
+    "packaging>=23",
+]
+
+[project.urls]
+Repository = "https://github.com/sskaye/forgegraph"
+
+[project.scripts]
+forgegraph = "forgegraph.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "pyright>=1.1.380",
+    "pre-commit>=3.8",
+    "openpyxl>=3.1",  # writes the Excel files in the eval and sample data
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forgegraph"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["*.md", "review"]  # review pages and notebooks are generated
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/build_api_notebook.py" = ["E501"]  # the notebook's prose cells stay on one line each
+# Pydantic copies field defaults per instance, so mutable defaults are safe on models.
+"src/forgegraph/spec/*.py" = ["RUF012"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+extraPaths = ["tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.coverage.run]
+source = ["forgegraph"]

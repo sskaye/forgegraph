@@ -1,0 +1,20 @@
+# Catalog specification: note layer
+
+This page mirrors src/forgegraph/catalogs/layers/note.yaml, which is the specification. A test fails if they ever differ.
+
+name: note          *# \[layer type\]; The layer type this catalog shows.*\
+version: 0          *# \[int\]; The version number of the specification.*\
+description: Cards for the note layer.          *# \[text\]; The description of the catalog.*\
+extends: None          *# \[None, catalog\]; Each parameter not listed is taken from this catalog. If None, this file must list every parameter.*\
+baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
+settings: None          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
+layer:          *# The layer every card draws, named after its type: its parameters.*\
+    text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note, in label markup.*\
+    position: bottom_left          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; Its position.*\
+ \
+baselines: None          *# Numbered baselines: the baseline with one or more changes, named for variations' from. None if none.*\
+ \
+variations:          *# Every parameter of the layer type: its card's value. {value, from, with}: change other parameters too; a layer's own may be named alone. no_card: no card.*\
+    text: "Runs 1 and 2\\n60 °C"          *# \[text\]; The note, in label markup; a line break starts a new line.*\
+    position: top_right          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; auto: the first clear one.*\
+    inside: false          *# \[true, false\]; Inside the plot area, or outside it.*

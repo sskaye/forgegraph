@@ -1,0 +1,25 @@
+name: xy
+version: 0
+description: Polarization curves, one line per cell and run.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: Polarization
+    data:
+        file: xy.parquet
+        preprocessing: None
+    axis:
+        x:
+            data:
+                column: Cell Current (mA/cm²)
+        y:
+            data:
+                column: Cell Voltage (V)
+    encoding:
+        color: Cell
+        detail: Run

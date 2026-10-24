@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="forgegraph-inputs" content="0000000000000000000000000000000000000000000000000000000000000000">
+<title>Round-trip Catalog</title>
+<style>
+:root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
+        --accent:#0969da; }
+body { font-family:-apple-system,"Segoe UI",system-ui,sans-serif; color:var(--fg);
+       background:var(--bg); margin:0; padding:1.5rem 24px 3rem; line-height:1.5; }
+body > input { position:absolute; opacity:0; pointer-events:none; }
+.bar { position:sticky; top:0; z-index:10; background:var(--bg);
+       border-bottom:1px solid var(--line); margin:0 -24px; padding:.2rem 24px .1rem; }
+.bar h1 { margin:.4rem 0 .6rem; }
+.tabs label { display:inline-block; padding:.4rem 1rem; margin:0 .25rem .5rem 0;
+              border:1px solid var(--line); border-radius:6px; cursor:pointer; }
+.files, .panel { display:none; }
+[id] { scroll-margin-top:11rem; }  /* a jump to a comment lands below the header */
+h2 { margin:.8rem 0 .2rem; }
+table { border-collapse:collapse; width:100%; font-size:.9rem; }
+th, td { border-bottom:1px solid var(--line); padding:.35rem .5rem; text-align:left;
+         vertical-align:top; }
+tr.category th { background:var(--soft); font-family:ui-monospace,Menlo,monospace; }
+td.path { font-family:ui-monospace,Menlo,monospace; white-space:nowrap; }
+.grid { display:grid; gap:1.4rem; margin-top:1.5rem;
+        grid-template-columns:repeat(auto-fill, minmax(min(100%, 600px), 1fr)); }
+.card { border:1px solid var(--line); border-radius:6px; padding:.6rem 1rem 1rem; }
+.card h4 { margin:.3rem 0 .6rem; font-family:ui-monospace,Menlo,monospace; font-size:.95rem; }
+figure { margin:0; } figure img { max-width:100%; height:auto; }
+#tab-graphtype:checked ~ .bar #graphtype-files, #tab-graphtype:checked ~ #graphtype { display:block; }
+#tab-graphtype-t:checked ~ #graphtype #graphtype-t { display:block; }
+#tab-graphtype:checked ~ .bar label[for=tab-graphtype], #tab-graphtype-t:checked ~ .bar label[for=tab-graphtype-t] { background:var(--accent); border-color:var(--accent); color:#fff; }
+</style></head><body>
+<input type="radio" name="kinds" id="tab-graphtype" checked>
+<input type="radio" name="graphtype-files" id="tab-graphtype-t" checked>
+<header class="bar">
+<h1 id="title">Round-trip Catalog</h1>
+<div class="tabs" id="kinds">
+<label for="tab-graphtype">GraphTypes</label>
+</div>
+<div class="tabs files" id="graphtype-files">
+<label for="tab-graphtype-t">t</label>
+</div>
+</header>
+<section class="panel" id="graphtype">
+<section class="panel" id="graphtype-t">
+<h2 id="graphtype-t-heading"><!-- fmc:1 -->GraphType &gt; t<!-- /fmc:1 --></h2>
+<h3 id="graphtype-t-parameters"><!-- fmc:4 -->Parameters<!-- /fmc:4 --></h3>
+<table id="graphtype-t-params">
+<tr><th>Parameter</th><th>Default</th><th>Allowed values</th><th>Status</th><th>Description</th></tr>
+<tr class="category" id="graphtype-t-category-mark"><th colspan="5">mark</th></tr>
+<tr id="graphtype-t-param-mark-line-show"><td class="path">mark.line.show</td><td>true</td><td>true | false</td><td>variable</td><td>Draw lines.</td></tr>
+<tr id="graphtype-t-param-mark-line-connect_order"><td class="path">mark.line.connect_order</td><td>x</td><td><!-- fmc:3 -->x | data<!-- /fmc:3 --></td><td>variable</td><td><!-- fmc:2 -->Point order along each line.<!-- /fmc:2 --></td></tr>
+<tr id="graphtype-t-param-mark-marker-show"><td class="path">mark.marker.show</td><td>true</td><td>true | false</td><td>variable</td><td>Draw markers.</td></tr>
+</table>
+<div class="grid" id="graphtype-t-cards">
+<section class="card" id="graphtype-t-baseline">
+<h4>Baseline</h4>
+<figure id="graphtype-t-baseline-figure"><img alt="Baseline" width="100" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4//8/AAX+Av6n1qTZAAAAAElFTkSuQmCC"></figure>
+</section>
+<section class="card" id="graphtype-t-card-lines-show">
+<h4><!-- fmc:5 -->Baseline + mark.line.show = false<!-- /fmc:5 --></h4>
+<!-- fmc:6 --><figure id="graphtype-t-card-lines-show-figure"><img alt="Baseline + mark.line.show = false" width="100" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4//8/AAX+Av6n1qTZAAAAAElFTkSuQmCC"></figure><!-- /fmc:6 -->
+</section>
+</div>
+</section>
+</section>
+</body></html>
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "GraphType > t"
+  anchor_scope: "#graphtype-t-heading"
+  context_before: "Round-trip Catalog GraphTypes t"
+  context_after: "Parameters Parameter Default Allowed values Status Description mark mark.line.s"
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On a heading.
+- id: 2
+  anchor_text: "Point order along each line."
+  anchor_scope: "#graphtype-t-param-mark-line-connect_order"
+  context_before: "mark.line.connect_order x x | data variable"
+  context_after: "mark.marker.show true true | false variable Draw markers."
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On a description cell.
+- id: 3
+  anchor_text: "x | data"
+  anchor_scope: "#graphtype-t-param-mark-line-connect_order"
+  context_before: "mark.line.connect_order x"
+  context_after: "variable Point order along each line."
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On an allowed-values cell.
+- id: 4
+  anchor_text: Parameters
+  anchor_scope: "#graphtype-t-parameters"
+  context_before: "Round-trip Catalog GraphTypes t GraphType > t"
+  context_after: "Parameter Default Allowed values Status Description mark mark.line.show true tr"
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On a subheading.
+- id: 5
+  anchor_text: "Baseline + mark.line.show = false"
+  anchor_scope: "#graphtype-t-card-lines-show"
+  context_before: "mark.marker.show true true | false variable Draw markers. Baseline"
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On a card heading.
+- id: 6
+  anchor_text: figure
+  anchor_kind: element
+  anchor_selector: "#graphtype-t-card-lines-show-figure"
+  context_after: "Round-trip Catalog GraphTypes t GraphType > t Parameters Parameter Default Allo"
+  author: Fixture
+  timestamp: 2026-10-21T13:56:57Z
+  resolved: false
+  body: |
+    On a figure.
+-->

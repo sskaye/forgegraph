@@ -1,0 +1,35 @@
+name: bars
+version: 0
+description: Each cell's peak power density as a bar, with its value.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: Peak power density
+    data:
+        file: xy.parquet
+        preprocessing: None
+    axis:
+        x:
+            data:
+                column: Cell
+            tick:
+                algorithm: all
+        y:
+            data:
+                column: Power Density (mW/cm²)
+                aggregation: max
+    mark:
+        bar:
+            show: true
+        line:
+            show: false
+        marker:
+            show: false
+    series:
+        value_label:
+            show: true

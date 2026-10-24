@@ -1,6 +1,6 @@
 [project]
 name = "forgegraph"
-version = "0.1.0"
+version = "0.2.0"
 description = "Consistent, high-quality graphs from pandas DataFrames, for people and AI agents. Early development."
 readme = "README.md"
 license = "MIT"

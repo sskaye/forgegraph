@@ -112,7 +112,7 @@ def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
-    assert '<p id="version" class="version">version 0.1.0</p>' in text
+    assert '<p id="version" class="version">version 0.2.0</p>' in text
 
 
 def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeypatch):

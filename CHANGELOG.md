@@ -2,7 +2,9 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.1.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
-## Unreleased
+## 0.2.0 (2026-10-24)
+
+Images that changed: the [visual changelog](review/visual-changelog/0.2.0.html).
 
 ### Changed
 

@@ -4,8 +4,8 @@ uv run python scripts/visual_changelog.py main            # main against the wor
 uv run python scripts/visual_changelog.py v0.1.0 v0.2.0   # between two commits
     [--out review/visual-changelog.html]
 
-Compares the regression baselines (tests/baselines/*.png) and the catalog's figures (by id),
-and writes one page showing each changed, added or removed image.
+Compares the regression baselines (tests/baselines/*.png) and each catalog page's figures (by
+id), and writes one page showing each changed, added or removed image.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).parents[1]
 BASELINES = "tests/baselines"
 CATALOG = "catalog/forgegraph_base.html"
-EARLIER_CATALOG = "catalog/catalog.html"  # its name before phase 6
+EARLIER_CATALOG = "catalog/catalog.html"  # forgegraph_base's page before phase 6
 FIGURE = re.compile(r'<figure id="([^"]+)"><img [^>]*src="data:image/png;base64,([^"]+)"')
 
 
@@ -37,9 +37,18 @@ def _baselines(ref: str | None) -> dict[str, bytes]:
     }
 
 
-def _catalog(ref: str | None) -> dict[str, bytes]:
+def _pages(ref: str | None) -> set[str]:
+    """The catalog pages at a commit, or in the working tree, by path."""
+    if ref is None:
+        return {f"catalog/{p.name}" for p in (ROOT / "catalog").glob("*.html")}
+    names = _git("ls-tree", "--name-only", f"{ref}:catalog").decode().split()
+    pages = {f"catalog/{n}" for n in names if n.endswith(".html")}
+    return {CATALOG if p == EARLIER_CATALOG else p for p in pages}
+
+
+def _catalog(ref: str | None, page: str) -> dict[str, bytes]:
     text = None
-    for name in (CATALOG, EARLIER_CATALOG):
+    for name in (page, EARLIER_CATALOG) if page == CATALOG else (page,):
         try:
             text = (
                 (ROOT / name).read_text(encoding="utf-8")
@@ -94,7 +103,15 @@ def page(before: str, after: str | None) -> str:
     body = "\n".join(
         [
             _section("Regression baselines", "baselines", _baselines(before), _baselines(after)),
-            _section("Catalog", "catalog", _catalog(before), _catalog(after)),
+            *(
+                _section(
+                    f"Catalog: {Path(p).stem}",
+                    Path(p).stem,
+                    _catalog(before, p),
+                    _catalog(after, p),
+                )
+                for p in sorted(_pages(before) | _pages(after))
+            ),
         ]
     )
     return (

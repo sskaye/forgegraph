@@ -20,6 +20,8 @@ from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
 from forgegraph.spec.documents import builtin
 
+pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
+
 ROOT = Path(__file__).parents[1]
 CATALOG = ROOT / "catalog" / "forgegraph_base.html"
 FIXTURE = Path(__file__).parent / "fixtures" / "catalog_comments.html"
@@ -110,7 +112,7 @@ def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
-    assert '<p id="version" class="version">version 0.1.0</p>' in text
+    assert '<p id="version" class="version">version 0.2.0</p>' in text
 
 
 def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeypatch):

@@ -19,9 +19,8 @@ from typing import Any
 from matplotlib.axes import Axes
 
 from forgegraph import __version__
-from forgegraph.graph import SpecError, _created, _plain, spec_record
-from forgegraph.render import export
-from forgegraph.render.figure import (
+from forgegraph.drawing import export
+from forgegraph.drawing.figure import (
     GraphFigure,
     LayoutError,
     Watermark,
@@ -29,7 +28,8 @@ from forgegraph.render.figure import (
     layout,
     new_figure,
 )
-from forgegraph.render.style import PALETTES, Style, isolated
+from forgegraph.drawing.style import PALETTES, Style, isolated
+from forgegraph.graph import SpecError, _created, _plain, spec_record
 from forgegraph.spec.documents import (
     Registry,
     name_problems,

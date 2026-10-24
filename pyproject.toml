@@ -1,6 +1,6 @@
 [project]
 name = "forgegraph"
-version = "0.1.0"
+version = "0.2.0"
 description = "Consistent, high-quality graphs from pandas DataFrames, for people and AI agents. Early development."
 readme = "README.md"
 license = "MIT"
@@ -36,6 +36,7 @@ forgegraph = "forgegraph.cli:app"
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
+    "pytest-xdist>=3.6",  # tests run in parallel
     "ruff>=0.6",
     "pyright>=1.1.380",
     "pre-commit>=3.8",
@@ -74,7 +75,8 @@ typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = "--strict-markers -n auto"  # -n 0 runs them one at a time
+markers = ["slow: over a second, or drawing every catalog card; run only with --full"]
 
 [tool.coverage.run]
 source = ["forgegraph"]

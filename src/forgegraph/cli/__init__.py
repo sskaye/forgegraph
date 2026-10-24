@@ -88,7 +88,7 @@ def render(
     several tabs saves a file per tab (name-<tab>.png), a PDF with a page per tab, and an
     HTML page with every tab."""
     import forgegraph as fg
-    from forgegraph.layout import is_layout, stem
+    from forgegraph.layouts import is_layout, stem
     from forgegraph.spec.documents import nonstandard_note
 
     drawn: Any
@@ -138,7 +138,7 @@ def explain(
     """Show every value a graph is drawn with, whether it's fixed, and which file set it. For
     a layout: its own values, then each tile's, under tabs.<tab>.tiles.<tile>."""
     import forgegraph as fg
-    from forgegraph.layout import explain_layout, is_layout, nonstandard_packs_of
+    from forgegraph.layouts import explain_layout, is_layout, nonstandard_packs_of
     from forgegraph.spec.documents import explain as explain_values
     from forgegraph.spec.documents import load as load_yaml
     from forgegraph.spec.documents import nonstandard_note, packs_used, registry_for, validate

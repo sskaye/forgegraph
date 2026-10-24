@@ -9,11 +9,13 @@ uv sync
 uv run pre-commit install
 ```
 
-The checks a pull request must pass:
+While you work, `uv run pytest` runs the development suite: every test not marked slow, in parallel. The full suite adds the slow ones (every catalog card drawn, the image baselines, the catalog pages, and any test over a second). CI runs it on every pull request, and it's the one to run before a release:
 
 ```bash
-uv run pytest && uv run ruff check . && uv run pyright
+uv run pytest --full && uv run ruff check . && uv run pyright
 ```
+
+Mark a new test `@pytest.mark.slow` if it takes over a second (`uv run pytest --durations=20` lists the slowest).
 
 ## After changing a definition or how graphs are drawn
 

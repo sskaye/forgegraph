@@ -7,7 +7,7 @@ The record is one JSON document, stored invisibly in each file type:
 - pdf: the document information dictionary, key /ForgeGraph;
 - jpg: a JPEG comment segment;
 - tiff: the ImageDescription tag;
-- html: a JSON script in the page's head (render/page.py), with each figure's SVG carrying
+- html: a JSON script in the page's head (drawing/page.py), with each figure's SVG carrying
   its own record too.
 
 A layout's PDF has a page per tab, and the document's record covers them all.
@@ -31,7 +31,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from PIL import Image
 
-from forgegraph.render import page
+from forgegraph.drawing import page
 
 KEY = "ForgeGraph"
 FILE_TYPES = ("png", "jpg", "tiff", "svg", "pdf", "html")
@@ -77,7 +77,7 @@ def with_record(kind: str, kwargs: dict[str, Any], record: dict[str, Any] | None
 
 def save(fig: Figure, path: Path, dpi: int) -> Path:
     """Save fig to path (its suffix is the file type). A ForgeGraph figure's canvas adds the
-    provenance record (forgegraph.render.figure.GraphCanvas)."""
+    provenance record (forgegraph.drawing.figure.GraphCanvas)."""
     kind = kind_of(path)
     if kind not in IMAGES:
         raise ValueError(f"can't save as .{kind}; file types are {', '.join(FILE_TYPES)}")

@@ -18,10 +18,10 @@ from render_helpers import BASE, polarization
 from ruamel.yaml import YAML
 
 import forgegraph as fg
+from forgegraph.drawing.figure import FOOTNOTE
+from forgegraph.drawing.page import STALE_ID
 from forgegraph.jobs import run as job_run
 from forgegraph.jobs import status as status_file
-from forgegraph.render.figure import FOOTNOTE
-from forgegraph.render.page import STALE_ID
 
 
 def _dump(doc: dict[str, Any], path: Path) -> None:
@@ -87,6 +87,7 @@ def test_a_target_drawn_with_a_nonstandard_pack_says_so(project, monkeypatch):
     assert target.ok and target.nonstandard_packs == ["forgegraph_base"]
 
 
+@pytest.mark.slow
 def test_the_footnote_says_when_the_data_is_from(project):
     when = datetime(2026, 10, 21, 5, 12)
     os.utime(project / "p.parquet", (when.timestamp(), when.timestamp()))
@@ -102,6 +103,7 @@ def test_the_footnote_says_when_the_data_is_from(project):
     assert g.issues == fg.render(project / "p.yaml").issues  # nothing new for lint
 
 
+@pytest.mark.slow
 def test_no_stamp_when_freshness_stamp_is_off(project):
     _dump(schedule_doc(freshness={"stamp": False}), project / "lab.schedule.yaml")
     job_run.run(project / "lab.schedule.yaml")
@@ -136,6 +138,7 @@ def test_one_target_failing_leaves_the_others_and_fires_on_failure(project):
     assert (project / "out" / "p.png").is_file()
 
 
+@pytest.mark.slow
 def test_on_success_runs_and_a_slow_command_is_stopped(project):
     slow = [sys.executable, "-c", "import time; time.sleep(5)"]
     _dump(
@@ -180,6 +183,7 @@ def test_a_schedule_that_cant_run_is_an_error(project, variable, message):
         job_run.run(project / "lab.schedule.yaml")
 
 
+@pytest.mark.slow
 def test_a_layout_target_takes_its_oldest_tiles_time(project):
     shutil.copy(project / "p.parquet", project / "q.parquet")
     (project / "q.yaml").write_text(

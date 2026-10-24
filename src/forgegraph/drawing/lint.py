@@ -37,9 +37,9 @@ from matplotlib.lines import Line2D
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
-from forgegraph.render import text
-from forgegraph.render.figure import WATERMARK, texts_of
-from forgegraph.render.key import KEY, keys
+from forgegraph.drawing import text
+from forgegraph.drawing.figure import WATERMARK, texts_of
+from forgegraph.drawing.key import KEY, keys
 
 MIN_TEXT_PT = 6.0  # the smallest text journals accept in a printed figure
 OVERLAP_PX = 0.5  # letters closer than this count as touching, not overlapping

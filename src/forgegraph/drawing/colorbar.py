@@ -21,10 +21,10 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
-from forgegraph.render import spacing, text
-from forgegraph.render.figure import WATERMARK, texts_of, tick_marks
-from forgegraph.render.style import Style
-from forgegraph.render.ticks import NiceTicks
+from forgegraph.drawing import spacing, text
+from forgegraph.drawing.figure import WATERMARK, texts_of, tick_marks
+from forgegraph.drawing.style import Style
+from forgegraph.drawing.ticks import NiceTicks
 
 TITLE_ABOVE, TITLE_ALONG, BELOW = "title_above", "title_along", "below"
 

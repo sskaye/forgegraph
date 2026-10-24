@@ -19,8 +19,8 @@ from typer.testing import CliRunner
 
 import forgegraph as fg
 from forgegraph.cli import app
-from forgegraph.layout import Layout, explain_layout
-from forgegraph.render.figure import WATERMARK, visible_extent
+from forgegraph.drawing.figure import WATERMARK, visible_extent
+from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.documents import builtin, validate
 from forgegraph.spec.layout import slug
 
@@ -124,6 +124,7 @@ def problems(path) -> list[str]:
 # The grid
 
 
+@pytest.mark.slow
 def test_plot_boxes_line_up_whatever_their_tick_labels(project):
     path = write_layout(
         project,
@@ -152,6 +153,7 @@ def test_column_widths_are_ratios_of_plot_boxes(project):
     assert b["power"].width / b["volt"].width == pytest.approx(2, rel=1e-3)
 
 
+@pytest.mark.slow
 def test_a_span_runs_across_the_margins_and_gap_inside_it(project):
     path = write_layout(
         project,
@@ -194,6 +196,7 @@ def test_with_width_auto_each_plot_keeps_its_aspect_too(project):
     assert height == pytest.approx(150, abs=0.01)
 
 
+@pytest.mark.slow
 def test_a_fixed_size_is_the_figures_size(project):
     path = write_layout(
         project,
@@ -217,6 +220,7 @@ def test_tiles_are_a_gap_apart(project):
     assert b.x0 - a.x1 == pytest.approx(gap_px, abs=0.5)
 
 
+@pytest.mark.slow
 def test_a_blank_cell_is_left_empty(project):
     path = write_layout(
         project,
@@ -295,6 +299,7 @@ def test_lint_names_the_tile(project):
 # Separators
 
 
+@pytest.mark.slow
 def test_lines_run_between_tiles_but_not_through_a_span(project):
     path = write_layout(
         project,
@@ -317,6 +322,7 @@ def test_lines_run_between_tiles_but_not_through_a_span(project):
     assert max(np.asarray(horizontal[0].get_xdata())) < bright.x0
 
 
+@pytest.mark.slow
 def test_a_blank_cell_counts_as_a_tile_for_lines(project):
     areas = [["volt", "power"], ["bright", "."]]
     tiles = {"volt": "volt.yaml", "power": "power.yaml", "bright": "bright.yaml"}
@@ -345,6 +351,7 @@ def test_a_border_runs_round_the_tiles_a_gap_from_the_edge(project):
     assert left == pytest.approx(gap, abs=0.01)
 
 
+@pytest.mark.slow
 def test_the_separator_color_fills_the_gaps(project):
     path = write_layout(
         project,
@@ -360,6 +367,7 @@ def test_the_separator_color_fills_the_gaps(project):
 # Tabs and output
 
 
+@pytest.mark.slow
 def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     types = {"output": {"file_types": ["png", "pdf", "html"]}}
     _dump(
@@ -409,6 +417,7 @@ def test_a_layout_cant_set_its_formats_fixed_parameters():
     )
 
 
+@pytest.mark.slow
 def test_with_a_border_the_tab_bars_line_is_its_top(project):
     _dump(
         {**_format("page"), "variable_parameters": {"output": {"file_types": ["html"]}}},
@@ -436,6 +445,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     assert "border-bottom: 0.5pt solid #D9D9D9" in text  # the tab bar's line, as the border
 
 
+@pytest.mark.slow
 def test_one_tab_is_saved_without_its_name(project):
     path = write_layout(project, {"Figure": tab([["volt"]], volt="volt.yaml")})
     [png] = fg.layout(path).save_all(project / "out" / "fig")
@@ -449,6 +459,7 @@ def test_tab_names_become_file_names_and_links():
     assert slug("  Cells: A/C ") == "cells-ac"
 
 
+@pytest.mark.slow
 def test_the_record_holds_each_tiles_graphspec_and_data(project):
     path = write_layout(
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
@@ -462,6 +473,7 @@ def test_the_record_holds_each_tiles_graphspec_and_data(project):
     assert tiles["power"]["specs"]["format"]["name"] == "house/auto"  # the layout's, not its own
 
 
+@pytest.mark.slow
 def test_rendering_twice_gives_the_same_file(project):
     path = write_layout(
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
@@ -471,6 +483,7 @@ def test_rendering_twice_gives_the_same_file(project):
     assert a.read_bytes() == b.read_bytes()
 
 
+@pytest.mark.slow
 def test_drawing_on_a_tab_watermarks_every_tile(project):
     path = write_layout(
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
@@ -548,6 +561,7 @@ def test_tile_names_are_unique_and_tab_names_give_distinct_files():
     assert any("tiles.a: also a tile in tab 'One'" in p for p in found)
 
 
+@pytest.mark.slow
 def test_a_layouts_tabs_replace_those_it_inherits(project):
     _dump(
         {
@@ -600,6 +614,7 @@ def test_a_tiles_problems_say_where_they_are(project):
 # The command line
 
 
+@pytest.mark.slow
 def test_cli_renders_explains_and_loads_a_layout(project):
     path = write_layout(
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}

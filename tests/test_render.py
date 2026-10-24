@@ -20,13 +20,13 @@ from PIL import Image
 from render_helpers import BASE, png, polarization, render
 
 import forgegraph as fg
-from forgegraph.render import xy
-from forgegraph.render.export import FILE_TYPES, IMAGES
-from forgegraph.render.figure import WATERMARK
-from forgegraph.render.key import keys
-from forgegraph.render.style import Style, isolated
-from forgegraph.render.text import footprint
-from forgegraph.render.ticks import LogTicks, NiceTicks, breaks_log
+from forgegraph.drawing import xy
+from forgegraph.drawing.export import FILE_TYPES, IMAGES
+from forgegraph.drawing.figure import WATERMARK
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.text import footprint
+from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
 from forgegraph.spec.parameters import NONE
 
 # --- the figure follows the theme and format ---------------------------------------------
@@ -58,7 +58,7 @@ def test_given_dimensions_are_exact_and_auto_ones_fit(tmp_path):
     "name", ["okabe_ito", "tol_bright", "tol_muted", "tableau_10", "color_blind"]
 )
 def test_series_colors_can_name_a_palette(name):
-    from forgegraph.render.style import PALETTES
+    from forgegraph.drawing.style import PALETTES
 
     g = render(theme={"series.colors": name})
     drawn = {to_hex(line.get_color()).upper() for line in g.axes.get_lines()}
@@ -392,6 +392,7 @@ def test_scales_limits_and_titles():
     assert ax.get_title() == "P$_{max}$"
 
 
+@pytest.mark.slow
 def test_too_many_groups_warns():
     frame = pd.DataFrame(
         {
@@ -448,6 +449,7 @@ def test_provenance_round_trip(tmp_path, kind):
     assert record["resolved"]["theme"]["font.family"] == "Roboto"
 
 
+@pytest.mark.slow
 def test_provenance_levels(tmp_path):
     reference = "scripts/prepare.py"
     full = render({"data.preprocessing": reference})
@@ -464,6 +466,7 @@ def test_provenance_levels(tmp_path):
     assert fg.load(path) is None
 
 
+@pytest.mark.slow
 def test_the_provenance_spec_lists_what_each_level_records(tmp_path):
     """src/forgegraph/spec/provenance.yaml names every entry of the record, by level."""
     from ruamel.yaml import YAML
@@ -497,6 +500,7 @@ def test_every_format_file_type_is_saved(tmp_path):
     assert sorted(p.name for p in saved) == ["graph.pdf", "graph.png", "graph.svg"]
 
 
+@pytest.mark.slow
 def test_output_is_byte_identical_with_source_date_epoch(tmp_path, monkeypatch):
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     for kind in ("png", "svg", "pdf"):
@@ -537,6 +541,7 @@ def _watermarked(g: fg.Graph) -> bool:
     ],
     ids=["line color", "axis limits", "axis title", "added line"],
 )
+@pytest.mark.slow
 def test_any_change_after_rendering_makes_the_graph_non_standard(change, tmp_path):
     g = render()
     change(g.axes)
@@ -761,6 +766,7 @@ def test_log_axis_labels_are_plain_or_powers_never_both():
     assert labels and all(t.startswith("$10^") for t in labels)
 
 
+@pytest.mark.slow
 def test_extending_the_x_axis_for_labels_adds_no_ticks():
     from forgegraph.catalog.examples import Change, draw
 

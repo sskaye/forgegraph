@@ -1,4 +1,4 @@
-"""Gaps around an Axes' text, measured to the letters (see forgegraph.render.text).
+"""Gaps around an Axes' text, measured to the letters (see forgegraph.drawing.text).
 
 Matplotlib pads tick labels, axis titles and the title from their boxes; `apply()` sets
 those paddings so the visible gaps are the theme's, and centres each y tick label's letters
@@ -16,9 +16,9 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.text import Text
 from matplotlib.transforms import ScaledTranslation, Transform
 
-from forgegraph.render import text
-from forgegraph.render.key import keys
-from forgegraph.render.style import Style
+from forgegraph.drawing import text
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import Style
 
 
 def tick_font(style: Style) -> FontProperties:

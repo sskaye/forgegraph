@@ -99,7 +99,6 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
         error_bar:\
             cap_size: 0.25          *# \[positive float\]; Cap width, × base size.*\
             line_width: 0.08          *# \[positive float\]; Line width, × base size.*\
-            color: series          *# \[series, hex color\]; Error bar color. series: the series' color.*\
         reference_line:\
             color: "#808080"          *# \[hex color\]; Line and label color, unless drawn per series.*\
             line_style: dashed          *# \[solid, dashed, dotted, dashdot\]; Line style.*\
@@ -156,4 +155,7 @@ variable_parameters:          *# List of variable parameters for the t
             max_relative_distance: 0.8          *# \[0-1\]; Most a label's distance to its series may be, ÷ its distance to the next nearest.*\
             max_axis_extension: 0.15          *# \[0-1\]; Most the x-axis may grow to fit labels, × its range.*\
         color_bar:\
-            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color: a named scale, one hex color (light to it) or two (first to second).*
+            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color: a named scale, one hex color (light to it) or two (first to second).*\
+    layer:\
+        error_bar:\
+            color: "#000000"          *# \[series, hex color\]; Error bar color. series: the series' color.*

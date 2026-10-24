@@ -123,6 +123,9 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
         file_types: [png]          # [png, jpg, tiff, svg, pdf, html]; File types saved.
     provenance:
         level: full          # [full, minimal, off]; Which entries of the provenance record (docs/specs/provenance) each saved file carries. off: none.
+    layer:
+        error_bar:
+            color: "#000000"          # [series, hex color]; Error bar color. series: the series' color.
     layers:          # Layers drawn on the graph, each under a name of the GraphSpec's choosing, drawn in this order.
         target:
             type: reference_line          # [layer type]; The layer's type: one of the graph type's layer.types.

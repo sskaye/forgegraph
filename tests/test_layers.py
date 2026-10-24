@@ -488,6 +488,7 @@ def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
             "axis.x.tick.algorithm": "all",
             "encoding.color": "series",
             "series.offset": "side_by_side",
+            "layer.error_bar.color": "series",
             "legend.key.inside": False,
             "mark.bar.show": True,
             "mark.line.show": False,

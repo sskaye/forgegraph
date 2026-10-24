@@ -4,6 +4,10 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ## Unreleased
 
+### Changed
+
+- Error bars are black by default in both built-in themes, and their color (`layer.error_bar.color`) is a variable parameter: a GraphSpec may set `series` or any hex color.
+
 ### Fixed
 
 - `forgegraph --version` and `--help` no longer load matplotlib and pandas, so they answer at once, even on a new install. The API loads on first use.

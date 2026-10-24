@@ -12,11 +12,13 @@ The sample data in data/ is synthetic: monthly revenue by region, conversion by 
 
 ## Setup
 
-1. Install ForgeGraph from the main branch, and the skill. In your checkout of the repository:
+1. Clone the public repository fresh, on its Phase 10 branch (main, once that's merged). A clone made before October 24 points at a repository with a different history, so don't reuse it.
 
 ```bash
-git fetch && git checkout main && git pull
+git clone https://github.com/sskaye/forgegraph.git && cd forgegraph && git checkout phase-10-release
 ```
+
+   Then install ForgeGraph and the skill, from that checkout:
 
 ```bash
 uv tool install --force .
@@ -26,7 +28,9 @@ uv tool install --force .
 forgegraph skill install
 ```
 
-2. Make the trial folders, with the data, and a small pack, house, for step 8's reference note. Run this from the checkout, which sets `REPO` to it:
+   For another agent, add `--dest <its skills folder>`.
+
+2. Make the trial folders, with the data, and a small pack, house, for step 7's reference note. Run this from the checkout, which sets `REPO` to it:
 
 ```bash
 REPO=$(pwd) T=~/forgegraph-trial; mkdir -p $T/configs $T/standard $T/folder-only $T/not-allowed $T/house && printf 'name: house\nversion: 1.0.0\ndescription: Notes for the trial.\nissues: https://example.com/issues\nrequires: None\n' > $T/house/pack.yaml && for d in standard folder-only not-allowed; do cp $REPO/review/phase-06/runbook/data/*.csv $T/$d/; done

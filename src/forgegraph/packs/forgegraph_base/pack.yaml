@@ -1,5 +1,5 @@
 name: forgegraph_base          # [text]; The pack's name, either a folder where the pack is stored or a pip pack's entry point.
-version: 0.0.1          # [text]; The pack's release version.
+version: 0.1.0          # [text]; The pack's release version.
 description: ForgeGraph's base specs, complete, for other specs to extend or to use as they are.          # [text]; One line, describing what the pack is.
 issues: https://github.com/sskaye/forgegraph/issues          # [text]; Where to file feature requests and bug reports about the pack's specs.
 requires: None          # [None, version specifier]; The ForgeGraph versions the pack works with, as pip writes them, e.g. ">=0.6, <1". None: any.

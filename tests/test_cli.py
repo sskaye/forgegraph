@@ -33,6 +33,7 @@ def project(tmp_path, monkeypatch):
     return tmp_path
 
 
+@pytest.mark.slow
 def test_render_load_and_recover(project):
     result = runner.invoke(app, ["render", "graphspecs/p.yaml", "-o", "out/p", "--json"])
     assert result.exit_code == 0, result.output
@@ -150,6 +151,7 @@ def test_skill_install(tmp_path):
     assert _json(["skill", "install", "--dest", str(folder), "--force"])["result"] == "updated"
 
 
+@pytest.mark.slow
 def test_skill_examples_render(tmp_path):
     """The skill's example GraphSpecs and layout render as packaged, and its example schedule
     runs."""

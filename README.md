@@ -144,7 +144,7 @@ uv sync && uv run pre-commit install
 ```
 
 ```bash
-uv run pytest && uv run ruff check . && uv run pyright
+uv run pytest --full && uv run ruff check . && uv run pyright
 ```
 
 ## Repository map

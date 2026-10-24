@@ -15,6 +15,8 @@ from recreations import LAYOUT_RECREATIONS, RECREATIONS
 
 from forgegraph.render.style import isolated
 
+pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
+
 BASELINES = Path(__file__).parent / "baselines"
 
 

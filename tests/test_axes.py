@@ -266,6 +266,7 @@ def test_a_date_step_on_numbers_is_an_error():
         render({"axis.x.tick.algorithm": "manual", "axis.x.tick.step": "3 month"})
 
 
+@pytest.mark.slow
 def test_ticks_from_all_are_never_thinned():
     df = pd.DataFrame({"x": np.arange(0, 400, 1.0), "y": np.arange(400.0)})
     with pytest.raises(

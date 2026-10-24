@@ -360,6 +360,7 @@ def test_the_reference_config_and_base_pack_are_valid():
 # --- everything works under a pack ---------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_the_skills_examples_render_in_acmes_theme_and_format(tmp_path):
     from forgegraph import skill
 

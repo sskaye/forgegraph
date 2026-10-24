@@ -20,6 +20,8 @@ from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
 from forgegraph.spec.documents import builtin
 
+pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
+
 ROOT = Path(__file__).parents[1]
 CATALOG = ROOT / "catalog" / "forgegraph_base.html"
 FIXTURE = Path(__file__).parent / "fixtures" / "catalog_comments.html"

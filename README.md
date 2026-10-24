@@ -98,7 +98,7 @@ Every named theme, format, GraphSpec, layout and schedule comes from a **pack**,
 
 A **config** lists the packs that may be used:
 
-- The main config, `~/.config/forgegraph/config.toml` (or the file `FORGEGRAPH_CONFIG` names), applies to all work. ForgeGraph writes it the first time it runs, listing the built-in packs.
+- The main config, `~/.config/forgegraph/config.toml` (or the file `FORGEGRAPH_CONFIG` names), applies to all work. ForgeGraph writes it, listing the built-in packs, the first time a command reads the configs, such as `catalog` or `render`.
 - A folder config, `forgegraph.toml`, applies to the files in its folder and every folder below it. A file may use only the packs it lists.
 - A pack that a folder config lists but the main config doesn't still works, but it's non-standard: graphs drawn with it are watermarked, and ForgeGraph's commands say so. That way you can make and try a pack without changing an organization's main config.
 

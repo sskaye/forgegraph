@@ -2,6 +2,13 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.1.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
+## Unreleased
+
+### Fixed
+
+- `forgegraph --version` and `--help` no longer load matplotlib and pandas, so they answer at once, even on a new install. The API loads on first use.
+- The README and the skill's reference say when the main config is written: the first time a command reads the configs, such as `catalog` or `render`.
+
 ## 0.1.0 (2026-10-24)
 
 The first public release.

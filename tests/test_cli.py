@@ -327,3 +327,17 @@ def test_schema_says_when_a_spec_cant_be_used_here(project):
         "Not allowed here: pack 'acme' isn't in the configs that apply, so a GraphSpec here "
         "can't use 'acme/acme'"
     ]
+
+
+def test_version_and_help_load_no_drawing_libraries():
+    """`forgegraph --version` and `--help` answer at once: importing the package and its
+    command line loads neither matplotlib nor pandas."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, forgegraph, forgegraph.cli; "
+        "print(sorted(m for m in ('matplotlib', 'pandas') if m in sys.modules))"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert done.stdout.strip() == "[]"

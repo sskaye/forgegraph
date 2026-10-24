@@ -1,6 +1,6 @@
-# Analytics pack trial: runbook
+# forgegraph_base_2 trial: runbook
 
-This trial tries the skill with a pack the way a user would, before the public release. The pack is `forgegraph_base_2`, in `packs/forgegraph_base_2`. The trial runs in three folders, one for each way a config can treat the pack:
+This trial tries the skill with a pack the way a user would, before the public release. The pack is `forgegraph_base_2`, built into ForgeGraph. The trial runs in three folders, one for each way a config can treat the pack:
 
 1. **standard:** the main config lists the pack. Graphs are standard.
 2. **folder-only:** only a folder config lists the pack. Graphs work but are non-standard, so they're watermarked.
@@ -12,10 +12,10 @@ The sample data in data/ is synthetic: monthly revenue by region, conversion by 
 
 ## Setup
 
-1. Install ForgeGraph from the PR branch, and the skill. In your checkout of the repository:
+1. Install ForgeGraph from the main branch, and the skill. In your checkout of the repository:
 
 ```bash
-git fetch && git checkout phase-06-09 && git pull
+git fetch && git checkout main && git pull
 ```
 
 ```bash
@@ -26,16 +26,16 @@ uv tool install --force .
 forgegraph skill install
 ```
 
-2. Make the trial folders, with the pack and the data. Run this from the checkout, which sets `REPO` to it:
+2. Make the trial folders, with the data, and a small pack, house, for step 8's reference note. Run this from the checkout, which sets `REPO` to it:
 
 ```bash
-REPO=$(pwd) T=~/forgegraph-trial; mkdir -p $T/configs $T/standard $T/folder-only $T/not-allowed && cp -R $REPO/packs/forgegraph_base_2 $T/forgegraph_base_2 && rm -rf $T/forgegraph_base_2/catalogs && for d in standard folder-only not-allowed; do cp $REPO/review/phase-06/runbook/data/*.csv $T/$d/; done
+REPO=$(pwd) T=~/forgegraph-trial; mkdir -p $T/configs $T/standard $T/folder-only $T/not-allowed $T/house && printf 'name: house\nversion: 1.0.0\ndescription: Notes for the trial.\nissues: https://example.com/issues\nrequires: None\n' > $T/house/pack.yaml && for d in standard folder-only not-allowed; do cp $REPO/review/phase-06/runbook/data/*.csv $T/$d/; done
 ```
 
 3. Write the two main configs and the two folder configs:
 
 ```bash
-T=~/forgegraph-trial; printf 'packs = ["forgegraph_base", "%s/forgegraph_base_2"]\n' $T > $T/configs/main-with-pack.toml && printf 'packs = ["forgegraph_base"]\n' > $T/configs/main-base.toml && printf 'packs = ["forgegraph_base", "../forgegraph_base_2"]\n' > $T/folder-only/forgegraph.toml && printf 'packs = ["forgegraph_base"]\n' > $T/not-allowed/forgegraph.toml
+T=~/forgegraph-trial; printf 'packs = ["forgegraph_base", "forgegraph_base_2", "%s/house"]\n' $T > $T/configs/main-with-pack.toml && printf 'packs = ["forgegraph_base"]\n' > $T/configs/main-base.toml && printf 'packs = ["forgegraph_base", "forgegraph_base_2"]\n' > $T/folder-only/forgegraph.toml && printf 'packs = ["forgegraph_base"]\n' > $T/not-allowed/forgegraph.toml
 ```
 
 4. Start each part's sessions from a terminal in that part's folder, with its main config, as each part shows. Start a new session for each step, unless the step is a follow-up.
@@ -67,17 +67,17 @@ Steps:
    - Check the gaps in late July and late August, and the date ticks.
 6. Ask: "Put the revenue lines and the conversion bars side by side in one figure for a report, using the forgegraph_base_2 pack."
    - Check that the layout draws both, and that its format is a layout format.
-7. Ask: "Make a version of the forgegraph_base_2 theme with a light grid, called grid_theme, and use it to redraw the revenue graph."
-   - Check that forgegraph_base_2/themes/grid_theme.yaml extends `forgegraph_base_2/base_theme` and sets only the grid.
-   - Check that the agent doesn't change a config without asking. The pack is already listed, so no change is needed.
-8. Copy the reference note into the pack, from a terminal in your checkout:
+7. Copy the reference note into the house pack, from a terminal in your checkout:
 
 ```bash
-mkdir -p ~/forgegraph-trial/forgegraph_base_2/references && cp review/phase-06/runbook/house-note.md ~/forgegraph-trial/forgegraph_base_2/references/house.md
+mkdir -p ~/forgegraph-trial/house/references && cp review/phase-06/runbook/house-note.md ~/forgegraph-trial/house/references/house.md
 ```
 
    - Then ask, without naming the pack: "Plot monthly revenue for the East region from sales_by_region.csv in our house style."
    - Check that the agent reads the note (`forgegraph pack-notes`) and uses the theme and format it names.
+8. Ask: "Make a version of the forgegraph_base_2 theme with a light grid, called grid_theme, and use it to redraw the revenue graph."
+   - Check that the agent makes a pack of its own for it (the built-in pack is part of ForgeGraph), with themes/grid_theme.yaml extending `forgegraph_base_2/base_theme` and setting only the grid.
+   - Check that it lists the new pack in a folder config, and asks before changing the main config. If it doesn't change the main config, the graph is watermarked as non-standard and it says so.
 9. Ask: "I'd like a violin plot of units sold by product category from price_vs_demand.csv in the forgegraph_base_2 style. If ForgeGraph can't make one, draw it anyway."
    - Check that it says ForgeGraph has no violin plot, then draws one on the blank canvas in the forgegraph_base_2 theme.
    - Check that the image is watermarked.

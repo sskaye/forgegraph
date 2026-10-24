@@ -45,7 +45,7 @@
 #                          and it was run once with `forgegraph job run`
 # A case's `packs` are copied into its folder from examples/packs or packs/, and `config`
 # writes its folder config, forgegraph.toml. Its main config, outside the folder, lists
-# `main` (default: forgegraph_base and the case's packs).
+# `main` (default: the built-in packs and the case's packs).
 # A case with closing: false sends its last turn without the closing line (a question).
 # Every case also checks that the data files are unchanged and that no theme or format was
 # created beyond `themes`.
@@ -710,8 +710,7 @@ cases:
 
   - id: forgegraph-base-2-style
     data: [co2_monthly.csv]
-    packs: [forgegraph_base_2]
-    config: ["forgegraph_base", "./forgegraph_base_2"]
+    config: ["forgegraph_base", "forgegraph_base_2"]
     turns: ["Please draw the monthly CO₂ record in co2_monthly.csv as a line chart, using a theme from the forgegraph_base_2 pack."]
     expect:
       graph: true

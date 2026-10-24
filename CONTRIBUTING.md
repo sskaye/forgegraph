@@ -1,13 +1,18 @@
 # Contributing
 
-ForgeGraph is in early development and isn't accepting outside contributions yet. This page will grow before the first public release.
+Contributions are welcome. For a bug or a feature request, open an [issue](https://github.com/sskaye/forgegraph/issues). For a change, open a pull request with tests, after running the checks below.
 
 ## Development setup
 
 ```bash
 uv sync
 uv run pre-commit install
-uv run pytest
+```
+
+The checks a pull request must pass:
+
+```bash
+uv run pytest && uv run ruff check . && uv run pyright
 ```
 
 ## After changing a definition or how graphs are drawn
@@ -19,6 +24,8 @@ Rebuild the review catalog (it keeps its review comments; Node 18+ is needed onc
 
 ```bash
 uv run forgegraph catalog build
+uv run forgegraph catalog build --pack forgegraph_base_2
+uv run python scripts/mirror_specs.py
 uv run python scripts/build_recreations.py --baselines
 ```
 
@@ -27,3 +34,4 @@ uv run python scripts/build_recreations.py --baselines
 ## Requesting a chart type
 
 Open a GitHub issue describing the graph you need, ideally with an example image or sketch and a little sample data. No code is needed.
+

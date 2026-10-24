@@ -170,7 +170,10 @@ def test_skill_examples_render(tmp_path):
 def test_catalog_lists_one_kind(project):
     listed = _json(["catalog", "themes"])
     assert set(listed) == {"ok", "folder", "configs", "packs", "themes", "parameters"}
-    assert [t["name"] for t in listed["themes"]] == ["forgegraph_base/base_theme"]
+    assert [t["name"] for t in listed["themes"]] == [
+        "forgegraph_base/base_theme",
+        "forgegraph_base_2/base_theme",
+    ]  # both built-in packs, which a new main config lists
 
 
 def test_render_keeps_dots_in_the_name(project):

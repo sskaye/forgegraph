@@ -1,18 +1,24 @@
 # ForgeGraph
 
-Fast, consistent, publication-quality graphs from pandas DataFrames, for people and AI agents alike.
+Fast, consistent, publication-quality graphs from pandas DataFrames, useable by people and AI agents.
 
-You describe a graph in a short **GraphSpec**. ForgeGraph draws it in a house style that a **theme** and a **format** set once. It checks what it drew, and records how the graph was made inside the saved file. An agent skill lets Claude Code make and revise graphs the same way.
+You describe a graph in a **GraphSpec**. ForgeGraph draws it in a house style set by a **theme** and a **format**. It checks what it drew, and records how the graph was made inside the saved file. An agent skill lets agents make and revise graphs the same way.
 
-- **One look, kept:** themes fix what must stay the same (fonts, palette, lines, keys) and leave the rest to each graph.
-- **Packs and configs:** an organization keeps the specs its graphs must use in a pack, and a config says which packs may be used, for all work or for one folder.
-- **Lint on every render:** overlapping or clipped text, a key covering data, fonts too small for the format, dropped rows and more.
-- **Provenance:** every saved file carries its GraphSpec and the specs it was drawn with, and `forgegraph load` recovers them.
-- **Layouts:** several graphs in one figure, from a two-panel paper figure to an HTML dashboard with tabs.
-- **Scheduled renders:** a schedule file re-renders graphs and layouts, with a "data as of" note and a stale banner.
-- **Anything else, marked:** what no graph type can draw can be drawn with matplotlib on a themed canvas, and is always watermarked as non-standard.
+**<u>Key Features</u>**
 
-**Status:** 0.x. One graph type, `xy` (lines, markers and bars), with reference lines, notes and error bars as layers. More graph types come from requests: [open an issue](https://github.com/sskaye/forgegraph/issues).
+- **Themes:** fixes the look of the graph (fonts, palette, lines, keys, etc.).
+- **Formats:** sets the destination: figure size, base font size, file types and resolution, e.g. a slide, a journal column or a dashboard tile.
+- **GraphTypes:** defines the type of graph and its parameters. E.g. `xy` (lines, markers and bars).
+- **Layers:** features drawn over a graph. E.g. reference lines, notes, & error bars.
+- **GraphSpecs:** specify the data, theme, format, and all customizable properties.
+- **Layouts:** combine multiple graphs into a larger figure or multi-tab dashboard.
+- **Scheduled renders:** re-render graphs and dashboards on a schedule set with cron, launchd, or by an agent.
+- **Provenance:** every saved file contains its specifications as metadata, enabling inspection of how the graph was made and reproduction of it.
+- **Packs:** collect together a set of themes and formats for different use cases. E.g. a company or lab’s standard style, journal requirements, etc.
+- **Configs:** control which packs may be used, per user or folder. Used to enforce use of style pack(s) and watermark non-standard graphs.
+- **Lint:** Graphs are linted on rendering, with warnings for issues including overlapping or clipped text, a key covering data, or fonts too small.
+
+**Status:** 0.x.  `xy` graph type (lines, markers, & bars), reference lines, error bars, and notes layers, initial style packs. More graph types coming soon. If there’s specific ones you want, [open an issue](https://github.com/sskaye/forgegraph/issues).
 
 ## Install
 
@@ -22,13 +28,19 @@ ForgeGraph needs Python 3.12 or later.
 pip install forgegraph
 ```
 
-For the `forgegraph` command on its own, `uv tool install forgegraph` works too. To give Claude Code the skill:
+For the `forgegraph` command on its own, `uv tool install forgegraph` works too. To install the skill for Claude Code:
 
 ```bash
 forgegraph skill install
 ```
 
-Then ask Claude for a graph: the skill takes it from your data to a finished graph, saving the GraphSpec beside it.
+For another agent, give the folder it reads skills from:
+
+```bash
+forgegraph skill install --dest <skills folder>
+```
+
+Then ask your agent for a graph: the skill takes it from your data to a finished graph, saving the GraphSpec beside it.
 
 ## Quick start
 
@@ -80,21 +92,9 @@ variable_parameters:
 forgegraph render voltage.yaml
 ```
 
-## How a graph is made
-
-- **GraphSpec:** what to draw: the data, the columns on each axis, colors, titles, layers. A YAML file, or a dict in Python.
-- **Graph type:** the kind of graph, such as `xy`, and the parameters it offers.
-- **Theme:** the look. It fixes some parameters and gives defaults for the rest.
-- **Format:** the destination: figure size, base font size, file types and resolution.
-- **Layers:** what's drawn over a graph: reference lines, notes, error bars.
-- **Layout:** several GraphSpecs arranged in one figure or page.
-- **Schedule:** the GraphSpecs and layouts to re-render, and when.
-
-The input is a pandas DataFrame, passed through the Python API or saved as a Parquet file that the GraphSpec's `data.file` names. How the DataFrame is made is up to you; `data.preprocessing` can record where that code is.
-
 ## Packs and configs
 
-Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. ForgeGraph's own pack is `forgegraph_base`; a second look, `forgegraph_base_2`, is in this repository's [packs](packs/forgegraph_base_2) folder.
+Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. The initial built-in packs are `forgegraph_base` and `forgegraph_base_2`, stored in src/forgegraph/packs.
 
 A **config** lists the packs that may be used:
 
@@ -120,24 +120,24 @@ Every command takes `--help`, and `--json` for agents.
 
 Each pack in this repository has a catalog: a page with a card for each parameter, showing what changing it does.
 
-- [forgegraph_base](catalog/forgegraph_base.html): ForgeGraph's own pack, with its graph types and layer types.
-- [forgegraph_base_2](catalog/forgegraph_base_2.html): its own theme and format, and the same graph types and layer types drawn in them.
+- forgegraph_base: ForgeGraph's own pack, with its graph types and layer types.
+- forgegraph_base_2: its own theme and format, and the same graph types and layer types drawn in them.
 
 ## Your graphs are yours
 
-ForgeGraph is [MIT-licensed](LICENSE). Graphs and other output you make with it are yours: no attribution or licence terms apply to them. See [TRADEMARKS.md](TRADEMARKS.md) for use of the name.
+ForgeGraph is [MIT-licensed](LICENSE). Graphs and other output you make with it are yours: no attribution or licence terms apply to them. See TRADEMARKS.md for use of the name.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md): how ForgeGraph is designed, and why.
-- [Decisions](docs/decisions.md): decisions that refine the architecture.
-- [Specifications](docs/specs): every spec, a folder per kind.
+- Architecture: how ForgeGraph is designed, and why.
+- Decisions: decisions that refine the architecture.
+- Specifications: every spec, a folder per kind.
 - [Changelog](CHANGELOG.md).
-- [Build plan](docs/build-plan.md): how ForgeGraph is being built, phase by phase.
+- Build plan: how ForgeGraph is being built, phase by phase.
 
 ## Contributing
 
-Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye/forgegraph/issues); the skill can file them for you. [CONTRIBUTING.md](CONTRIBUTING.md) covers working on ForgeGraph itself. In short:
+Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye/forgegraph/issues); the skill can file them for you. CONTRIBUTING.md covers working on ForgeGraph itself. In short:
 
 ```bash
 uv sync && uv run pre-commit install
@@ -154,12 +154,12 @@ uv run pytest && uv run ruff check . && uv run pyright
   - **cli/**: the `forgegraph` command.
   - **spec/**: reading, checking and resolving specs, and the provenance record.
   - **render/**: drawing, layout and lint. **layout/**: layouts. **jobs/**: scheduled renders.
-  - **packs/**: packs and configs, and the built-in pack `forgegraph_base`. **fonts/**: bundled fonts and their licences.
+  - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
   - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog/**, **catalogs/**: the catalog builder, and each definition's catalog file.
   - **skill/forgegraph/**: the agent skill.
-- **packs/forgegraph_base_2/**: a second look, as a folder pack.
 - **catalog/**: the generated catalog pages.
 - **examples/**: sample data, and `packs/acme`, an example pack in a deliberately different style.
 - **evals/skill/**: the skill's eval cases, run by `scripts/run_skill_evals.py`.
 - **tests/**, **scripts/**: tests, and build and maintenance scripts.
 - **docs/**: the documents above. **review/**: each build phase's review pages.
+

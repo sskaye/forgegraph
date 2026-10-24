@@ -185,7 +185,7 @@ Decisions made while building that refine or depart from [architecture.md](archi
 
 ## Phase 6
 
-**Where packs live.** ForgeGraph's own pack, forgegraph_base, is a folder inside the package (src/forgegraph/packs/forgegraph_base); graph types, layer types and their catalog files stay in the core. Fonts are the core's too, in src/forgegraph/fonts, so any theme can use them. The acme example is in examples/packs. forgegraph_base_2 is in packs/ at the top of the repository, outside the package, until Steven decides whether it ships.
+**Where packs live.** ForgeGraph's built-in packs, forgegraph_base and forgegraph_base_2 (Steven), are folders inside the package (src/forgegraph/packs), and a config names them like pip packs; a new main config lists both. Graph types, layer types and their catalog files stay in the core. Fonts are the core's too, in src/forgegraph/fonts, so any theme can use them. The acme example is in examples/packs.
 
 **The main config is ~/.config/forgegraph/config.toml on every platform (Steven).** One path is the easiest to document; Windows included. `FORGEGRAPH_CONFIG` names another file instead, which keeps evals and tests away from the machine's own and lets an organization point at a managed one.
 
@@ -214,3 +214,9 @@ Decisions made while building that refine or depart from [architecture.md](archi
 ## Phase 9
 
 **The blank canvas.** `forgegraph.blank(theme, format)` checks its theme and format against the configs as a GraphSpec's are. Its Axes cycles through the theme's palette, and drawing inside `with canvas.drawing():` gives what's drawn the theme's matplotlib settings. It's always non-standard: every drawing carries the watermark, and its record has no GraphSpec, its theme and format by name and version, and nonstandard: true.
+
+## Phase 10
+
+**Public first, from a fresh repository (Steven).** The repository goes public before the release, so CI runs free on every push. The first two commits held a confidential term, so the public repository, sskaye/forgegraph, starts from the current files as one commit, without the earlier history; the private working history is kept as sskaye/forgegraph-dev.
+
+**The first release is 0.1.0 (Steven).** Before it, the version is whatever is convenient.

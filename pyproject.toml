@@ -1,6 +1,6 @@
 [project]
 name = "forgegraph"
-version = "0.0.1"
+version = "0.1.0"
 description = "Consistent, high-quality graphs from pandas DataFrames, for people and AI agents. Early development."
 readme = "README.md"
 license = "MIT"
@@ -48,6 +48,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/forgegraph"]
+
+[tool.hatch.build.targets.sdist]
+# The review pages and generated catalogs belong to the repository, not the package.
+exclude = ["/review", "/catalog", "/evals", "/.github"]
 
 [tool.ruff]
 line-length = 100

@@ -47,7 +47,7 @@ from ruamel.yaml import YAML
 ROOT = Path(__file__).parents[1]
 EVALS = ROOT / "evals" / "skill"
 DATA = ROOT / "examples" / "sample-data"
-PACKS = (ROOT / "examples" / "packs", ROOT / "packs")  # where a case's packs are copied from
+PACKS = (ROOT / "examples" / "packs",)  # where a case's folder packs are copied from
 IMAGES = (".png", ".pdf", ".svg", ".jpg", ".jpeg", ".tif", ".tiff", ".html")  # .html: a page
 TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill"]
 TURN_TIMEOUT_S = 900  # a turn that takes longer than 15 minutes has gone wrong
@@ -706,7 +706,9 @@ def _run_one(
         listed = ", ".join(f'"{p}"' for p in case["config"])
         (ws / "forgegraph.toml").write_text(f"packs = [{listed}]\n")
     main = ws.parent / f"{ws.name}.main.toml"  # the case's own, never this machine's
-    named = case.get("main", ["forgegraph_base", *(str(ws / n) for n in case.get("packs", []))])
+    from forgegraph.packs import BUILT_IN
+
+    named = case.get("main", [*BUILT_IN, *(str(ws / n) for n in case.get("packs", []))])
     main.write_text("packs = [" + ", ".join(f"'{p}'" for p in named) + "]\n")  # literal strings
     setup = [str(p.relative_to(ws)) for p in _project_files(ws)]
     (ws.parent / f"{ws.name}.setup.txt").write_text("\n".join(setup))

@@ -17,7 +17,7 @@ from forgegraph.catalog import build, forgemark
 from forgegraph.catalog.files import CatalogError, read
 from forgegraph.catalog.page import Card, Instance, Kind, Row, page
 from forgegraph.cli import app
-from forgegraph.packs import read_pack
+from forgegraph.packs import built_in_folder, read_pack
 from forgegraph.spec.documents import builtin
 
 ROOT = Path(__file__).parents[1]
@@ -81,11 +81,11 @@ def test_the_catalog_is_current():
 
 
 def test_the_forgegraph_base_2_catalog_is_current():
-    """Rebuild with `uv run forgegraph catalog build --pack packs/forgegraph_base_2`."""
-    pack = read_pack(CATALOG.parents[1] / "packs" / "forgegraph_base_2", "folder")
+    """Rebuild with `uv run forgegraph catalog build --pack forgegraph_base_2`."""
+    pack = read_pack(built_in_folder("forgegraph_base_2"), "built in", "forgegraph_base_2")
     assert build.current(CATALOG.parent / "forgegraph_base_2.html", pack), (
         "catalog/forgegraph_base_2.html is out of date: "
-        "run forgegraph catalog build --pack packs/forgegraph_base_2"
+        "run forgegraph catalog build --pack forgegraph_base_2"
     )
 
 
@@ -110,7 +110,7 @@ def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
-    assert '<p id="version" class="version">version 0.3.0</p>' in text
+    assert '<p id="version" class="version">version 0.1.0</p>' in text
 
 
 def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeypatch):

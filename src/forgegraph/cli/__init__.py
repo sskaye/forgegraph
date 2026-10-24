@@ -630,16 +630,20 @@ def skill_install(
 
 
 PackFolder = Annotated[
-    Path | None, typer.Option("--pack", help="A pack's folder: its catalog, not ForgeGraph's.")
+    Path | None,
+    typer.Option("--pack", help="A built-in pack's name, or a pack's folder: its catalog."),
 ]
 
 
 def _pack(folder: Path | None, as_json: bool) -> Any:
-    from forgegraph.packs import PackError, read_pack
+    """The pack --pack names: a built-in pack by name, or a pack's folder."""
+    from forgegraph.packs import BUILT_IN, PackError, built_in_folder, read_pack
 
     if folder is None:
         return None
     try:
+        if str(folder) in BUILT_IN:
+            return read_pack(built_in_folder(str(folder)), "built in", str(folder))
         return read_pack(folder.resolve(), "folder")
     except PackError as e:
         _fail(e.problems, as_json)

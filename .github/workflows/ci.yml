@@ -50,9 +50,6 @@ jobs:
           FORGEGRAPH_REQUIRE_NODE: "1"
 
   tests-other-os:
-    # macOS and Windows minutes count heavily against a private repo's quota,
-    # so these run only on main and on demand.
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     name: Tests (${{ matrix.os }}, Python 3.12)
     runs-on: ${{ matrix.os }}
     strategy:
@@ -66,3 +63,29 @@ jobs:
           python-version: "3.12"
       - run: uv sync --locked
       - run: uv run pytest
+
+  package:
+    # The wheel as a user gets it from pip, installed fresh and tried from outside the repo.
+    name: Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      - run: uv build --out-dir dist
+      - run: uvx --from "twine>=6.2" twine check dist/*
+      - run: uv venv --python 3.12 "$RUNNER_TEMP/clean"
+      - run: uv pip install --python "$RUNNER_TEMP/clean" dist/*.whl
+      - name: Smoke test, outside the repository
+        working-directory: ${{ runner.temp }}
+        run: |
+          if [ -d "$RUNNER_TEMP/clean/Scripts" ]; then bin="$RUNNER_TEMP/clean/Scripts"; else bin="$RUNNER_TEMP/clean/bin"; fi
+          PATH="$bin:$PATH" "$bin/python" -I "$GITHUB_WORKSPACE/scripts/smoke_installed.py"

@@ -2,7 +2,8 @@
 
 A pack is a folder of specs with a pack.yaml at its top: themes/, formats/, graphspecs/,
 layouts/ and schedules/, with catalogs/, references/ and fonts/. Its specs are named
-`pack/name`. ForgeGraph's own are the pack forgegraph_base, in this package.
+`pack/name`. ForgeGraph's built-in packs, forgegraph_base and forgegraph_base_2, are in
+this package, and a config names them like pip packs.
 
 A config lists the packs that may be used: `packs = [...]`, each the name forgegraph_base,
 a pip pack's name, or a folder pack's path from the config file. Two configs can apply to a
@@ -41,7 +42,7 @@ from forgegraph import __version__
 BASE = "forgegraph_base"
 FOLDER_CONFIG = "forgegraph.toml"
 MAIN_CONFIG_VARIABLE = "FORGEGRAPH_CONFIG"
-BUILT_IN = (BASE,)  # the packs ForgeGraph ships, which a new main config lists
+BUILT_IN = (BASE, "forgegraph_base_2")  # the packs ForgeGraph ships, which a new main config lists
 ENTRY_POINTS = "forgegraph.packs"
 FIELDS = ("name", "version", "description", "issues", "requires")
 FOLDERS = {
@@ -119,8 +120,13 @@ def write_main_config(path: Path) -> None:
     print(f"ForgeGraph wrote its main config, {path}, listing {listed}.", file=sys.stderr)
 
 
+def built_in_folder(name: str) -> Path:
+    """A built-in pack's folder, in this package."""
+    return Path(str(files(__package__) / name))
+
+
 def base_folder() -> Path:
-    return Path(str(files(__package__) / BASE))
+    return built_in_folder(BASE)
 
 
 def read_pack(folder: Path, source: str, expected: str | None = None) -> Pack:
@@ -204,8 +210,8 @@ def _is_path(entry: str) -> bool:
 
 
 def _resolve(entry: str, config: Config) -> Pack:
-    if entry == BASE:
-        return read_pack(base_folder(), "built in", BASE)
+    if entry in BUILT_IN:
+        return read_pack(built_in_folder(entry), "built in", entry)
     if _is_path(entry):
         folder = Path(entry).expanduser()
         if not folder.is_absolute():

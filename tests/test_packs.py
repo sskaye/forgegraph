@@ -48,8 +48,8 @@ def user(tmp_path: Path, monkeypatch, *listed: str) -> Path:
 def test_a_missing_main_config_is_written_listing_the_built_in_packs(tmp_path, monkeypatch, capsys):
     main = tmp_path / "home" / "forgegraph" / "config.toml"
     monkeypatch.setenv(packs.MAIN_CONFIG_VARIABLE, str(main))
-    assert set(setup(tmp_path).packs) == {"forgegraph_base"}
-    assert packs.read_config(main).packs == ("forgegraph_base",)
+    assert set(setup(tmp_path).packs) == {"forgegraph_base", "forgegraph_base_2"}
+    assert packs.read_config(main).packs == ("forgegraph_base", "forgegraph_base_2")
     assert f"ForgeGraph wrote its main config, {main}" in capsys.readouterr().err
     shutil.copytree(ACME, tmp_path / "acme")
     with pytest.raises(
@@ -57,6 +57,14 @@ def test_a_missing_main_config_is_written_listing_the_built_in_packs(tmp_path, m
         match=f"'acme/acme' is in the pack 'acme', which {re.escape(str(main))} doesn't allow",
     ):
         fg.render(graphspec(tmp_path, "acme/acme"))
+
+
+def test_a_config_names_a_built_in_pack_like_a_pip_pack(tmp_path):
+    allow(tmp_path, "forgegraph_base_2")
+    reg = registry_for(tmp_path)
+    assert reg.allowed == {"forgegraph_base_2"}
+    assert reg.packs["forgegraph_base_2"].source == "built in"
+    assert "forgegraph_base_2/base_theme" in reg.docs["theme"]
 
 
 def test_a_main_config_that_cant_be_written_is_an_error(tmp_path, monkeypatch):

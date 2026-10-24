@@ -505,14 +505,13 @@ forgegraph/
 │   ├── render/        # matplotlib engine, text markup, lint, export, provenance
 │   ├── layout/        # multi-panel figures and dashboards
 │   ├── jobs/          # running a schedule, status files
-│   ├── packs/         # finding packs and configs; forgegraph_base/, ForgeGraph's own specs
+│   ├── packs/         # finding packs and configs; the built-in packs forgegraph_base/ and forgegraph_base_2/
 │   ├── catalog/       # HTML catalog, Forgemark carry-over
 │   ├── skill/         # SKILL.md + references, installed by `forgegraph skill install`
 │   └── cli/
 ├── docs/              # specification, architecture, build plan, specs/, decisions.md
 ├── examples/
 │   ├── packs/acme/    # example org pack: a deliberately different house style
-├── packs/forgegraph_base_2/  # a pack replicating a matplotlib style; shipping undecided
 │   └── notebooks/
 ├── catalog/           # generated catalog, reviewed in place (committed, so comments are versioned)
 ├── review/            # other review deliverables, one folder per phase

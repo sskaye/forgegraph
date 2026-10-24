@@ -150,10 +150,10 @@ uv run pytest --full && uv run ruff check . && uv run pyright
 ## Repository map
 
 - **src/forgegraph/**: the package.
-  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `blank.py`: the themed canvas.
+  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `canvas.py`: the themed canvas.
   - **cli/**: the `forgegraph` command.
   - **spec/**: reading, checking and resolving specs, and the provenance record.
-  - **render/**: drawing, layout and lint. **layout/**: layouts. **jobs/**: scheduled renders.
+  - **drawing/**: drawing, layout and lint. **layouts/**: layouts. **jobs/**: scheduled renders.
   - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
   - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog/**, **catalogs/**: the catalog builder, and each definition's catalog file.
   - **skill/forgegraph/**: the agent skill.

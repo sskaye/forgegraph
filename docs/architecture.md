@@ -502,8 +502,8 @@ forgegraph/
 │   ├── graph_types/   # xy/, bar/ — graph_type.yaml + render.py + samples/
 │   ├── layers/        # reference_line/, note/, … — layer.yaml + render.py
 │   ├── fonts/         # bundled fonts
-│   ├── render/        # matplotlib engine, text markup, lint, export, provenance
-│   ├── layout/        # multi-panel figures and dashboards
+│   ├── drawing/       # matplotlib engine, text markup, lint, export, provenance
+│   ├── layouts/       # multi-panel figures and dashboards
 │   ├── jobs/          # running a schedule, status files
 │   ├── packs/         # finding packs and configs; the built-in packs forgegraph_base/ and forgegraph_base_2/
 │   ├── catalog/       # HTML catalog, Forgemark carry-over

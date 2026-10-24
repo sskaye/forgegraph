@@ -33,10 +33,10 @@ from matplotlib.axes import Axes
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
-from forgegraph.render import marks
-from forgegraph.render.axes import DrawError
-from forgegraph.render.markup import markup
-from forgegraph.render.style import LINE_STYLES, Style, unset
+from forgegraph.drawing import marks
+from forgegraph.drawing.axes import DrawError
+from forgegraph.drawing.markup import markup
+from forgegraph.drawing.style import LINE_STYLES, Style, unset
 
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"

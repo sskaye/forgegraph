@@ -18,10 +18,10 @@ from render_helpers import BASE, polarization
 from ruamel.yaml import YAML
 
 import forgegraph as fg
+from forgegraph.drawing.figure import FOOTNOTE
+from forgegraph.drawing.page import STALE_ID
 from forgegraph.jobs import run as job_run
 from forgegraph.jobs import status as status_file
-from forgegraph.render.figure import FOOTNOTE
-from forgegraph.render.page import STALE_ID
 
 
 def _dump(doc: dict[str, Any], path: Path) -> None:

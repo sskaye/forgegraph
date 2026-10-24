@@ -19,14 +19,14 @@ from matplotlib.colors import Normalize
 from matplotlib.lines import Line2D
 from matplotlib.ticker import Locator, NullLocator
 
-from forgegraph.render import axes as axis_data
-from forgegraph.render import colorbar, layers, marks
-from forgegraph.render import labels as labelling
-from forgegraph.render.axes import DrawError, natural
-from forgegraph.render.key import KEY, keys
-from forgegraph.render.lint import Issue
-from forgegraph.render.markup import literal, markup
-from forgegraph.render.style import LINE_STYLES, MARKERS, Style, unset
+from forgegraph.drawing import axes as axis_data
+from forgegraph.drawing import colorbar, layers, marks
+from forgegraph.drawing import labels as labelling
+from forgegraph.drawing.axes import DrawError, natural
+from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.lint import Issue
+from forgegraph.drawing.markup import literal, markup
+from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
 
 Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
 Y_VALUE = "__forgegraph_y__"
@@ -645,8 +645,8 @@ def unlabel(ax: Axes) -> None:
 def check_outside(ax: Axes) -> None:
     """After the layout that makes room for a key outside the plot box: it mustn't run into
     the titles, tick labels, a note outside the plot, a color bar or another key."""
-    from forgegraph.render import text
-    from forgegraph.render.figure import texts_of
+    from forgegraph.drawing import text
+    from forgegraph.drawing.figure import texts_of
 
     outside = [k for k in keys(ax) if k.outside]
     if not outside:

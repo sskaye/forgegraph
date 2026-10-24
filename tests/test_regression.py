@@ -13,7 +13,7 @@ import pytest
 from matplotlib.testing.compare import compare_images
 from recreations import LAYOUT_RECREATIONS, RECREATIONS
 
-from forgegraph.render.style import isolated
+from forgegraph.drawing.style import isolated
 
 pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 

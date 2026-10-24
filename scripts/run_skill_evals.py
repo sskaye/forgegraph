@@ -292,7 +292,7 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     """The final layout: it draws, its tabs and tiles, a spanning tile, a blank cell, its
     column widths, and its lint."""
     import forgegraph as fg
-    from forgegraph.layout import _load
+    from forgegraph.layouts import _load
     from forgegraph.spec.layout import BLANK, tabs
 
     layouts = _named(ws, ".layout.yaml")

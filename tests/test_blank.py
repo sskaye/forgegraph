@@ -10,7 +10,7 @@ import pytest
 from pack_helpers import allow
 
 import forgegraph as fg
-from forgegraph.render.figure import WATERMARK
+from forgegraph.drawing.figure import WATERMARK
 
 THEME, FORMAT = "forgegraph_base/base_theme", "forgegraph_base/base_format"
 ACME = Path(__file__).parents[1] / "examples" / "packs" / "acme"

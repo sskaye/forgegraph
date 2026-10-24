@@ -4,10 +4,10 @@ A layout file (spec/layout.py) names a format and a grid of GraphSpec files for 
 Each tile is drawn as its GraphSpec says, in its own theme, from its own data, into an Axes
 of the tab's figure; the layout's format replaces each tile's own, so every tile is drawn at
 the layout's base size, and the figure is the format's size. The tiles are then laid out
-together (layout/arrange.py), so their plot boxes line up, with the layout's separators
+together (layouts/arrange.py), so their plot boxes line up, with the layout's separators
 between them.
 
-A rendered tab's figure checks itself as a graph's does (render/figure.py): drawing or saving
+A rendered tab's figure checks itself as a graph's does (drawing/figure.py): drawing or saving
 it first checks whether it's still as ForgeGraph left it, and watermarks every tile if not.
 """
 
@@ -26,21 +26,8 @@ from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import RendererAgg
 
 from forgegraph import __version__
-from forgegraph.graph import (
-    NONE,
-    PLACE_PASSES,
-    Prepared,
-    SpecError,
-    _artists,
-    _created,
-    _plain,
-    prepare,
-    recorded,
-    spec_record,
-)
-from forgegraph.layout.arrange import Grid, Placed, apply_separators, arrange, backgrounds
-from forgegraph.render import export, lint, page
-from forgegraph.render.figure import (
+from forgegraph.drawing import export, lint, page
+from forgegraph.drawing.figure import (
     MARGIN_IN,
     GraphCanvas,
     GraphFigure,
@@ -53,8 +40,21 @@ from forgegraph.render.figure import (
     footnote_room,
     place_footnote,
 )
-from forgegraph.render.key import keys
-from forgegraph.render.style import Style, isolated, unset
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import Style, isolated, unset
+from forgegraph.graph import (
+    NONE,
+    PLACE_PASSES,
+    Prepared,
+    SpecError,
+    _artists,
+    _created,
+    _plain,
+    prepare,
+    recorded,
+    spec_record,
+)
+from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
 from forgegraph.spec.documents import (
     Registry,
     Resolved,

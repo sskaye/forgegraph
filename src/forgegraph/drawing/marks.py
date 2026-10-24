@@ -35,8 +35,8 @@ from matplotlib.dates import date2num
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.render.axes import DrawError
-from forgegraph.render.style import Style, unset
+from forgegraph.drawing.axes import DrawError
+from forgegraph.drawing.style import Style, unset
 
 BAR = "forgegraph-bar"  # each series' bars
 VALUE_LABEL = "forgegraph-value-label"

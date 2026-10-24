@@ -343,3 +343,22 @@ def test_version_and_help_load_no_drawing_libraries():
     )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert done.stdout.strip() == "[]"
+
+
+def test_every_import_form_gives_the_module_and_the_api_its_functions():
+    """No submodule shares a name with the API, so `import forgegraph.x as m` is the module
+    whichever is imported first, and fg.render, fg.layout and fg.blank are the API."""
+    import subprocess
+    import sys
+
+    code = (
+        "import types\n"
+        "import forgegraph.drawing.layers as a\n"
+        "import forgegraph.layouts as b\n"
+        "import forgegraph.canvas as c\n"
+        "import forgegraph as fg\n"
+        "assert all(isinstance(m, types.ModuleType) for m in (a, b, c))\n"
+        "api = (fg.render, fg.layout, fg.blank)\n"
+        "assert all(callable(f) and not isinstance(f, types.ModuleType) for f in api)\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

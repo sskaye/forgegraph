@@ -18,9 +18,9 @@ from matplotlib.backends.backend_agg import RendererAgg
 from matplotlib.figure import Figure
 
 from forgegraph import __version__
-from forgegraph.render import export, lint, page
-from forgegraph.render import xy as xy_type
-from forgegraph.render.figure import (
+from forgegraph.drawing import export, lint, page
+from forgegraph.drawing import xy as xy_type
+from forgegraph.drawing.figure import (
     WATERMARK,
     LayoutError,
     Watermark,
@@ -29,8 +29,8 @@ from forgegraph.render.figure import (
     layout,
     new_figure,
 )
-from forgegraph.render.key import keys
-from forgegraph.render.style import Style, isolated, unset
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.spec.documents import (
     Registry,
     Resolved,

@@ -24,7 +24,7 @@ import tempfile  # noqa: E402
 from recreations import LAYOUT_RECREATIONS, RECREATIONS  # noqa: E402
 
 from forgegraph.catalog.build import write  # noqa: E402
-from forgegraph.render.style import isolated  # noqa: E402
+from forgegraph.drawing.style import isolated  # noqa: E402
 
 BASELINE_DPI = 72
 CSS_DPI = 96  # a CSS inch, so images show at the figure's real size

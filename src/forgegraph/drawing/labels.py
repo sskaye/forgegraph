@@ -29,10 +29,10 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import FixedLocator
 from matplotlib.transforms import Bbox
 
-from forgegraph.render import text
-from forgegraph.render.key import KEY, Entry, Key
-from forgegraph.render.marks import Bars
-from forgegraph.render.style import Style
+from forgegraph.drawing import text
+from forgegraph.drawing.key import KEY, Entry, Key
+from forgegraph.drawing.marks import Bars
+from forgegraph.drawing.style import Style
 
 DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)]
 SERIES_LABEL = "forgegraph-series-label"

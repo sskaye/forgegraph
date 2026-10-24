@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import forgegraph as fg
-from forgegraph.render.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
+from forgegraph.drawing.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
 from forgegraph.spec.documents import builtin, drawing_problems, explain, validate
 
 RATES = pd.DataFrame(
@@ -336,7 +336,7 @@ def test_a_note_finds_a_clear_corner_and_keys_avoid_it():
     [note] = [t for t in g.axes.texts if t.get_gid() == NOTE]
     box = note.get_window_extent()
     assert g.axes.get_window_extent().contains(*box.get_points().mean(axis=0))
-    from forgegraph.render.key import keys
+    from forgegraph.drawing.key import keys
 
     assert all(not k.bbox().overlaps(box) for k in keys(g.axes))
 
@@ -373,7 +373,7 @@ def _label_box(g: fg.Graph):
 
 
 def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
-    from forgegraph.render.labels import box_clear
+    from forgegraph.drawing.labels import box_clear
 
     top = 30.0  # the highest rate
     g = graph(
@@ -469,7 +469,7 @@ def test_a_labels_value_takes_its_own_format_or_its_axiss():
 def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
     """Each series' error bars stay on its own bars, moved by its side-by-side offset: as
     drawn, after layout has changed the axes, not where they were first placed (#2)."""
-    from forgegraph.render.marks import Bars
+    from forgegraph.drawing.marks import Bars
 
     df = pd.DataFrame(
         {

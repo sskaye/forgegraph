@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from forgegraph.drawing import export
+from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, data_path, render
-from forgegraph.render import export
-from forgegraph.render.style import isolated
 from forgegraph.spec.documents import Registry, builtin, resolve, resolve_layers
 from forgegraph.spec.parameters import NONE, Parameter, definitions, tree_has, tree_set
 

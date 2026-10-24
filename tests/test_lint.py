@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from render_helpers import polarization, render
 
-from forgegraph.render.key import keys
-from forgegraph.render.lint import MIN_TEXT_PT
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.lint import MIN_TEXT_PT
 
 
 def _clean_data() -> pd.DataFrame:

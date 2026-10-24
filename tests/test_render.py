@@ -20,13 +20,13 @@ from PIL import Image
 from render_helpers import BASE, png, polarization, render
 
 import forgegraph as fg
-from forgegraph.render import xy
-from forgegraph.render.export import FILE_TYPES, IMAGES
-from forgegraph.render.figure import WATERMARK
-from forgegraph.render.key import keys
-from forgegraph.render.style import Style, isolated
-from forgegraph.render.text import footprint
-from forgegraph.render.ticks import LogTicks, NiceTicks, breaks_log
+from forgegraph.drawing import xy
+from forgegraph.drawing.export import FILE_TYPES, IMAGES
+from forgegraph.drawing.figure import WATERMARK
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.text import footprint
+from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
 from forgegraph.spec.parameters import NONE
 
 # --- the figure follows the theme and format ---------------------------------------------
@@ -58,7 +58,7 @@ def test_given_dimensions_are_exact_and_auto_ones_fit(tmp_path):
     "name", ["okabe_ito", "tol_bright", "tol_muted", "tableau_10", "color_blind"]
 )
 def test_series_colors_can_name_a_palette(name):
-    from forgegraph.render.style import PALETTES
+    from forgegraph.drawing.style import PALETTES
 
     g = render(theme={"series.colors": name})
     drawn = {to_hex(line.get_color()).upper() for line in g.axes.get_lines()}

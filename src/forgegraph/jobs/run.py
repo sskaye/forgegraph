@@ -209,7 +209,7 @@ def _log(schedule: Schedule, line: str) -> None:
 
 
 def _is_layout(path: Path) -> bool:
-    from forgegraph.layout import is_layout
+    from forgegraph.layouts import is_layout
 
     return is_layout(path)
 
@@ -228,7 +228,7 @@ def data_files(target: Path) -> list[Path]:
 
     if not _is_layout(target):
         return of_graphspec(target)
-    from forgegraph.layout import _load, _tile_files
+    from forgegraph.layouts import _load, _tile_files
 
     doc, reg, folder = _load(target, None)
     files, _ = _tile_files(doc, reg, folder)
@@ -240,7 +240,7 @@ def _date_order(target: Path) -> str:
     """The theme's date order for the footnote: the GraphSpec's, or a layout's first tile's."""
     path = target
     if _is_layout(target):
-        from forgegraph.layout import _load, _tile_files
+        from forgegraph.layouts import _load, _tile_files
 
         doc, reg, folder = _load(target, None)
         files, _ = _tile_files(doc, reg, folder)
@@ -261,7 +261,7 @@ def _date_order(target: Path) -> str:
 def stamp(as_of: datetime, cadence: Cadence, order: str) -> str:
     """The "data as of" footnote: e.g. "Data as of Oct 21, 2026, 05:12 · rendered daily
     at 06:00"."""
-    from forgegraph.render.axes import MONTHS
+    from forgegraph.drawing.axes import MONTHS
 
     month = MONTHS[as_of.month - 1][:3]
     day = (
@@ -274,8 +274,8 @@ def stamp(as_of: datetime, cadence: Cadence, order: str) -> str:
 
 def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
     import forgegraph as fg
-    from forgegraph.layout import stem
-    from forgegraph.render.page import Freshness
+    from forgegraph.drawing.page import Freshness
+    from forgegraph.layouts import stem
 
     shown = os.path.relpath(target, schedule.path.parent)
     found: list[DataFile] = []

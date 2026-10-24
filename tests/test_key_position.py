@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 import forgegraph as fg
-from forgegraph.render import text
-from forgegraph.render.key import keys
+from forgegraph.drawing import text
+from forgegraph.drawing.key import keys
 
 SHARES = pd.DataFrame(
     {

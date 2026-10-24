@@ -26,9 +26,9 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
-from forgegraph.render import spacing
-from forgegraph.render.figure import MARGIN_IN, PASSES, LayoutError, visible_extent
-from forgegraph.render.style import Style, isolated, unset
+from forgegraph.drawing import spacing
+from forgegraph.drawing.figure import MARGIN_IN, PASSES, LayoutError, visible_extent
+from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.spec.layout import BLANK, Area
 
 Room = tuple[float, float, float, float]  # left, right, bottom, top, in inches

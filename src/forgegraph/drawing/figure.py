@@ -1,7 +1,7 @@
 """Figures sized by the format, laid out by what's visible.
 
 Width and height are in mm. ForgeGraph lays the figure out itself rather than with
-matplotlib's layout engines, which space text by its box (see forgegraph.render.text): the
+matplotlib's layout engines, which space text by its box (see forgegraph.drawing.text): the
 plot box is placed so that everything drawn, measured to its letters and lines, sits MARGIN
 from each edge of the figure. With both sizes given, the plot box takes the space left; with
 one auto, the plot box keeps the theme's plot_area.aspect and the figure is fitted around it.
@@ -26,10 +26,10 @@ from matplotlib.text import Text
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
-from forgegraph.render import export, spacing, text
-from forgegraph.render.key import keys
-from forgegraph.render.markup import literal
-from forgegraph.render.style import MM_PER_INCH, Style, isolated
+from forgegraph.drawing import export, spacing, text
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.markup import literal
+from forgegraph.drawing.style import MM_PER_INCH, Style, isolated
 
 MARGIN_IN = 0.04  # space kept between what's drawn and the figure's edges
 WATERMARK = "forgegraph-watermark"

@@ -2,7 +2,7 @@
 
 import pytest
 
-from forgegraph.render.markup import literal, markup
+from forgegraph.drawing.markup import literal, markup
 
 
 @pytest.mark.parametrize(

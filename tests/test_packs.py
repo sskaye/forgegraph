@@ -16,8 +16,8 @@ from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph import packs
+from forgegraph.drawing.figure import WATERMARK
 from forgegraph.packs import PackError, read_pack, setup
-from forgegraph.render.figure import WATERMARK
 from forgegraph.spec import documents
 from forgegraph.spec.documents import name_problems, registry_for, validate
 
@@ -360,6 +360,7 @@ def test_the_reference_config_and_base_pack_are_valid():
 # --- everything works under a pack ---------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_the_skills_examples_render_in_acmes_theme_and_format(tmp_path):
     from forgegraph import skill
 
@@ -391,7 +392,7 @@ def test_a_schedule_extends_a_packs_schedule(tmp_path):
 
 
 def test_a_pack_theme_still_watermarks_a_changed_graph(tmp_path):
-    from forgegraph.render.figure import WATERMARK
+    from forgegraph.drawing.figure import WATERMARK
 
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")

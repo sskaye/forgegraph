@@ -13,8 +13,8 @@ from pack_helpers import allow, write_pack
 from ruamel.yaml import YAML
 
 import forgegraph as fg
-from forgegraph.render.key import KEY
-from forgegraph.render.marks import VALUE_LABEL, Bars
+from forgegraph.drawing.key import KEY
+from forgegraph.drawing.marks import VALUE_LABEL, Bars
 
 COUNTS = pd.DataFrame(
     {
@@ -285,7 +285,7 @@ def _drawn_offsets(g: fg.Graph, base: str, dpi: int) -> list[float]:
 
     from PIL import Image
 
-    from forgegraph.render.style import isolated
+    from forgegraph.drawing.style import isolated
 
     with isolated(g.style):
         buf = io.BytesIO()

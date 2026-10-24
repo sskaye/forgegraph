@@ -9,8 +9,8 @@ from typing import Any
 import pandas as pd
 
 import forgegraph as fg
-from forgegraph.render.export import KEY
-from forgegraph.render.style import isolated
+from forgegraph.drawing.export import KEY
+from forgegraph.drawing.style import isolated
 from forgegraph.spec.documents import Registry, builtin
 from forgegraph.spec.parameters import NONE, definitions, tree_set
 

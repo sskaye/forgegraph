@@ -1,4 +1,4 @@
-"""Text measured to its letters (forgegraph.render.text), and the layout built on it.
+"""Text measured to its letters (forgegraph.drawing.text), and the layout built on it.
 
 The layout checks measure the drawn pixels, not the module's own arithmetic.
 """
@@ -12,10 +12,10 @@ import pytest
 from PIL import Image
 from render_helpers import render
 
-from forgegraph.render import text
-from forgegraph.render.figure import MARGIN_IN
-from forgegraph.render.key import keys
-from forgegraph.render.style import isolated
+from forgegraph.drawing import text
+from forgegraph.drawing.figure import MARGIN_IN
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.style import isolated
 
 DPI = 600
 PT = DPI / 72  # pixels per point

@@ -98,7 +98,7 @@ Every named theme, format, GraphSpec, layout and schedule comes from a **pack**,
 
 A **config** lists the packs that may be used:
 
-- The main config, `~/.config/forgegraph/config.toml` (or the file `FORGEGRAPH_CONFIG` names), applies to all work. ForgeGraph writes it the first time it runs, listing the built-in packs.
+- The main config, `~/.config/forgegraph/config.toml` (or the file `FORGEGRAPH_CONFIG` names), applies to all work. ForgeGraph writes it, listing the built-in packs, the first time a command reads the configs, such as `catalog` or `render`.
 - A folder config, `forgegraph.toml`, applies to the files in its folder and every folder below it. A file may use only the packs it lists.
 - A pack that a folder config lists but the main config doesn't still works, but it's non-standard: graphs drawn with it are watermarked, and ForgeGraph's commands say so. That way you can make and try a pack without changing an organization's main config.
 
@@ -144,16 +144,16 @@ uv sync && uv run pre-commit install
 ```
 
 ```bash
-uv run pytest && uv run ruff check . && uv run pyright
+uv run pytest --full && uv run ruff check . && uv run pyright
 ```
 
 ## Repository map
 
 - **src/forgegraph/**: the package.
-  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `blank.py`: the themed canvas.
+  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `canvas.py`: the themed canvas.
   - **cli/**: the `forgegraph` command.
   - **spec/**: reading, checking and resolving specs, and the provenance record.
-  - **render/**: drawing, layout and lint. **layout/**: layouts. **jobs/**: scheduled renders.
+  - **drawing/**: drawing, layout and lint. **layouts/**: layouts. **jobs/**: scheduled renders.
   - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
   - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog/**, **catalogs/**: the catalog builder, and each definition's catalog file.
   - **skill/forgegraph/**: the agent skill.

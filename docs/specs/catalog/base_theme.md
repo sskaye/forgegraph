@@ -196,7 +196,7 @@ variations:          *# Every parameter of the theme, by category: its
     layer:\
         error_bar:\
             cap_size: {value: 0.8, from: error_bars}          *# \[positive float\]; Cap width, × base size.*\
-            color: {value: "#000000", from: error_bars}          *# \[series, hex color\]; Error bar color. series: the series' color.*\
+            color: {value: series, from: error_bars}          *# \[series, hex color\]; Error bar color. series: the series' color.*\
             line_width: {value: 0.25, from: error_bars}          *# \[positive float\]; Line width, × base size.*\
         reference_line:\
             line_style: {value: dotted, from: target}          *# \[solid, dashed, dotted, dashdot\]; Line style.*\

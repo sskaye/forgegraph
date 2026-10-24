@@ -33,6 +33,7 @@ def project(tmp_path, monkeypatch):
     return tmp_path
 
 
+@pytest.mark.slow
 def test_render_load_and_recover(project):
     result = runner.invoke(app, ["render", "graphspecs/p.yaml", "-o", "out/p", "--json"])
     assert result.exit_code == 0, result.output
@@ -150,6 +151,7 @@ def test_skill_install(tmp_path):
     assert _json(["skill", "install", "--dest", str(folder), "--force"])["result"] == "updated"
 
 
+@pytest.mark.slow
 def test_skill_examples_render(tmp_path):
     """The skill's example GraphSpecs and layout render as packaged, and its example schedule
     runs."""
@@ -327,3 +329,36 @@ def test_schema_says_when_a_spec_cant_be_used_here(project):
         "Not allowed here: pack 'acme' isn't in the configs that apply, so a GraphSpec here "
         "can't use 'acme/acme'"
     ]
+
+
+def test_version_and_help_load_no_drawing_libraries():
+    """`forgegraph --version` and `--help` answer at once: importing the package and its
+    command line loads neither matplotlib nor pandas."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, forgegraph, forgegraph.cli; "
+        "print(sorted(m for m in ('matplotlib', 'pandas') if m in sys.modules))"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert done.stdout.strip() == "[]"
+
+
+def test_every_import_form_gives_the_module_and_the_api_its_functions():
+    """No submodule shares a name with the API, so `import forgegraph.x as m` is the module
+    whichever is imported first, and fg.render, fg.layout and fg.blank are the API."""
+    import subprocess
+    import sys
+
+    code = (
+        "import types\n"
+        "import forgegraph.drawing.layers as a\n"
+        "import forgegraph.layouts as b\n"
+        "import forgegraph.canvas as c\n"
+        "import forgegraph as fg\n"
+        "assert all(isinstance(m, types.ModuleType) for m in (a, b, c))\n"
+        "api = (fg.render, fg.layout, fg.blank)\n"
+        "assert all(callable(f) and not isinstance(f, types.ModuleType) for f in api)\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

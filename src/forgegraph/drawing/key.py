@@ -1,7 +1,7 @@
 """Keys: a legend naming the series, or a style key explaining line styles and markers.
 
 ForgeGraph lays a key out itself, with every gap measured to the letters (see
-forgegraph.render.text): an optional title, then one row per entry, a line sample then the
+forgegraph.drawing.text): an optional title, then one row per entry, a line sample then the
 entry's name. The theme's legend parameters set the frame, its padding (the same on every
 side), the gaps between title and rows and between rows, the sample's length and its gap to
 the name, and the key's inset from the plot box.
@@ -24,9 +24,9 @@ from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation, Transform
 
-from forgegraph.render import text
-from forgegraph.render.marks import Bars
-from forgegraph.render.style import Style
+from forgegraph.drawing import text
+from forgegraph.drawing.marks import Bars
+from forgegraph.drawing.style import Style
 
 # Each position: where it is on the plot box (axes fraction), and which way the key extends
 # from it: right (1), left (-1) or centred (0); down (-1), up (1) or centred (0).

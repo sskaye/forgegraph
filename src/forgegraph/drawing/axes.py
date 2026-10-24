@@ -2,7 +2,7 @@
 
 - **Type** (data.type): decimal, integer, datetime or categorical. auto takes it from the
   column: dates and times, then numbers (integer for an integer column), otherwise
-  categorical. An integer axis's automatic ticks are whole numbers (forgegraph.render.ticks).
+  categorical. An integer axis's automatic ticks are whole numbers (forgegraph.drawing.ticks).
 - **Categories** sit at positions 0, 1, 2 … in data.order: as in the data (a pandas
   Categorical's own order), alphanumeric (natural: Run 2 before Run 10), or by the other
   axis's value (the total at each category), ascending or descending. Every value present is
@@ -43,9 +43,9 @@ from matplotlib.dates import date2num, num2date
 from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator
 
-from forgegraph.render.markup import literal
-from forgegraph.render.style import Style
-from forgegraph.render.ticks import LogTicks, NiceTicks, target
+from forgegraph.drawing.markup import literal
+from forgegraph.drawing.style import Style
+from forgegraph.drawing.ticks import LogTicks, NiceTicks, target
 
 
 class DrawError(ValueError):

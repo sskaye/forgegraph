@@ -14,6 +14,8 @@ from forgegraph.catalog.files import read
 from forgegraph.spec.documents import builtin
 from forgegraph.spec.parameters import graph_type_files
 
+pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
+
 FILES = [("theme", n) for n in sorted(builtin().docs["theme"])]
 FILES += [("format", n) for n in sorted(builtin().docs["format"])]
 FILES += [("graph_type", n) for n in graph_type_files()]

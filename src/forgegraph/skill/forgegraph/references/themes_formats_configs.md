@@ -37,7 +37,7 @@ To create a pack:
 
 A config lists the packs a GraphSpec may use, e.g. `packs = ["forgegraph_base", "./lab"]`. A folder pack is a path from the config file. `forgegraph schema config` lists the settings.
 
-- The main config, \~/.config/forgegraph/config.toml (or the file FORGEGRAPH_CONFIG names), applies to all work. ForgeGraph writes it, listing the built-in packs, the first time it runs.
+- The main config, \~/.config/forgegraph/config.toml (or the file FORGEGRAPH_CONFIG names), applies to all work. ForgeGraph writes it, listing the built-in packs, the first time a command reads the configs.
 - A folder config, forgegraph.toml, applies to the files in its folder and in every folder below it. A file uses the nearest one: in its own folder, or else in the closest folder above it.
 - When both apply, a file may use only the packs the folder config lists. A pack the main config doesn't list works, but it's non-standard: whatever is drawn with it is watermarked, and ForgeGraph's commands say so.
 - A pack's specs may build on specs in any pack a config that applies lists, or in an installed pip pack, even if a GraphSpec may not use that pack.

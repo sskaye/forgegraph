@@ -182,6 +182,7 @@ class PlaceShift(Transform):
     points (slots): side-by-side marks, wherever they're drawn."""
 
     input_dims = output_dims = 2  # type: ignore[assignment]  # matplotlib declares them so
+    pass_through = True  # it keeps no cache of its own, so it always passes a change on
 
     def __init__(self, ax: Axes, base_axis: str, shifts: dict[float, float]) -> None:
         super().__init__(shorthand_name="place shift")
@@ -197,6 +198,11 @@ class PlaceShift(Transform):
             self.shifts.get(_key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in flat[:, self.k]
         ]
         return out.reshape(points.shape)
+
+    def _invalidate_internal(self, level: int, invalidating_node: Any) -> None:
+        # Its non-affine part reads the data transform's affine part, so any change to that is
+        # a full change here: lines drawn through it then redo their paths (#2).
+        super()._invalidate_internal(Transform._INVALID_FULL, invalidating_node)  # type: ignore[attr-defined]
 
     def inverted(self) -> Transform:  # for picking only: the place, without its shift
         return self.ax.transData.inverted()

@@ -464,3 +464,49 @@ def test_a_labels_value_takes_its_own_format_or_its_axiss():
         len(t.get_text().split(".")[1]) for t in g.axes.get_xticklabels() if "." in t.get_text()
     )
     assert layer_texts(g, REFERENCE) == [f"{1.5:.{x_decimals + 1}f}"]  # the x axis's ticks
+
+
+def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
+    """Each series' error bars stay on its own bars, moved by its side-by-side offset: as
+    drawn, after layout has changed the axes, not where they were first placed (#2)."""
+    from forgegraph.render.marks import Bars
+
+    df = pd.DataFrame(
+        {
+            "kind": ["A"] * 9 + ["B"] * 9,
+            "series": (["x"] * 3 + ["y"] * 3 + ["z"] * 3) * 2,
+            "value": [30, 32, 34, 20, 22, 26, 40, 45, 50, 25, 27, 29, 15, 18, 21, 35, 37, 42],
+        }
+    )
+    g = graph(
+        {"spread": {"type": "error_bar"}},
+        df,
+        **{
+            "axis.x.data.column": "kind",
+            "axis.y.data.column": "value",
+            "axis.y.data.aggregation": "mean",
+            "axis.x.tick.algorithm": "all",
+            "encoding.color": "series",
+            "series.offset": "side_by_side",
+            "legend.key.inside": False,
+            "mark.bar.show": True,
+            "mark.line.show": False,
+            "mark.marker.show": False,
+        },
+    )
+    g.figure.canvas.draw()
+    centres = {
+        str(b.color): sorted((r.x0 + r.x1) / 2 for r in b.rectangles())
+        for b in g.axes.collections
+        if isinstance(b, Bars)
+    }
+    stems = [ln for ln in layer_lines(g, ERROR_BAR) if ln.get_marker() in ("None", "", None)]
+    assert len(stems) == 3
+    for stem in stems:
+        # what the last draw used, which a stale cache would leave where the stem began
+        drawn = stem._get_transformed_path().get_fully_transformed_path().vertices
+        now = stem.get_transform().transform(stem.get_xydata())
+        finite = np.isfinite(now).all(axis=1)
+        np.testing.assert_allclose(drawn[finite], now[finite], atol=0.01)
+        xs = sorted(set(np.round(drawn[finite][:, 0], 1)))
+        np.testing.assert_allclose(xs, centres[str(stem.get_color())], atol=1.0)

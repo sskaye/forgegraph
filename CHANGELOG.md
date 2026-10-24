@@ -8,6 +8,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 - `forgegraph --version` and `--help` no longer load matplotlib and pandas, so they answer at once, even on a new install. The API loads on first use.
 - The README and the skill's reference say when the main config is written: the first time a command reads the configs, such as `catalog` or `render`.
+- Error bars on side-by-side bars (`series.offset: side_by_side`) are drawn on their own bars. Before, every series but the middle one had its error bars drawn where they were first placed, before layout, usually off the axes.
 
 ## 0.1.0 (2026-10-24)
 

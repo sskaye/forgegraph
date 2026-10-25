@@ -137,7 +137,7 @@ def _pack_fields(kind: str) -> list[dict[str, Any]]:
     config: each with its example value, range and description."""
     import re
 
-    from forgegraph.packs import base_folder
+    from forgegraph.spec.parameters import base_folder
 
     source = base_folder() / "pack.yaml" if kind == "pack" else base_folder().parent / "config.toml"
     rows = []

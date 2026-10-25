@@ -10,7 +10,7 @@ import pytest
 
 import forgegraph
 from forgegraph.catalog_build import build
-from forgegraph.packs import BASE
+from forgegraph.spec.parameters import BASE
 
 PACKAGE = Path(forgegraph.__file__).parent
 

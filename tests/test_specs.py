@@ -13,7 +13,7 @@ import pytest
 
 from forgegraph.spec.documents import Registry, builtin, drawing_problems, resolve, validate
 from forgegraph.spec.parameters import (
-    BASE_PACK,
+    BASE,
     CORE_KINDS,
     HEADER,
     KINDS,
@@ -31,7 +31,7 @@ from forgegraph.spec.parameters import (
 
 def reference_name(kind: str) -> str:
     """The name of the file that specifies a kind: ForgeGraph's own, or the base pack's."""
-    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE_PACK}/{REFERENCE[kind]}"
+    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE}/{REFERENCE[kind]}"
 
 
 DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layers aren't

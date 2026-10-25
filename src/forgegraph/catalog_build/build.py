@@ -24,9 +24,9 @@ from forgegraph.catalog_build.examples import NONSTANDARD, Change, draw, image
 from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.graph import Graph, SpecError
-from forgegraph.packs import BASE, Pack
+from forgegraph.packs import Pack
 from forgegraph.spec.documents import Registry, builtin, resolve
-from forgegraph.spec.parameters import NONE, Parameter, graph_type_files
+from forgegraph.spec.parameters import BASE, NONE, Parameter, graph_type_files
 
 COMMENTS = "<!-- forgemark-comments"
 DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough to commit

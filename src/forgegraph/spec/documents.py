@@ -39,19 +39,18 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from forgegraph.fonts import WEIGHTS, font_available, font_weights, register_pack_fonts
+from forgegraph.packs import FOLDERS as PACK_FOLDERS
 from forgegraph.packs import (
-    BASE,
     Config,
     Pack,
-    base_folder,
     fonts,
     pip_packs,
     read_pack,
     setup,
     user_config,
 )
-from forgegraph.packs import FOLDERS as PACK_FOLDERS
 from forgegraph.spec.parameters import (
+    BASE,
     COLLECTIONS,
     CORE_KINDS,
     HEADER,
@@ -60,6 +59,8 @@ from forgegraph.spec.parameters import (
     SECTIONS,
     STEP,
     Parameter,
+    base_folder,
+    categories,
     check_parameter,
     check_value,
     definitions,
@@ -592,19 +593,11 @@ def _allows(reg: Registry) -> str:
     return " and ".join(str(c.path) for c in reg.configs) + " doesn't allow"
 
 
-@cache
-def _categories() -> frozenset[str]:
-    """The top-level categories of every kind's parameters."""
-    paths = [p for k in ("graphspec", "theme", "format") for p in definitions(k)]
-    paths += [p for gt in graph_type_files() for p in definitions("graph_type", gt)]
-    return frozenset(p.split(".")[0] for p in paths)
-
-
 def _header(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
     errors = [f"{k}: required" for k in HEADER if k not in doc]
     errors += [
         f"{k}: a category of parameters; it goes under {SECTIONS[1]} or {SECTIONS[0]}"
-        if k in _categories()
+        if k in categories("graphspec", "theme", "format", "graph_type")
         else f"{k}: unknown field; a file has only {', '.join(HEADER)}"
         for k in doc
         if k not in HEADER

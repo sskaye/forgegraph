@@ -201,7 +201,7 @@ def catalog_build(
     from forgegraph.catalog_build.build import build
     from forgegraph.catalog_build.files import CatalogError
     from forgegraph.catalog_build.forgemark import ForgemarkError
-    from forgegraph.packs import BASE
+    from forgegraph.spec.parameters import BASE
 
     chosen = _pack(pack, as_json)
     if out is None:

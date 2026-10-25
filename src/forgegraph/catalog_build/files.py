@@ -23,9 +23,16 @@ from forgegraph.catalog_build.examples import SPECIAL, Change, Variation
 from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.documents import Registry, load_yaml, resolve
-from forgegraph.spec.parameters import NONE, Parameter, check_parameter, definitions, flatten
+from forgegraph.spec.parameters import (
+    KINDS,
+    NONE,
+    Parameter,
+    check_parameter,
+    definitions,
+    flatten,
+)
 
-FOLDERS = {"theme": "themes", "format": "formats", "graph_type": "graph_types", "layer": "layers"}
+FOLDERS = {kind: KINDS[kind] for kind in ("theme", "format", "graph_type", "layer")}
 HEADER = ("name", "version", "description", "extends", "baseline", "baselines", "variations")
 LAYER_HEADER = (*HEADER[:5], "settings", "layer", *HEADER[5:])
 NO_CARD = "no_card"

@@ -146,6 +146,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: A. The three tests that monkeypatch documents would need retargeting under B too, so a facade saves less than it seems.
     
     Cost: mostly moved code; about 30 import lines in src.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:13Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 2
   anchor_text: "2. \"The specs a document names\" is written a dozen times"
   context_before: "6-line module, which imports spec/layout.py lazily while layout imports it back."
@@ -161,6 +166,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. A layout that names a theme, or a new named kind, becomes a one-line change, and validation leaves graph.py and layouts.
     
     Cost: about 90 lines; messages unchanged, so no test changes.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:13Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 3
   anchor_text: "3. Resolved values come in three shapes"
   context_before: "and a layout a format, is re-derived in about twelve places across four modules."
@@ -176,6 +186,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, in the same pass as 1. Explain becomes a typed structure, which Studio will need.
     
     Cost: about 60 lines across 12 files; 5 test lines that index [0].
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:13Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 4
   anchor_text: "4. A loaded document travels as a tuple"
   context_before: "xed, or plain values, and about twenty call sites index or convert between them."
@@ -191,6 +206,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. It's also where per-document caching of chains and entries would go, which today are recomputed on every call.
     
     Cost: about 120 lines across graph, layouts, jobs and the CLI.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:13Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 5
   anchor_text: "5. graph.py is also the shared library"
   context_before: "nd \"a relative path is found from the file that sets it\" is written three times."
@@ -211,6 +231,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. One subtlety to keep: Graph.record inspects only after the provenance-off check, Layout.record before it, so the off check stays with each caller.
     
     Cost: about 150 lines moved, 20 imports.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:13Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 6
   anchor_text: "6. The end of a render is written twice"
   context_before: "d spec checks from graph.py, and the provenance record is assembled three times."
@@ -226,6 +251,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. The snapshot-after-the-one-lint-draw rule is then written once, so the two render paths can't drift.
     
     Cost: about 60 lines, keeping the order check, snapshot, hash.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 7
   anchor_text: "7. The CLI and jobs branch on \"is it a layout\""
   context_before: "me steps, line for line, and a tile copies a prepared graph's fields one by one."
@@ -241,6 +271,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. A third drawn type would need no changes there.
     
     Cost: about 40 lines; outputs unchanged.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 8
   anchor_text: "8. Small duplicated constants"
   context_before: "ears nine times, choosing between two code paths that differ only in small ways."
@@ -256,6 +291,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, with 1.
     
     Cost: about 20 lines.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#10.
 - id: 9
   anchor_text: "9. Helpers in xy.py reach other modules as callbacks"
   context_before: Drawing
@@ -271,6 +311,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. Six callback parameters go, xy.place drops from 30 lines to about 8, and each module's dependencies show in its imports.
     
     Cost: about 100 lines, mostly moved; tests are black-box here.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 10
   anchor_text: "10. The render passes are driven twice"
   context_before: "he color bar receive general helpers from xy.py as lambdas and extra parameters."
@@ -286,6 +331,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, with 11. A future graph type then provides draw, place and label only.
     
     Cost: about 80 lines, most outside drawing/; one test monkeypatch retargeted.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 11
   anchor_text: "11. The layout settle loop is written twice"
   context_before: "and label passes, through a five-function protocol each graph type must provide."
@@ -309,6 +359,10 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     - author: Steven
       timestamp: "2026-10-25T13:10:01.465Z"
       body: "I can see both arguments. I’d go with whichever is easier to maintain and keep consistent in the long-term. That seems like B, but you’d know better than me."
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#11, as option B: one graph is laid out as a grid of one tile. Positions moved only in the last bit of a float (figure sizes by up to 9e-16 in), so a few anti-aliasing pixels differ on two catalog cards and one image baseline. Nothing visible changed.
 - id: 12
   anchor_text: "12. A series' stack, shifts and look travel in parallel lists"
   context_before: "ure-and-settle algorithm, and figure.py mixes the figure classes with measuring."
@@ -324,6 +378,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, with 14.
     
     Cost: about 90 lines in xy, marks and layers; no tests use these internals.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 13
   anchor_text: "13. The four style dimensions are listed in five places"
   context_before: "ther at five sites, and whether a series is the benchmark is decided four times."
@@ -339,6 +398,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. A new encoding becomes one row, and the lists can't drift apart. It also makes the renames (decision 1) touch one table instead of five lists.
     
     Cost: about 60 lines in xy.py.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 14
   anchor_text: "14. xy.draw is one 170-line function"
   context_before: "style, marker shape and marker fill each appear in five separate lists in xy.py."
@@ -354,6 +418,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, after 12, which removes most of its first stage.
     
     Cost: about 170 lines moved, order kept.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:14Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 15
   anchor_text: "15. axes.py holds three modules"
   context_before: "aws layers, sets the axes and decorates, in one function sharing all its locals."
@@ -369,6 +438,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it.
     
     Cost: about 300 lines moved, five import sites.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 16
   anchor_text: "16. What a label must stay clear of is defined four ways"
   context_before: "subsystem and the exception class other modules need are in one 675-line module."
@@ -384,6 +458,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. One place to read or change the clearance rules, which is also where the possible bug below would be fixed if it's ever seen.
     
     Cost: about 70 lines; box_clear kept as a thin wrapper for one test.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 17
   anchor_text: "17. Orientation is passed as strings"
   context_before: "is defined four ways Each kind of placed text builds its own list of obstacles."
@@ -401,6 +480,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     B. Leave it.
     
     Recommendation: B for now. It touches about 120 lines for the smallest gain here, and 12 and 14 remove some of the conditionals anyway. Worth revisiting if a horizontal-first graph type is added.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Not done, as agreed.
 - id: 18
   anchor_text: "18. A theme font is built the same way at eight sites"
   context_before: "Orientation is passed as strings About 40 conditionals choose between x and y."
@@ -416,6 +500,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it.
     
     Cost: about 20 lines.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#11.
 - id: 19
   anchor_text: "19. The catalog card loop does four jobs"
   context_before: "CLI, catalog, tests and scripts"
@@ -431,6 +520,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, before the catalog rule. The rule's "first baseline where the card changes the drawing" then becomes place() trying baselines through Drawings, and the perturbation test can't drift from the build.
     
     Cost: about 150 lines in build.py, a 90-line module, 30 test lines.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 20
   anchor_text: "20. Tests write spec documents and projects by hand"
   context_before: "ble and places the cards, and the perturbation test re-implements the placement."
@@ -446,6 +540,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. A header change becomes one edit instead of 30. It's also most of the work the renames would otherwise do by hand in tests.
     
     Cost: test code only; about 200 lines removed, 50 added.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:15Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 21
   anchor_text: "21. Forgemark's file format is defined in five places"
   context_before: "ame project setup appears six times, and two copies of a document builder exist."
@@ -465,6 +564,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: B.
     
     Cost: about 60 lines across 7 files.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 22
   anchor_text: "22. Every CLI command repeats its failure and output code"
   context_before: "onto a rebuilt page and stripping review markup are each written more than once."
@@ -488,6 +592,10 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     - author: Steven
       timestamp: "2026-10-25T13:12:14.761Z"
       body: B
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9, as option B: errors that list problems, a pack problem among them, print as problems instead of a traceback.
 - id: 23
   anchor_text: "23. Baselines and their regression check are drawn separately"
   context_before: "atches its errors and prints JSON or text in its own copy of the same few lines."
@@ -503,6 +611,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. The baseline and its check can't drift apart.
     
     Cost: about 40 lines.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 24
   anchor_text: "24. The skill evals' grade function is 270 lines"
   context_before: "elines and the test that compares against them each have their own drawing code."
@@ -518,6 +631,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it, checked by regrading a saved run set before and after and comparing the results. That's a regrade of existing transcripts, not a new eval run.
     
     Cost: a dev script reorganised; no tests cover it.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 25
   anchor_text: "25. test_catalog.py keeps fast tests out of the dev suite"
   context_before: "about 25 expectations inline, and draws and resolves the final GraphSpec twice."
@@ -533,6 +651,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it. Catalog-rule regressions are then caught in the dev suite, which matters once the catalog rule changes those rules.
     
     Cost: moved code only.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 26
   anchor_text: "26. The visual changelog parses card figures with its own regex"
   context_before: "ev suite The whole module is marked slow, though most of its tests draw nothing."
@@ -548,6 +671,11 @@ Found in passing, not seen in use, so deferred: direct labels are placed after s
     Recommendation: do it.
     
     Cost: about 10 lines.
+  replies:
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#9.
 - id: 27
   anchor_text: "Not a refactoring"
   context_before: "res with its own regex It reads the markup page.py writes, with its own pattern."

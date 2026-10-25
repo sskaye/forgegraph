@@ -86,6 +86,37 @@ class Roles:
     value_columns: list[str]
 
 
+@dataclass(frozen=True)
+class Look:
+    """A series' sizes, edges and z-orders, from the theme's series.* parameters, or the
+    benchmark's (series.benchmark.*): sizes in points."""
+
+    line_width: float
+    marker_size: float
+    edge: str  # a filled marker's outline color, or "none"
+    edge_width: float
+    bar_width: float
+    bar_edge: str
+    bar_edge_width: float
+    line_z: float
+    bar_z: float
+
+
+def _look(style: Style, benchmark: bool) -> Look:
+    b = "benchmark." if benchmark else ""
+    return Look(
+        style.pt(f"series.{b}line.width"),
+        style.pt(f"series.{b}marker.size"),
+        style.color(f"series.{b}marker.edge_color"),
+        style.pt(f"series.{b}marker.edge_width"),
+        style.pt(f"series.{b}bar.width"),
+        style.color(f"series.{b}bar.edge_color"),
+        style.pt(f"series.{b}bar.edge_width"),
+        3 if benchmark else 2,
+        2.8 if benchmark else 1.8,
+    )
+
+
 @dataclass
 class Series:
     x: np.ndarray
@@ -95,11 +126,14 @@ class Series:
     marker: str
     fill: str  # filled | open
     label: str | None  # the color group's name, or the benchmark's
+    look: Look
     benchmark: bool = False
     values: np.ndarray | None = None  # a numeric encoding.color's value at each point
     order: tuple[int, ...] = ()  # position of its groups, for drawing and legend order
     rows: Any = None  # the frame's rows it was drawn from, for layers
     place_column: str = ""  # the frame's base-axis column
+    stack: marks.Stacked | None = None  # where its marks start and end (draw)
+    shifts: dict[float, float] = field(default_factory=dict)  # its offset at each place (draw)
 
 
 @dataclass
@@ -115,8 +149,6 @@ class Drawn:
     # what place() and label() need from draw(), once the figure's size is final
     series: list[Series] = field(default_factory=list)
     roles: Roles | None = None
-    stacked: list[Any] = field(default_factory=list)
-    offsets: list[dict[float, float]] = field(default_factory=list)
     ref_lines: list[layers.RefLine] = field(default_factory=list)
     layers: dict[str, dict[str, Any]] = field(default_factory=dict)  # each layer, by name
     label_groups: list[labelling.Labelled] = field(default_factory=list)
@@ -461,6 +493,7 @@ def _series(
                 MARKERS[b["series.benchmark.marker.shape"]],
                 b["series.benchmark.marker.fill"],
                 None if bench_col == x else str(bench_value),  # named on its axis already
+                _look(style, True),
                 benchmark=True,
             )
         else:
@@ -475,6 +508,7 @@ def _series(
                 shape,
                 fill,
                 label,
+                _look(style, False),
                 values=np.asarray(_col(rows, color_col), dtype=float)
                 if numeric_color and color_col
                 else None,
@@ -528,8 +562,9 @@ def draw(
     log_values = gt[f"axis.{r.value}.scale"] == "log"
     stacked = marks.stack(series, gt["series.aggregation"], log_values)
     for s, st in zip(series, stacked, strict=True):
-        s.y = st.top  # lines and markers sit at the top of their stack
-    offsets = marks.slots(series, gt, style)
+        s.stack, s.y = st, st.top  # lines and markers sit at the top of their stack
+    for s, shifts in zip(series, marks.slots(series, gt, style), strict=True):
+        s.shifts = shifts
     bars_shown = bool(gt["mark.bar.show"])
 
     def as_xy(base: Any, value: Any) -> tuple[Any, Any]:
@@ -537,8 +572,6 @@ def draw(
         return (base, value) if r.base == "x" else (value, base)
 
     lines_shown, markers_shown = bool(gt["mark.line.show"]), bool(gt["mark.marker.show"])
-    edge = style.color("series.marker.edge_color")
-    edge_width = style.pt("series.marker.edge_width")
     cmap, norm = style.colormap(), None
     color_col = gt["encoding.color"]
     numeric = any(s.values is not None for s in series)
@@ -548,49 +581,31 @@ def draw(
     handles: dict[str, Line2D | marks.Bars] = {}
     paths: dict[str, list[np.ndarray]] = {}
     colors: dict[str, Any] = {}
-    for s, st, offset in zip(series, stacked, offsets, strict=True):
-        lw = (
-            style.pt("series.benchmark.line.width")
-            if s.benchmark
-            else style.pt("series.line.width")
-        )
-        ms = (
-            style.pt("series.benchmark.marker.size")
-            if s.benchmark
-            else style.pt("series.marker.size")
-        )
+    for s in series:
+        look = s.look
         line_color = s.color
         if s.values is not None and norm is not None:
             line_color = cmap(norm(float(np.nanmean(s.values))))
         open_marker = s.fill == "open"
-        rim, rim_width = (
-            (
-                style.color("series.benchmark.marker.edge_color"),
-                style.pt("series.benchmark.marker.edge_width"),
-            )
-            if s.benchmark
-            else (edge, edge_width)
-        )
+        rim, rim_width = look.edge, look.edge_width
         px, py = as_xy(s.x, s.y)
         (line,) = ax.plot(
             px,
             py,
             color=line_color,
             linestyle=s.linestyle if lines_shown else "none",
-            linewidth=lw,
+            linewidth=look.line_width,
             marker=s.marker if markers_shown and s.values is None else "none",
-            markersize=ms,
+            markersize=look.marker_size,
             markerfacecolor="none" if open_marker else line_color,
             markeredgecolor=line_color if (open_marker or rim == "none") else rim,
             markeredgewidth=rim_width if (open_marker or rim != "none") else 0.0,
-            zorder=3 if s.benchmark else 2,
+            zorder=look.line_z,
         )
-        line.set_transform(marks.shifted(ax, r.base, offset))
+        line.set_transform(marks.shifted(ax, r.base, s.shifts))
         handle = line
         if bars_shown:
-            bar = marks.bars(
-                ax, s, st, style, r.base, offset, line_color, 2.8 if s.benchmark else 1.8
-            )
+            bar = marks.bars(ax, s, r.base, line_color)
             if not (lines_shown or markers_shown):
                 handle = bar  # the key's sample is a swatch of the bar
         if s.values is not None and markers_shown and norm is not None:
@@ -601,18 +616,18 @@ def draw(
                 cmap=cmap,
                 norm=norm,
                 marker=s.marker,
-                s=ms**2,
-                edgecolors="none" if edge == "none" else edge,
-                linewidths=edge_width,
+                s=look.marker_size**2,
+                edgecolors="none" if look.edge == "none" else look.edge,
+                linewidths=look.edge_width,
                 zorder=2.5,
             )
-            dots.set_offset_transform(marks.shifted(ax, r.base, offset))
+            dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts))
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)
             paths.setdefault(s.label, []).append(np.c_[marks.numbers(px), marks.numbers(py)])
 
-    layers.error_bars(ax, listed, series, frame, gt, style, r, offsets)
+    layers.error_bars(ax, listed, series, frame, gt, style, r)
     lines = layers.reference_lines(ax, listed, series, frame, style, drawn.kinds)
 
     ax.set_xscale(gt["axis.x.scale"])
@@ -668,8 +683,6 @@ def draw(
     drawn.style_keys = _style_keys(gt, frame, style)
     drawn.y_title = yt if r.value == "y" else xt
     drawn.roles = r
-    drawn.stacked = stacked
-    drawn.offsets = offsets
     drawn.layers = listed
     layers.notes_outside(ax, listed, style)
     return drawn
@@ -680,7 +693,7 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     labels. True if an axis was widened, so the figure must be laid out again."""
     r = cast(Roles, drawn.roles)  # draw() set it
     marks.check_room(ax, drawn.series, gt, style, r.base)
-    widened = marks.value_labels(ax, drawn.series, drawn.stacked, drawn.offsets, gt, style, r.base)
+    widened = marks.value_labels(ax, drawn.series, gt, style, r.base)
     return layers.label_lines(ax, drawn.ref_lines, gt, style) or widened
 
 

@@ -337,7 +337,6 @@ def error_bars(
     gt: dict[str, Any],
     style: Style,
     roles: Any,
-    offsets: list[dict[float, float]],
 ) -> None:
     """Draw each error_bar layer on every series, moved by its side-by-side offsets."""
     t = style.theme
@@ -362,7 +361,7 @@ def error_bars(
                 f"stands for, so set axis.{roles.value}.data.aggregation too"
             )
         log = gt[f"axis.{axis}.scale"] == "log"
-        for s, offset in zip(series, offsets, strict=True):
+        for s in series:
             centres = marks.numbers(s.y if along_value else s.x)
             distances = {}
             for end in ("lower", "upper"):
@@ -390,7 +389,7 @@ def error_bars(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
                 )
             places = marks.numbers(s.x if along_value else s.y)
-            shifted = marks.shifted(ax, roles.base, offset)
+            shifted = marks.shifted(ax, roles.base, s.shifts)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
 
 

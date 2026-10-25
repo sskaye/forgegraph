@@ -151,12 +151,19 @@ def numbers(values: Any) -> np.ndarray:
     return np.asarray(values, dtype=float)
 
 
-def widths(s: Any, gt: dict[str, Any], style: Style) -> float:
+def widths(s: Any, gt: dict[str, Any]) -> float:
     """A series' mark width along the base axis, in points: its bars, or its markers."""
-    bench = "benchmark." if s.benchmark else ""
-    if gt["mark.bar.show"]:
-        return style.pt(f"series.{bench}bar.width")
-    return style.pt(f"series.{bench}marker.size")
+    return s.look.bar_width if gt["mark.bar.show"] else s.look.marker_size
+
+
+def _present(series: list[Any]) -> dict[float, list[int]]:
+    """The series with a mark at each place (by key), by their positions in series."""
+    at: dict[float, list[int]] = {}
+    for i, s in enumerate(series):
+        for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
+            if np.isfinite(p) and np.isfinite(v):
+                at.setdefault(key(p), []).append(i)
+    return at
 
 
 def slots(series: list[Any], gt: dict[str, Any], style: Style) -> list[dict[float, float]]:
@@ -165,14 +172,9 @@ def slots(series: list[Any], gt: dict[str, Any], style: Style) -> list[dict[floa
     if gt["series.offset"] != "side_by_side":
         return [{} for _ in series]
     gap = style.pt("series.bar.gap") if gt["mark.bar.show"] else 0.0
-    at: dict[float, list[int]] = {}
-    for i, s in enumerate(series):
-        for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
-            if np.isfinite(p) and np.isfinite(v):
-                at.setdefault(key(p), []).append(i)
     out: list[dict[float, float]] = [{} for _ in series]
-    for place, present in at.items():
-        each = [widths(series[i], gt, style) for i in present]
+    for place, present in _present(series).items():
+        each = [widths(series[i], gt) for i in present]
         start = -(sum(each) + gap * (len(each) - 1)) / 2
         for i, w in zip(present, each, strict=True):
             out[i][place] = start + w / 2
@@ -328,29 +330,21 @@ def _whole(distance: float, centre: float) -> float:
     return float(np.sign(distance) * (np.floor(size + 0.5) + base))
 
 
-def bars(
-    ax: Axes,
-    s: Any,
-    stacked: Stacked,
-    style: Style,
-    base_axis: str,
-    shifts: dict[float, float],
-    color: Any,
-    zorder: float,
-) -> Bars:
-    """One series' bars, in the theme's bar look (the benchmark's for the benchmark)."""
-    bench = "benchmark." if s.benchmark else ""
+def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
+    """One series' bars, from its stack, at its shifts, in its look's bar width, edge and
+    z-order."""
+    look = s.look
     collection = Bars(
         ax,
         numbers(s.x),
-        stacked,
+        s.stack,
         base_axis,
-        shifts,
-        style.pt(f"series.{bench}bar.width"),
+        s.shifts,
+        look.bar_width,
         color,
-        style.color(f"series.{bench}bar.edge_color"),
-        style.pt(f"series.{bench}bar.edge_width"),
-        zorder,
+        look.bar_edge,
+        look.bar_edge_width,
+        look.bar_z,
     )
     ax.add_collection(collection, autolim=False)
     ends = [
@@ -372,12 +366,7 @@ def check_room(
     if not (gt["mark.bar.show"] or side):
         return
     gap = style.pt("series.bar.gap") if gt["mark.bar.show"] else 0.0
-    at: dict[float, list[float]] = {}
-    for s in series:
-        w = widths(s, gt, style)
-        for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
-            if np.isfinite(p) and np.isfinite(v):
-                at.setdefault(key(p), []).append(w)
+    at = {p: [widths(series[i], gt) for i in present] for p, present in _present(series).items()}
     places = sorted(at)
     if len(places) < 2:
         return
@@ -411,13 +400,7 @@ def _contrast(a: str, b: str) -> float:
 
 
 def value_labels(
-    ax: Axes,
-    series: list[Any],
-    stacked: list[Stacked],
-    offsets: list[dict[float, float]],
-    gt: dict[str, Any],
-    style: Style,
-    base_axis: str,
+    ax: Axes, series: list[Any], gt: dict[str, Any], style: Style, base_axis: str
 ) -> bool:
     """Write the values (series.value_label) after layout, in series.value_label.format (see
     axes.number_text). Returns True if the value axis was widened to fit them, so the figure
@@ -476,10 +459,11 @@ def value_labels(
         made.append(a)
         return a
 
-    for s, st, shifts in zip(series, stacked, offsets, strict=True):
+    for s in series:
         if not show:
             break
-        width = widths(s, gt, style)
+        st, shifts = s.stack, s.shifts
+        width = widths(s, gt)
         for place, bottom, top, value in zip(
             numbers(s.x), st.bottom, st.top, st.value, strict=True
         ):
@@ -515,8 +499,8 @@ def value_labels(
     if total:
         ends: dict[tuple[bool, float], tuple[float, float]] = {}
         sums: dict[tuple[bool, float], float] = {}
-        for s, st in zip(series, stacked, strict=True):
-            for place, top, value in zip(numbers(s.x), st.top, st.value, strict=True):
+        for s in series:
+            for place, top, value in zip(numbers(s.x), s.stack.top, s.stack.value, strict=True):
                 if np.isfinite(top) and np.isfinite(value):
                     pile = (s.benchmark, float(place))
                     lo, hi = ends.get(pile, (0.0, 0.0))

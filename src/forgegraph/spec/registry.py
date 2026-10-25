@@ -121,6 +121,15 @@ class Registry:
             return f"isn't allowed: no config lists it, and without one only {BASE} may be used"
         return " and ".join(str(c.path) for c in self.configs) + " doesn't allow"
 
+    def spec_record(self, kind: str, name: str) -> dict[str, Any]:
+        """A spec's name and version, and its pack's version if it's a pack's, as provenance
+        records it."""
+        out = {"name": name, "version": self.docs[kind][name]["version"]}
+        pack = self.pack_of(kind, name)
+        if pack is not None:
+            out["pack_version"] = self.packs[pack].version
+        return out
+
     def copy(self) -> Registry:
         """A registry to add to without changing this one."""
         return Registry(

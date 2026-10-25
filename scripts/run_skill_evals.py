@@ -269,7 +269,7 @@ def _created_styles(ws: Path) -> list[str]:
 def _drawn(final: Path) -> tuple[Any, pd.DataFrame | None, str]:
     """The final GraphSpec drawn, its Parquet data, and why either failed."""
     import forgegraph as fg
-    from forgegraph.graph import data_path
+    from forgegraph.data import data_path
     from forgegraph.spec.loaded import load_document
 
     try:
@@ -426,7 +426,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         where = "no GraphSpec in the folder"
         ok = bool(specs) and bool(images)
         if specs:
-            from forgegraph.graph import data_path
+            from forgegraph.data import data_path
             from forgegraph.spec.loaded import load_document
 
             try:
@@ -580,7 +580,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
     if "numeric_columns" in expect:
         evidence, ok = "no GraphSpec in the project", False
         if specs:
-            from forgegraph.graph import data_path
+            from forgegraph.data import data_path
             from forgegraph.spec.loaded import load_document
 
             final = specs[-1]

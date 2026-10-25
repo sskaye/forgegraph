@@ -25,7 +25,6 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from forgegraph import __version__
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing.axes import DrawError
 from forgegraph.drawing.figure import (
@@ -43,24 +42,14 @@ from forgegraph.drawing.figure import (
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
-from forgegraph.graph import (
-    PLACE_PASSES,
-    Inspected,
-    Prepared,
-    Saved,
-    SpecError,
-    fixed_limits,
-    pixel_hash,
-    prepare,
-    recorded,
-    spec_record,
-)
+from forgegraph.drawn import Inspected, Saved, SpecError, pixel_hash
+from forgegraph.graph import PLACE_PASSES, Prepared, fixed_limits, prepare
 from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
 from forgegraph.spec.loaded import Loaded, load_document, placed
-from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord, created, plain
+from forgegraph.spec.provenance import DataRecord, TileRecord, graph_fields, record
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, Values, resolve
 from forgegraph.spec.validate import named_problems, validate
@@ -92,11 +81,8 @@ class Tile:
         """Its provenance record; it was drawn in the layout's format, not its own."""
         return TileRecord(
             file=self.file,
-            graphspec=recorded(self.spec, full),
             specs={**self.specs, "format": layout_format},
-            resolved=plain(self.values) if full else None,
-            data=self.data.file if full else None,
-            preprocessing=self.data.preprocessing if full else None,
+            **graph_fields(self.spec, self.values, self.data, full),
         )
 
 
@@ -207,10 +193,8 @@ class Layout(Saved):
             return None
         full = level == "full"
         fmt = self.specs["format"]
-        record = ProvenanceRecord(
-            provenance_level=level,
-            forgegraph_version=__version__,
-            created=created(),
+        return record(
+            level,
             specs=self.specs,
             nonstandard=nonstandard,
             nonstandard_packs=packs or None,
@@ -219,7 +203,6 @@ class Layout(Saved):
                 t.name: {n: tile.record(full, fmt) for n, tile in t.tiles.items()} for t in shown
             },
         )
-        return record.model_dump(exclude_none=True)
 
     def save_all(self, stem: str | Path) -> list[Path]:
         """Save every file type the format lists. html: one page with every tab; pdf: one file,
@@ -443,7 +426,7 @@ def render_layout(
     layout = Layout(doc, values, own, fmt.plain())
     layout.specs = {
         "layout": {"name": doc["name"], "version": doc["version"]},
-        "format": spec_record("format", values["specifications.format"], reg),
+        "format": reg.spec_record("format", values["specifications.format"]),
     }
     layout._own_packs = sorted(packs_used("layout", doc, reg) & reg.nonstandard)
     prepared: dict[str, dict[str, Prepared]] = {}

@@ -158,7 +158,7 @@ Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye
 ## Repository map
 
 - **src/forgegraph/**: the package.
-  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `canvas.py`: `fg.blank`, the themed canvas.
+  - `graph.py`: the Python API (`fg.xy`, `fg.render`, `fg.graphspec`, `fg.load`) and the `Graph` object; `canvas.py`: `fg.blank`, the themed canvas; `drawn.py`: what they and layouts share once drawn; `data.py`: reading a GraphSpec's data.
   - **cli/**: the `forgegraph` command.
   - **spec/**: reading, checking and resolving specs, and the provenance record.
   - **drawing/**: drawing, layout and lint. **layouts/**: `fg.layout` and layouts. **jobs/**: scheduled renders.

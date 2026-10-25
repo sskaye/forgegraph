@@ -189,7 +189,7 @@ def _is_layout(path: Path) -> bool:
 
 def data_files(target: Path) -> list[Path]:
     """The Parquet files a GraphSpec or layout draws from, as its files name them."""
-    from forgegraph.graph import data_path
+    from forgegraph.data import data_path
 
     found = [data_path(graphspec) for graphspec in _graphspecs(target)]
     return list(dict.fromkeys(f.resolve() for f in found if f is not None))

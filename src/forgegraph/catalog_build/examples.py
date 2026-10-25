@@ -13,9 +13,10 @@ from typing import Any
 
 from PIL import Image
 
+from forgegraph.data import data_path
 from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
-from forgegraph.graph import Graph, data_path, render
+from forgegraph.graph import Graph, render
 from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.loaded import Loaded
 from forgegraph.spec.parameters import NONE, Parameter, definitions, tree_has, tree_set

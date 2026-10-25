@@ -18,7 +18,6 @@ from typing import Any
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from forgegraph import __version__
 from forgegraph.drawing import export
 from forgegraph.drawing.figure import (
     GraphFigure,
@@ -28,9 +27,9 @@ from forgegraph.drawing.figure import (
     watermark,
 )
 from forgegraph.drawing.style import Style, isolated
-from forgegraph.graph import Saved, SpecError, spec_record
+from forgegraph.drawn import Saved, SpecError
 from forgegraph.spec.access import name_problems, packs_used, use_fonts
-from forgegraph.spec.provenance import ProvenanceRecord, created, plain
+from forgegraph.spec.provenance import plain, record
 from forgegraph.spec.registry import Registry, registry_for
 from forgegraph.spec.resolve import resolve
 from forgegraph.spec.validate import validate
@@ -70,16 +69,13 @@ class Blank(Saved):
         level = self.values["format"]["provenance.level"]
         if level == "off":
             return None
-        record = ProvenanceRecord(
-            provenance_level=level,
-            forgegraph_version=__version__,
-            created=created(),
+        return record(
+            level,
             specs=self.specs,
             nonstandard=True,
             nonstandard_packs=self.nonstandard_packs or None,
             resolved=plain(self.values) if level == "full" else None,
         )
-        return record.model_dump(exclude_none=True)
 
     def save_all(self, stem: str | Path) -> list[Path]:
         """Save every file type the format lists but html, as stem.png and so on."""
@@ -136,7 +132,7 @@ def blank(
         fig, ax = new_figure(style)
     ax.set_prop_cycle(color=style.series_colors())
     canvas = Blank(fig, ax, style, values)
-    canvas.specs = {k: spec_record(k, n, reg) for k, n in (("theme", theme), ("format", format))}
+    canvas.specs = {k: reg.spec_record(k, n) for k, n in (("theme", theme), ("format", format))}
     used = packs_used("theme", reg.docs["theme"][theme], reg)
     used |= packs_used("format", reg.docs["format"][format], reg)
     use_fonts("theme", reg.docs["theme"][theme], reg)

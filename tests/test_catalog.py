@@ -3,27 +3,24 @@
 from __future__ import annotations
 
 import dataclasses
-import hashlib
-import io
 import json
 import os
-import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 from pack_helpers import cli_problems, needs_node, write_pack
+from test_catalog_files import HEADER, catalog_project
 from typer.testing import CliRunner
 
-import forgegraph
 from forgegraph import forgemark
 from forgegraph.catalog_build import build
+from forgegraph.catalog_build.build import instance
 from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, open_commented, page
 from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
-from forgegraph.spec.documents import builtin
 
 pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 
@@ -92,30 +89,6 @@ def test_the_forgegraph_base_2_catalog_is_current():
     )
 
 
-def test_a_packs_table_shows_its_own_values():
-    """A row shows the value the shown spec draws with, and whether it fixes it, not the
-    definition's: the forgegraph_base_2 theme's, not the base theme's."""
-    text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
-
-    def cells(row: str) -> list[str]:
-        start = text.index(f'<tr id="{row}">')
-        row_text = text[start : text.index("</tr>", start)]
-        found = re.findall(r"<td[^>]*>(.*?)</td>", row_text)
-        return [re.sub(r"<[^>]+>", "", c) for c in found[1:]]  # after the parameter's name
-
-    theme = "theme-forgegraph_base_2-base_theme-param-"
-    assert cells(theme + "title-size")[0] == "1.45"
-    assert cells(theme + "series-marker-edge_color")[0] == "#000000"
-    assert cells("format-forgegraph_base_2-compact_format-param-output-dpi")[0] == "200"
-
-
-def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
-    text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
-    panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
-    assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
-    assert f'<p id="version" class="version">version {forgegraph.__version__}</p>' in text
-
-
 def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeypatch):
     page_path = tmp_path / "catalog.html"
     shutil.copy(FIXTURE, page_path)
@@ -168,6 +141,18 @@ def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
     assert "Node 18" in problem
 
 
+def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
+    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
+        "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
+    )
+    reg = catalog_project(tmp_path, catalog, kind_folder="themes")
+    found = read("theme", "house/plain", reg)
+    # only grid.show: leave out the inherited cards, which draw differently
+    kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
+    with pytest.raises(CatalogError, match=r"Baseline \+ grid.show = false draws the same"):
+        instance(dataclasses.replace(found, variations=kept), "Theme > plain", reg)
+
+
 def make_fixture() -> None:
     """Write the fixture page and comment on it: prose, table cells, a heading and a figure."""
     FIXTURE.parent.mkdir(exist_ok=True)
@@ -187,150 +172,3 @@ def make_fixture() -> None:
 
 if __name__ == "__main__":  # uv run python tests/test_catalog.py: remake the fixture
     make_fixture()
-
-
-# --- catalog files ---------------------------------------------------------------------
-
-HEADER = (
-    "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"
-    "baseline: forgegraph_base/polarization\n"
-)
-
-
-def _project(tmp_path, catalog: str, kind_folder: str = "formats", name: str = "plain"):
-    """A pack, house, with a format (or theme) extending the base one, and its catalog."""
-    folder = write_pack(tmp_path)
-    kind = "format" if kind_folder == "formats" else "theme"
-    (folder / kind_folder).mkdir()
-    (folder / kind_folder / f"{name}.yaml").write_text(
-        f"name: {name}\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_{kind}\n"
-        "fixed_parameters: None\nvariable_parameters: None\n"
-    )
-    (folder / "catalogs" / kind_folder).mkdir(parents=True)
-    (folder / "catalogs" / kind_folder / f"{name}.yaml").write_text(catalog)
-    reg = builtin().add_pack(read_pack(folder, "folder"))
-    reg.allowed = frozenset({"forgegraph_base", "house"})
-    return reg
-
-
-def _problems(tmp_path, catalog: str, **kw) -> list[str]:
-    reg = _project(tmp_path, catalog, **kw)
-    with pytest.raises(CatalogError) as e:
-        read(
-            "format" if kw.get("kind_folder", "formats") == "formats" else "theme",
-            f"house/{kw.get('name', 'plain')}",
-            reg,
-        )
-    return e.value.problems
-
-
-def test_a_catalog_extending_another_lists_only_what_differs(tmp_path):
-    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_format") + (
-        "baselines: None\nvariations:\n    figure:\n        width: 90\n"
-    )
-    reg = _project(tmp_path, catalog)
-    widths = {v.change.value for p, v in read("format", "house/plain", reg).variations if v}
-    assert 90 in widths and 100 not in widths
-
-
-def test_every_file_needs_a_catalog(tmp_path):
-    reg = _project(tmp_path, "")
-    (tmp_path / "house" / "catalogs" / "formats" / "plain.yaml").unlink()
-    with pytest.raises(CatalogError, match="missing; every format needs a catalog"):
-        read("format", "house/plain", reg)
-
-
-def test_catalog_rules_are_errors(tmp_path):
-    catalog = HEADER.format(name="plain", extends="None") + (
-        "baselines:\n"
-        "    two: [90, 80]\n"
-        "variations:\n"
-        "    figure:\n"
-        "        width: -5\n"
-        "        height: {value: auto, from: nowhere}\n"
-        "        depth: 3\n"
-    )
-    problems = _problems(tmp_path, catalog)
-    assert any("baselines.two: must be parameters and their values" in p for p in problems)
-    assert any("variations: missing figure.base_size" in p for p in problems)
-    assert any("variations.figure.depth: unknown parameter" in p for p in problems)
-    assert any("variations.figure.width: must be" in p for p in problems)
-    assert any("from: no numbered baseline 'nowhere'" in p for p in problems)
-
-
-def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
-    from forgegraph.catalog_build.build import instance
-
-    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
-        "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
-    )
-    reg = _project(tmp_path, catalog, kind_folder="themes")
-    found = read("theme", "house/plain", reg)
-    # only grid.show: leave out the inherited cards, which draw differently
-    kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
-    with pytest.raises(CatalogError, match=r"Baseline \+ grid.show = false draws the same"):
-        instance(dataclasses.replace(found, variations=kept), "Theme > plain", reg)
-
-
-def test_builtin_catalogs_follow_the_rules():
-    for kind, names in (("theme", builtin().docs["theme"]), ("format", builtin().docs["format"])):
-        for name in names:
-            read(kind, name, builtin())
-    read("graph_type", "xy", builtin())
-    for name in builtin().docs["layer"]:
-        read("layer", name, builtin())
-
-
-def test_a_numbered_baseline_can_change_several_parameters():
-    catalog = read("graph_type", "xy", builtin())
-    offset = next(v for p, v in catalog.variations if p.path == "series.offset")
-    assert offset is not None and offset.base is not None
-    parts = {c.path: c.value for c in offset.base.parts}
-    assert parts["encoding.color"] == "Run" and parts["mark.bar.show"] is True
-
-
-def test_a_layer_catalog_draws_its_layer_on_every_card():
-    catalog = read("layer", "note", builtin())
-    always = {c.path: c.value for c in catalog.always}
-    assert always["layers.note.type"] == "note"
-    assert always["layers.note.position"] == "bottom_left"
-    paths = [v.change.path for _, v in catalog.variations if v]
-    assert paths == ["layers.note.text", "layers.note.position", "layers.note.inside"]
-
-
-def test_a_layer_catalogs_settings_are_on_every_card():
-    always = {c.path: c.value for c in read("layer", "error_bar", builtin()).always}
-    assert always["axis.y.data.aggregation"] == "mean"
-    assert always["layers.error_bar.type"] == "error_bar"
-
-
-def test_commented_categories_are_open():
-    from forgegraph.catalog_build.page import open_commented
-
-    page_ = (
-        '<details class="category" id="a"><summary>a</summary>'
-        '<details class="category" id="a-b"><summary>a.b</summary><!-- fmc:1 -->x<!-- /fmc:1 -->'
-        '</details></details><details class="category" id="c"></details>'
-    )
-    opened = open_commented(page_)
-    assert opened.count(" open") == 2 and 'category" open id="c"' not in opened
-    assert open_commented(opened) == opened
-
-
-def test_forgemark_is_downloaded_once_and_refused_if_its_checksum_differs(tmp_path, monkeypatch):
-    served = []
-
-    def urlopen(url, timeout):
-        served.append(url)
-        return io.BytesIO(body)
-
-    monkeypatch.setattr(forgemark, "CACHE", tmp_path)
-    monkeypatch.setattr(forgemark.urllib.request, "urlopen", urlopen)
-    body = b"not the pinned tool"
-    with pytest.raises(forgemark.ForgemarkError, match=r"checksum mismatch.*not running it"):
-        forgemark.tool()
-    assert not list(tmp_path.iterdir())  # nothing kept
-    monkeypatch.setattr(forgemark, "SHA256", hashlib.sha256(body).hexdigest())
-    path = forgemark.tool()
-    assert path.read_bytes() == body and forgemark.tool() == path
-    assert served == [forgemark.URL, forgemark.URL]  # the second good call used the cache

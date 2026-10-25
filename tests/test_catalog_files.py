@@ -13,6 +13,7 @@ from forgegraph.catalog_build.cards import (
     Change,
     Scene,
     candidates,
+    card,
     gets_card,
     place,
     placed,
@@ -140,8 +141,8 @@ def test_every_parameter_gets_a_card_and_the_page_shows_the_variable_ones():
     assert "grid.show" in catalog.variable and "font.family" not in catalog.variable
     shown = [c.changes[-1].path for c in place(catalog, lambda s, c: True)[1:]]
     assert set(shown) == catalog.variable
-    every = place(catalog, lambda s, c: True, every=True)[1:]
-    assert len(every) == len(catalog.cards)
+    fixed = card(catalog, "font.family", lambda s, c: True)  # placed alone, as any card
+    assert fixed.change.value == "IBM Plex Serif" and fixed.base is None
 
 
 def test_a_formats_output_and_provenance_get_no_card():

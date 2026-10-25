@@ -235,58 +235,55 @@ def _id(change: Change) -> str:
 Differs = Callable[[tuple[Change, ...], tuple[Change, ...]], bool]
 
 
-def _first(catalog: Catalog, options: tuple[tuple[Change, ...], ...], differs: Differs):
+def card(
+    catalog: Catalog, path: str, differs: Differs, fallback: Differs | None = None
+) -> Variation:
+    """A parameter's card: its first candidate that draws differently from a baseline, on the
+    first such baseline (the GraphSpec, then the numbered baselines in order). One with none
+    is placed by fallback if given (a pack's catalog: as ForgeGraph's places it), else it's a
+    CatalogError. No other card changes where it's placed."""
+    from forgegraph.catalog_build.files import CatalogError
+
+    p, options = next((p, o) for p, o in catalog.cards if p.path == path)
     bases: list[Change | None] = [None, *catalog.baselines]
-    return next(
-        (
-            (changes, base)
-            for changes in options
-            for base in bases
-            if differs(() if base is None else (base,), changes)
-        ),
-        None,
+    for test in (differs,) if fallback is None else (differs, fallback):
+        for changes in options:
+            for base in bases:
+                if test(() if base is None else (base,), changes):
+                    return Variation(p, changes, base)
+    raise CatalogError(
+        [
+            f"{catalog.kind.replace('_', ' ')} {catalog.name}: {path}: no candidate changes "
+            "the drawing on any baseline; add a baseline that shows it"
+        ]
     )
 
 
-def placed(
-    catalog: Catalog, differs: Differs, fallback: Differs | None = None, every: bool = False
-) -> list[Variation]:
-    """Each variable parameter's card (with every, every parameter's): its first candidate
-    that draws differently from a baseline, on the first such baseline (the GraphSpec, then
-    the numbered baselines in order). One with none is placed by fallback if given (a pack's
-    catalog: as ForgeGraph's places it), else it's a CatalogError."""
+def placed(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Variation]:
+    """Each variable parameter's card (card()); every problem as one CatalogError."""
     from forgegraph.catalog_build.files import CatalogError
 
     out, problems = [], []
-    for p, options in catalog.cards:
-        if not every and p.path not in catalog.variable:
+    for p, _ in catalog.cards:
+        if p.path not in catalog.variable:
             continue
-        found = _first(catalog, options, differs)
-        if found is None and fallback is not None:
-            found = _first(catalog, options, fallback)
-        if found is None:
-            problems.append(
-                f"{catalog.kind.replace('_', ' ')} {catalog.name}: {p.path}: no candidate "
-                "changes the drawing on any baseline; add a baseline that shows it"
-            )
-        else:
-            out.append(Variation(p, *found))
+        try:
+            out.append(card(catalog, p.path, differs, fallback))
+        except CatalogError as e:
+            problems += e.problems
     if problems:
         raise CatalogError(problems)
     return out
 
 
-def place(
-    catalog: Catalog, differs: Differs, fallback: Differs | None = None, every: bool = False
-) -> list[Planned]:
+def place(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Planned]:
     """The cards of a catalog's panel, in order: the baseline, then each variable parameter's
-    card (with every, every parameter's; see placed()), each numbered baseline before the
-    first card starting from it."""
+    card (placed()), each numbered baseline before the first card starting from it."""
     first = "Baseline"
     if catalog.always:  # a layer's catalog: say what every card adds to the GraphSpec
         first = " + ".join([f"Baseline: {catalog.baseline}", *(_change(c) for c in catalog.always)])
     cards = [Planned("baseline", first, ())]
-    variations = placed(catalog, differs, fallback, every)
+    variations = placed(catalog, differs, fallback)
     numbers: dict[str, int] = {}  # each numbered baseline's number, by the change that makes it
     at: dict[str, int] = {}  # and its place in cards
     for v in variations:

@@ -10,26 +10,25 @@ provenance record says so.
 
 from __future__ import annotations
 
-import io
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from forgegraph import __version__
 from forgegraph.drawing import export
 from forgegraph.drawing.figure import (
     GraphFigure,
     LayoutError,
-    Watermark,
-    _watermarked,
     layout,
     new_figure,
+    watermark,
 )
-from forgegraph.drawing.style import PALETTES, Style, isolated
-from forgegraph.graph import SpecError, _created, _plain, spec_record
+from forgegraph.drawing.style import Style, isolated
+from forgegraph.graph import Saved, SpecError, spec_record
 from forgegraph.spec.documents import (
     Registry,
     name_problems,
@@ -38,11 +37,11 @@ from forgegraph.spec.documents import (
     resolve,
     validate,
 )
-from forgegraph.spec.provenance import ProvenanceRecord
+from forgegraph.spec.provenance import ProvenanceRecord, created, plain
 
 
 @dataclass
-class Blank:
+class Blank(Saved):
     """A themed canvas. Draw on `axes` with matplotlib; `save` lays the figure out with
     ForgeGraph's margins and saves it in the format's file types, watermarked."""
 
@@ -55,13 +54,15 @@ class Blank:
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
 
     def inspect(self) -> bool:
+        """A canvas is always non-standard."""
         return True
 
     def mark(self) -> None:
-        if not _watermarked(self.axes):
-            self.axes.add_artist(Watermark(self.axes, self.style))
+        """Draw the watermark over the plot box, once."""
+        watermark(self.axes, self.style)
 
     def saving(self) -> AbstractContextManager[None]:
+        """The matplotlib settings files are saved with."""
         return isolated(self.style)
 
     def drawing(self) -> AbstractContextManager[None]:
@@ -76,20 +77,22 @@ class Blank:
         record = ProvenanceRecord(
             provenance_level=level,
             forgegraph_version=__version__,
-            created=_created(),
+            created=created(),
             specs=self.specs,
             nonstandard=True,
             nonstandard_packs=self.nonstandard_packs or None,
-            resolved=_plain(self.values) if level == "full" else None,
+            resolved=plain(self.values) if level == "full" else None,
         )
         return record.model_dump(exclude_none=True)
 
-    def save(self, path: str | Path) -> list[Path]:
-        """Save the canvas: a path with a suffix saves that file type; without one, every file
-        type the format lists, except html."""
-        target = Path(path)
-        kinds = [target.suffix.lstrip(".")] if target.suffix else self._kinds()
-        stem = target.with_suffix("") if target.suffix else target
+    def save_all(self, stem: str | Path) -> list[Path]:
+        """Save every file type the format lists but html, as stem.png and so on."""
+        return self._write(
+            Path(stem), [k for k in self.values["format"]["output.file_types"] if k != "html"]
+        )
+
+    def _write(self, stem: Path, kinds: list[str]) -> list[Path]:
+        """Lay the figure out, then save each file type."""
         with isolated(self.style):
             try:
                 layout(self.figure, self.axes, self.style)
@@ -100,14 +103,11 @@ class Blank:
                 export.save(self.figure, stem.with_name(f"{stem.name}.{k}"), dpi) for k in kinds
             ]
 
-    def _kinds(self) -> list[str]:
-        return [k for k in self.values["format"]["output.file_types"] if k != "html"]
+    def _name(self) -> str:
+        return "canvas"
 
-    def _repr_png_(self) -> bytes:
-        buffer = io.BytesIO()
-        with isolated(self.style):
-            self.figure.savefig(buffer, format="png", dpi=100)
-        return buffer.getvalue()
+    def _shown(self) -> tuple[Figure, Style]:
+        return self.figure, self.style
 
 
 def _registry(folder: str | Path | None) -> Registry:
@@ -124,24 +124,26 @@ def _values(kind: str, name: str, reg: Registry) -> dict[str, Any]:
     return {p: v for p, (v, _) in resolve(kind, reg.docs[kind][name], reg).items()}
 
 
-def blank(theme: str, format: str, folder: str | Path | None = None) -> Blank:
-    """A canvas in this theme and format, for drawing what no graph type can. The configs
-    that apply are found from folder (default: the working folder)."""
-    reg = _registry(folder)
+def blank(
+    theme: str,
+    format: str,
+    folder: str | Path | None = None,
+    registry: Registry | None = None,
+) -> Blank:
+    """A canvas in this theme and format, for drawing what no graph type can. The specs are
+    checked against `registry` if given (as fg.render's are), otherwise against the configs
+    found from folder (default: the working folder)."""
+    reg = registry or _registry(folder)
     values = {"theme": _values("theme", theme, reg), "format": _values("format", format, reg)}
     style = Style(values["theme"], values["format"])
     with isolated(style):
         fig, ax = new_figure(style)
-    ax.set_prop_cycle(color=_colors(values["theme"]))
+    ax.set_prop_cycle(color=style.series_colors())
     canvas = Blank(fig, ax, style, values)
     canvas.specs = {k: spec_record(k, n, reg) for k, n in (("theme", theme), ("format", format))}
     used = packs_used("theme", reg.docs["theme"][theme], reg)
     used |= packs_used("format", reg.docs["format"][format], reg)
+    reg.use_fonts("theme", reg.docs["theme"][theme])
     canvas.nonstandard_packs = sorted(used & reg.nonstandard)
     fig.graph = canvas
     return canvas
-
-
-def _colors(theme: dict[str, Any]) -> list[str]:
-    colors = theme["series.colors"]
-    return list(PALETTES[colors]) if isinstance(colors, str) else list(colors)

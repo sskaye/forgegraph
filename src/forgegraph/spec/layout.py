@@ -15,9 +15,12 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from forgegraph.spec.parameters import NONE, SECTIONS, check_parameter, tab_definitions
+
+if TYPE_CHECKING:  # spec.documents imports this module, so only to check types
+    from forgegraph.spec.documents import Registry
 
 BLANK = "."
 TAB_KEYS = ("grid", "tiles")
@@ -85,27 +88,27 @@ def _listed(d: dict[str, Any]) -> tuple[str, Any] | None:
     return None
 
 
-def _chain(doc: dict[str, Any], reg: Any) -> list[dict[str, Any]]:
-    from forgegraph.spec.documents import _chain
+def _layout_chain(doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
+    from forgegraph.spec.documents import chain
 
-    return _chain("layout", doc, reg)
+    return chain("layout", doc, reg)
 
 
-def tabs_source(doc: dict[str, Any], reg: Any) -> dict[str, Any]:
+def tabs_source(doc: dict[str, Any], reg: Registry) -> dict[str, Any]:
     """The file in a layout's extends chain whose tabs it ends up with: the nearest listing
     any."""
-    chain = _chain(doc, reg)
-    return next((d for d in chain if _listed(d) is not None), chain[-1])
+    found = _layout_chain(doc, reg)
+    return next((d for d in found if _listed(d) is not None), found[-1])
 
 
-def resolve_tabs(doc: dict[str, Any], reg: Any) -> tuple[dict[str, Any], str]:
+def resolve_tabs(doc: dict[str, Any], reg: Registry) -> tuple[dict[str, Any], str]:
     """The tabs a layout ends up with, as listed, and which file lists them."""
     source = tabs_source(doc, reg)
     listed = _listed(source)
     return (listed[1], f"layout '{source.get('name')}'") if listed else ({}, "")
 
 
-def tabs(doc: dict[str, Any], reg: Any) -> list[Tab]:
+def tabs(doc: dict[str, Any], reg: Registry) -> list[Tab]:
     """A valid layout's tabs, in order."""
     grid, _ = tab_definitions()
     out = []
@@ -159,11 +162,11 @@ def _places(areas: list[list[str]]) -> tuple[dict[str, Area], list[str]]:
     return dict(order), problems
 
 
-def layout_problems(doc: dict[str, Any], reg: Any) -> list[str]:
+def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     """Problems with a layout's tabs, and with the tabs it ends up with."""
     errors: list[str] = []
     listed = _listed(doc)
-    for d in _chain(doc, reg)[1:]:
+    for d in _layout_chain(doc, reg)[1:]:
         inherited = _listed(d)
         if listed is not None and inherited is not None and inherited[0] == SECTIONS[0]:
             errors.append(f"{listed[0]}.tabs: fixed by layout '{d.get('name')}'")
@@ -250,7 +253,7 @@ def layout_problems(doc: dict[str, Any], reg: Any) -> list[str]:
     return errors
 
 
-def drawing_problems(doc: dict[str, Any], reg: Any) -> list[str]:
+def drawing_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     """What a valid layout still lacks before it can be drawn: a GraphSpec file for each
     tile."""
     entries, _ = resolve_tabs(doc, reg)
@@ -263,14 +266,14 @@ def drawing_problems(doc: dict[str, Any], reg: Any) -> list[str]:
 
 
 def _sizes_problems(
-    doc: dict[str, Any], reg: Any, entries: dict[str, Any], where: str
+    doc: dict[str, Any], reg: Registry, entries: dict[str, Any], where: str
 ) -> list[str]:
     """With the format's height (or width) auto, rows (columns) take the size their tiles
     need, so row_heights (column_widths) can't also be set."""
     from forgegraph.spec.documents import resolve
 
     chosen = resolve("layout", doc, reg).get("specifications.format", (None,))[0]
-    fmt = reg.docs["format"].get(chosen)
+    fmt = reg.docs["format"].get(chosen) if chosen is not None else None
     if fmt is None:
         return []
     values = resolve("format", fmt, reg)

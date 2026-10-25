@@ -27,8 +27,8 @@ definitions (see parameters.py).
 from __future__ import annotations
 
 import copy
-import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cache
@@ -38,7 +38,7 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from forgegraph.fonts import register_pack_fonts
+from forgegraph.fonts import WEIGHTS, font_available, font_weights, register_pack_fonts
 from forgegraph.packs import (
     BASE,
     Config,
@@ -58,6 +58,7 @@ from forgegraph.spec.parameters import (
     KINDS,
     NONE,
     SECTIONS,
+    STEP,
     Parameter,
     check_parameter,
     check_value,
@@ -66,9 +67,9 @@ from forgegraph.spec.parameters import (
     graph_type_files,
     header_definitions,
 )
+from forgegraph.spec.schedule import Cadence, CadenceError
 
 _yaml = YAML(typ="safe", pure=True)
-STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date axis's tick step
 OTHER_KINDS = ("graph_type", "theme", "format")  # files a GraphSpec names
 HEADINGS = ("theme", "format")  # kinds that may use graph-type headings
 CHOICE = {
@@ -78,7 +79,7 @@ CHOICE = {
 }
 
 
-def load(path: Path) -> Any:
+def load_yaml(path: Path) -> Any:
     """A YAML file's contents. Each file is parsed once while it's unchanged (same size and
     modification time); every caller gets its own copy."""
     stat = path.stat()
@@ -109,9 +110,11 @@ class Registry:
     nonstandard: frozenset[str] = frozenset()
 
     def names(self) -> dict[str, set[str]]:
+        """Every known file's name, by kind."""
         return {kind: set(d) for kind, d in self.docs.items()}
 
     def add(self, kind: str, doc: dict[str, Any], path: Path | None = None) -> None:
+        """Know a file of a kind by its name, and where it was read from, if it was."""
         self.docs[kind][doc["name"]] = doc
         if path is not None:
             self.paths[kind][doc["name"]] = path
@@ -121,7 +124,7 @@ class Registry:
         self.packs[pack.name] = pack
         for kind, folder in PACK_FOLDERS.items():
             for path in sorted((pack.folder / folder).glob("*.yaml")):
-                doc = load(path)
+                doc = load_yaml(path)
                 if isinstance(doc, dict) and "name" in doc:
                     self.add(kind, {**doc, "name": f"{pack.name}/{doc['name']}"}, path)
                     for named in _specs_named(doc):
@@ -136,9 +139,13 @@ class Registry:
         pack = name.split("/")[0]
         if pack in self.packs or pack not in pip_packs():
             return
-        found = read_pack(pip_packs()[pack], "pip", pack)
-        self.add_pack(found)
-        register_pack_fonts(fonts(found))
+        self.add_pack(read_pack(pip_packs()[pack], "pip", pack))
+
+    def use_fonts(self, kind: str, doc: dict[str, Any]) -> None:
+        """Register with matplotlib the fonts of the packs a file is drawn with (see
+        packs_used), each font once."""
+        for name in sorted(packs_used(kind, doc, self)):
+            register_pack_fonts(fonts(self.packs[name]))
 
     def pack_of(self, kind: str, name: str) -> str | None:
         """The pack a spec comes from: None for a drawn file, or a graph or layer type."""
@@ -148,6 +155,7 @@ class Registry:
         return next((p.name for p in self.packs.values() if p.folder in path.parents), None)
 
     def copy(self) -> Registry:
+        """A registry to add to without changing this one."""
         return Registry(
             {k: dict(v) for k, v in self.docs.items()},
             {k: dict(v) for k, v in self.paths.items()},
@@ -165,7 +173,7 @@ def _core() -> Registry:
     reg = Registry()
     for kind in CORE_KINDS:
         for path in sorted(Path(str(files("forgegraph") / KINDS[kind])).glob("*.yaml")):
-            doc = load(path)
+            doc = load_yaml(path)
             if isinstance(doc, dict) and "name" in doc:
                 reg.add(kind, doc, path)
     return reg.add_pack(read_pack(base_folder(), "built in", BASE))
@@ -188,9 +196,26 @@ def registry_for(start: Path) -> Registry:
     reg.allowed = frozenset(found.packs)
     reg.configs = found.configs
     reg.nonstandard = found.nonstandard
-    for pack in found.listed.values():
-        register_pack_fonts(fonts(pack))
     return reg
+
+
+def load_document(
+    kind: str, spec: dict[str, Any] | str | Path, registry: Registry | None = None
+) -> tuple[Any, Registry, Path]:
+    """A document of a kind, given as a file path or the document itself; the registry it's
+    checked against (registry, or else its folder's), holding it if it's named; and the
+    folder its own relative paths are found from. registry itself is never changed."""
+    if isinstance(spec, str | Path):
+        path = Path(spec)
+        doc = load_yaml(path)
+        reg = (registry or registry_for(path.parent)).copy()
+        if isinstance(doc, dict) and "name" in doc:
+            reg.add(kind, doc, path)
+        return doc, reg, path.parent
+    reg = (registry or registry_for(Path.cwd())).copy()
+    if isinstance(spec, dict) and "name" in spec and spec["name"] not in reg.docs[kind]:
+        reg.add(kind, spec)
+    return spec, reg, Path.cwd()
 
 
 def _specs_named(doc: dict[str, Any]) -> list[Any]:
@@ -246,7 +271,7 @@ def _category(section: str, heading: str | None, category: str, params: Any) -> 
     ]
 
 
-def _chain(kind: str, doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
+def chain(kind: str, doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
     """The document, then each file it extends, nearest first."""
     chain = [doc]
     seen = [doc.get("name")]
@@ -274,7 +299,7 @@ def _definitions_for(kind: str, doc: dict[str, Any], reg: Registry) -> dict[str,
     """A graph type's parameters are those of the graph type at the root of its chain."""
     if kind != "graph_type":
         return definitions(kind)
-    root = _chain(kind, doc, reg)[-1]["name"]
+    root = chain(kind, doc, reg)[-1]["name"]
     if root not in graph_type_files():
         defined = ", ".join(graph_type_files())
         raise ValueError(
@@ -285,6 +310,8 @@ def _definitions_for(kind: str, doc: dict[str, Any], reg: Registry) -> dict[str,
 
 @dataclass(frozen=True)
 class Resolved:
+    """A parameter's value as resolved: whether it's fixed, and which file set it."""
+
     value: Any
     fixed: bool
     origin: str  # e.g. "theme 'journal'", or "theme 'journal', under xy"
@@ -297,7 +324,7 @@ def resolve_detailed(
     file that lists a parameter decides it; within one file, an entry under the graph type's
     heading beats the general one."""
     out: dict[str, Resolved] = {}
-    for d in _chain(kind, doc, reg):
+    for d in chain(kind, doc, reg):
         own: dict[str, tuple[int, Resolved]] = {}
         label = f"{_label(kind)} '{d.get('name')}'"
         for section, heading, path, value in entries(kind, d, reg):
@@ -312,13 +339,24 @@ def resolve_detailed(
     return out
 
 
-def setter(kind: str, doc: dict[str, Any], reg: Registry, path: str) -> int | None:
-    """Which file in doc's extends chain sets a parameter: 0 for doc itself, 1 for the file
-    it extends, and so on; None if none of them lists it."""
-    for depth, d in enumerate(_chain(kind, doc, reg)):
+def setter(kind: str, doc: dict[str, Any], reg: Registry, path: str) -> dict[str, Any] | None:
+    """The file in doc's extends chain that sets a parameter, nearest first; None if none of
+    them lists it."""
+    for d in chain(kind, doc, reg):
         if any(p == path for _, _, p, _ in entries(kind, d, reg)):
-            return depth
+            return d
     return None
+
+
+def folder_of(
+    kind: str, source: dict[str, Any] | None, doc: dict[str, Any], reg: Registry, folder: Path
+) -> Path:
+    """The folder relative paths in source, a file in doc's extends chain, are found from:
+    its file's folder; `folder` for doc itself (or a file the registry has no path for)."""
+    if source is None or source is doc:
+        return folder
+    known = reg.paths[kind].get(source["name"])
+    return known.parent if known is not None else folder
 
 
 def resolve(
@@ -329,7 +367,10 @@ def resolve(
 
 
 def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
-    """Every problem with a file of `kind`, as '<location>: <what's wrong>'."""
+    """Every problem with a file of `kind`, as '<location>: <what's wrong>'. Each step runs
+    only if the ones before found nothing: the header, each listed parameter, then (with
+    extends None) every parameter listed, then the kind's own rules and what the configs
+    allow."""
     reg = reg or builtin()
     if not isinstance(doc, dict):
         return ["(document): must be a mapping of fields"]
@@ -340,6 +381,31 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
         defs = _definitions_for(kind, doc, reg)
     except ValueError as e:
         return [str(e)]
+    errors, listed = _entry_problems(kind, doc, reg, defs)
+    if errors:
+        return errors
+    if doc["extends"] == NONE:
+        missing = [path for path in defs if path not in listed]
+        if missing:
+            return [
+                "extends: None, so every parameter must be listed; missing: " + ", ".join(missing)
+            ]
+    rules = _RULES.get(kind)
+    errors = rules(doc, reg) if rules else []
+    if kind == "graphspec" and errors:  # its layers or values can't be resolved: stop here
+        return errors
+    errors += permission_problems(kind, doc, reg)
+    if kind == "format":
+        errors += _format_size(doc, reg)
+    return errors
+
+
+def _entry_problems(
+    kind: str, doc: dict[str, Any], reg: Registry, defs: dict[str, Parameter]
+) -> tuple[list[str], set[str]]:
+    """Each listed parameter's problems (unknown, fixed elsewhere, out of range, listed
+    twice), and the paths listed without a graph-type heading."""
+    errors: list[str] = []
     names = reg.names()
     others = (
         _settable(doc, reg)
@@ -382,47 +448,40 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
             continue
         for suffix, message in check_parameter(p, value, names):
             errors.append(f"{where}{path}{suffix}: {message}")
+    return errors, {path for (heading, path) in seen if heading is None}
+
+
+def _graphspec_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
+    errors = layer_problems(doc, reg)
     if errors:
         return errors
-    if doc["extends"] == NONE:
-        listed = {path for (heading, path) in seen if heading is None}
-        missing = [path for path in defs if path not in listed]
-        if missing:
-            errors.append(
-                "extends: None, so every parameter must be listed; missing: " + ", ".join(missing)
-            )
-            return errors
-    if kind == "graphspec":
-        errors += layer_problems(doc, reg)
-        if errors:
-            return errors
-        errors += _inherited_fixed(doc, reg)
-        if not errors:
-            errors += _graphspec_rules(resolve_graphspec(doc, reg))
-    if kind == "layout":
-        from forgegraph.spec.layout import layout_problems
+    errors = _inherited_fixed(doc, reg)
+    return errors or _graphspec_rules(resolve_graphspec(doc, reg))
 
-        errors += layout_problems(doc, reg)
-    if kind == "schedule":
-        from forgegraph.spec.schedule import Cadence, CadenceError
 
-        try:
-            Cadence.from_values({p: v for p, (v, _) in resolve(kind, doc, reg).items()})
-        except CadenceError as e:
-            errors.append(str(e))
-    if kind == "theme":
-        errors += _theme_rules(doc, reg)
-    errors += permission_problems(kind, doc, reg)
-    if kind == "format":
-        for gt in [None, *reg.docs["graph_type"]]:
-            r = resolve("format", doc, reg, gt)
-            if (
-                r.get("figure.width", (None,))[0] == "auto"
-                and r.get("figure.height", (None,))[0] == "auto"
-            ):
-                errors.append("size: width and height can't both be auto")
-                break
-    return errors
+def _layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
+    from forgegraph.spec.layout import layout_problems
+
+    return layout_problems(doc, reg)
+
+
+def _schedule_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
+    try:
+        Cadence.from_values({p: v for p, (v, _) in resolve("schedule", doc, reg).items()})
+    except CadenceError as e:
+        return [str(e)]
+    return []
+
+
+def _format_size(doc: dict[str, Any], reg: Registry) -> list[str]:
+    for gt in [None, *reg.docs["graph_type"]]:
+        r = resolve("format", doc, reg, gt)
+        if (
+            r.get("figure.width", (None,))[0] == "auto"
+            and r.get("figure.height", (None,))[0] == "auto"
+        ):
+            return ["size: width and height can't both be auto"]
+    return []
 
 
 def _owner(kind: str, doc: dict[str, Any], reg: Registry) -> str | None:
@@ -463,7 +522,7 @@ def packs_used(kind: str, doc: dict[str, Any], reg: Registry) -> set[str]:
     out = set()
 
     def add(k: str, d: dict[str, Any]) -> None:
-        for link in _chain(k, d, reg):
+        for link in chain(k, d, reg):
             pack = _owner(k, link, reg)
             if pack is not None:
                 out.add(pack)
@@ -556,11 +615,11 @@ def _header(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
     names[kind] = names[kind] - {doc["name"]}  # a file can't extend itself
     for key, p in header_definitions(kind).items():
         if key == "extends" and doc[key] not in (None, NONE) and doc[key] not in reg.docs[kind]:
-            continue  # reported by _chain, with a suggestion
+            continue  # reported by chain, with a suggestion
         if err := check_value(doc[key], p.range, names):
             errors.append(f"{key}: {err}")
     try:
-        _chain(kind, doc, reg)
+        chain(kind, doc, reg)
     except ValueError as e:
         errors.append(str(e))
     return errors
@@ -723,8 +782,9 @@ def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
 
 
 def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
-    from forgegraph.fonts import WEIGHTS, font_available, font_weights
-
+    """A theme's fonts are installed (its packs' registered first), its weights are ones its
+    family has, and its watermark text draws something."""
+    reg.use_fonts("theme", doc)
     errors = []
     for section, heading, path, value in entries("theme", doc, reg):
         if path == "font.family" and isinstance(value, str) and not font_available(value):
@@ -732,7 +792,7 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
             errors.append(f"{where}font.family: no font '{value}' is bundled or installed")
     if errors:
         return errors
-    headings = {h for d in _chain("theme", doc, reg) for _, h, _, _ in entries("theme", d, reg)}
+    headings = {h for d in chain("theme", doc, reg) for _, h, _, _ in entries("theme", d, reg)}
     for heading in sorted(headings, key=lambda h: h or ""):
         values = resolve("theme", doc, reg, heading)
         where = f" under {heading}" if heading else ""
@@ -748,6 +808,15 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
                 "letters' outlines, so it needs at least one visible character"
             )
     return errors
+
+
+# Each kind's own rules, after its parameters are each found valid (see validate).
+_RULES: dict[str, Callable[[dict[str, Any], Registry], list[str]]] = {
+    "graphspec": _graphspec_problems,
+    "layout": _layout_problems,
+    "schedule": _schedule_problems,
+    "theme": _theme_rules,
+}
 
 
 def _visible(text: str) -> bool:
@@ -805,7 +874,7 @@ def resolve_layers(doc: dict[str, Any], reg: Registry) -> dict[str, Resolved]:
     own. Each value is the layer as listed (type and parameters), merged by name down the
     extends chain."""
     out: dict[str, Resolved] = {}
-    for d in reversed(_chain("graphspec", doc, reg)):
+    for d in reversed(chain("graphspec", doc, reg)):
         label = f"GraphSpec '{d.get('name')}'"
         for section, name, entry in _layers_in(d):
             if entry in (None, NONE):

@@ -13,6 +13,8 @@ import pytest
 
 from forgegraph.spec.documents import Registry, builtin, drawing_problems, resolve, validate
 from forgegraph.spec.parameters import (
+    BASE_PACK,
+    CORE_KINDS,
     HEADER,
     KINDS,
     NONE,
@@ -23,9 +25,14 @@ from forgegraph.spec.parameters import (
     definition_file,
     definitions,
     parse_range,
-    reference_name,
     tree_set,
 )
+
+
+def reference_name(kind: str) -> str:
+    """The name of the file that specifies a kind: ForgeGraph's own, or the base pack's."""
+    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE_PACK}/{REFERENCE[kind]}"
+
 
 DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layers aren't
 LAYER_TYPES = sorted(builtin().docs["layer"])
@@ -553,10 +560,10 @@ def test_an_unchanged_file_is_parsed_once(tmp_path, monkeypatch):
     parsed = []
     parse = documents._yaml.load
     monkeypatch.setattr(documents._yaml, "load", lambda f: parsed.append(1) or parse(f))
-    first = documents.load(path)
+    first = documents.load_yaml(path)
     first["a"] = 99  # a caller changing what it was given
     first["b"].append("z")
-    assert documents.load(path) == {"a": 1, "b": ["x", "y"]}
+    assert documents.load_yaml(path) == {"a": 1, "b": ["x", "y"]}
     assert len(parsed) == 1
 
 
@@ -567,11 +574,11 @@ def test_an_edited_file_is_parsed_again(tmp_path):
 
     path = tmp_path / "t.yaml"
     path.write_text("a: 1\n")
-    assert documents.load(path) == {"a": 1}
+    assert documents.load_yaml(path) == {"a": 1}
     path.write_text("a: 2\n")  # the same size: only the time tells
     stat = path.stat()
     os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
-    assert documents.load(path) == {"a": 2}
+    assert documents.load_yaml(path) == {"a": 2}
 
 
 def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
@@ -594,3 +601,31 @@ def test_a_graphspecs_own_parameters_are_worked_out_once(monkeypatch):
     monkeypatch.setattr(parameters, "graph_type_files", lambda: calls.append(1) or files())
     assert parameters.definitions("graphspec") == first
     assert calls == []
+
+
+def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, monkeypatch):
+    """From a file: its folder's registry, holding it; as a document: the given registry or
+    the working folder's, holding it unless one of its name is there. The given registry is
+    never changed."""
+    from ruamel.yaml import YAML
+
+    from forgegraph.spec.documents import builtin, load_document
+
+    doc = {**builtin().docs["graphspec"]["forgegraph_base/polarization"], "name": "mine"}
+    path = tmp_path / "mine.yaml"
+    with path.open("w", encoding="utf-8") as f:  # its descriptions hold subscripts
+        YAML().dump(doc, f)
+    loaded, reg, folder = load_document("graphspec", path)
+    assert loaded["name"] == "mine" and reg.paths["graphspec"]["mine"] == path
+    assert folder == tmp_path
+
+    given = builtin()
+    loaded, reg, folder = load_document("graphspec", doc, given)
+    assert reg.docs["graphspec"]["mine"] is doc and "mine" not in given.docs["graphspec"]
+    monkeypatch.chdir(tmp_path)
+    assert load_document("graphspec", doc)[2] == tmp_path
+
+    named = builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    stranger = {**named, "description": "a document of a name the registry holds"}
+    _, reg, _ = load_document("graphspec", stranger, builtin())
+    assert reg.docs["graphspec"]["forgegraph_base/polarization"] is not stranger

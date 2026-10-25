@@ -19,10 +19,10 @@ from typing import Any
 from PIL import Image
 
 from forgegraph import __version__
-from forgegraph.catalog import forgemark
-from forgegraph.catalog.examples import NONSTANDARD, Change, draw, image
-from forgegraph.catalog.files import CatalogError, read
-from forgegraph.catalog.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
+from forgegraph.catalog_build import forgemark
+from forgegraph.catalog_build.examples import NONSTANDARD, Change, draw, image
+from forgegraph.catalog_build.files import CatalogError, read
+from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.graph import Graph, SpecError
 from forgegraph.packs import BASE, Pack
 from forgegraph.spec.documents import Registry, builtin, resolve
@@ -105,12 +105,6 @@ def _message_png(text: str, width_in: float) -> bytes:
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", facecolor="#f6f8fa")
     return buffer.getvalue()
-
-
-def png(graph: Graph) -> bytes:
-    from forgegraph.catalog.examples import png as plain
-
-    return plain(graph, CSS_DPI * DENSITY)
 
 
 def show(value: Any) -> str:

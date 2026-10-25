@@ -551,7 +551,7 @@ def notes_inside(
                 (fraction, 1.0 if top else 0.0),
                 "axes fraction",
                 (dx, -inset if top else inset),
-                horizontal if horizontal != "center" else "center",
+                horizontal,
                 "top" if top else "bottom",
                 style,
             )

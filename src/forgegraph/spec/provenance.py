@@ -12,20 +12,13 @@ GraphSpec file and the same entries as a GraphSpec's, at the layout's format's l
 
 from __future__ import annotations
 
+import os
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import Field
 
 from forgegraph.spec.common import Model
-
-CARRIERS = {
-    "png": "PNG text chunk with key 'ForgeGraph'",
-    "jpg": "JPEG comment (COM) segment",
-    "tiff": "TIFF ImageDescription tag",
-    "svg": "Dublin Core <dc:description> in the SVG <metadata>",
-    "pdf": "Document Info dictionary, key /ForgeGraph",
-    "html": '<script type="application/json" id="forgegraph"> in the page\'s head',
-}
 
 
 class DataRecord(Model):
@@ -61,3 +54,21 @@ class ProvenanceRecord(Model):
     preprocessing: str | None = None  # full only: data.preprocessing as written
     layout: dict[str, Any] | None = None  # a layout's file, as written
     tabs: dict[str, dict[str, TileRecord]] | None = None  # a layout's tabs shown: each tile
+
+
+def created() -> str:
+    """When a record is made, in UTC: now, or SOURCE_DATE_EPOCH for reproducible builds."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    moment = datetime.fromtimestamp(int(epoch), UTC) if epoch else datetime.now(UTC)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def plain(value: Any) -> Any:
+    """Values as plain Python: NumPy scalars as Python numbers, inside dicts and lists too."""
+    if isinstance(value, dict):
+        return {k: plain(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [plain(v) for v in value]
+    if hasattr(value, "item"):
+        return value.item()
+    return value

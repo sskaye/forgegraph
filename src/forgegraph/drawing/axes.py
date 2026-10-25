@@ -47,13 +47,13 @@ from forgegraph.drawing import text as text_module
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, target
+from forgegraph.spec.parameters import STEP
 
 
 class DrawError(ValueError):
     """A GraphSpec whose data can't be drawn as asked."""
 
 
-TYPES = ("decimal", "integer", "date", "categorical")
 # Steps for automatic date ticks, finest first: d3's, with 2 weeks, 6 months and longer runs
 # of years. Each step's unit divides the next unit up, so its ticks are calendar boundaries.
 CALENDAR_STEPS = [
@@ -73,7 +73,6 @@ UNIT_DAYS = {  # each unit's shortest length, in days
     "month": 28.0,
     "year": 365.0,
 }
-STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")
 # strftime directives that mean the same on every platform; names are written in English.
 DATE_DIRECTIVES = set("aAwdbBmyYHIpMSfzZjUWGuV%")
 UNPADDED = set("dmH")  # %-d, %-m and %-H: written without a leading zero, on every platform

@@ -7,6 +7,7 @@ constant (architecture principle 4).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -23,7 +24,7 @@ from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.figure import texts_of
-from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.key import KEY, Entry, keys
 from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
@@ -31,14 +32,45 @@ from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
 
 Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
 COLUMN_NAME = "column_name"
-# Each style a column can set, by its name here, and its parameter.
-BY_PATHS = {
-    "color_by": "encoding.color",
-    "line_style_by": "encoding.line_style",
-    "marker_shape_by": "encoding.marker_shape",
-    "marker_fill_by": "encoding.marker_fill",
-}
-BYS = tuple(BY_PATHS)
+
+
+@dataclass(frozen=True)
+class Dimension:
+    """A style a column can set: its name here, its parameter, the theme's choices for it
+    (and what a warning calls them), and those choices as matplotlib draws them."""
+
+    by: str
+    encoding_path: str
+    theme_path: str
+    words: str
+    choices: Callable[[Style], list[Any]]
+
+
+COLOR = Dimension(
+    "color_by", "encoding.color", "series.colors", "colors", lambda s: s.series_colors()
+)
+LINE_STYLE = Dimension(
+    "line_style_by",
+    "encoding.line_style",
+    "series.line.style",
+    "line styles",
+    lambda s: [LINE_STYLES[v] for v in s.theme["series.line.style"]],
+)
+MARKER_SHAPE = Dimension(
+    "marker_shape_by",
+    "encoding.marker_shape",
+    "series.marker.shape",
+    "marker shapes",
+    lambda s: [MARKERS[v] for v in s.theme["series.marker.shape"]],
+)
+MARKER_FILL = Dimension(
+    "marker_fill_by",
+    "encoding.marker_fill",
+    "series.marker.fill",
+    "marker fills",
+    lambda s: list(s.theme["series.marker.fill"]),
+)
+DIMENSIONS = (COLOR, LINE_STYLE, MARKER_SHAPE, MARKER_FILL)  # in Series' order
 
 
 __all__ = ["DrawError", "draw", "label", "place"]
@@ -88,8 +120,18 @@ class Drawn:
     ref_lines: list[layers.RefLine] = field(default_factory=list)
     layers: dict[str, dict[str, Any]] = field(default_factory=dict)  # each layer, by name
     label_groups: list[labelling.Labelled] = field(default_factory=list)
-    style_keys: list[Any] = field(default_factory=list)  # (handles, names, title, column)
+    style_keys: list[StyleKey] = field(default_factory=list)
     y_title: str | None = None  # the value axis's title
+
+
+@dataclass
+class StyleKey:
+    """A key explaining the line styles, marker shapes or fills one column sets: its entries,
+    its title, and the column, as an error names it."""
+
+    entries: list[Entry]
+    title: str | None
+    column: str
 
 
 def _column(gt: dict[str, Any], path: str, frame: pd.DataFrame) -> str | None:
@@ -184,7 +226,7 @@ def build_series(
 class _Encodings:
     """How a frame's rows become series, and how each is styled (build_series)."""
 
-    by: dict[str, str | None]  # each style's column, by its BY_PATHS key
+    by: dict[str, str | None]  # each style's column, by its Dimension's by
     path_columns: list[str]  # encoding.detail's columns
     bench_col: str | None
     bench_value: Any
@@ -192,10 +234,7 @@ class _Encodings:
     is_bench: pd.Series  # which rows are the benchmark's
     orders: dict[str, list[Any]]  # each style's groups, in order
     grouping: list[str]  # the columns a series' rows share
-    colors: list[str]
-    line_styles: list[Any]
-    shapes: list[Any]
-    fills: list[Any]
+    choices: dict[str, list[Any]]  # each style's choices, by its Dimension's by
 
 
 def _kinds(frame: pd.DataFrame, r: Roles, gt: dict[str, Any], drawn: Drawn) -> dict[str, str]:
@@ -269,7 +308,7 @@ def _drawable_rows(
 def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodings:
     """Which columns group and style the series, the benchmark's rows, and each style's
     groups in order."""
-    by = {path: _column(gt, BY_PATHS[path], frame) for path in BYS}
+    by = {d.by: _column(gt, d.encoding_path, frame) for d in DIMENSIONS}
     paths = gt["encoding.detail"]
     path_columns = [] if unset(paths) else ([paths] if isinstance(paths, str) else list(paths))
     for p in path_columns:
@@ -281,7 +320,7 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     bench_value = gt["benchmark.value"]
 
     color_type = gt["encoding.color_type"]
-    color_col = by["color_by"]
+    color_col = by[COLOR.by]
     data_color = color_col is not None and color_col != Y_COLUMN
     numbers = (
         color_col is not None
@@ -306,21 +345,18 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     orders = {
         path: _order(_col(others, col), how)
         for path, col in by.items()
-        if col is not None and not (path == "color_by" and numeric_color)
+        if col is not None and not (path == COLOR.by and numeric_color)
     }
     lines_shown = bool(gt["mark.line.show"])  # a line joins only one color's points
     grouping = [
         col
         for path, col in by.items()
-        if col is not None and not (path == "color_by" and numeric_color and not lines_shown)
+        if col is not None and not (path == COLOR.by and numeric_color and not lines_shown)
     ]
     grouping += [
         c for c in [*path_columns, Y_COLUMN] if c not in grouping
     ]  # each y column: its own line
-    colors = style.series_colors()
-    line_styles = [LINE_STYLES[s] for s in style.theme["series.line.style"]]
-    shapes = [MARKERS[s] for s in style.theme["series.marker.shape"]]
-    fills = list(style.theme["series.marker.fill"])
+    choices = {d.by: d.choices(style) for d in DIMENSIONS}
 
     return _Encodings(
         by,
@@ -331,10 +367,7 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
         is_bench,
         orders,
         grouping,
-        colors,
-        line_styles,
-        shapes,
-        fills,
+        choices,
     )
 
 
@@ -392,7 +425,6 @@ def _series(
     aggregation = gt[f"axis.{r.value}.data.aggregation"]
     by, orders, grouping, is_bench = enc.by, enc.orders, enc.grouping, enc.is_bench
     bench_col, bench_value, numeric_color = enc.bench_col, enc.bench_value, enc.numeric_color
-    colors, line_styles, shapes, fills = enc.colors, enc.line_styles, enc.shapes, enc.fills
     series: list[Series] = []
     groups = (
         frame.groupby([*grouping, is_bench.rename("__bench__")], sort=False, dropna=False)
@@ -432,15 +464,16 @@ def _series(
                 benchmark=True,
             )
         else:
-            color_col = by["color_by"]
+            color_col = by[COLOR.by]
             label = None if color_col is None or numeric_color else str(values[color_col])
+            color, line, shape, fill = (_cycle(enc.choices[d.by], index[d.by]) for d in DIMENSIONS)
             s = Series(
                 xs,
                 ys_,
-                _cycle(colors, index["color_by"]),
-                _cycle(line_styles, index["line_style_by"]),
-                _cycle(shapes, index["marker_shape_by"]),
-                _cycle(fills, index["marker_fill_by"]),
+                color,
+                line,
+                shape,
+                fill,
                 label,
                 values=np.asarray(_col(rows, color_col), dtype=float)
                 if numeric_color and color_col
@@ -456,22 +489,16 @@ def _series(
 def _group_warnings(enc: _Encodings, drawn: Drawn) -> None:
     """A style with more groups than the theme has choices repeats them: a warning."""
     by, orders, numeric_color = enc.by, enc.orders, enc.numeric_color
-    colors, line_styles, shapes, fills = enc.colors, enc.line_styles, enc.shapes, enc.fills
-    styles = (
-        ("color_by", colors, "series.colors", "colors"),
-        ("line_style_by", line_styles, "series.line.style", "line styles"),
-        ("marker_shape_by", shapes, "series.marker.shape", "marker shapes"),
-        ("marker_fill_by", fills, "series.marker.fill", "marker fills"),
-    )
-    for name, choices, theme_path, what in styles:
-        if by[name] is None or (name == "color_by" and numeric_color):
+    for d in DIMENSIONS:
+        if by[d.by] is None or (d is COLOR and numeric_color):
             continue
-        if len(orders[name]) > len(choices):
+        groups, choices, what = len(orders[d.by]), len(enc.choices[d.by]), d.words
+        if groups > choices:
             drawn.warnings.append(
                 Issue(
                     "too-many-groups",
-                    f"{BY_PATHS[name]}: {len(orders[name])} groups but {len(choices)} {what} "
-                    f"in {theme_path}; {what} repeat",
+                    f"{d.encoding_path}: {groups} groups but {choices} {what} in "
+                    f"{d.theme_path}; {what} repeat",
                 )
             )
 
@@ -715,15 +742,21 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         "positions": tuple(gt["legend.key.positions"]),
         "inside": bool(gt["legend.key.inside"]),
     }
-    for handles, names, title, column in drawn.style_keys:
+    for style_key in drawn.style_keys:
         key = labelling.legend(
-            ax, handles, names, style, title, taken=taken, lines_shown=lines_shown, **where
+            ax,
+            style_key.entries,
+            style,
+            style_key.title,
+            taken=taken,
+            lines_shown=lines_shown,
+            **where,
         )
         if key is None:
             raise DrawError(
-                f"style key for {column}: no position in legend.key.positions is free and clear "
-                "of data; add positions, put keys outside (legend.key.inside: false), widen the "
-                "format or set the plot's limits to leave room"
+                f"style key for {style_key.column}: no position in legend.key.positions is free "
+                "and clear of data; add positions, put keys outside (legend.key.inside: false), "
+                "widen the format or set the plot's limits to leave room"
             )
         taken.append(key)
     method = gt["legend.method"]
@@ -747,11 +780,9 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             drawn.labelling = "direct"
             return
         if m == "key":
-            handles, names = [g.handle for g in groups], [g.name for g in groups]
             leg = labelling.legend(
                 ax,
-                handles,
-                names,
+                [Entry(g.name, g.handle) for g in groups],
                 style,
                 legend_title,
                 taken=taken,
@@ -779,41 +810,39 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     raise DrawError(f"legend.method: {method} doesn't fit this graph; {hint}")
 
 
-def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[tuple]:
+def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[StyleKey]:
     """Keys explaining line styles, marker shapes and fills set by an encoding other than
-    encoding.color: one (handles, names, title, column) per styling column."""
+    encoding.color: one per styling column."""
     styled = {
-        p: gt[BY_PATHS[p]]
-        for p in BYS[1:]
-        if not unset(gt[BY_PATHS[p]]) and gt[BY_PATHS[p]] != gt["encoding.color"]
+        d.by: gt[d.encoding_path]
+        for d in DIMENSIONS
+        if d is not COLOR
+        and not unset(gt[d.encoding_path])
+        and gt[d.encoding_path] != gt[COLOR.encoding_path]
     }
-    t = style.theme
+    choices = {d.by: d.choices(style) for d in (LINE_STYLE, MARKER_SHAPE, MARKER_FILL)}
     grey = style.color("font.color")
     found = []
     for column in dict.fromkeys(styled.values()):
-        paths = [p for p, c in styled.items() if c == column]
+        bys = [b for b, c in styled.items() if c == column]
         source = Y_COLUMN if column == COLUMN_NAME else column
         values = _order(_col(frame, source), gt["encoding.order"])
-        handles, names = [], []
+        entries = []
         for i, value in enumerate(values):
-            ls = LINE_STYLES[_cycle(t["series.line.style"], i if "line_style_by" in paths else 0)]
-            mk = MARKERS[_cycle(t["series.marker.shape"], i if "marker_shape_by" in paths else 0)]
-            fill = _cycle(list(t["series.marker.fill"]), i if "marker_fill_by" in paths else 0)
-            handles.append(
-                Line2D(
-                    [],
-                    [],
-                    color=grey,
-                    linestyle=cast(Any, ls if gt["mark.line.show"] else "none"),
-                    marker=mk if gt["mark.marker.show"] else "none",
-                    markersize=style.pt("series.marker.size"),
-                    markerfacecolor="none" if fill == "open" else grey,
-                    markeredgecolor=grey,
-                )
+            ls, mk, fill = (_cycle(choices[b], i if b in bys else 0) for b in choices)
+            handle = Line2D(
+                [],
+                [],
+                color=grey,
+                linestyle=cast(Any, ls if gt["mark.line.show"] else "none"),
+                marker=mk if gt["mark.marker.show"] else "none",
+                markersize=style.pt("series.marker.size"),
+                markerfacecolor="none" if fill == "open" else grey,
+                markeredgecolor=grey,
             )
-            names.append(literal(str(value)))
+            entries.append(Entry(literal(str(value)), handle))
         title = None if column == COLUMN_NAME else literal(str(column))
-        found.append((handles, names, title, "column names" if column == COLUMN_NAME else column))
+        found.append(StyleKey(entries, title, "column names" if column == COLUMN_NAME else column))
     return found
 
 

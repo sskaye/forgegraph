@@ -343,8 +343,7 @@ def box_clear(ax: Axes, bbox: Bbox, lines_shown: bool, texts: bool = True) -> bo
 
 def legend(
     ax: Axes,
-    handles: list[Line2D | Bars],
-    names: list[str],
+    entries: list[Entry],
     style: Style,
     title: str | None,
     *,
@@ -357,7 +356,7 @@ def legend(
     frame no line or marker passes through; outside it, the first not taken (layout makes
     room). None if there's no such position. Keys already placed (`taken`) keep theirs."""
     used = {k.position for k in taken or []}
-    key = Key([Entry(n, h) for n, h in zip(names, handles, strict=True)], title, style)
+    key = Key(entries, title, style)
     for position in positions:
         if position in used:
             continue

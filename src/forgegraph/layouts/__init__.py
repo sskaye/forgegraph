@@ -41,7 +41,7 @@ from forgegraph.drawing.figure import (
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
-from forgegraph.graph import PLACE_PASSES, Prepared, prepare
+from forgegraph.graph import PLACE_PASSES, Graph, Prepared, prepare, render
 from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
@@ -184,6 +184,16 @@ class Layout(Saved):
     def warnings(self) -> list[str]:
         return [i.message for i in self.issues]
 
+    @property
+    def data_records(self) -> list[DataRecord]:
+        """What each tile read and drew, tab by tab."""
+        return [tile.data for t in self.tabs for tile in t.tiles.values()]
+
+    @property
+    def labelling_by_name(self) -> dict[str, str]:
+        """How each tile's series are named (see Graph.labelling), by "<tab>.<tile>"."""
+        return {f"{t.name}.{n}": tile.labelling for t in self.tabs for n, tile in t.tiles.items()}
+
     def check(self) -> list[lint.Issue]:
         for t in self.tabs:
             t.check()
@@ -304,13 +314,21 @@ def _saving(style: Style, values: dict[str, Any]) -> Iterator[None]:
 
 
 def stem(path: Path) -> str:
-    """A layout file's name without .layout.yaml (or .yaml)."""
+    """A GraphSpec or layout file's name, without .layout.yaml or .yaml: what its files are
+    saved as."""
     name = path.name
     return name[: -len(SUFFIX)] if name.endswith(SUFFIX) else path.stem
 
 
 def is_layout(path: Path) -> bool:
     return path.name.endswith(SUFFIX)
+
+
+def draw_file(path: Path, footnote: str | None = None) -> Graph | Layout:
+    """Draw a GraphSpec file, or a layout file (.layout.yaml), with an optional footnote."""
+    if is_layout(path):
+        return render_layout(path, footnote=footnote)
+    return render(path, footnote=footnote)
 
 
 def _format_values(doc: dict[str, Any], reg: Registry, own: Values) -> Values:

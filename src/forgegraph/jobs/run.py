@@ -233,7 +233,7 @@ def stamp(as_of: datetime, cadence: Cadence, order: str) -> str:
 def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
     import forgegraph as fg
     from forgegraph.drawing.page import Freshness
-    from forgegraph.layouts import stem
+    from forgegraph.layouts import draw_file, stem
 
     shown = os.path.relpath(target, schedule.path.parent)
     found: list[DataFile] = []
@@ -257,11 +257,7 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
         file=shown, ok=False, data=found, data_as_of=_iso(as_of) if as_of else None
     )
     try:
-        drawn: Any = (
-            fg.layout(target, footnote=footnote)
-            if _is_layout(target)
-            else fg.render(target, footnote=footnote)
-        )
+        drawn = draw_file(target, footnote=footnote)
     except fg.SpecError as e:
         result.problems = list(e.problems)
         return result
@@ -273,17 +269,12 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
             _iso(as_of), schedule.stale_after_hours, schedule.cadence.describe()
         )
     folder = schedule.output_folder or target.parent
-    name = stem(target) if _is_layout(target) else target.stem
     try:
-        saved = drawn.save_all(folder / name)
+        saved = drawn.save_all(folder / stem(target))
     except Exception as e:
         result.problems = [f"saving: {type(e).__name__}: {e}"]
         return result
-    records = (
-        [tile.data for t in drawn.tabs for tile in t.tiles.values()]
-        if _is_layout(target)
-        else [drawn.data]
-    )
+    records = drawn.data_records
     dropped: dict[str, int] = {}
     for r in records:
         for reason, n in r.rows_dropped.items():

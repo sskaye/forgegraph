@@ -80,6 +80,16 @@ class Graph(Inspected, Saved):
         """Lint's findings, as messages."""
         return [i.message for i in self.issues]
 
+    @property
+    def data_records(self) -> list[DataRecord]:
+        """What was read and drawn (as a layout's are, by tile)."""
+        return [self.data]
+
+    @property
+    def labelling_by_name(self) -> str:
+        """How its series are named: its one labelling, where a layout's are by tile."""
+        return self.labelling
+
     def record(self) -> dict[str, Any] | None:
         """The provenance record saved files carry, at the format's provenance.level; None
         with off."""

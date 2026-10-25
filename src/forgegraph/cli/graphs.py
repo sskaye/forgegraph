@@ -29,30 +29,22 @@ def render(
     several tabs saves a file per tab (name-<tab>.png), a PDF with a page per tab, and an
     HTML page with every tab."""
     import forgegraph as fg
-    from forgegraph.layouts import is_layout, stem
+    from forgegraph.layouts import draw_file, stem
     from forgegraph.spec.access import nonstandard_note
 
-    drawn: Any
     try:
-        drawn = fg.layout(graphspec) if is_layout(graphspec) else fg.render(graphspec)
+        drawn = draw_file(graphspec)
     except fg.SpecError as e:
         fail(e.problems, as_json)
         return
     if out is not None:
         saved = drawn.save(out)
-    elif isinstance(drawn, fg.Layout):
-        saved = drawn.save_all(graphspec.parent / stem(graphspec))
     else:
-        saved = drawn.save_all(graphspec.parent / graphspec.stem)
-    labelling = (
-        {f"{t.name}.{n}": tile.labelling for t in drawn.tabs for n, tile in t.tiles.items()}
-        if isinstance(drawn, fg.Layout)
-        else drawn.labelling
-    )
-    result = {
+        saved = drawn.save_all(graphspec.parent / stem(graphspec))
+    result: dict[str, Any] = {
         "ok": True,
         "saved": [str(p) for p in saved],
-        "labelling": labelling,
+        "labelling": drawn.labelling_by_name,
         "lint": [i.as_dict() for i in drawn.issues],
     }
     if drawn.nonstandard_packs:

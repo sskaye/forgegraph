@@ -176,11 +176,9 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
     fig = ax.figure
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     px = fig.dpi / 72.0
-    size = style.pt("legend.label.size")
-    weight = style.weight("legend.label.weight")
     clearance = style.pt("legend.direct.clearance") * px
     association = float(style.theme["legend.direct.max_relative_distance"])
-    prop = text.font(str(style.theme["font.family"]), size, weight)
+    prop = style.font("legend.label.size", "legend.label.weight")
     label_edges = [text.edges(g.name, prop) for g in groups]
     sizes = [(e.width * px, e.height * px) for e in label_edges]  # each label's letters
 

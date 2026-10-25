@@ -220,9 +220,7 @@ def layout(fig: Figure, ax: Axes, style: Style) -> None:
 
 def add_footnote(fig: Figure, words: str, style: Style) -> Text:
     """The figure's footnote, in the theme's footnote look; layout places it."""
-    prop = text.font(
-        str(style.theme["font.family"]), style.pt("footnote.size"), style.weight("font.weight")
-    )
+    prop = style.font("footnote.size", "font.weight")
     note = fig.text(
         0,
         0,
@@ -306,7 +304,7 @@ class Watermark(PathPatch):
 
     def __init__(self, ax: Axes, style: Style) -> None:
         t = style.theme
-        prop = text.font(str(t["font.family"]), 1.0, style.weight("watermark.weight"))
+        prop = style.font(1.0, "watermark.weight")  # 1 pt: draw() scales it to the box
         turn = Affine2D().rotate_deg(float(t["watermark.angle"]))
         outline = TextPath((0, 0), str(t["watermark.text"]), prop=prop).transformed(turn)
         if np.asarray(outline.vertices).size == 0:  # the theme check's backstop

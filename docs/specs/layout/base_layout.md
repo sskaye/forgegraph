@@ -17,9 +17,10 @@ variable_parameters:          *# List of variable parameters for the l
         color: "#FFFFFF"          *# \[None, hex color\]; Color of the gaps, blank cells and figure edges. None: transparent.*\
         line:\
             show: false          *# \[true, false\]; Draw a line along the middle of each gap between tiles. A blank cell counts as a tile.*\
-            border: false          *# \[true, false\]; Draw a line around the outside, a gap's room from the edge, through its middle.*\
             color: "#D9D9D9"          *# \[hex color\]; Line color.*\
             width: 0.05          *# \[positive float\]; Line width, × base size.*\
+        border:\
+            show: false          *# \[true, false\]; Draw a line around the outside, a gap's room from the edge, through its middle.*\
     tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A layout's tabs replace those it inherits.*\
         main:\
             grid:\

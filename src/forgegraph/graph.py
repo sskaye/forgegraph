@@ -287,16 +287,17 @@ def xy(
     registry: Registry | None = None,
 ) -> Graph:
     """Draw y against x from a DataFrame. color, line_style, marker_shape, marker_fill and
-    detail set the encoding parameters of those names; `parameters` sets any other variable
+    detail set the encoding's columns (encoding.color.column, encoding.line.style.column,
+    encoding.marker.shape.column, ...); `parameters` sets any other variable
     parameter by path, e.g. {"mark.line.show": False, "axis.x.scale": "log"}. registry: as
     for render."""
     settings: dict[str, Any] = {"axis.x.data.column": x, "axis.y.data.column": y}
     for path, value in (
-        ("encoding.color", color),
-        ("encoding.line_style", line_style),
-        ("encoding.marker_shape", marker_shape),
-        ("encoding.marker_fill", marker_fill),
-        ("encoding.detail", detail),
+        ("encoding.color.column", color),
+        ("encoding.line.style.column", line_style),
+        ("encoding.marker.shape.column", marker_shape),
+        ("encoding.marker.fill.column", marker_fill),
+        ("encoding.detail.column", detail),
     ):
         if value is not None:
             settings[path] = value

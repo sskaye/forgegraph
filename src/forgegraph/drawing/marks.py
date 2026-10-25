@@ -8,7 +8,7 @@ mark.bar; themes series.bar, series.value_label).
   place is an error that names axis.*.data.aggregation.
 - **Bars** (mark.bar.show) run from 0 (1 on a log axis), or from the stack below, to each
   value. Each series' bars are one collection of rectangles (Bars), outlined in the theme's
-  series.bar.edge_color and edge_width (the benchmark's, series.benchmark.bar), whose width
+  series.bar.edge.color and edge.width (the benchmark's, series.benchmark.bar), whose width
   is the theme's series.bar.width in points at any size: they're laid out again at every draw.
 - **Side by side** (series.offset) centres the marks at each place on it, in series order:
   bars series.bar.gap apart, markers touching. A place with fewer series has fewer marks,
@@ -73,10 +73,10 @@ def check(gt: dict[str, Any], value_axis: str) -> None:
     if labels and how != "none" and position == "outside":
         raise DrawError(
             "series.value_label.position: outside, but stacked segments are labelled inside; "
-            "use auto, or series.value_label.total for each stack's total"
+            "use auto, or series.value_label.total.show for each stack's total"
         )
-    if gt["series.value_label.total"] and how != "sum":
-        raise DrawError("series.value_label.total: applies with series.aggregation sum")
+    if gt["series.value_label.total.show"] and how != "sum":
+        raise DrawError("series.value_label.total.show: applies with series.aggregation sum")
     if gt["mark.bar.show"]:
         low = gt[f"axis.{value_axis}.min"]
         base = 1.0 if gt[f"axis.{value_axis}.scale"] == "log" else 0.0
@@ -411,7 +411,7 @@ def value_labels(
     text_of = number_text(gt, value_axis, axis, fmt, "series.value_label.format")
     for a in [a for a in ax.texts if a.get_gid() == VALUE_LABEL]:
         a.remove()
-    show, total = bool(gt["series.value_label.show"]), bool(gt["series.value_label.total"])
+    show, total = bool(gt["series.value_label.show"]), bool(gt["series.value_label.total.show"])
     if not (show or total):
         return False
     fig = ax.figure

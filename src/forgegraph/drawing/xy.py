@@ -48,25 +48,25 @@ class Dimension:
 
 
 COLOR = Dimension(
-    "color_by", "encoding.color", "series.colors", "colors", lambda s: s.series_colors()
+    "color_by", "encoding.color.column", "series.colors", "colors", lambda s: s.series_colors()
 )
 LINE_STYLE = Dimension(
     "line_style_by",
-    "encoding.line_style",
+    "encoding.line.style.column",
     "series.line.style",
     "line styles",
     lambda s: [LINE_STYLES[v] for v in s.theme["series.line.style"]],
 )
 MARKER_SHAPE = Dimension(
     "marker_shape_by",
-    "encoding.marker_shape",
+    "encoding.marker.shape.column",
     "series.marker.shape",
     "marker shapes",
     lambda s: [MARKERS[v] for v in s.theme["series.marker.shape"]],
 )
 MARKER_FILL = Dimension(
     "marker_fill_by",
-    "encoding.marker_fill",
+    "encoding.marker.fill.column",
     "series.marker.fill",
     "marker fills",
     lambda s: list(s.theme["series.marker.fill"]),
@@ -108,11 +108,11 @@ def _look(style: Style, benchmark: bool) -> Look:
     return Look(
         style.pt(f"series.{b}line.width"),
         style.pt(f"series.{b}marker.size"),
-        style.color(f"series.{b}marker.edge_color"),
-        style.pt(f"series.{b}marker.edge_width"),
+        style.color(f"series.{b}marker.edge.color"),
+        style.pt(f"series.{b}marker.edge.width"),
         style.pt(f"series.{b}bar.width"),
-        style.color(f"series.{b}bar.edge_color"),
-        style.pt(f"series.{b}bar.edge_width"),
+        style.color(f"series.{b}bar.edge.color"),
+        style.pt(f"series.{b}bar.edge.width"),
         3 if benchmark else 2,
         2.8 if benchmark else 1.8,
     )
@@ -129,7 +129,7 @@ class Series:
     label: str | None  # the color group's name, or the benchmark's
     look: Look
     benchmark: bool = False
-    values: np.ndarray | None = None  # a numeric encoding.color's value at each point
+    values: np.ndarray | None = None  # a numeric encoding.color.column's value at each point
     order: tuple[int, ...] = ()  # position of its groups, for drawing and legend order
     rows: Any = None  # the frame's rows it was drawn from, for layers
     place_column: str = ""  # the frame's base-axis column
@@ -260,7 +260,7 @@ class _Encodings:
     """How a frame's rows become series, and how each is styled (build_series)."""
 
     by: dict[str, str | None]  # each style's column, by its Dimension's by
-    path_columns: list[str]  # encoding.detail's columns
+    path_columns: list[str]  # encoding.detail.column
     bench_col: str | None
     bench_value: Any
     numeric_color: bool  # colors on a scale, from numbers
@@ -342,17 +342,17 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     """Which columns group and style the series, the benchmark's rows, and each style's
     groups in order."""
     by = {d.by: _column(gt, d.encoding_path, frame) for d in DIMENSIONS}
-    paths = gt["encoding.detail"]
+    paths = gt["encoding.detail.column"]
     path_columns = [] if unset(paths) else ([paths] if isinstance(paths, str) else list(paths))
     for p in path_columns:
         if p not in frame.columns:
             raise DrawError(
-                f"encoding.detail: no column '{p}' in the data; columns are {_names(frame)}"
+                f"encoding.detail.column: no column '{p}' in the data; columns are {_names(frame)}"
             )
     bench_col = _column(gt, "benchmark.data_column", frame)
     bench_value = gt["benchmark.value"]
 
-    color_type = gt["encoding.color_type"]
+    color_type = gt["encoding.color.type"]
     color_col = by[COLOR.by]
     data_color = color_col is not None and color_col != Y_COLUMN
     numbers = (
@@ -362,7 +362,7 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     )
     if color_type == "continuous" and data_color and not numbers:
         raise DrawError(
-            f"encoding.color_type: continuous, but {color_col} isn't numbers; "
+            f"encoding.color.type: continuous, but {color_col} isn't numbers; "
             "use categorical or auto"
         )
     numeric_color = numbers and color_type != "categorical"  # drawn on a color scale
@@ -585,7 +585,7 @@ def _as_xy(r: Roles, base: Any, value: Any) -> tuple[Any, Any]:
 def _draw_marks(
     ax: Axes, series: list[Series], gt: dict[str, Any], style: Style, r: Roles
 ) -> tuple[list[labelling.Labelled], Normalize | None]:
-    """Each series' line, markers and bars (a numeric encoding.color's markers on its color
+    """Each series' line, markers and bars (a numeric encoding.color.column's markers on its color
     scale); returns the names to label, with what's drawn under each, and the color scale's
     range, if there is one."""
     bars_shown = bool(gt["mark.bar.show"])
@@ -710,7 +710,7 @@ def _decorate(
         ax.grid(True)
         ax.set_axisbelow(True)
     if norm is not None:
-        color_col = gt["encoding.color"]
+        color_col = gt["encoding.color.column"]
         bar_title = _title(
             gt["legend.color_bar.title.text"], None if unset(color_col) else str(color_col)
         )
@@ -775,7 +775,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             raise DrawError("legend.method: direct isn't available with bars; use key or auto")
         allowed = [m for m in allowed if m != "direct"]
     tries = allowed if method == "auto" else [method]
-    color_col = gt["encoding.color"]
+    color_col = gt["encoding.color.column"]
     legend_title = _title(
         gt["legend.key.title.text"],
         None if unset(color_col) or color_col == COLUMN_NAME else str(color_col),
@@ -817,7 +817,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
 
 def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[StyleKey]:
     """Keys explaining line styles, marker shapes and fills set by an encoding other than
-    encoding.color: one per styling column."""
+    encoding.color.column: one per styling column."""
     styled = {
         d.by: gt[d.encoding_path]
         for d in DIMENSIONS

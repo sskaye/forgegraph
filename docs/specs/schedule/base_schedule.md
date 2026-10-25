@@ -14,11 +14,13 @@ variable_parameters:          *# List of variable parameters for the s
         files: None          *# \[texts\]; GraphSpec and layout files rendered each run: absolute, from ~, or relative to this file. A schedule must set it.*\
         output_folder: None          *# \[None, text\]; Folder the outputs are saved in: absolute, starting with ~, or relative to the file that sets it. None: beside each target file.*\
     cadence:          *# When the job runs, in the machine's local time.*\
-        interval: 1          *# \[positive int\]; Units between runs: a divisor of 60 (minute), 24 (hour) or 12 (month); otherwise 1.*\
-        interval_unit: day          *# \[minute, hour, day, week, month, year\]; The unit interval counts in.*\
+        interval:\
+            count: 1          *# \[positive int\]; Units between runs: a divisor of 60 (minute), 24 (hour) or 12 (month); otherwise 1.*\
+            unit: day          *# \[minute, hour, day, week, month, year\]; The unit interval.count counts in.*\
         at: "06:00"          *# \[None, text, texts\]; When in each unit: ":30", "06:00", "mon 06:00", "1 06:00", "Jan 1 06:00", or a list. None: its start.*\
     freshness:\
-        stamp: true          *# \[true, false\]; Draw the "data as of" stamp, with the cadence, in every output.*\
+        stamp:\
+            show: true          *# \[true, false\]; Draw the "data as of" stamp, with the cadence, in every output.*\
         stale_after_hours: auto          *# \[auto, positive float\]; Data age after which the HTML page shows the stale banner. auto: a period plus 25%.*\
     status:\
         file: auto          *# \[auto, text\]; The status file: absolute, starting with ~, or relative to the file that sets it. auto: \<name>.status.json in output_folder, or beside this file.*\

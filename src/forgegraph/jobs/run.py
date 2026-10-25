@@ -2,7 +2,7 @@
 
 1. Take a lock beside the status file, so two runs never overlap.
 2. Render every target (GraphSpec or layout) into the output folder, each with the "data as
-   of" footnote (when freshness.stamp is on) and, on HTML pages, the stale banner. A target
+   of" footnote (when freshness.stamp.show is on) and, on HTML pages, the stale banner. A target
    that fails is recorded and the others still render.
 3. Write the status file (jobs/status.py), then run on_failure if any target failed, or
    on_success, without a shell, and write the status file again with what the command did.
@@ -251,7 +251,7 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
             found.append(DataFile(path=str(f)))
     as_of = min(times) if times and len(times) == len(files) else None
     footnote = None
-    if as_of is not None and schedule.values["freshness.stamp"]:
+    if as_of is not None and schedule.values["freshness.stamp.show"]:
         footnote = stamp(as_of, schedule.cadence, _date_order(target))
     result = TargetStatus(
         file=shown, ok=False, data=found, data_as_of=_iso(as_of) if as_of else None

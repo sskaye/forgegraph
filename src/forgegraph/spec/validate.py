@@ -257,12 +257,12 @@ def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
         errors.append("axis.y.title: several y columns have no single name; set a title, or None")
     if (
         several
-        and v.get("encoding.color") == "column_name"
+        and v.get("encoding.color.column") == "column_name"
         and v.get("legend.key.title.text") == "column_name"
     ):
         errors.append(
-            "legend.key.title.text: encoding.color is column_name, which has no single name; "
-            "set a title, or None"
+            "legend.key.title.text: encoding.color.column is column_name, which has no single "
+            "name; set a title, or None"
         )
     if all(v.get(f"mark.{m}.show") is False for m in ("line", "marker", "bar")):
         errors.append(

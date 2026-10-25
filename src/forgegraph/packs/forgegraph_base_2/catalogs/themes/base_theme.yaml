@@ -12,10 +12,10 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         axis.y.data.column: "Power Density (mW/cm²)"
         axis.y.data.aggregation: max
         axis.x.tick.algorithm: all
-        encoding.color: None
-        encoding.detail: None
+        encoding.color.column: None
+        encoding.detail.column: None
         mark.bar.show: true
         mark.line.show: false
-        series.bar.edge_color: "#000000"
-        series.benchmark.bar.edge_color: "#000000"
-        series.benchmark.marker.edge_color: "#000000"
+        series.bar.edge.color: "#000000"
+        series.benchmark.bar.edge.color: "#000000"
+        series.benchmark.marker.edge.color: "#000000"

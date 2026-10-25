@@ -37,31 +37,35 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
                 date_order: month_day          *# \[month_day, day_month\]; Day and month in automatic date tick labels: Jul 6, or 6 Jul.*\
                 max_wrap: 1          *# \[int\]; Times an x tick label may wrap to fit beside its neighbors (not dates). 0: never.*\
             minor:\
-                num: 0          *# \[int\]; Minor ticks between major ticks. 0: none.*\
+                count: 0          *# \[int\]; Minor ticks between major ticks. 0: none.*\
                 length: 0.15          *# \[positive float\]; Minor tick length, × base size.*\
                 width: 0.05          *# \[positive float\]; Minor tick width, × base size.*\
     plot_area:\
         sides: \[left, bottom, top, right\]          *# \[left, right, top, bottom, None\]; Sides with a border line. None: none.*\
-        line_width: 0.08          *# \[positive float\]; Border line width, × base size.*\
-        line_color: "#000000"          *# \[hex color\]; Border line color.*\
+        line:\
+            width: 0.08          *# \[positive float\]; Border line width, × base size.*\
+            color: "#000000"          *# \[hex color\]; Border line color.*\
         aspect: 1.1          *# \[positive float\]; Plot area width ÷ height.*\
         margin: 0.05          *# \[0-1\]; Gap between data and the plot area's edge, × the data's range.*\
     grid:\
         color: "#E6E6E6"          *# \[hex color\]; Grid color.*\
-        line_width: 0.05          *# \[positive float\]; Grid line width, × base size.*\
-        line_style: solid          *# \[solid, dashed, dotted\]; Grid line style.*\
-    series:\
-        colors: okabe_ito          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color groups, in order, then repeating: a named palette, or a list of colors.*\
         line:\
-            style: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; Line styles for encoding.line_style groups, in order.*\
+            width: 0.05          *# \[positive float\]; Grid line width, × base size.*\
+            style: solid          *# \[solid, dashed, dotted\]; Grid line style.*\
+    series:\
+        colors: okabe_ito          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.*\
+        line:\
+            style: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; Line styles for encoding.line.style.column groups, in order.*\
             cap: projecting          *# \[butt, round, projecting\]; Shape of a line's ends.*\
             join: round          *# \[miter, round, bevel\]; Shape of a line's corners.*\
         marker:\
-            shape: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; Marker shapes for encoding.marker_shape groups, in order.*\
-            fill: \[filled, open\]          *# \[filled, open\]; Marker fills for encoding.marker_fill groups, in order. open: outline only.*\
-            edge_color: "#000000"          *# \[None, hex color\]; Outline color of filled markers. None: none.*\
+            shape: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; Marker shapes for encoding.marker.shape.column groups, in order.*\
+            fill: \[filled, open\]          *# \[filled, open\]; Marker fills for encoding.marker.fill.column groups, in order. open: outline only.*\
+            edge:\
+                color: "#000000"          *# \[None, hex color\]; Outline color of filled markers. None: none.*\
         bar:\
-            edge_color: "#000000"          *# \[None, hex color\]; Bar outline color. None: none.*\
+            edge:\
+                color: "#000000"          *# \[None, hex color\]; Bar outline color. None: none.*\
         value_label:\
             size: 0.9          *# \[positive float\]; Value label size, × base size.*\
             gap: 0.25          *# \[positive float\]; Gap from the mark to the label's letters, × base size.*\
@@ -69,17 +73,20 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
             color: "#808080"          *# \[hex color\]; Benchmark color.*\
             marker:\
                 fill: filled          *# \[filled, open\]; Benchmark marker fill.*\
-                edge_color: "#000000"          *# \[None, hex color\]; Outline color of a filled benchmark marker. None: none.*\
+                edge:\
+                    color: "#000000"          *# \[None, hex color\]; Outline color of a filled benchmark marker. None: none.*\
             bar:\
-                edge_color: "#000000"          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
+                edge:\
+                    color: "#000000"          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
     legend:\
         methods: \[auto, direct, key\]          *# \[auto, direct, key, none\]; Methods graphs may use to name series; auto tries direct and key, in this list's order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.*\
         label:\
             size: 1.0          *# \[positive float\]; Series name size, × base size.*\
             weight: semibold          *# \[light, regular, medium, semibold, bold\]; Direct label weight; key names use font.weight.*\
         key:\
-            frame: false          *# \[true, false\]; Box around the key.*\
-            frame_width: 0.06          *# \[positive float\]; Frame line width, × base size.*\
+            frame:\
+                show: false          *# \[true, false\]; Box around the key.*\
+                width: 0.06          *# \[positive float\]; Frame line width, × base size.*\
             background: None          *# \[None, hex color\]; Fill behind the key. None: none.*\
             padding: 0.5          *# \[positive float\]; Gap inside the frame, every side, × base size.*\
             inset: 0.5          *# \[positive float\]; Gap from the plot area to the key, × base size.*\
@@ -97,12 +104,15 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
             gap: 0.8          *# \[positive float\]; Gap from the plot area to the bar, × base size.*\
     layer:\
         error_bar:\
-            cap_size: 0.25          *# \[positive float\]; Cap width, × base size.*\
-            line_width: 0.08          *# \[positive float\]; Line width, × base size.*\
+            cap:\
+                width: 0.25          *# \[positive float\]; Cap width, × base size.*\
+            line:\
+                width: 0.08          *# \[positive float\]; Line width, × base size.*\
         reference_line:\
             color: "#808080"          *# \[hex color\]; Line and label color, unless drawn per series.*\
-            line_style: dashed          *# \[solid, dashed, dotted, dashdot\]; Line style.*\
-            line_width: 0.08          *# \[positive float\]; Line width, × base size.*\
+            line:\
+                style: dashed          *# \[solid, dashed, dotted, dashdot\]; Line style.*\
+                width: 0.08          *# \[positive float\]; Line width, × base size.*\
             label:\
                 size: 0.8          *# \[positive float\]; Label size, × base size.*\
                 gap: 0.25          *# \[positive float\]; Gap from the line to the label's letters, × base size.*\
@@ -130,11 +140,13 @@ variable_parameters:          *# List of variable parameters for the t
             width: 0.15          *# \[positive float\]; Line width, × base size.*\
         marker:\
             size: 0.5          *# \[positive float\]; Marker size, × base size.*\
-            edge_width: 0.05          *# \[positive float\]; Marker outline width, × base size.*\
+            edge:\
+                width: 0.05          *# \[positive float\]; Marker outline width, × base size.*\
         bar:\
             width: 2.5          *# \[positive float\]; Bar width, × base size. Bars that would overlap are an error.*\
             gap: 0.15          *# \[0-2\]; Gap between side-by-side bars, × base size.*\
-            edge_width: 0.05          *# \[positive float\]; Bar outline width, × base size.*\
+            edge:\
+                width: 0.05          *# \[positive float\]; Bar outline width, × base size.*\
         benchmark:\
             line:\
                 style: solid          *# \[solid, dashed, dotted, dashdot\]; Benchmark line style.*\
@@ -142,20 +154,23 @@ variable_parameters:          *# List of variable parameters for the t
             marker:\
                 shape: circle          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; Benchmark marker shape.*\
                 size: 0.5          *# \[positive float\]; Benchmark marker size, × base size.*\
-                edge_width: 0.05          *# \[positive float\]; Benchmark marker outline width, × base size.*\
+                edge:\
+                    width: 0.05          *# \[positive float\]; Benchmark marker outline width, × base size.*\
             bar:\
                 width: 2.5          *# \[positive float\]; Benchmark bar width, × base size.*\
-                edge_width: 0.05          *# \[positive float\]; Benchmark bar outline width, × base size.*\
+                edge:\
+                    width: 0.05          *# \[positive float\]; Benchmark bar outline width, × base size.*\
     legend:\
         key:\
             sample:\
-                marker_size: 0.5          *# \[positive float\]; Marker size in key samples, × base size; series.marker.size sets the plot's.*\
+                marker:\
+                    size: 0.5          *# \[positive float\]; Marker size in key samples, × base size; series.marker.size sets the plot's.*\
         direct:\
             clearance: 0.2          *# \[positive float\]; Minimum gap around a direct label, × base size.*\
             max_relative_distance: 0.8          *# \[0-1\]; Most a label's distance to its series may be, ÷ its distance to the next nearest.*\
             max_axis_extension: 0.15          *# \[0-1\]; Most the x-axis may grow to fit labels, × its range.*\
         color_bar:\
-            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color: a named scale, one hex color (light to it) or two (first to second).*\
+            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color.column: a named scale, one hex color (light to it) or two (first to second).*\
     layer:\
         error_bar:\
             color: "#000000"          *# \[series, hex color\]; Error bar color. series: the series' color.*

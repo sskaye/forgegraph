@@ -367,7 +367,7 @@ def test_a_border_runs_round_the_tiles_a_gap_from_the_edge(project):
     path = write_layout(
         project,
         {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
-        separators={"line": {"border": True}},
+        separators={"border": {"show": True}},
     )
     t = fg.layout(path).tabs[0]
     [border] = [a for a in t.figure.artists if isinstance(a, Line2D)]  # no lines between
@@ -456,7 +456,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
         project,
         {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")},
         fmt="house/page",
-        separators={"line": {"border": True}},
+        separators={"border": {"show": True}},
     )
     layout = fg.layout(path)
     [page_file] = layout.save_all(project / "out" / "fig")

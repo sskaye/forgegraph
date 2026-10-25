@@ -182,8 +182,8 @@ def reference_lines(
             draw_line(
                 at,
                 color=line_color,
-                linewidth=style.pt("layer.reference_line.line_width"),
-                linestyle=LINE_STYLES[t["layer.reference_line.line_style"]],
+                linewidth=style.pt("layer.reference_line.line.width"),
+                linestyle=LINE_STYLES[t["layer.reference_line.line.style"]],
                 zorder=1.5,
                 gid=REFERENCE,
             )
@@ -443,7 +443,7 @@ def _draw_bars(
     t: dict[str, Any],
 ) -> None:
     ink = color if t["layer.error_bar.color"] == "series" else style.color("layer.error_bar.color")
-    width = style.pt("layer.error_bar.line_width")
+    width = style.pt("layer.error_bar.line.width")
     n = len(places)
     along = np.repeat(places, 3)
     span = np.empty(3 * n)
@@ -463,7 +463,7 @@ def _draw_bars(
         ends_y,
         linestyle="none",
         marker=cap,
-        markersize=style.pt("layer.error_bar.cap_size"),
+        markersize=style.pt("layer.error_bar.cap.width"),
         markeredgewidth=width,
         color=ink,
         zorder=1.9,

@@ -106,7 +106,7 @@ def test_the_footnote_says_when_the_data_is_from(project):
 
 @pytest.mark.slow
 def test_no_stamp_when_freshness_stamp_is_off(project):
-    dump(schedule_doc(freshness={"stamp": False}), project / "lab.schedule.yaml")
+    dump(schedule_doc(freshness={"stamp": {"show": False}}), project / "lab.schedule.yaml")
     job_run.run(project / "lab.schedule.yaml")
     plain = fg.render(project / "p.yaml")
     plain.save(project / "plain.png")
@@ -203,7 +203,10 @@ def test_two_runs_never_overlap(project):
     [
         ({"targets": {"files": None}}, "targets.files: must be set"),
         ({"targets": {"files": ["nowhere.yaml"]}}, "targets.files: no file at"),
-        ({"cadence": {"interval": 7, "interval_unit": "minute", "at": None}}, "doesn't divide 60"),
+        (
+            {"cadence": {"interval": {"count": 7, "unit": "minute"}, "at": None}},
+            "doesn't divide 60",
+        ),
     ],
 )
 def test_a_schedule_that_cant_run_is_an_error(project, variable, message):
@@ -309,7 +312,7 @@ def test_failure_injection_status_hook_and_banner(project):
 def test_a_weekday_job_isnt_stale_over_the_weekend(project):
     weekdays = ["mon 06:00", "tue 06:00", "wed 06:00", "thu 06:00", "fri 06:00"]
     dump(
-        schedule_doc(cadence={"interval_unit": "week", "at": weekdays}),
+        schedule_doc(cadence={"interval": {"unit": "week"}, "at": weekdays}),
         project / "lab.schedule.yaml",
     )
     friday = datetime(2026, 10, 23, 5, 30).astimezone()

@@ -31,23 +31,28 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
                 size: 1.27          *# \[positive float\]; Tick label size, × base size.*\
                 gap: 0.55          *# \[positive float\]; Gap from tick to label, × base size.*\
     plot_area:\
-        line_width: 0.091          *# \[positive float\]; Border line width, × base size.*\
-        line_color: "#262626"          *# \[hex color\]; Border line color.*\
+        line:\
+            width: 0.091          *# \[positive float\]; Border line width, × base size.*\
+            color: "#262626"          *# \[hex color\]; Border line color.*\
         aspect: 1.11          *# \[positive float\]; Plot area width ÷ height.*\
     grid:\
         color: "#F2F2F2"          *# \[hex color\]; Grid color.*\
-        line_width: 0.064          *# \[positive float\]; Grid line width, × base size.*\
+        line:\
+            width: 0.064          *# \[positive float\]; Grid line width, × base size.*\
     series:\
-        colors: tableau_10          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color groups, in order, then repeating: a named palette, or a list of colors.*\
+        colors: tableau_10          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.*\
         line:\
             cap: round          *# \[butt, round, projecting\]; Shape of a line's ends.*\
         bar:\
-            edge_color: None          *# \[None, hex color\]; Bar outline color. None: none.*\
+            edge:\
+                color: None          *# \[None, hex color\]; Bar outline color. None: none.*\
         benchmark:\
             marker:\
-                edge_color: None          *# \[None, hex color\]; Outline color of a filled benchmark marker. None: none.*\
+                edge:\
+                    color: None          *# \[None, hex color\]; Outline color of a filled benchmark marker. None: none.*\
             bar:\
-                edge_color: None          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
+                edge:\
+                    color: None          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
     legend:\
         methods: \[auto, key, direct\]          *# \[auto, direct, key, none\]; Methods graphs may use to name series; auto tries direct and key, in this list's order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.*\
         label:\
@@ -70,4 +75,5 @@ variable_parameters:          *# List of variable parameters for the t
             width: 0.18          *# \[positive float\]; Line width, × base size.*\
         marker:\
             size: 0.64          *# \[positive float\]; Marker size, × base size.*\
-            edge_width: 0.082          *# \[positive float\]; Marker outline width, × base size.*
+            edge:\
+                width: 0.082          *# \[positive float\]; Marker outline width, × base size.*

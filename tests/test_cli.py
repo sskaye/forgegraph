@@ -272,7 +272,11 @@ def test_dates_with_names_beside_the_lines(project):
         project,
         "stocks",
         frame,
-        {"axis.x.data.column": "date", "axis.y.data.column": "price", "encoding.color": "symbol"},
+        {
+            "axis.x.data.column": "date",
+            "axis.y.data.column": "price",
+            "encoding.color.column": "symbol",
+        },
     )
     start = time.monotonic()
     report = cli("render", "graphspecs/stocks.yaml")

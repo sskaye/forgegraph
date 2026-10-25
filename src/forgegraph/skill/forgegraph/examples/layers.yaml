@@ -22,7 +22,8 @@ variable_parameters:
                 column: Cell Voltage (V)
                 aggregation: mean
     encoding:
-        color: Cell
+        color:
+            column: Cell
     layers:
         spread:
             type: error_bar

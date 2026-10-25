@@ -30,7 +30,7 @@ def test_a_packs_table_shows_its_own_values():
 
     theme = "theme-forgegraph_base_2-base_theme-param-"
     assert cells(theme + "title-size")[0] == "1.45"
-    assert cells(theme + "series-marker-edge_color")[0] == "#000000"
+    assert cells(theme + "series-marker-edge-color")[0] == "#000000"
     assert cells("format-forgegraph_base_2-compact_format-param-output-dpi")[0] == "200"
 
 

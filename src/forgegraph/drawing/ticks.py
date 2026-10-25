@@ -23,7 +23,7 @@ algorithm keeps to whole-number steps of 1 or more: extended_wilkinson and wilki
 other candidates, heckbert, nelder and r_pretty move to their next whole step, matplotlib's
 MaxNLocator takes integer=True, and log axes drop breaks below 1.
 
-Minor ticks (minor_ticks) are the theme's axis.tick.minor.num between each pair of major
+Minor ticks (minor_ticks) are the theme's axis.tick.minor.count between each pair of major
 ticks, evenly in log terms on a log axis.
 """
 
@@ -533,8 +533,8 @@ class LogStep(Locator):
 
 
 def minor_ticks(axis: Any, style: Style) -> None:
-    """axis.tick.minor.num minor ticks between each pair of major ticks, or none."""
-    n = int(style.theme["axis.tick.minor.num"])
+    """axis.tick.minor.count minor ticks between each pair of major ticks, or none."""
+    n = int(style.theme["axis.tick.minor.count"])
     axis.set_minor_locator(_Between(n) if n > 0 else NullLocator())
 
 

@@ -42,8 +42,8 @@ TEST_FORMAT = {"figure.width": 150, "figure.height": 140, "figure.base_size": 12
 BASE = {
     "axis.x.data.column": "current_density",
     "axis.y.data.column": "cell_voltage",
-    "encoding.color": "cell",
-    "encoding.detail": "run",
+    "encoding.color.column": "cell",
+    "encoding.detail.column": "run",
     "benchmark.data_column": "cell",
     "benchmark.value": "Benchmark",
 }

@@ -61,9 +61,9 @@ def child(
 
 
 # Values another parameter must have for this one to be valid at all.
-CONTEXT = {"figure.width": {"figure.height": 140}, "cadence.interval_unit": {"cadence.at": None}}
+CONTEXT = {"figure.width": {"figure.height": 140}, "cadence.interval.unit": {"cadence.at": None}}
 # Parameters whose valid values depend on others', checked together in test_schedule.py.
-CHECKED_TOGETHER = {"cadence.interval", "cadence.at"}
+CHECKED_TOGETHER = {"cadence.interval.count", "cadence.at"}
 
 
 # What a layer's other required parameters are set to while one parameter is checked.
@@ -313,6 +313,23 @@ def test_unknown_parameter_and_category():
         "fixed_parameters.axis.tick.length_mul: unknown parameter; "
         "did you mean 'axis.tick.length'?",
         "fixed_parameters.axes: unknown category; did you mean 'axis'?",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "old", "value", "new"),
+    [
+        ("theme", "grid.line_width", 0.05, "grid.line.width"),
+        ("theme", "legend.key.frame", True, "legend.key.frame.show"),
+        ("theme", "axis.tick.minor.num", 4, "axis.tick.minor.count"),
+        ("theme", "series.bar.edge_color", "#000000", "series.bar.edge.color"),
+        ("graphspec", "encoding.marker_shape", "Cell", "encoding.marker.shape.column"),
+        ("schedule", "freshness.stamp", False, "freshness.stamp.show"),
+    ],
+)
+def test_a_renamed_parameter_suggests_its_new_name(kind, old, value, new):
+    assert validate(kind, child(kind, "variable_parameters", {old: value})) == [
+        f"variable_parameters.{old}: unknown parameter; did you mean '{new}'?"
     ]
 
 

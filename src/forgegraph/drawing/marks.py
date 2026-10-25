@@ -35,7 +35,7 @@ from matplotlib.dates import date2num
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.drawing.axes import DrawError
+from forgegraph.drawing.axes import DrawError, number_text
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
 
@@ -417,10 +417,14 @@ def value_labels(
     gt: dict[str, Any],
     style: Style,
     base_axis: str,
-    text_of: Any,
 ) -> bool:
-    """Write the values (series.value_label) after layout. Returns True if the value axis was
-    widened to fit them, so the figure must be laid out again."""
+    """Write the values (series.value_label) after layout, in series.value_label.format (see
+    axes.number_text). Returns True if the value axis was widened to fit them, so the figure
+    must be laid out again."""
+    value_axis = "y" if base_axis == "x" else "x"
+    fmt = gt["series.value_label.format"]
+    axis = ax.yaxis if value_axis == "y" else ax.xaxis
+    text_of = number_text(gt, value_axis, axis, fmt, "series.value_label.format")
     for a in [a for a in ax.texts if a.get_gid() == VALUE_LABEL]:
         a.remove()
     show, total = bool(gt["series.value_label.show"]), bool(gt["series.value_label.total"])

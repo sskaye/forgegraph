@@ -431,6 +431,28 @@ def format_number(value: float, fmt: str) -> str:
     return format(value, fmt)
 
 
+def number_text(
+    gt: dict[str, Any], name: str, axis: Any, given: Any, path: str, extra: int = 0
+) -> Any:
+    """How a label writes a value on axis name: in its own format; auto, in the axis's tick
+    label format if that's set, otherwise with as many decimals as the tick labels show,
+    plus extra."""
+    if given == "auto":
+        given, path = gt[f"axis.{name}.tick.label.format"], f"axis.{name}.tick.label.format"
+    if given != "auto":
+        checked = number_format(str(given), path)
+        return lambda v: format_number(float(v), checked)
+    places = _tick_decimals(axis) + extra
+    return lambda v: f"{float(v):.{places}f}"
+
+
+def _tick_decimals(axis: Any) -> int:
+    """The most decimal places the axis's tick labels show."""
+    shown = [t.get_text().replace("\u2212", "-") for t in axis.get_ticklabels()]
+    decimals = [len(t.split(".")[1]) for t in shown if re.fullmatch(r"-?\d+\.\d+", t)]
+    return max(decimals, default=0)
+
+
 def format_date(when: datetime, fmt: str) -> str:
     """strftime with English names for %a %A %b %B %p, and %-d %-m %-H without a leading
     zero."""

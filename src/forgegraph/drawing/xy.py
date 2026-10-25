@@ -7,8 +7,6 @@ constant (architecture principle 4).
 
 from __future__ import annotations
 
-import itertools
-import re
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -17,20 +15,20 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
 from matplotlib.lines import Line2D
-from matplotlib.ticker import Locator, NullLocator
+from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, marks, text
+from forgegraph.drawing import colorbar, layers, marks, text, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import DrawError, natural
 from forgegraph.drawing.figure import texts_of
 from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
 
 Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
-Y_VALUE = "__forgegraph_y__"
 COLUMN_NAME = "column_name"
 # Each style a column can set, by its name here, and its parameter.
 BY_PATHS = {
@@ -586,18 +584,7 @@ def draw(
             colors.setdefault(s.label, line_color)
             paths.setdefault(s.label, []).append(np.c_[marks.numbers(px), marks.numbers(py)])
 
-    layers.error_bars(
-        ax,
-        listed,
-        series,
-        frame,
-        gt,
-        style,
-        r,
-        offsets,
-        lambda shifts: marks.shifted(ax, r.base, shifts),
-        Y_VALUE,
-    )
+    layers.error_bars(ax, listed, series, frame, gt, style, r, offsets)
     lines = layers.reference_lines(ax, listed, series, frame, style, drawn.kinds)
 
     ax.set_xscale(gt["axis.x.scale"])
@@ -616,7 +603,7 @@ def draw(
             n = len(drawn.categories[name])
             (ax.set_xlim if name == "x" else ax.set_ylim)(-0.5, n - 0.5)
         else:
-            _minor_ticks(axis, style)
+            ticks.minor_ticks(axis, style)
     _limits(ax, gt)
     if bars_shown and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
         floor = 1.0 if log_values else 0.0
@@ -645,7 +632,7 @@ def draw(
         bar_title = _title(
             gt["legend.color_bar.title.text"], None if unset(color_col) else str(color_col)
         )
-        colorbar.add(ax, norm, cmap, bar_title, style, lambda axis: _minor_ticks(axis, style))
+        colorbar.add(ax, norm, cmap, bar_title, style)
     drawn.series = series
     drawn.label_groups = [
         labelling.Labelled(name, colors[name], paths[name], handles[name]) for name in handles
@@ -660,69 +647,13 @@ def draw(
     return drawn
 
 
-def _line_text(ax: Axes, gt: dict[str, Any], line: layers.RefLine) -> str:
-    """A reference line's value in its label, written as _number_text says; with auto and no
-    tick label format, one decimal place more than the tick labels show (a single value is
-    read more closely than the scale)."""
-    axis = ax.xaxis if line.axis == "x" else ax.yaxis
-    path = f"layers.{line.name}.label.format"
-    return _number_text(gt, line.axis, axis, line.fmt, path, extra=1)(line.at)
-
-
-def _number_text(
-    gt: dict[str, Any], name: str, axis: Any, given: Any, path: str, extra: int = 0
-) -> Any:
-    """How a label writes a value on axis name: in its own format; auto, in the axis's tick
-    label format if that's set, otherwise with as many decimals as the tick labels show,
-    plus extra."""
-    if given == "auto":
-        given, path = gt[f"axis.{name}.tick.label.format"], f"axis.{name}.tick.label.format"
-    if given != "auto":
-        checked = axis_data.number_format(str(given), path)
-        return lambda v: axis_data.format_number(float(v), checked)
-    places = _tick_decimals(axis) + extra
-    return lambda v: f"{float(v):.{places}f}"
-
-
-def _tick_decimals(axis: Any) -> int:
-    """The most decimal places the axis's tick labels show."""
-    shown = [t.get_text().replace("\u2212", "-") for t in axis.get_ticklabels()]
-    decimals = [len(t.split(".")[1]) for t in shown if re.fullmatch(r"-?\d+\.\d+", t)]
-    return max(decimals, default=0)
-
-
 def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     """What needs the figure's final size: bars' room, value labels and reference lines'
     labels. True if an axis was widened, so the figure must be laid out again."""
     r = cast(Roles, drawn.roles)  # draw() set it
-    series = drawn.series
-    marks.check_room(ax, series, gt, style, r.base)
-    axis = ax.yaxis if r.value == "y" else ax.xaxis
-    widened = marks.value_labels(
-        ax,
-        series,
-        drawn.stacked,
-        drawn.offsets,
-        gt,
-        style,
-        r.base,
-        _number_text(
-            gt, r.value, axis, gt["series.value_label.format"], "series.value_label.format"
-        ),
-    )
-    lines_shown = bool(gt["mark.line.show"])
-    gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
-    return (
-        layers.label_lines(
-            ax,
-            drawn.ref_lines,
-            style,
-            lambda box: labelling.box_clear(ax, box, lines_shown),
-            lambda box, name, what: marks.grow_to_fit(ax, [box], gt, name, gap, what),
-            lambda line: _line_text(ax, gt, line),
-        )
-        or widened
-    )
+    marks.check_room(ax, drawn.series, gt, style, r.base)
+    widened = marks.value_labels(ax, drawn.series, drawn.stacked, drawn.offsets, gt, style, r.base)
+    return layers.label_lines(ax, drawn.ref_lines, gt, style) or widened
 
 
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
@@ -731,16 +662,7 @@ def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     six places. Anything that can't be placed cleanly is an error, never a fallback."""
     axis_data.check_fit(ax, gt, style)
     _name_series(ax, drawn, gt, style)
-    lines_shown = bool(gt["mark.line.show"])
-    placed = [k.bbox() for k in keys(ax)]
-    layers.notes_inside(
-        ax,
-        drawn.layers,
-        style,
-        lambda box: (
-            labelling.box_clear(ax, box, lines_shown) and not any(box.overlaps(k) for k in placed)
-        ),
-    )
+    layers.notes_inside(ax, drawn.layers, gt, style)
 
 
 def unlabel(ax: Axes) -> None:
@@ -923,40 +845,3 @@ def _box_and_ticks(ax: Axes, style: Style) -> None:
         labeltop="top" in ticks,
         labelbottom="bottom" in ticks,
     )
-
-
-def _minor_ticks(axis: Any, style: Style) -> None:
-    """axis.tick.minor.num minor ticks between each pair of major ticks, or none."""
-    n = int(style.theme["axis.tick.minor.num"])
-    axis.set_minor_locator(_Between(n) if n > 0 else NullLocator())
-
-
-class _Between(Locator):
-    """n ticks evenly between each pair of major ticks (evenly in log terms on a log axis),
-    and in the part-intervals beyond the first and last major tick."""
-
-    def __init__(self, n: int) -> None:
-        self.n = n
-
-    def __call__(self) -> Any:
-        axis = cast(Any, self.axis)
-        assert axis is not None
-        lo, hi = sorted(axis.get_view_interval())
-        majors = np.asarray(axis.get_major_locator()())
-        log = axis.get_scale() == "log"
-        if len(majors) < 2:
-            return []
-        f = np.log10 if log else (lambda v: v)
-        g = (lambda v: 10.0**v) if log else (lambda v: v)
-        m = f(majors)
-        step = np.diff(m)
-        edges = np.concatenate(([m[0] - step[0]], m, [m[-1] + step[-1]]))
-        out = [
-            g(a + (b - a) * k / (self.n + 1))
-            for a, b in itertools.pairwise(edges)
-            for k in range(1, self.n + 1)
-        ]
-        return [v for v in out if lo <= v <= hi]
-
-    def tick_values(self, vmin: float, vmax: float) -> Any:
-        return self()

@@ -33,8 +33,9 @@ from matplotlib.axes import Axes
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import marks
-from forgegraph.drawing.axes import DrawError
+from forgegraph.drawing import labels, marks
+from forgegraph.drawing.axes import DrawError, number_text
+from forgegraph.drawing.key import keys
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset
 from forgegraph.drawing.text import measure
@@ -118,6 +119,7 @@ def _aggregate(values: np.ndarray, how: str) -> float:
 
 
 ROW = "__forgegraph_row__"  # the long-form frame's column of each row's data row
+Y_VALUE = "__forgegraph_y__"  # the long-form frame's column of values along the value axis
 
 
 def _each_row_once(frame: pd.DataFrame, column: str) -> np.ndarray:
@@ -251,20 +253,29 @@ def _label_line(
     )
 
 
-def label_lines(
-    ax: Axes, lines: list[RefLine], style: Style, clear: Any, grow: Any, text_of: Any
-) -> bool:
-    """Place each line's label once the figure is laid out (again on every pass). clear says
-    whether a box is clear of what's drawn; grow(box, axis, what) widens an automatic axis
-    to take a box, True if it did; text_of(line) writes a line's value, in its label.format.
-    Returns True if an axis was widened, so the figure must be laid out again."""
+def _line_text(ax: Axes, gt: dict[str, Any], line: RefLine) -> str:
+    """A reference line's value in its label, written as axes.number_text says; with auto
+    and no tick label format, one decimal place more than the tick labels show (a single
+    value is read more closely than the scale)."""
+    axis = ax.xaxis if line.axis == "x" else ax.yaxis
+    path = f"layers.{line.name}.label.format"
+    return number_text(gt, line.axis, axis, line.fmt, path, extra=1)(line.at)
+
+
+def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style) -> bool:
+    """Place each line's label once the figure is laid out (again on every pass): clear of
+    what's drawn, or, at a chosen position past the plot's edge, with an automatic axis
+    widened to take it. Returns True if an axis was widened, so the figure must be laid out
+    again."""
     for a in [t for t in ax.texts if t.get_gid() == REFERENCE]:
         a.remove()
+    lines_shown = bool(gt["mark.line.show"])
+    gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
     widened = False
     for line in lines:
         if not (line.label or line.with_value):
             continue
-        words = line.label + (text_of(line) if line.with_value else "")
+        words = line.label + (_line_text(ax, gt, line) if line.with_value else "")
         auto = line.position == "auto"
         for position in LABEL_ORDER if auto else [line.position]:
             a = _label_line(ax, line.axis, line.at, words, position, line.color, style)
@@ -276,10 +287,11 @@ def label_lines(
                 and box.y0 >= plot.y0 - 0.5
                 and box.y1 <= plot.y1 + 0.5
             )
-            if inside and clear(box):
+            if inside and labels.box_clear(ax, box, lines_shown):
                 break
             if not auto and not inside:  # past the plot's edge: widen, then place again
-                widened |= grow(box, line.axis, f"layers.{line.name}: its label")
+                what = f"layers.{line.name}: its label"
+                widened |= marks.grow_to_fit(ax, [box], gt, line.axis, gap, what)
                 break
             a.remove()
             if not auto:
@@ -325,11 +337,8 @@ def error_bars(
     style: Style,
     roles: Any,
     offsets: list[dict[float, float]],
-    shifted: Any,
-    value_column: str,
 ) -> None:
-    """Draw each error_bar layer on every series. value_column: the frame's column of values
-    along the value axis."""
+    """Draw each error_bar layer on every series, moved by its side-by-side offsets."""
     t = style.theme
     for name, layer in layers.items():
         if layer["type"] != "error_bar":
@@ -363,7 +372,7 @@ def error_bars(
                             f"{where}.value.{end}: data_column, whose values aren't distances; "
                             "set value.aggregation.function to its spread"
                         )
-                    given = value_column if along_value else s.place_column
+                    given = Y_VALUE if along_value else s.place_column
                 distances[end] = _distances(
                     given,
                     how,
@@ -380,7 +389,8 @@ def error_bars(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
                 )
             places = marks.numbers(s.x if along_value else s.y)
-            _draw_bars(ax, places, low, high, axis, s.color, style, shifted(offset), t)
+            shifted = marks.shifted(ax, roles.base, offset)
+            _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
 
 
 def _distances(
@@ -530,10 +540,12 @@ def _note(
 
 
 def notes_inside(
-    ax: Axes, layers: dict[str, dict[str, Any]], style: Style, clear: Any
+    ax: Axes, layers: dict[str, dict[str, Any]], gt: dict[str, Any], style: Style
 ) -> list[Bbox]:
-    """Notes inside the plot area, after layout and keys; return their boxes. clear says
-    whether a box is clear of everything drawn."""
+    """Notes inside the plot area, after layout and keys, each clear of everything drawn,
+    the keys and the other notes; return their boxes."""
+    lines_shown = bool(gt["mark.line.show"])
+    taken = [k.bbox() for k in keys(ax)]
     placed: list[Bbox] = []
     inset = style.pt("layer.note.inset")
     for name, layer in layers.items():
@@ -557,7 +569,10 @@ def notes_inside(
             )
             measure(ax.figure)
             box = a.get_window_extent()
-            if clear(box) and not any(box.overlaps(p) for p in placed):
+            clear = labels.box_clear(ax, box, lines_shown) and not any(
+                box.overlaps(k) for k in taken
+            )
+            if clear and not any(box.overlaps(p) for p in placed):
                 placed.append(box)
                 break
             a.remove()

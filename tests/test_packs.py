@@ -10,8 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from pack_helpers import allow, dump, write_config, write_pack
-from render_helpers import BASE, polarization
+from pack_helpers import allow, doc, dump, graphspec_file, write_config, write_pack
 
 import forgegraph as fg
 from forgegraph import packs
@@ -28,11 +27,7 @@ ACME = ROOT / "examples" / "packs" / "acme"
 
 
 def graphspec(folder: Path, theme: str, fmt: str = "forgegraph_base/base_format") -> Path:
-    polarization().to_parquet(folder / "p.parquet")
-    doc = fg.graphspec("g", "xy", theme=theme, format=fmt, data_file="p.parquet", settings=BASE)
-    path = folder / "g.yaml"
-    dump(doc, path)
-    return path
+    return graphspec_file(folder, "g", theme=theme, format=fmt)
 
 
 def user(tmp_path: Path, monkeypatch, *listed: str) -> Path:
@@ -209,16 +204,8 @@ def test_a_layout_and_its_tiles_use_the_layouts_configs(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")
     graphspec(tmp_path, "acme/acme", "acme/slide")
-    layout = {
-        "name": "fig",
-        "version": 0,
-        "description": "",
-        "extends": "acme/dashboard",
-        "fixed_parameters": "None",
-        "variable_parameters": {
-            "tabs": {"T": {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}}
-        },
-    }
+    tab = {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}
+    layout = doc("acme/dashboard", "fig", variable={"tabs": {"T": tab}})
     dump(layout, tmp_path / "fig.layout.yaml")
     drawn = fg.layout(tmp_path / "fig.layout.yaml")
     assert drawn.specs["layout"]["name"] == "fig" and drawn.specs["format"]["name"] == "acme/slide"
@@ -229,16 +216,8 @@ def test_a_layout_drawn_with_a_nonstandard_pack_is_watermarked(tmp_path, monkeyp
     user(tmp_path, monkeypatch, "forgegraph_base")  # not acme
     allow(tmp_path, "forgegraph_base", "./acme")
     graphspec(tmp_path, "acme/acme", "acme/slide")
-    layout = {
-        "name": "fig",
-        "version": 0,
-        "description": "",
-        "extends": "acme/dashboard",
-        "fixed_parameters": "None",
-        "variable_parameters": {
-            "tabs": {"T": {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}}
-        },
-    }
+    tab = {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}
+    layout = doc("acme/dashboard", "fig", variable={"tabs": {"T": tab}})
     dump(layout, tmp_path / "fig.layout.yaml")
     drawn = fg.layout(tmp_path / "fig.layout.yaml")
     assert drawn.nonstandard and drawn.nonstandard_packs == ["acme"]

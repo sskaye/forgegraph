@@ -554,3 +554,69 @@ Each kind of document is specified by its definition file: every parameter with 
 - further graph types: histogram, heatmap/contour, area, waterfall/loss breakdown; added through the request flow as needed
 - workbooks: a Parquet file bundled with the GraphSpecs and dashboards drawn from it, as one file to share or open (like Tableau's packaged workbooks), especially for Studio
 
+
+---
+
+## Appendix: the reasons behind smaller decisions
+
+Decisions made while building whose reasons aren't given above.
+
+### Drawing
+
+- **Invalid requests are errors, never silent substitutes.** If what's asked is logically invalid or impossible, ForgeGraph stops and names the parameter and what to do, rather than defaulting to other behaviour or only warning: a warning can go unseen by an agent. Behaviour a spec defines isn't a fallback: colors repeating past the last, as series.colors says, stays a warning.
+- **Drawing checks every file it uses.** A GraphSpec's graph type, theme and format, and each file they extend, are validated, so a theme with a problem stops the graph rather than being drawn with substitutes.
+- **A missing font weight is an error.** A theme's weights are font-file weights (light 300 to bold 700). A theme whose font lacks a weight it uses is an error naming the weights the font has, rather than matplotlib substituting the nearest.
+- **Bundled italics.** matplotlib's maths typesetting needs an italic face even when labels are upright, so Roboto and Source Sans 3 are bundled with their italics. Every bundled family has every weight a theme can name.
+- **Text is measured to its letters.** matplotlib spaces text by a box sized for the font's tallest letters and deepest descenders, so its gaps aren't the gaps you see. Following CSS's `text-box: trim-both cap alphabetic`, Figma's vertical trim and D3's axis offsets, a text's edges run from its capital height to its baseline, growing only where its letters reach further. ForgeGraph lays the figure out itself, with no matplotlib layout engine.
+- **No font hinting.** Text has the same width at every resolution, so what's laid out is what's saved.
+- **Roboto is the base font,** chosen from a comparison of 13 open fonts.
+- **Ticks come from published algorithms** (drawing/ticks.py), which a theme chooses: the base theme's are extended Wilkinson for linear axes and R's scales::breaks_log for log axes. A rule of ForgeGraph's own let labels run together on short axes. On every axis the labels must fit: the algorithm is asked for one tick fewer while they would overlap.
+- **The layout always fits its tick labels.** Tick labels can keep a layout from settling: a taller plot box gets more, wider labels, which make it shorter again. After 6 unsettled passes it lays out once more with, on each side, the most room either of the last two passes needed, so whichever labels the final draw has fit.
+- **Date axes use one calendar unit per axis.** matplotlib's automatic date ticks mix units (the 1st and 15th, labelled "Aug" and "15") and name the shared context in a corner. As in d3 and Vega-Lite, ticks are a calendar unit's boundaries, never finer than the data's spacing, with the next unit up on a second line where it changes, as Plotly and Datawrapper do. Weekly ticks fall on Mondays even when the data starts on another day, which reads more naturally than counting from the data's first day. ForgeGraph writes %-d, %-m and %-H itself, since strftime's differ by platform.
+- **The default palette is Okabe–Ito.** With 4 or more groups, color_blind's colors ran together in the skill evals: two blues and two greys. Okabe and Ito's palette keeps its first four colors distinct for color-blind readers.
+- **The base theme leaves line widths and marker sizes to the GraphSpec.** Agents in the skill evals needed smaller markers and thinner lines for dense data. Key samples have their own marker size, so shrinking the plot's markers leaves the key readable.
+- **forgegraph_base_2 follows matplotlib's output, not its style sheet's numbers.** matplotlib draws the style's font weight 350 with Source Sans 3 Light, so the theme uses light. Its gaps were measured from matplotlib's output and set to match, since matplotlib measures from text boxes and ForgeGraph from letters.
+
+### Names
+
+- **Parameter names follow Vega-Lite where a standard term exists** (encoding, mark, detail), keeping ForgeGraph's nesting, snake_case and units. A third of the parameters have no Vega-Lite equivalent, so its names weren't adopted wholesale. "Legend" is the umbrella for every way of naming what colors and styles mean, as in Vega-Lite.
+- **Every size is × figure.base_size,** so a theme draws correctly in any format.
+- **The command is `forgegraph`.** `fg` is a built-in command in bash and zsh, and a shell runs its built-in before any program of that name.
+- **A tab's name is what its tab shows.** File names and links use it lowercased, with spaces as hyphens, so there's no separate label to keep in step.
+
+### Layouts
+
+- **The grid is a list of tile names per row,** written one row under the other so it reads as a picture of the figure, as CSS grids, matplotlib's subplot_mosaic and patchwork do. A list of tiles with spans can't express a tile spanning rows.
+- **A layout's tabs replace those it inherits,** rather than merging by name as a GraphSpec's layers do: a set of tabs is one design.
+- **Spacing between tiles is the layout's,** not the theme's: it exists only in layouts, and a layout has no theme. A pack sets its house spacing in a base layout that its others extend.
+- **The layout's format is twice the base format's width,** so two columns are each as wide as one base graph at the same text size. At the base width, two columns were too small for their labels in the skill evals.
+- **A layout can set its format's variable parameters,** as a GraphSpec can, so a dashboard can be saved as HTML without a format of its own.
+- **html is a file type for any graph,** not only dashboards: a graph linked from a wiki, or a scheduled graph whose page shows the stale banner. Figures are SVG with their text as outlines, so pages look the same in every browser.
+- **Example formats stay examples.** Journal and dashboard sizes differ by journal and screen, and organizations keep their formats in packs.
+
+### Schedules
+
+- **A scheduled job is a file,** so it can be reviewed, kept in version control and checked like any other spec.
+- **The cadence has one unit.** launchd's calendar intervals, cron and Task Scheduler's repetition count whole minutes, and can't run every 2 weeks or 3 days exactly, so `interval` divides 60, 24 or 12 for minutes, hours and months and is 1 otherwise. A list of times replaces separate weekday settings.
+- **ForgeGraph writes no scheduler entries.** That would reach only the local machine, so one user's path would differ from everyone else's and couldn't be tested as theirs, and each operating system's rules made it the brittle part.
+- **on_success as well as on_failure.** on_success lets a check-in service notice a job that stopped running, which on_failure can't.
+- **Stale data isn't a failure.** A run that succeeds on old data isn't a failed run, so stale data shows in the banner, the footnote and the status file's data times, not through on_failure. "Data as of" is a target's oldest data file, so one stale tile makes a layout stale.
+
+### Packs and configs
+
+- **Packs are the only source of named specs,** so the specs a person or organization requires are kept in one place, and a folder can't pick up stray themes and formats beside a GraphSpec.
+- **A pack only a folder config lists is non-standard, not an error,** so someone who can't change their organization's main config can still make and try a pack, while a pack used by accident is labelled, not silent. A folder config can't replace the main one, which would let a folder drop an organization's pack.
+- **The main config is ~/.config/forgegraph/config.toml on every platform,** Windows included: one path is the easiest to document. `FORGEGRAPH_CONFIG` names another file, which keeps evals and tests away from the machine's own and lets an organization point at a managed one.
+- **The main config is written on first use,** listing the built-in packs, since pip can't run code when it installs a package. It's never overwritten.
+- **forgegraph.toml is a folder config,** and the CLI's option is `--folder`: calling it a project's would assume how the folder is used.
+- **The record names each pack spec's pack version,** so a file shows which release of a house style drew it.
+- **`schema graphspec` shows any spec ForgeGraph can find,** while `catalog` and `pack-notes` show only the allowed packs, so an agent can see how a spec it builds on is written.
+- **Specs made in code keep plain names.** A theme or format added to a registry through the Python API has no pack; only names written pack/name are checked against the configs.
+
+### Requests and the repository
+
+- **The first release is small.** Features come from specific requests, not from guessing what users will want; annotations are built when someone asks for them.
+- **Requests go through the skill,** which points to references/requests.md: agents already know how to write a feature request or bug report, so there's no issue form.
+- **The public repository starts from one commit.** The earlier history held a confidential term, so it's kept privately.
+- **Forgemark's tool is pinned,** downloaded once and checked by SHA-256. Problems found in Forgemark are reported to its maintainer, not worked around.
+- **Review pages and catalog pages are exempt from the large-file check,** since they embed their images, and the deny-list check skips base64 image data, which can hold a short deny-listed term by chance.

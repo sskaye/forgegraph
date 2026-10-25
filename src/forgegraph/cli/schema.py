@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
-from forgegraph.cli import Json, app, fail, json_errors
+from forgegraph.cli import Folder, Json, app, fail, json_errors, report
 
 
 @app.command(short_help="Show every parameter of a kind: its default, range and description.")
@@ -29,10 +28,7 @@ def schema(
     format: Annotated[
         str | None, typer.Option("--format", help="graphspec: the format it uses.")
     ] = None,
-    folder: Annotated[
-        Path | None,
-        typer.Option("--folder", help="The folder whose configs apply (default: here)."),
-    ] = None,
+    folder: Folder = None,
     as_json: Json = False,
 ) -> None:
     """Show every parameter of a kind: its default, range and description. For graphspec,
@@ -52,7 +48,7 @@ def schema(
     kinds = [kind] if kind else [k for k in known if k != "graphspec"]
     for k in kinds:
         if k not in known:
-            fail([f"unknown kind '{k}'; kinds are {', '.join(known)}"], as_json)
+            fail([f"unknown kind '{k}'; kinds are {', '.join(known)}"])
     out: dict[str, Any] = {}
     for k in kinds:
         if k in ("pack", "config"):
@@ -62,9 +58,8 @@ def schema(
             if graph_type is None or theme is None or format is None:
                 missing = [f for f, v in (("--graph-type", graph_type), ("--theme", theme),
                                           ("--format", format)) if v is None]  # fmt: skip
-                fail([f"schema graphspec needs {', '.join(missing)}"], as_json)
-                return
-            out[k], notes = _settable(graph_type, theme, format, folder or Path.cwd(), as_json)
+                fail([f"schema graphspec needs {', '.join(missing)}"])
+            out[k], notes = _settable(graph_type, theme, format, folder or Path.cwd())
             if notes:
                 out["notes"] = notes
             continue
@@ -119,17 +114,20 @@ def schema(
                 }
                 for p in [*grid.values(), tile]
             ]
-    if as_json:
-        typer.echo(json.dumps(out, indent=2, default=str))
-        return
-    for note in out.pop("notes", []):
-        typer.echo(note)
-    for k, params in out.items():
-        typer.echo(k)
-        for p in params:
-            value = p.get("value", p.get("default"))
-            fixed = f" Fixed: set by the {k.replace('_', ' ')}." if p.get("fixed") else ""
-            typer.echo(f"  {p['parameter']} = {value!r}: {p['range']}. {p['description']}{fixed}")
+
+    def text() -> None:
+        for note in out.pop("notes", []):
+            typer.echo(note)
+        for k, params in out.items():
+            typer.echo(k)
+            for p in params:
+                value = p.get("value", p.get("default"))
+                fixed = f" Fixed: set by the {k.replace('_', ' ')}." if p.get("fixed") else ""
+                typer.echo(
+                    f"  {p['parameter']} = {value!r}: {p['range']}. {p['description']}{fixed}"
+                )
+
+    report(out, as_json, text, default=str)
 
 
 def _pack_fields(kind: str) -> list[dict[str, Any]]:
@@ -150,7 +148,7 @@ def _pack_fields(kind: str) -> list[dict[str, Any]]:
 
 
 def _settable(
-    graph_type: str, theme: str, format: str, root: Path, as_json: bool
+    graph_type: str, theme: str, format: str, root: Path
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Every parameter a GraphSpec can set, with the value it has unless the GraphSpec sets
     it, and which file gives that value; and notes on any spec named whose pack is
@@ -166,7 +164,7 @@ def _settable(
         f"{k.replace('_', ' ')}: {p}" for k, n in chosen_names for p in found_problems(k, n, reg)
     ]
     if problems:
-        fail(problems, as_json)
+        fail(problems)
     notes = []
     named = {reg.pack_of(k, n): n for k, n in chosen_names if reg.pack_of(k, n) is not None}
     nonstandard = sorted(p for p in named if p in reg.nonstandard)

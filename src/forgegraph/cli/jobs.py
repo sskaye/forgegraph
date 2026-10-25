@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from forgegraph.cli import Json, fail, job_app, json_errors
+from forgegraph.cli import Json, job_app, json_errors, report
 
 ScheduleFile = Annotated[Path, typer.Argument(help="A schedule file (.schedule.yaml).")]
 
@@ -23,25 +22,21 @@ def job_run(
 ) -> None:
     """Run a schedule once: render its targets, write its status file and run on_failure or
     on_success. Exits 1 if any target failed. Schedule this command to render on a schedule."""
-    from forgegraph.jobs import ScheduleError
     from forgegraph.jobs import status as status_file
     from forgegraph.jobs.run import load, run
 
-    try:
-        code = run(schedule)
-    except ScheduleError as e:
-        fail(e.problems, as_json)
-        return
+    code = run(schedule)
     record = status_file.read(load(schedule).status_path)
-    if as_json:
-        out = {"ok": code == 0, "status": record.model_dump() if record else None}
-        typer.echo(json.dumps(out, indent=2))
-    elif record is not None:
-        for t in record.targets:
+
+    def text() -> None:
+        for t in record.targets if record is not None else []:
             if t.ok:
                 for p in t.outputs:
                     typer.echo(f"saved {p}")
             for p in t.problems:
                 typer.echo(f"error: {t.file}: {p}", err=True)
+
+    out = {"ok": code == 0, "status": record.model_dump() if record else None}
+    report(out, as_json, text)
     if code:
         raise typer.Exit(code)

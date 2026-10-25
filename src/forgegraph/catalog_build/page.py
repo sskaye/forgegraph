@@ -209,6 +209,14 @@ def _card(card: Card) -> str:
     )
 
 
+_FIGURE = re.compile(r'<figure id="([^"]+)"><img [^>]*src="data:image/png;base64,([^"]+)"')
+
+
+def figures(page_text: str) -> dict[str, bytes]:
+    """A catalog page's card images, as _card writes them, by their figure's id."""
+    return {fid: base64.b64decode(data) for fid, data in _FIGURE.findall(page_text)}
+
+
 def _instance(inst: Instance) -> str:
     cards = "\n".join(_card(c) for c in inst.cards)
     return (

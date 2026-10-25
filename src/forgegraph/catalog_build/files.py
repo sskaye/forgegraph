@@ -19,7 +19,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from forgegraph.catalog_build.examples import SPECIAL, Change, Variation
+from forgegraph.catalog_build.cards import Change, Variation
+from forgegraph.catalog_build.examples import SPECIAL
 from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.parameters import (

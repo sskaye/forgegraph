@@ -37,6 +37,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -266,19 +267,75 @@ def _created_styles(ws: Path) -> list[str]:
     )
 
 
-def _drawn(final: Path) -> tuple[Any, pd.DataFrame | None, str]:
-    """The final GraphSpec drawn, its Parquet data, and why either failed."""
-    import forgegraph as fg
-    from forgegraph.data import data_path
-    from forgegraph.spec.loaded import load_document
+@dataclass
+class Project:
+    """What a run left, read once for grading: its folder and files, the transcripts' turns
+    and the final reply, and the GraphSpecs the agent wrote, the final one drawn, resolved
+    and its data found when a check first asks, each keeping the error that stopped it."""
 
-    try:
-        graph = fg.render(final)
-    except Exception as e:
-        return None, None, f"{type(e).__name__}: {e}"
-    where = data_path(load_document("graphspec", final))
-    frame = pd.read_parquet(where) if where is not None and where.is_file() else None
-    return graph, frame, ""
+    ws: Path
+    files: list[Path]
+    images: list[Path]
+    turns: list[list[dict[str, Any]]]
+    reply: str
+    specs: list[Path]
+
+    @classmethod
+    def read(cls, ws: Path, transcripts: list[Path]) -> Project:
+        files = _project_files(ws)
+        turns = [_events(t) for t in transcripts]
+        reply = ""
+        for e in turns[-1] if turns else []:
+            if e.get("type") == "result":
+                reply = str(e.get("result", ""))
+        images = [p for p in files if p.suffix.lower() in IMAGES]
+        return cls(ws, files, images, turns, reply, _graphspecs(ws))
+
+    @property
+    def final(self) -> Path:
+        """The GraphSpec written last; only asked for when there is one."""
+        return self.specs[-1]
+
+    @cached_property
+    def graph(self) -> tuple[Any, str]:
+        """The final GraphSpec drawn, or None and why it didn't draw."""
+        import forgegraph as fg
+
+        try:
+            return fg.render(self.final), ""
+        except Exception as e:
+            return None, f"{type(e).__name__}: {e}"
+
+    @cached_property
+    def resolved(self) -> tuple[dict[str, dict[str, Any]] | None, str]:
+        """The final GraphSpec's values by kind, or None and why they couldn't be found."""
+        try:
+            return _resolved(self.final), ""
+        except Exception as e:
+            return None, f"{type(e).__name__}: {e}"
+
+    @cached_property
+    def data(self) -> tuple[Path | None, Exception | None]:
+        from forgegraph.data import data_path
+        from forgegraph.spec.loaded import load_document
+
+        try:
+            return data_path(load_document("graphspec", self.final)), None
+        except Exception as e:
+            return None, e
+
+    def data_file(self) -> Path | None:
+        """The final GraphSpec's data file; raises what finding it raised."""
+        where, error = self.data
+        if error is not None:
+            raise error
+        return where
+
+    @cached_property
+    def frame(self) -> pd.DataFrame | None:
+        """The final GraphSpec's Parquet data, if its file is there."""
+        where = self.data_file()
+        return pd.read_parquet(where) if where is not None and where.is_file() else None
 
 
 def _named(ws: Path, suffix: str) -> list[Path]:
@@ -368,6 +425,22 @@ def _schedule_checks(want: dict[str, Any], ws: Path) -> list[Check]:
 
 def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict) -> list[Check]:
     expect = case["expect"]
+    project = Project.read(ws, transcripts)
+    checks = _record_checks(case, project, before)
+    checks += _spec_checks(expect, project)
+    checks += _data_checks(expect, project)
+    checks += _file_checks(expect, project)
+    if "layout" in expect:
+        checks += _layout_checks(expect["layout"], ws, expect.get("lint", []))
+    if "schedule" in expect:
+        checks += _schedule_checks(expect["schedule"], ws)
+    return checks + _reply_checks(expect, project)
+
+
+def _record_checks(case: dict[str, Any], project: Project, before: dict) -> list[Check]:
+    """The data unchanged and no theme or format made; and for a graph, its files made by
+    ForgeGraph (as non-standard, when asked), and looked at after each draw."""
+    expect, ws, images, turns = case["expect"], project.ws, project.images, project.turns
     after = _hashes(ws, case["data"])
     checks = [Check("data unchanged", after == before, json.dumps(after))]
     allowed = expect.get("themes", [])
@@ -379,132 +452,124 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
             ", ".join(created) or "none",
         )
     )
-    files = _project_files(ws)
-    images = [p for p in files if p.suffix.lower() in IMAGES]
-    turns = [_events(t) for t in transcripts]
-    reply = ""
-    for e in turns[-1] if turns else []:
-        if e.get("type") == "result":
-            reply = str(e.get("result", ""))
-    if expect.get("graph"):
-        import forgegraph as fg
+    if not expect.get("graph"):
+        return checks
+    import forgegraph as fg
 
-        made = [p for p in images if p.suffix.lower() != ".jpeg"]
-        records = {p.name: fg.load(p) is not None for p in made}
-        checks.append(
-            Check(
-                "made with ForgeGraph",
-                bool(made) and all(records.values()),
-                json.dumps(records) if made else "no image in the project",
-            )
+    made = [p for p in images if p.suffix.lower() != ".jpeg"]
+    records = {p.name: fg.load(p) is not None for p in made}
+    checks.append(
+        Check(
+            "made with ForgeGraph",
+            bool(made) and all(records.values()),
+            json.dumps(records) if made else "no image in the project",
         )
-        if expect.get("nonstandard"):  # drawn on a blank canvas: recorded as non-standard
-            marked = {p.name: bool((fg.load(p) or {}).get("nonstandard")) for p in made}
-            checks.append(Check("drawn non-standard", any(marked.values()), json.dumps(marked)))
-        if expect.get("nonstandard_pack"):  # drawn with a pack the main config doesn't list
-            named = {p.name: (fg.load(p) or {}).get("nonstandard_packs", []) for p in made}
-            checks.append(
-                Check("drawn with a non-standard pack", any(named.values()), json.dumps(named))
-            )
-        looked, evidence = True, []
-        must_look = expect.get("look_turns", list(range(1, len(turns) + 1)))
-        for i, events in enumerate(turns, start=1):
-            if i not in must_look:
-                continue
-            uses = _tool_uses(events)
-            last = max((k for k, u in enumerate(uses) if _draws(u, ws, expect)), default=None)
-            if last is None:  # drawn only by running the schedule, then each run is a draw
-                last = max((k for k, u in enumerate(uses) if _job_runs(u)), default=None)
-            if last is None:
-                continue
-            seen = any(_looks(u) for u in uses[last + 1 :])
-            looked &= seen
-            evidence.append(f"turn {i}: {'looked' if seen else 'rendered without looking'}")
-        checks.append(Check("looked at the image", looked and bool(evidence), "; ".join(evidence)))
-    specs = _graphspecs(ws)
+    )
+    if expect.get("nonstandard"):  # drawn on a blank canvas: recorded as non-standard
+        marked = {p.name: bool((fg.load(p) or {}).get("nonstandard")) for p in made}
+        checks.append(Check("drawn non-standard", any(marked.values()), json.dumps(marked)))
+    if expect.get("nonstandard_pack"):  # drawn with a pack the main config doesn't list
+        named = {p.name: (fg.load(p) or {}).get("nonstandard_packs", []) for p in made}
+        checks.append(
+            Check("drawn with a non-standard pack", any(named.values()), json.dumps(named))
+        )
+    looked, evidence = True, []
+    must_look = expect.get("look_turns", list(range(1, len(turns) + 1)))
+    for i, events in enumerate(turns, start=1):
+        if i not in must_look:
+            continue
+        uses = _tool_uses(events)
+        last = max((k for k, u in enumerate(uses) if _draws(u, ws, expect)), default=None)
+        if last is None:  # drawn only by running the schedule, then each run is a draw
+            last = max((k for k, u in enumerate(uses) if _job_runs(u)), default=None)
+        if last is None:
+            continue
+        seen = any(_looks(u) for u in uses[last + 1 :])
+        looked &= seen
+        evidence.append(f"turn {i}: {'looked' if seen else 'rendered without looking'}")
+    checks.append(Check("looked at the image", looked and bool(evidence), "; ".join(evidence)))
+    return checks
+
+
+def _spec_checks(expect: dict[str, Any], project: Project) -> list[Check]:
+    """The final GraphSpec: beside its data and graph, its lint, its values and its layers."""
+    checks: list[Check] = []
+    ws, specs, images = project.ws, project.specs, project.images
     if expect.get("graph") and not expect.get("nonstandard"):  # a canvas drawing has none
         where = "no GraphSpec in the folder"
         ok = bool(specs) and bool(images)
         if specs:
-            from forgegraph.data import data_path
-            from forgegraph.spec.loaded import load_document
-
-            try:
-                data = data_path(load_document("graphspec", specs[-1]))
-            except Exception as e:
-                data, where = None, f"{type(e).__name__}: {e}"
+            data = project.data[0]
             inside = (  # resolved both sides: macOS's temporary folder is a link
                 data is not None and data.is_file() and ws.resolve() in data.resolve().parents
             )
             ok = ok and inside
             where = f"{specs[-1].relative_to(ws)}, data {data}, {len(images)} images"
         checks.append(Check("GraphSpec, data and graph in the folder", ok, where))
-    if "lint" in expect or "values" in expect:
-        if not specs:
-            checks.append(Check("GraphSpec written", False, "no GraphSpec in the project"))
-        else:
-            final = specs[-1]
-            if "lint" in expect:
-                import forgegraph as fg
-
-                try:
-                    issues = fg.render(final).issues
-                    extra = [i for i in issues if i.check not in expect["lint"]]
+    if ("lint" in expect or "values" in expect) and not specs:
+        checks.append(Check("GraphSpec written", False, "no GraphSpec in the project"))
+    elif "lint" in expect or "values" in expect:
+        final = project.final
+        if "lint" in expect:
+            graph, problem = project.graph
+            if graph is None:  # a GraphSpec that doesn't draw fails the check
+                checks.append(Check("lint clean", False, problem))
+            else:
+                issues = graph.issues
+                extra = [i for i in issues if i.check not in expect["lint"]]
+                checks.append(
+                    Check(
+                        "lint clean",
+                        not extra,
+                        "; ".join(f"{i.check}: {i.message}" for i in issues) or "no issues",
+                    )
+                )
+        if "values" in expect:
+            values, problem = project.resolved
+            if values is None:
+                checks.append(Check("values", False, problem))
+            else:
+                for key, want in expect["values"].items():
+                    kind, path = key.split(":", 1)
+                    found = values.get(kind, {})
+                    if "*" in path:  # axis.*.x: either axis's value that matches
+                        options = [found.get(path.replace("*", a)) for a in ("x", "y")]
+                        actual = next((o for o in options if _matches(o, want)), options)
+                    else:
+                        actual = found.get(path, "<not a parameter>")
                     checks.append(
                         Check(
-                            "lint clean",
-                            not extra,
-                            "; ".join(f"{i.check}: {i.message}" for i in issues) or "no issues",
+                            f"{key} = {want}", _matches(actual, want), f"{final.name}: {actual!r}"
                         )
                     )
-                except Exception as e:  # a GraphSpec that doesn't draw fails the check
-                    checks.append(Check("lint clean", False, f"{type(e).__name__}: {e}"))
-            if "values" in expect:
-                try:
-                    values = _resolved(final)
-                except Exception as e:
-                    values = None
-                    checks.append(Check("values", False, f"{type(e).__name__}: {e}"))
-                if values is not None:
-                    for key, want in expect["values"].items():
-                        kind, path = key.split(":", 1)
-                        found = values.get(kind, {})
-                        if "*" in path:  # axis.*.x: either axis's value that matches
-                            options = [found.get(path.replace("*", a)) for a in ("x", "y")]
-                            actual = next((o for o in options if _matches(o, want)), options)
-                        else:
-                            actual = found.get(path, "<not a parameter>")
-                        checks.append(
-                            Check(
-                                f"{key} = {want}",
-                                _matches(actual, want),
-                                f"{final.name}: {actual!r}",
-                            )
-                        )
     for want in expect.get("layers", []):
         layers: dict[str, dict[str, Any]] = {}
         evidence = "no GraphSpec in the project"
         if specs:
-            try:
-                layers = _resolved(specs[-1]).get("layers", {})
+            values, problem = project.resolved
+            if values is None:
+                evidence = problem
+            else:
+                layers = values.get("layers", {})
                 evidence = json.dumps(layers, default=str)
-            except Exception as e:
-                evidence = f"{type(e).__name__}: {e}"
         ok = any(
             all(_matches(layer.get(k), v) for k, v in want.items()) for layer in layers.values()
         )
         checks.append(Check(f"a layer {want}", ok, evidence))
-    data_checks = (
-        "lines",
-        "rows_plotted",
-        "x_dates",
-        "x_between",
-        "y_above",
-        "only",
-        "tick_labels",
-    )
-    if specs and (any(k in expect for k in data_checks) or expect.get("categorical_color")):
-        graph, frame, problem = _drawn(specs[-1])
+    return checks
+
+
+DATA_CHECKS = ("lines", "rows_plotted", "x_dates", "x_between", "y_above", "only", "tick_labels")
+
+
+def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
+    """What the final GraphSpec draws from its data: its series, rows, dates, values, tick
+    labels and color; and its data's numeric columns."""
+    checks: list[Check] = []
+    specs = project.specs
+    if specs and (any(k in expect for k in DATA_CHECKS) or expect.get("categorical_color")):
+        graph, problem = project.graph
+        frame = project.frame if graph is not None else None
         x = y = None
         if graph is not None:
             values = graph.values["graph_type"]
@@ -580,13 +645,9 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
     if "numeric_columns" in expect:
         evidence, ok = "no GraphSpec in the project", False
         if specs:
-            from forgegraph.data import data_path
-            from forgegraph.spec.loaded import load_document
-
-            final = specs[-1]
-            where = data_path(load_document("graphspec", final))
-            if where is not None and where.is_file():
-                frame = pd.read_parquet(where)
+            where = project.data_file()
+            frame = project.frame
+            if frame is not None and where is not None:
                 kinds = {
                     c: str(frame[c].dtype) if c in frame else "missing"
                     for c in expect["numeric_columns"]
@@ -594,12 +655,20 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
                 ok = all(c in frame and pd.api.types.is_numeric_dtype(frame[c]) for c in kinds)
                 evidence = f"{where.name}: {kinds}"
             else:
-                evidence = f"{final.name}: data.file names no file ({where})"
+                evidence = f"{project.final.name}: data.file names no file ({where})"
         checks.append(Check(f"numeric columns {expect['numeric_columns']}", ok, evidence))
+    return checks
+
+
+def _file_checks(expect: dict[str, Any], project: Project) -> list[Check]:
+    """The files the case asks for, one GraphSpec kept, and no graph made another way, or
+    none at all."""
+    checks: list[Check] = []
+    ws, images, specs = project.ws, project.images, project.specs
     for pattern in expect.get("files", []):
         hits = [
             str(p.relative_to(ws))
-            for p in files
+            for p in project.files
             if fnmatch.fnmatch(str(p.relative_to(ws)), pattern)
             or fnmatch.fnmatch(p.name, pattern.split("/")[-1])
         ]
@@ -623,12 +692,15 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         checks.append(
             Check("no graph made", not images, ", ".join(p.name for p in images) or "none")
         )
-    if "layout" in expect:
-        checks += _layout_checks(expect["layout"], ws, expect.get("lint", []))
-    if "schedule" in expect:
-        checks += _schedule_checks(expect["schedule"], ws)
+    return checks
+
+
+def _reply_checks(expect: dict[str, Any], project: Project) -> list[Check]:
+    """The final reply says one of each set of words the case lists."""
+    reply = project.reply.lower()
+    checks = []
     for words in expect.get("says", []):
-        found = [w for w in words if w.lower() in reply.lower()]
+        found = [w for w in words if w.lower() in reply]
         checks.append(Check(f"says one of {words}", bool(found), ", ".join(found) or "none"))
     return checks
 

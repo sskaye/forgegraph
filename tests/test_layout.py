@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import pytest
 from matplotlib.lines import Line2D
-from pack_helpers import allow, dump, write_pack
+from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, write_pack
 from PIL import Image
 from render_helpers import BASE, painted_draws, polarization
 from typer.testing import CliRunner
@@ -31,46 +31,28 @@ FORMAT = {"width": 200, "height": "auto", "base_size": 10}
 
 
 def _format(name: str, **figure: Any) -> dict[str, Any]:
-    return {
-        "name": name,
-        "version": 0,
-        "description": "test",
-        "extends": "forgegraph_base/base_format",
-        "fixed_parameters": {"figure": {**FORMAT, **figure}},
-        "variable_parameters": {"output": {"file_types": ["png"]}},
-    }
+    fixed = {"figure": {**FORMAT, **figure}}
+    variable = {"output.file_types": ["png"]}
+    return doc("forgegraph_base/base_format", name, fixed=fixed, variable=variable)
 
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     """A project: the example data, GraphSpecs whose y tick labels differ in width, a theme
     with other colors, and formats with an auto and a fixed height."""
-    polarization().to_parquet(tmp_path / "p.parquet")
     for name, y, extra in (
         ("volt", "cell_voltage", {}),
         ("power", "power_density", {}),
         ("bright", "cell_voltage", {}),
     ):
-        settings = {**BASE, "axis.y.data.column": y, **extra}
-        doc = fg.graphspec(
+        graphspec_file(
+            tmp_path,
             name,
-            "xy",
             theme="house/bright" if name == "bright" else "forgegraph_base/base_theme",
-            data_file="p.parquet",
-            settings=settings,
+            settings={**BASE, "axis.y.data.column": y, **extra},
         )
-        dump(doc, tmp_path / f"{name}.yaml")
-    dump(
-        {
-            "name": "bright",
-            "version": 0,
-            "description": "test",
-            "extends": "forgegraph_base/base_theme",
-            "fixed_parameters": "None",
-            "variable_parameters": {"series": {"colors": "tol_bright"}},
-        },
-        tmp_path / "house" / "themes" / "bright.yaml",
-    )
+    theme = doc("forgegraph_base/base_theme", "bright", variable={"series.colors": "tol_bright"})
+    dump(theme, tmp_path / "house" / "themes" / "bright.yaml")
     dump(_format("auto"), tmp_path / "house" / "formats" / "auto.yaml")
     dump(_format("fixed", height=150), tmp_path / "house" / "formats" / "fixed.yaml")
     write_pack(tmp_path)
@@ -83,17 +65,10 @@ def project(tmp_path, monkeypatch):
 def write_layout(
     folder, tabs: dict[str, Any], name: str = "fig", fmt: str = "house/auto", **variable: Any
 ) -> Any:
-    doc = {
-        "name": name,
-        "version": 0,
-        "description": "test",
-        "extends": "forgegraph_base/base_layout",
-        "fixed_parameters": "None",
-        "variable_parameters": {"specifications": {"format": fmt}, **variable, "tabs": tabs},
-    }
-    path = folder / f"{name}.layout.yaml"
-    dump(doc, path)
-    return path
+    variable = {"specifications": {"format": fmt}, **variable, "tabs": tabs}
+    return dump(
+        doc("forgegraph_base/base_layout", name, variable=variable), folder / f"{name}.layout.yaml"
+    )
 
 
 def tab(areas: list[list[str]], **tiles: str) -> dict[str, Any]:
@@ -163,25 +138,13 @@ def test_tiles_a_parent_layout_lists_are_found_from_its_folder(project):
     """A layout extending a pack's layout: the tile files the pack's layout lists are found
     from its folder, not from the layout that extends it."""
     layouts = project / "house" / "layouts"
-    (layouts / "graphs").mkdir(parents=True)
-    polarization().to_parquet(layouts / "graphs" / "p.parquet")
-    dump(
-        fg.graphspec("v", "xy", data_file="p.parquet", settings=BASE), layouts / "graphs" / "v.yaml"
-    )
+    graphspec_file(layouts / "graphs", "v")
     parent = write_layout(layouts, {"Figure": tab([["v"]], v="graphs/v.yaml")}, name="shared")
     parent.rename(layouts / "shared.yaml")
     work = project / "work"
     work.mkdir()
     allow(work, "forgegraph_base", "../house")
-    child = {
-        "name": "mine",
-        "version": 0,
-        "description": "test",
-        "extends": "house/shared",
-        "fixed_parameters": "None",
-        "variable_parameters": "None",
-    }
-    dump(child, work / "mine.layout.yaml")
+    dump(doc("house/shared", "mine"), work / "mine.layout.yaml")
     layout = fg.layout(work / "mine.layout.yaml")
     assert list(layout.tabs[0].tiles) == ["v"]
 
@@ -577,15 +540,8 @@ def test_a_graphspec_saves_as_a_page(project):
 
 
 def _check(variable: dict[str, Any]) -> list[str]:
-    doc = {
-        "name": "t",
-        "version": 0,
-        "description": "test",
-        "extends": "forgegraph_base/base_layout",
-        "fixed_parameters": "None",
-        "variable_parameters": variable,
-    }
-    return validate("layout", doc, builtin().copy())
+    layout = doc("forgegraph_base/base_layout", variable=variable)
+    return validate("layout", layout, builtin().copy())
 
 
 @pytest.mark.parametrize(
@@ -630,37 +586,20 @@ def test_tile_names_are_unique_and_tab_names_give_distinct_files():
 
 def test_cli_explain_reports_a_layout_that_fails(project):
     path = write_layout(project, {"T": tab([["volt"]], volt="missing.yaml")})
-    result = runner.invoke(app, ["explain", str(path), "--json"])
-    assert result.exit_code == 1
-    [problem] = json.loads(result.output)["problems"]
+    [problem] = cli_problems("explain", str(path))
     assert "missing.yaml" in problem
 
 
 @pytest.mark.slow
 def test_a_layouts_tabs_replace_those_it_inherits(project):
-    dump(
-        {
-            "name": "base",
-            "version": 0,
-            "description": "test",
-            "extends": "forgegraph_base/base_layout",
-            "fixed_parameters": "None",
-            "variable_parameters": {
-                "specifications": {"format": "house/auto"},
-                "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
-            },
-        },
-        project / "house" / "layouts" / "base.yaml",
-    )
-    doc = {
-        "name": "child",
-        "version": 0,
-        "description": "test",
-        "extends": "house/base",
-        "fixed_parameters": "None",
-        "variable_parameters": {"tabs": {"New": tab([["power"]], power="power.yaml")}},
+    old = {
+        "specifications.format": "house/auto",
+        "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
     }
-    dump(doc, project / "child.layout.yaml")
+    base = doc("forgegraph_base/base_layout", "base", variable=old)
+    dump(base, project / "house" / "layouts" / "base.yaml")
+    new = {"tabs": {"New": tab([["power"]], power="power.yaml")}}
+    dump(doc("house/base", "child", variable=new), project / "child.layout.yaml")
     layout = fg.layout(project / "child.layout.yaml")
     assert [t.name for t in layout.tabs] == ["New"]
 

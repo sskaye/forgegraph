@@ -10,6 +10,7 @@ import copy
 import re
 
 import pytest
+from pack_helpers import doc
 
 from forgegraph.spec.parameters import (
     BASE,
@@ -46,28 +47,17 @@ NUMERIC = {"int", "positive int", "float", "positive float"}
 
 def reg_with(*docs: tuple[str, dict]) -> Registry:
     reg = builtin().copy()
-    for kind, doc in docs:
-        reg.add(kind, doc)
+    for kind, document in docs:
+        reg.add(kind, document)
     return reg
 
 
 def child(
     kind: str, section: str = "variable_parameters", params: dict | None = None, name: str = "child"
 ) -> dict:
-    """A file extending the definition file that lists the given parameters."""
-    tree: dict = {}
-    for path, value in (params or {}).items():
-        tree_set(tree, path, value)
-    doc = {
-        "name": name,
-        "version": 1,
-        "description": "A test file.",
-        "extends": reference_name(kind),
-        "fixed_parameters": NONE,
-        "variable_parameters": NONE,
-    }
-    doc[section] = tree or NONE
-    return doc
+    """A file extending the definition file that lists the given parameters, in section."""
+    listed = {"fixed" if section == "fixed_parameters" else "variable": params}
+    return doc(reference_name(kind), name, description="A test file.", version=1, **listed)
 
 
 # Values another parameter must have for this one to be valid at all.

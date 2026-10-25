@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from forgegraph.cli import Json, fail, json_errors, skill_app
+from forgegraph.cli import Json, fail, json_errors, report, skill_app
 
 
 @skill_app.command("install", short_help="Install the ForgeGraph skill for agents.")
@@ -28,21 +27,15 @@ def skill_install(
 ) -> None:
     """Install the ForgeGraph skill for agents: in ~/.claude/skills (every project), or in a
     project with --project."""
-    from forgegraph.skill import InstallError, install
+    from forgegraph.skill import install
 
     if here and dest is not None:
-        fail(["use --project or --dest, not both"], as_json)
+        fail(["use --project or --dest, not both"])
     folder = (
         dest
         if dest is not None
         else (Path.cwd() / ".claude" / "skills" if here else Path.home() / ".claude" / "skills")
     )
-    try:
-        target, what = install(folder, force)
-    except InstallError as e:
-        fail([str(e)], as_json)
-        return
-    if as_json:
-        typer.echo(json.dumps({"ok": True, "skill": str(target), "result": what}, indent=2))
-        return
-    typer.echo(f"{what}: {target}")
+    target, what = install(folder, force)
+    result = {"ok": True, "skill": str(target), "result": what}
+    report(result, as_json, lambda: typer.echo(f"{what}: {target}"))

@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 import pytest
+from pack_helpers import doc
 
 from forgegraph.spec.registry import builtin
 from forgegraph.spec.schedule import Cadence, CadenceError
@@ -73,14 +74,10 @@ def test_cadences_that_cant_run_exactly_are_errors(interval, unit, at, message):
 
 
 def test_a_schedules_cadence_is_checked_with_the_file():
-    doc = {
-        "name": "t",
-        "version": 0,
-        "description": "",
-        "extends": "forgegraph_base/base_schedule",
-        "fixed_parameters": "None",
-        "variable_parameters": {"cadence": {"interval": 2, "interval_unit": "day"}},
-    }
-    assert validate("schedule", doc, builtin()) == [
+    schedule = doc(
+        "forgegraph_base/base_schedule",
+        variable={"cadence.interval": 2, "cadence.interval_unit": "day"},
+    )
+    assert validate("schedule", schedule, builtin()) == [
         "cadence.interval: must be 1 for days; cron and launchd can't run every 2 days exactly"
     ]

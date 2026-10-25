@@ -8,14 +8,13 @@ out: they're for the people reviewing the skill, not for the agent using it.
 
 from __future__ import annotations
 
-import re
 import shutil
 from importlib.resources import files
 from pathlib import Path
 
+from forgegraph import forgemark
+
 NAME = "forgegraph"
-_MARKER = re.compile(r"<!-- /?fmc:\d+ -->")
-_COMMENTS = "<!-- forgemark-comments"
 
 
 class InstallError(ValueError):
@@ -27,13 +26,6 @@ def source() -> Path:
     return Path(str(files("forgegraph") / "skill" / NAME))
 
 
-def _clean(text: str) -> str:
-    """A skill file's text without review comments."""
-    if _COMMENTS in text:
-        text = text[: text.index(_COMMENTS)].rstrip("\n") + "\n"
-    return _MARKER.sub("", text)
-
-
 def contents() -> dict[str, bytes]:
     """The skill's files as installed, by path within the skill's folder."""
     out = {}
@@ -43,7 +35,7 @@ def contents() -> dict[str, bytes]:
             continue  # caches and hidden files such as .DS_Store aren't part of the skill
         data = path.read_bytes()
         if path.suffix == ".md":
-            data = _clean(data.decode("utf-8")).encode("utf-8")
+            data = forgemark.strip(data.decode("utf-8")).encode("utf-8")
         out[path.relative_to(source()).as_posix()] = data
     return out
 

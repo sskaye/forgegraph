@@ -2,7 +2,8 @@
 
 Each recreation is a GraphSpec's settings plus the DataFrame it draws. The same set feeds the
 review page (scripts/build_recreations.py) and the image-regression baselines
-(tests/test_regression.py). No real measurements are used.
+(tests/test_regression.py), each baseline and its check drawn by baseline_image(). No real
+measurements are used.
 """
 
 from __future__ import annotations
@@ -15,14 +16,17 @@ from unittest import mock
 
 import numpy as np
 import pandas as pd
-from pack_helpers import doc
-from ruamel.yaml import YAML
+from pack_helpers import allow, doc, dump, write_config, write_pack
 
 import forgegraph as fg
+from forgegraph.drawing.export import KEY
+from forgegraph.drawing.style import isolated
 from forgegraph.layouts import Layout
 from forgegraph.packs import MAIN_CONFIG_VARIABLE
 from forgegraph.spec.documents import Registry, builtin
 from forgegraph.spec.parameters import NONE
+
+BASELINE_DPI = 72
 
 
 @dataclass
@@ -342,22 +346,15 @@ class LayoutRecreation:
         """Write the tiles' GraphSpecs, the format (in a folder pack, house) and the layout
         into folder, and draw it, with a main config of its own allowing house, so it's
         standard."""
-        yaml = YAML()
-        (folder / "house" / "formats").mkdir(parents=True, exist_ok=True)
-        (folder / "house" / "pack.yaml").write_text(
-            "name: house\nversion: 1.0.0\ndescription: The recreations' slide format.\n"
-            "issues: https://example.com/issues\nrequires: None\n"
-        )
-        (folder / "forgegraph.toml").write_text('packs = ["forgegraph_base", "./house"]\n')
-        (folder / "main.toml").write_text('packs = ["forgegraph_base", "./house"]\n')
+        write_pack(folder)
+        allow(folder, "forgegraph_base", "./house")
+        main = write_config(folder / "main.toml", "forgegraph_base", "./house")
         fmt = doc(
             "forgegraph_base/base_format", "slide", fixed={"figure": self.format}, description=""
         )
-        with (folder / "house" / "formats" / "slide.yaml").open("w", encoding="utf-8") as f:
-            yaml.dump(fmt, f)
+        dump(fmt, folder / "house" / "formats" / "slide.yaml")
         for name, r in self.tiles.items():
-            with (folder / f"{name}.yaml").open("w", encoding="utf-8") as f:
-                yaml.dump(r.graphspec(), f)
+            dump(r.graphspec(), folder / f"{name}.yaml")
         tiles = {name: f"{name}.yaml" for name in self.tiles}
         layout = doc(
             "forgegraph_base/base_layout",
@@ -368,10 +365,8 @@ class LayoutRecreation:
             },
             description=self.caption,
         )
-        path = folder / f"{self.name}.layout.yaml"
-        with path.open("w", encoding="utf-8") as f:
-            yaml.dump(layout, f)
-        with mock.patch.dict(os.environ, {MAIN_CONFIG_VARIABLE: str(folder / "main.toml")}):
+        path = dump(layout, folder / f"{self.name}.layout.yaml")
+        with mock.patch.dict(os.environ, {MAIN_CONFIG_VARIABLE: str(main)}):
             return fg.layout(path, data={name: r.data for name, r in self.tiles.items()})
 
 
@@ -452,3 +447,17 @@ LAYOUT_RECREATIONS = [
         SLIDE,
     ),
 ]
+
+
+def baseline_image(r: Recreation | LayoutRecreation, path: Path, folder: Path) -> Path:
+    """Draw a recreation at path as a PNG with no record, at the baselines' resolution; a
+    layout recreation's first tab, its files written in folder."""
+    if isinstance(r, LayoutRecreation):
+        tab = r.render(folder).tabs[0]
+        with tab.saving():
+            tab.figure.savefig(path, format="png", dpi=BASELINE_DPI, metadata={KEY: None})
+        return path
+    graph = r.render()
+    with isolated(graph.style):
+        graph.figure.savefig(path, format="png", dpi=BASELINE_DPI, metadata={KEY: None})
+    return path

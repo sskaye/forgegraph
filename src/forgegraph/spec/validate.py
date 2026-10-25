@@ -13,10 +13,10 @@ definitions (see parameters.py).
   as variable, under the same category. It may not change a parameter that a GraphSpec it
   extends lists as fixed. Its layers are checked by layers.py, a layout's tabs by layout.py.
 - A format's width and height can't both be auto; a graph type's legend.method must be one
-  of the theme's legend.methods; benchmark.data_column and benchmark.value are set
-  together or not at all; with several y columns, axis.y.title is text or None; and
-  anything else impossible (no font, nothing drawn, a backwards or non-positive log
-  axis) is an error, never a silent substitute.
+  of the theme's legend.methods; the parameters TIES ties (benchmark.data_column and
+  benchmark.value) are set together or not at all; with several y columns, axis.y.title
+  is text or None; and anything else impossible (no font, nothing drawn, a backwards or
+  non-positive log axis) is an error, never a silent substitute.
 """
 
 from __future__ import annotations
@@ -53,6 +53,9 @@ from forgegraph.spec.resolve import (
     resolve,
 )
 from forgegraph.spec.schedule import Cadence, CadenceError
+
+# Graph-type parameters set together or not at all; the catalog's cards keep them so too.
+TIES = (("benchmark.data_column", "benchmark.value"),)
 
 
 def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
@@ -221,7 +224,7 @@ def _inherited_fixed(doc: dict[str, Any], reg: Registry) -> list[str]:
 
 def _graphspec_rules(values: dict[str, dict[str, Any]]) -> list[str]:
     """What a GraphSpec's values, resolved once, may not combine."""
-    return _method_allowed(values) + _benchmark_complete(values) + _graph_rules(values)
+    return _method_allowed(values) + _ties_complete(values) + _graph_rules(values)
 
 
 def _method_allowed(values: dict[str, dict[str, Any]]) -> list[str]:
@@ -233,12 +236,15 @@ def _method_allowed(values: dict[str, dict[str, Any]]) -> list[str]:
     return [f"legend.method: theme '{theme}' allows only {', '.join(methods)}"]
 
 
-def _benchmark_complete(values: dict[str, dict[str, Any]]) -> list[str]:
+def _ties_complete(values: dict[str, dict[str, Any]]) -> list[str]:
     gt = values["graph_type"]
-    column, value = gt.get("benchmark.data_column"), gt.get("benchmark.value")
-    if (column in (None, NONE)) == (value in (None, NONE)):
-        return []
-    return ["benchmark: set data_column and value together, or neither"]
+    errors = []
+    for tie in TIES:
+        if len({gt.get(path) in (None, NONE) for path in tie}) > 1:
+            category = tie[0].rsplit(".", 1)[0]
+            names = " and ".join(path.rsplit(".", 1)[1] for path in tie)
+            errors.append(f"{category}: set {names} together, or neither")
+    return errors
 
 
 def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:

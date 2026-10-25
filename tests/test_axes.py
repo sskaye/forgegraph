@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.dates import num2date
+from pack_helpers import child
 from render_helpers import render
 
 import forgegraph as fg
@@ -219,14 +220,8 @@ def test_a_tick_at_every_date_is_labelled_at_their_unit():
 def test_the_theme_orders_day_and_month():
     df = _dates("2026-03-01", 40, "D")
     reg = builtin().copy()
-    theme = {
-        "name": "uk",
-        "version": 0,
-        "description": "",
-        "extends": "forgegraph_base/base_theme",
-        "fixed_parameters": {"axis": {"tick": {"label": {"date_order": "day_month"}}}},
-        "variable_parameters": "None",
-    }
+    order = {"axis.tick.label.date_order": "day_month"}
+    theme = child("theme", "forgegraph_base/base_theme", order, name="uk")
     reg.add("theme", theme)
     g = fg.xy(df, "when", "value", theme="uk", registry=reg)
     assert labels(g)[:2] == ["2 Mar\n2026", "9 Mar"]

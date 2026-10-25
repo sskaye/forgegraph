@@ -14,21 +14,18 @@ import base64
 import html
 import io
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-sys.path.insert(0, str(ROOT / "scripts"))
 
-import tempfile  # noqa: E402
+from recreations import LAYOUT_RECREATIONS, RECREATIONS, baseline_image  # noqa: E402
 
-from recreations import LAYOUT_RECREATIONS, RECREATIONS  # noqa: E402
-
-from forgegraph.catalog_build.build import write  # noqa: E402
+from forgegraph import forgemark  # noqa: E402
 from forgegraph.drawing.export import KEY  # noqa: E402
 from forgegraph.drawing.style import isolated  # noqa: E402
 
-BASELINE_DPI = 72
 CSS_DPI = 96  # a CSS inch, so images show at the figure's real size
 
 
@@ -40,19 +37,11 @@ def _png(graph, dpi: int) -> bytes:
 
 
 def baselines() -> None:
-    folder = ROOT / "tests" / "baselines"
-    folder.mkdir(exist_ok=True)
-    for r in RECREATIONS:
-        (folder / f"{r.name}.png").write_bytes(_png(r.render(), BASELINE_DPI))
-        print(f"wrote tests/baselines/{r.name}.png")
-    for lr in LAYOUT_RECREATIONS:
+    (ROOT / "tests" / "baselines").mkdir(exist_ok=True)
+    for r in [*RECREATIONS, *LAYOUT_RECREATIONS]:
         with tempfile.TemporaryDirectory() as folder:
-            tab = lr.render(Path(folder)).tabs[0]
-            with tab.saving():
-                tab.figure.savefig(
-                    baseline(lr.name), format="png", dpi=BASELINE_DPI, metadata={KEY: None}
-                )
-        print(f"wrote tests/baselines/{lr.name}.png")
+            baseline_image(r, baseline(r.name), Path(folder))
+        print(f"wrote tests/baselines/{r.name}.png")
 
 
 def baseline(name: str) -> Path:
@@ -122,5 +111,5 @@ if __name__ == "__main__":
         baselines()
     else:
         out = ROOT / "review" / "phase-02" / "recreations.html"
-        lint = write(out, page())  # keeps the page's comments
+        lint = forgemark.rewrite(out, page())  # keeps the page's comments
         print(f"wrote {out.relative_to(ROOT)}" + (f"\n{lint}" if lint else ""))

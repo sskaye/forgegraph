@@ -1,15 +1,15 @@
 """Drawing the catalog's cards: a baseline GraphSpec with changes.
 
-What each card changes comes from the catalog files (forgegraph.catalog_build.files).
+What each card changes comes from the catalog files (forgegraph.catalog_build.files), and
+where it's placed from forgegraph.catalog_build.cards.
 """
 
 from __future__ import annotations
 
 import copy
 import io
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 
@@ -17,19 +17,15 @@ from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, data_path, render
 from forgegraph.spec.documents import Registry, builtin, resolve, resolve_layers
-from forgegraph.spec.parameters import NONE, Parameter, definitions, tree_has, tree_set
+from forgegraph.spec.parameters import NONE, definitions, tree_has, tree_set
+
+if TYPE_CHECKING:  # catalog_build.cards imports this module, so only to check types
+    from forgegraph.catalog_build.cards import Change
 
 NONSTANDARD = "non-standard"  # a change that draws on the graph after ForgeGraph finishes
 FOOTNOTED = "footnoted"  # a change that draws a footnote, as a scheduled run's stamp
 FOOTNOTE = "Data as of Oct 21, 2026, 05:12 \u00b7 rendered daily at 06:00"
 SPECIAL = (NONSTANDARD, FOOTNOTED)  # baselines that aren't parameter changes
-
-
-@dataclass(frozen=True)
-class Change:
-    path: str  # a parameter's, or for a group, the numbered baseline's name
-    value: Any
-    parts: tuple[Change, ...] = ()  # a numbered baseline changing several parameters
 
 
 def _flat(changes: tuple[Change, ...]) -> list[Change]:
@@ -117,16 +113,3 @@ def image(graph: Graph, dpi: float) -> Image.Image:
         graph.figure.savefig(buffer, format="raw", dpi=dpi)
     width, height = (int(v * dpi) for v in graph.figure.get_size_inches())
     return Image.frombuffer("RGBA", (width, height), buffer.getvalue(), "raw", "RGBA", 0, 1)
-
-
-@dataclass(frozen=True)
-class Variation:
-    """A parameter's change (with any it needs), from the baseline or a numbered baseline."""
-
-    parameter: Parameter
-    changes: tuple[Change, ...]  # the parameter's own first
-    base: Change | None = None
-
-    @property
-    def change(self) -> Change:
-        return self.changes[0]

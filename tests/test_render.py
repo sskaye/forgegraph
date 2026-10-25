@@ -15,7 +15,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from pack_helpers import allow, dump, write_pack
+from pack_helpers import allow, dump, graphspec_file, write_pack
 from PIL import Image
 from render_helpers import BASE, painted_draws, png, polarization, render
 
@@ -696,22 +696,18 @@ def test_xy_draws_into_any_axes_so_layouts_can_place_it():
 
 
 def _write_graphspec(path, **kw) -> None:
-
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """A GraphSpec drawing the example data, without writing the data."""
     dump(fg.graphspec(path.stem, "xy", settings=BASE, **kw), path)
 
 
 def test_data_file_relative_to_the_graphspec(tmp_path):
-    (tmp_path / "data").mkdir()
-    polarization().to_parquet(tmp_path / "data" / "p.parquet")
-    _write_graphspec(tmp_path / "graphspecs" / "p.yaml", data_file="../data/p.parquet")
+    graphspec_file(tmp_path / "graphspecs", data="../data/p.parquet")
     g = fg.render(tmp_path / "graphspecs" / "p.yaml")
     assert g.data.file == "../data/p.parquet" and g.data.rows_read == 96
 
 
 def test_data_file_absolute_or_from_home(tmp_path, monkeypatch):
-    polarization().to_parquet(tmp_path / "p.parquet")
-    _write_graphspec(tmp_path / "specs" / "a.yaml", data_file=str(tmp_path / "p.parquet"))
+    graphspec_file(tmp_path / "specs", "a", str(tmp_path / "p.parquet"))
     assert fg.render(tmp_path / "specs" / "a.yaml").data.rows_read == 96
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows finds ~ here
@@ -722,9 +718,7 @@ def test_data_file_absolute_or_from_home(tmp_path, monkeypatch):
 def test_inherited_data_file_is_found_from_the_file_that_sets_it(tmp_path):
     """A GraphSpec extending another finds a relative data.file from the other's folder."""
     house = write_pack(tmp_path / "packs")
-    (house / "graphspecs").mkdir()
-    polarization().to_parquet(house / "graphspecs" / "p.parquet")
-    _write_graphspec(house / "graphspecs" / "base.yaml", data_file="p.parquet")
+    graphspec_file(house / "graphspecs", "base")
     allow(tmp_path, "forgegraph_base", "./packs/house")
     (tmp_path / "elsewhere").mkdir()
     child = tmp_path / "elsewhere" / "child.yaml"
@@ -747,7 +741,7 @@ def test_a_missing_or_unreadable_data_file_is_an_error(tmp_path):
     with pytest.raises(fg.SpecError, match=re.escape("data.file: no file at")):
         fg.render(tmp_path / "g.yaml")
     polarization().to_csv(tmp_path / "p.parquet", index=False)  # not Parquet inside
-    _write_graphspec(tmp_path / "h.yaml", data_file="p.parquet")
+    graphspec_file(tmp_path, "h")
     with pytest.raises(fg.SpecError, match="isn't a Parquet file"):
         fg.render(tmp_path / "h.yaml")
 
@@ -834,7 +828,8 @@ def test_log_axis_labels_are_plain_or_powers_never_both():
 
 @pytest.mark.slow
 def test_extending_the_x_axis_for_labels_adds_no_ticks():
-    from forgegraph.catalog_build.examples import Change, draw
+    from forgegraph.catalog_build.cards import Change
+    from forgegraph.catalog_build.examples import draw
 
     fanned = Change("data.file", "fanned.parquet")  # long names: they need room
     g = draw(

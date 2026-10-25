@@ -97,20 +97,65 @@ def _layout(
     baseline. align: how lines of different widths line up (matplotlib's multialignment)."""
     family, size, weight, style = key
     prop = FontProperties(family=list(family), size=size, weight=weight, style=style)
-    fig = Figure(figsize=(2, 2), dpi=72 * _FINE)  # fine enough that pixel rounding is negligible
-    FigureCanvasAgg(fig)
-    rc: Any = {"text.hinting": "no_hinting"}  # as render.style draws
+    fig = _measuring()
+    rc: Any = {"text.hinting": "no_hinting"}  # as drawing.style draws
     with matplotlib.rc_context(rc):
         artist = fig.text(0, 0, text, fontproperties=prop, va="baseline", ha=align, transform=None)
-        renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
-        extent = artist.get_window_extent(renderer)
-        _, lines, _ = artist._get_layout(renderer)  # type: ignore[attr-defined]
+        try:
+            renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+            extent = artist.get_window_extent(renderer)
+            _, lines, _ = artist._get_layout(renderer)  # type: ignore[attr-defined]
+        finally:
+            artist.remove()
     start = extent.x0
     placed = tuple((line, (x - start) / _FINE, y / _FINE) for line, _, (x, y) in lines)
     return extent.y1 / _FINE, -extent.y0 / _FINE, extent.width / _FINE, placed
 
 
 _FINE = 20  # pixels per point when measuring matplotlib's box
+
+
+@cache
+def _measuring() -> Figure:
+    """The figure texts are laid out on to be measured, one at a time. Their transform is
+    None, so its size doesn't matter; its resolution is fine enough that pixel rounding is
+    negligible."""
+    fig = Figure(figsize=(2, 2), dpi=72 * _FINE)
+    FigureCanvasAgg(fig)
+    return fig
+
+
+def extent(text: str, prop: FontProperties, dpi: float) -> tuple[float, float]:
+    """A label's width and height in pixels at dpi, as matplotlib lays it out in the
+    current settings: measured once for each text, font, resolution and text setting."""
+    rc = matplotlib.rcParams
+    settings = (
+        rc["text.hinting"],
+        rc["text.hinting_factor"],
+        rc["mathtext.rm"],
+        rc["mathtext.default"],
+        prop.get_math_fontfamily(),  # fixed when the font was made, from the settings then
+    )
+    return _extent(text, _key(prop), float(dpi), settings)
+
+
+@cache
+def _extent(text: str, key: tuple, dpi: float, settings: tuple) -> tuple[float, float]:
+    family, size, weight, style = key
+    prop = FontProperties(family=list(family), size=size, weight=weight, style=style)
+    prop.set_math_fontfamily(settings[-1])
+    probe = Text(text=text, fontproperties=prop)
+    probe.set_figure(_probing(dpi))
+    box = probe.get_window_extent()
+    return box.width, box.height
+
+
+@cache
+def _probing(dpi: float) -> Figure:
+    """The figure labels are measured on at dpi."""
+    fig = Figure(dpi=dpi)
+    FigureCanvasAgg(fig)
+    return fig
 
 
 def edges(text: str, prop: FontProperties, align: str = "left") -> Edges:
@@ -185,3 +230,12 @@ def footprint(artist: Text, renderer: Any) -> Bbox:
     if angle == 270:  # reads downward: its top faces right, its start is at the top
         return Bbox.from_extents(x0 + cut_bottom, y0 + cut_end, x1 - cut_top, y1 - cut_start)
     return extent  # other angles: matplotlib's box (only the watermark, inside the plot)
+
+
+def measure(fig: Any) -> None:
+    """Draw the figure to measure what's on it, without painting: its artists are laid out
+    as the canvas draws them (on the canvas's renderer), but nothing is rendered. Every draw
+    before the last is one of these."""
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+    with renderer._draw_disabled():  # what matplotlib's draw_without_rendering does
+        fig.draw(renderer)

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 import matplotlib
@@ -106,6 +107,12 @@ class Style:
         light = (1 - 0.88 * (1 - r), 1 - 0.88 * (1 - g), 1 - 0.88 * (1 - b))
         return LinearSegmentedColormap.from_list("forgegraph", [light, (r, g, b)])
 
+    @cached_property
+    def settings(self) -> dict[str, Any]:
+        """Matplotlib's defaults with rc() over them, checked once: what drawing uses."""
+        checked = matplotlib.RcParams({**dict.copy(matplotlib.rcParamsDefault), **self.rc()})
+        return {k: v for k, v in dict.items(checked) if k != "backend"}
+
     def rc(self) -> dict[str, Any]:
         t, family = self.theme, str(self.theme["font.family"])
         text = self.color("font.color")
@@ -179,8 +186,14 @@ class Style:
 
 @contextmanager
 def isolated(style: Style) -> Iterator[None]:
-    """Matplotlib's defaults plus the style, whatever the user's own settings are."""
+    """Matplotlib's defaults plus the style, whatever the user's own settings are. The
+    settings are checked once per style; entering and leaving copy them in and back, as
+    matplotlib's own rc_context restores what it saved."""
     register_fonts()
-    with matplotlib.rc_context(matplotlib.rcParamsDefault):
-        matplotlib.rcParams.update(style.rc())  # type: ignore[call-overload]
+    params = matplotlib.rcParams
+    saved = dict.copy(params)  # raw: reading "backend" through rcParams would resolve it
+    dict.update(params, style.settings)
+    try:
         yield
+    finally:
+        dict.update(params, saved)

@@ -345,6 +345,19 @@ def test_version_and_help_load_no_drawing_libraries():
     assert done.stdout.strip() == "[]"
 
 
+def test_drawing_loads_no_pdf_writer_until_a_pdf_is_saved():
+    """matplotlib's PDF backend (with its font subsetter) loads only for a PDF."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, forgegraph as fg; fg.render; import forgegraph.drawing.export; "
+        "print('matplotlib.backends.backend_pdf' in sys.modules)"
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert done.stdout.strip() == "False"
+
+
 def test_every_import_form_gives_the_module_and_the_api_its_functions():
     """No submodule shares a name with the API, so `import forgegraph.x as m` is the module
     whichever is imported first, and fg.render, fg.layout and fg.blank are the API."""

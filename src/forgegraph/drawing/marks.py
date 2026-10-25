@@ -37,6 +37,7 @@ from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
 from forgegraph.drawing.axes import DrawError
 from forgegraph.drawing.style import Style, unset
+from forgegraph.drawing.text import measure
 
 BAR = "forgegraph-bar"  # each series' bars
 VALUE_LABEL = "forgegraph-value-label"
@@ -195,9 +196,9 @@ class PlaceShift(Transform):
         flat = points.reshape(-1, 2)
         out = np.array(self.ax.transData.transform(flat), dtype=float)
         px = self.ax.figure.dpi / 72  # type: ignore[union-attr]
-        out[:, self.k] += [
-            self.shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in flat[:, self.k]
-        ]
+        places, which = np.unique(flat[:, self.k], return_inverse=True)  # few places, many points
+        moves = [self.shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in places]
+        out[:, self.k] += np.asarray(moves, dtype=float)[which]
         return out.reshape(points.shape)
 
     def _invalidate_internal(self, level: int, invalidating_node: Any) -> None:
@@ -523,7 +524,7 @@ def value_labels(
                 place, hi if t >= 0 else lo, text_of(t), 0.0, "beyond", ink, 1.0 if t >= 0 else -1.0
             )
 
-    fig.canvas.draw()  # type: ignore[union-attr]
+    measure(fig)
     boxes = [a.get_window_extent() for a in made]
     for (i, a), (j, b) in (
         (p, q) for p in enumerate(boxes) for q in enumerate(boxes) if p[0] < q[0]
@@ -580,7 +581,7 @@ def _fits_bar(
 ) -> bool:
     """Whether a label inside a bar's end fits within the bar (bar_width points across), gap
     clear of its ends."""
-    ax.figure.canvas.draw()  # type: ignore[union-attr]
+    measure(ax.figure)
     box = a.get_window_extent()
     k = 1 if vertical else 0
     ends = sorted(

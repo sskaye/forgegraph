@@ -6,7 +6,8 @@ import copy
 import hashlib
 import io
 import os
-from contextlib import AbstractContextManager
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,7 +15,6 @@ from typing import Any
 
 import pandas as pd
 from matplotlib.axes import Axes
-from matplotlib.backends.backend_agg import RendererAgg
 from matplotlib.figure import Figure
 
 from forgegraph import __version__
@@ -79,6 +79,7 @@ class Graph:
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     _snapshot: tuple[int, ...] = ()  # the figure's artists when rendering finished
     _drawn: str = ""  # a hash of the pixels the figure drew when rendering finished
+    _held: bool = False  # inspected already, during one save (see inspected_once)
     _drawing: list[lint.Issue] = field(default_factory=list)  # found while drawing
     _font_problems: list[str] = field(default_factory=list)
 
@@ -129,17 +130,23 @@ class Graph:
         the same pixels. Once it isn't, the graph stays non-standard, and every drawing of it
         carries the watermark. Drawing or saving the figure, by any route, checks first.
         Returns `nonstandard`."""
-        if not self.changed:
+        if not self.changed and not self._held:
             self.changed = _artists(self.figure) != self._snapshot or self._pixels() != self._drawn
         return self.changed
 
+    @contextmanager
+    def inspected_once(self) -> Iterator[None]:
+        """Inspect the figure now, and not again until the block ends: saving several files
+        doesn't change it."""
+        self.inspect()
+        self._held = True
+        try:
+            yield
+        finally:
+            self._held = False
+
     def _pixels(self) -> str:
-        """A hash of the figure drawn at its size and resolution (without the watermark: it's
-        drawn only once the figure is found changed)."""
-        renderer = RendererAgg(*self.figure.bbox.size, self.figure.dpi)
-        with isolated(self.style), lint.font_messages():  # lint reports missing glyphs
-            self.figure.draw(renderer)
-        return hashlib.sha256(bytes(renderer.buffer_rgba())).hexdigest()
+        return pixel_hash(self.figure, self.style)
 
     def record(self) -> dict[str, Any] | None:
         """The provenance record saved files carry, at the format's provenance.level; None
@@ -180,7 +187,7 @@ class Graph:
     def _write(self, stem: Path, kinds: list[str]) -> list[Path]:
         dpi = int(self.values["format"]["output.dpi"])
         out = []
-        with isolated(self.style):  # matplotlib's savefig settings too, not the user's
+        with isolated(self.style), self.inspected_once():  # savefig settings too
             for kind in kinds:
                 path = stem.with_name(f"{stem.name}.{kind}")
                 if kind == "html":
@@ -399,18 +406,28 @@ def render(
             raise SpecError([str(e)]) from None
         except module.DrawError as e:
             raise SpecError([str(e)]) from None
-        fig.canvas.draw()
     p.finish(drawn)
     graph = Graph(p.doc, fig, ax, p.values, style, p.record, drawn.labelling, [], p.specs)
     graph.nonstandard_packs = p.nonstandard_packs
     graph.changed = bool(p.nonstandard_packs)  # drawn with a pack the main config doesn't list
     graph._drawing = list(drawn.warnings)
     graph._font_problems = font_problems
-    graph.check()
+    graph.check()  # the one draw after layout, which the record of its pixels shares
     graph._snapshot = _artists(fig)
-    graph._drawn = graph._pixels()
+    graph._drawn = pixel_hash(fig, style, redraw=False)
     fig.graph = graph  # from here on, drawing or saving the figure inspects it first
     return graph
+
+
+def pixel_hash(fig: Figure, style: Style, *, redraw: bool = True) -> str:
+    """A hash of the figure as its canvas draws it, without the watermark (drawn only once
+    the figure is found changed). redraw False: of what the canvas drew last."""
+    renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+    if redraw:  # drawn into the canvas's renderer, but not through the canvas: no inspecting
+        renderer.clear()
+        with isolated(style), lint.font_messages():  # lint reports missing glyphs
+            fig.draw(renderer)
+    return hashlib.sha256(bytes(renderer.buffer_rgba())).hexdigest()
 
 
 def _limit(value: Any) -> float | None:

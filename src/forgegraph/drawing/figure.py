@@ -186,7 +186,7 @@ def layout(fig: Figure, ax: Axes, style: Style) -> None:
     last = both = (0.0, 0.0, 0.0, 0.0)
     for _ in range(PASSES):
         spacing.apply(ax, style)
-        fig.canvas.draw()
+        text.measure(fig)
         renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
         dpi = fig.dpi
         extent, box = visible_extent(ax, renderer), ax.bbox

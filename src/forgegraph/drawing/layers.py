@@ -37,6 +37,7 @@ from forgegraph.drawing import marks
 from forgegraph.drawing.axes import DrawError
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset
+from forgegraph.drawing.text import measure
 
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
@@ -267,7 +268,7 @@ def label_lines(
         auto = line.position == "auto"
         for position in LABEL_ORDER if auto else [line.position]:
             a = _label_line(ax, line.axis, line.at, words, position, line.color, style)
-            ax.figure.canvas.draw()  # type: ignore[union-attr]
+            measure(ax.figure)
             box, plot = a.get_window_extent(), ax.get_window_extent()
             inside = (
                 box.x0 >= plot.x0 - 0.5
@@ -554,7 +555,7 @@ def notes_inside(
                 "top" if top else "bottom",
                 style,
             )
-            ax.figure.canvas.draw()  # type: ignore[union-attr]
+            measure(ax.figure)
             box = a.get_window_extent()
             if clear(box) and not any(box.overlaps(p) for p in placed):
                 placed.append(box)

@@ -382,6 +382,14 @@ def box_clear(ax: Axes, bbox: Bbox, lines: bool, keys: bool = False) -> bool:
     return Obstacles.of(ax, lines=lines, keys=keys).clear(bbox, pad)
 
 
+def unplace(ax: Axes) -> None:
+    """Take away the keys and direct labels placed in ax, to place them again."""
+    for k in keys_of(ax):
+        k.remove()
+    for t in [t for t in ax.texts if t.get_gid() == SERIES_LABEL]:
+        t.remove()
+
+
 def legend(
     ax: Axes,
     entries: list[Entry],

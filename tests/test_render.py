@@ -586,7 +586,7 @@ def test_rendering_draws_the_figure_once_its_layout_is_final(monkeypatch):
     from forgegraph.drawing.figure import GraphFigure
 
     draws, laid_out = [], []
-    lay_out = graph_module._lay_out_and_label
+    lay_out = graph_module.finish
 
     def counting_lay_out(*args, **kwargs):
         laid_out.clear()
@@ -600,7 +600,7 @@ def test_rendering_draws_the_figure_once_its_layout_is_final(monkeypatch):
             draws.append(renderer)
         original(self, renderer)
 
-    monkeypatch.setattr(graph_module, "_lay_out_and_label", counting_lay_out)
+    monkeypatch.setattr(graph_module, "finish", counting_lay_out)
     monkeypatch.setattr(GraphFigure, "draw", counting_draw)
     render()
     assert len(draws) == 1

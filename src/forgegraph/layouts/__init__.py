@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -27,19 +28,20 @@ from matplotlib.figure import Figure
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import GraphFigure, TileAxes, canvas_figure, inches, watermark
-from forgegraph.drawing.key import keys
 from forgegraph.drawing.layout import (
     MARGIN_IN,
     Grid,
     Placed,
+    Plot,
     add_footnote,
     arrange,
+    finish,
     footnote_room,
     place_footnote,
 )
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
-from forgegraph.graph import PLACE_PASSES, Graph, Prepared, prepare, render
+from forgegraph.graph import Graph, Prepared, prepare, render
 from forgegraph.layouts.separators import apply_separators, backgrounds
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
@@ -497,13 +499,19 @@ def _draw_tab(
             add_footnote(fig, footnote, first.style)
         foot = footnote_room(fig)
         sizes = (gap, width, height, tab.column_widths, tab.row_heights, edge, foot)
+        plots = [
+            Plot(
+                p.ax,
+                prepared[p.name].module,
+                drawn[p.name],
+                prepared[p.name].values["graph_type"],
+                p.style,
+                partial(_tile_call, tab, p),
+            )
+            for p in placed
+        ]
         try:
-            grid = _lay_out_and_label(fig, tab, placed, prepared, drawn, sizes)
-            if any(k.outside for p in placed for k in keys(p.ax)):  # room for keys outside
-                grid = _lay_out_and_label(fig, tab, placed, prepared, drawn, sizes)
-                for p in placed:
-                    with isolated(p.style):
-                        _tile_call(tab, p.name, prepared[p.name].module.check_outside, p.ax)
+            grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes))
         except LayoutError as e:
             raise SpecError([f"tabs.{tab.name}: {e}"]) from None
         backgrounds(fig, grid, placed)
@@ -524,41 +532,11 @@ def _where(tab: Tab, name: str) -> str:
     return f"tabs.{tab.name}.tiles.{name} ({tab.tiles[name]})"
 
 
-def _tile_call(tab: Tab, name: str, function: Any, *args: Any) -> Any:
-    """Call a graph type's function on a tile, naming the tile in any error."""
-    try:
-        return function(*args)
-    except DrawError as e:
-        raise SpecError([f"{_where(tab, name)}: {e}"]) from None
-
-
-def _lay_out_and_label(
-    fig: Any,
-    tab: Tab,
-    placed: list[Placed],
-    prepared: dict[str, Prepared],
-    drawn: dict[str, Any],
-    sizes: tuple[Any, ...],
-) -> Grid:
-    """As graph._lay_out_and_label, for every tile at once: lay out, place what needs the
-    final sizes (again while that changes anything), then name each tile's series."""
-    grid = arrange(fig, tab.areas, placed, *sizes)
-    for _ in range(PLACE_PASSES):
-        moved = False
-        for p in placed:
-            prep = prepared[p.name]
-            with isolated(p.style):
-                gt = prep.values["graph_type"]
-                moved |= bool(
-                    _tile_call(tab, p.name, prep.module.place, p.ax, drawn[p.name], gt, p.style)
-                )
-        if not moved:
-            break
-        grid = arrange(fig, tab.areas, placed, *sizes)
-    for p in placed:
-        prep = prepared[p.name]
-        with isolated(p.style):
-            prep.module.unlabel(p.ax)
-            gt = prep.values["graph_type"]
-            _tile_call(tab, p.name, prep.module.label, p.ax, drawn[p.name], gt, p.style)
-    return grid
+def _tile_call(tab: Tab, tile: Placed, function: Any, *args: Any) -> Any:
+    """Call a graph type's function on a tile, in the tile's settings, naming the tile in any
+    error."""
+    with isolated(tile.style):
+        try:
+            return function(*args)
+        except DrawError as e:
+            raise SpecError([f"{_where(tab, tile.name)}: {e}"]) from None

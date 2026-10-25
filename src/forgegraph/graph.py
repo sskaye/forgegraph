@@ -17,8 +17,7 @@ from forgegraph.drawing import export, lint, page
 from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
-from forgegraph.drawing.key import keys
-from forgegraph.drawing.layout import add_footnote, layout
+from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
@@ -31,7 +30,6 @@ from forgegraph.spec.resolve import Values, chain
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
-PLACE_PASSES = 3  # place, then lay out again, while value labels widen the axis
 
 
 @dataclass
@@ -134,21 +132,6 @@ class Graph(Inspected, Saved):
 
     def _shown(self) -> tuple[Figure, Style]:
         return self.figure, self.style
-
-
-def _lay_out_and_label(
-    fig: Figure, ax: Any, module: Any, drawn: Any, gt: dict[str, Any], style: Style
-) -> None:
-    """Lay out, place what needs the final size (value labels may widen the value axis, so
-    again), then name the series and place notes. A second call, after a key went outside
-    the plot box, lays out with room for it and places everything again."""
-    layout(fig, ax, style)
-    for _ in range(PLACE_PASSES):
-        if not module.place(ax, drawn, gt, style):
-            break
-        layout(fig, ax, style)
-    module.unlabel(ax)
-    module.label(ax, drawn, gt, style)
 
 
 @dataclass
@@ -257,10 +240,8 @@ def render(
         if footnote:
             add_footnote(fig, footnote, style)
         try:
-            _lay_out_and_label(fig, ax, module, drawn, gt, style)
-            if any(k.outside for k in keys(ax)):  # it needs room: lay out around it, again
-                _lay_out_and_label(fig, ax, module, drawn, gt, style)
-                module.check_outside(ax)
+            plot = Plot(ax, module, drawn, gt, style, _call)
+            finish([plot], lambda: layout(fig, ax, style))
         except LayoutError as e:
             raise SpecError([str(e)]) from None
         except module.DrawError as e:
@@ -272,6 +253,12 @@ def render(
     graph._drawing = list(drawn.warnings)
     graph.seal(fig, font_problems, p.nonstandard_packs)
     return graph
+
+
+def _call(function: Any, *args: Any) -> Any:
+    """Call a graph type's function on a graph alone: render's settings and its handling of
+    errors already apply."""
+    return function(*args)
 
 
 def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | None]]:

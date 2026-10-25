@@ -1,6 +1,8 @@
 """The xy graph type (graph_types/xy.yaml): y against x, one series per group of rows.
 
-`draw()` draws into an Axes it's given, so a layout can place several graphs on one figure.
+`draw()` draws into an Axes it's given, so a layout can place several graphs on one figure;
+`place()` and `label()` finish what needs the figure's final size (drawing.layout.finish runs
+them). Every graph type's module provides these three.
 Every visual value comes from the resolved theme (via Style); nothing here is a style
 constant (architecture principle 4).
 """
@@ -19,13 +21,12 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, marks, text, ticks
+from forgegraph.drawing import colorbar, layers, marks, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
-from forgegraph.drawing.key import KEY, Entry, keys
+from forgegraph.drawing.key import Entry
 from forgegraph.drawing.layers import Y_VALUE
-from forgegraph.drawing.layout import texts_of
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
@@ -729,53 +730,13 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     """Name the series (legend.method), explain styles, then place notes inside the plot, all
     after the figure's size is final. Keys go first, since they need a corner and a note has
-    six places. Anything that can't be placed cleanly is an error, never a fallback."""
+    six places. Anything that can't be placed cleanly is an error, never a fallback. What an
+    earlier label() placed is taken away first, to place it again after the layout changed."""
+    labelling.unplace(ax)
+    layers.unplace_notes(ax)
     axis_data.check_fit(ax, gt, style)
     _name_series(ax, drawn, gt, style)
     layers.notes_inside(ax, drawn.layers, gt, style)
-
-
-def unlabel(ax: Axes) -> None:
-    """Take away what label() placed (keys, names beside lines, notes inside the plot), to
-    place it again after the layout changes."""
-    for k in keys(ax):
-        k.remove()
-    for t in list(ax.texts):
-        inside_note = t.get_gid() == layers.NOTE and getattr(t, "xycoords", None) == "axes fraction"
-        if t.get_gid() == labelling.SERIES_LABEL or inside_note:
-            t.remove()
-
-
-def check_outside(ax: Axes) -> None:
-    """After the layout that makes room for a key outside the plot box: it mustn't run into
-    the titles, tick labels, a note outside the plot, a color bar or another key."""
-
-    outside = [k for k in keys(ax) if k.outside]
-    if not outside:
-        return
-    plot = ax.get_window_extent()
-    renderer = ax.figure.canvas.get_renderer()  # type: ignore[attr-defined]
-    around = labelling.Obstacles(
-        texts=[
-            (t, text.footprint(t, renderer))  # to the letters
-            for t in texts_of(ax)
-            if t.get_visible() and t.get_text().strip() and t.get_gid() != KEY
-        ],
-        boxes=[
-            *(("the color bar", child.get_tightbbox()) for child in ax.child_axes),
-            *((f"the key at {o.position}", o.bbox()) for o in outside),
-        ],
-    )
-    for k in outside:
-        box = k.bbox()
-        hits = around.hits(box)  # not k itself, whose box is box
-        if box.overlaps(plot):
-            hits.append("the plot area")
-        if hits:
-            raise DrawError(
-                f"legend.key.positions: the key outside at {k.position} runs into "
-                f"{', '.join(hits[:3])}; choose another position"
-            )
 
 
 def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:

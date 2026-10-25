@@ -538,6 +538,14 @@ def _note(
     )
 
 
+def unplace_notes(ax: Axes) -> None:
+    """Take away the notes inside the plot area (placed in axes fraction, where notes outside
+    follow a title), to place them again."""
+    for t in list(ax.texts):
+        if t.get_gid() == NOTE and getattr(t, "xycoords", None) == "axes fraction":
+            t.remove()
+
+
 def notes_inside(
     ax: Axes, layers: dict[str, dict[str, Any]], gt: dict[str, Any], style: Style
 ) -> list[Bbox]:

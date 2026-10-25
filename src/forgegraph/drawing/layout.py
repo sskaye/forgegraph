@@ -19,11 +19,14 @@ change with the plot boxes' sizes, so the passes repeat until nothing moves (arr
 are never scaled: a figure too small for them is an error naming the tiles that don't fit.
 
 A footnote is written small at the bottom right, below everything else.
+
+finish runs a graph type's passes over the plots on a figure, laying the figure out between
+them: place what needs the final size, then label (draw comes before).
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -35,15 +38,17 @@ from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import spacing, text
-from forgegraph.drawing.errors import LayoutError
+from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import WATERMARK, inches
-from forgegraph.drawing.key import keys
+from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.labels import Obstacles
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.spec.layout import Area
 
 MARGIN_IN = 0.04  # space kept between what's drawn and the figure's edges
 PASSES = 6  # layout passes; if none settles, the last two passes' most room is used
+PLACE_PASSES = 3  # place, then lay out again, while value labels widen an axis
 FOOTNOTE = "forgegraph-footnote"
 
 Room = tuple[float, float, float, float]  # left, right, bottom, top, in inches
@@ -412,3 +417,78 @@ def layout(fig: Figure, ax: Axes, style: Style) -> Grid:
         ) from None
     place_footnote(fig, MARGIN_IN, MARGIN_IN)
     return grid
+
+
+@dataclass
+class Plot:
+    """A plot drawn on a figure, to finish: its Axes, its graph type's drawing module and
+    what that drew, the graph type's values and style it was drawn with, and call, which
+    calls one of the module's functions on it, call(function, *args), in the plot's
+    settings and naming the plot in any error."""
+
+    ax: Axes
+    module: Any
+    drawn: Any
+    gt: dict[str, Any]
+    style: Style
+    call: Callable[..., Any]
+
+
+def finish[T](plots: Sequence[Plot], lay_out: Callable[[], T]) -> T:
+    """Lay the figure out with lay_out, place what needs each plot's final size (value
+    labels may widen an axis, so lay out and place again while anything moved, up to
+    PLACE_PASSES times), then label each plot. A key outside a plot box needs room, so if
+    there is one, all of that again, laid out around it; then check that no key outside
+    runs into anything. Returns what the last lay_out returned."""
+    laid_out = _place_and_label(plots, lay_out)
+    if any(k.outside for p in plots for k in keys(p.ax)):
+        laid_out = _place_and_label(plots, lay_out)
+        for p in plots:
+            p.call(check_outside, p.ax)
+    return laid_out
+
+
+def _place_and_label[T](plots: Sequence[Plot], lay_out: Callable[[], T]) -> T:
+    laid_out = lay_out()
+    for _ in range(PLACE_PASSES):
+        moved = False
+        for p in plots:
+            moved |= bool(p.call(p.module.place, p.ax, p.drawn, p.gt, p.style))
+        if not moved:
+            break
+        laid_out = lay_out()
+    for p in plots:
+        p.call(p.module.label, p.ax, p.drawn, p.gt, p.style)
+    return laid_out
+
+
+def check_outside(ax: Axes) -> None:
+    """After the layout that makes room for a key outside the plot box: it mustn't run into
+    the titles, tick labels, a note outside the plot, a color bar or another key."""
+
+    outside = [k for k in keys(ax) if k.outside]
+    if not outside:
+        return
+    plot = ax.get_window_extent()
+    renderer = ax.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    around = Obstacles(
+        texts=[
+            (t, text.footprint(t, renderer))  # to the letters
+            for t in texts_of(ax)
+            if t.get_visible() and t.get_text().strip() and t.get_gid() != KEY
+        ],
+        boxes=[
+            *(("the color bar", child.get_tightbbox()) for child in ax.child_axes),
+            *((f"the key at {o.position}", o.bbox()) for o in outside),
+        ],
+    )
+    for k in outside:
+        box = k.bbox()
+        hits = around.hits(box)  # not k itself, whose box is box
+        if box.overlaps(plot):
+            hits.append("the plot area")
+        if hits:
+            raise DrawError(
+                f"legend.key.positions: the key outside at {k.position} runs into "
+                f"{', '.join(hits[:3])}; choose another position"
+            )

@@ -124,15 +124,25 @@ def roles(df: pd.DataFrame, gt: dict[str, Any]) -> Roles:
 
 
 def long_form(df: pd.DataFrame, gt: dict[str, Any]) -> tuple[pd.DataFrame, Roles]:
-    """One row per (row, value column), with the value column's name in Y_COLUMN."""
+    """One row per (row, value column), with the value column's name in Y_COLUMN and the
+    data row's position in layers.ROW."""
     r = roles(df, gt)
+    df = cast(pd.DataFrame, df.apply(_clock_time))
     frames = []
     for y in r.value_columns:
         part = df.copy()
+        part[layers.ROW] = np.arange(len(df))
         part[Y_VALUE] = df[y]
         part[Y_COLUMN] = y
         frames.append(part)
     return pd.concat(frames, ignore_index=True), r
+
+
+def _clock_time(column: pd.Series) -> pd.Series:
+    """Times with a time zone as the times their clocks show, which is where they're drawn."""
+    if isinstance(column.dtype, pd.DatetimeTZDtype):
+        return column.dt.tz_localize(None)
+    return column
 
 
 def _col(frame: pd.DataFrame, name: str) -> pd.Series:
@@ -550,17 +560,27 @@ def draw(
 
 
 def _line_text(ax: Axes, gt: dict[str, Any], line: layers.RefLine) -> str:
-    """A reference line's value in its label: in the layer's label.format; auto, in its
-    axis's tick label format if that's set, otherwise with one decimal place more than the
-    axis's tick labels show (a single value is read more closely than the scale)."""
-    path = f"layers.{line.name}.label.format"
-    if line.fmt != "auto":
-        return axis_data.format_number(line.at, axis_data.number_format(line.fmt, path))
-    tick_fmt = gt[f"axis.{line.axis}.tick.label.format"]
-    if tick_fmt != "auto":
-        return axis_data.format_number(line.at, axis_data.number_format(str(tick_fmt), path))
+    """A reference line's value in its label, written as _number_text says; with auto and no
+    tick label format, one decimal place more than the tick labels show (a single value is
+    read more closely than the scale)."""
     axis = ax.xaxis if line.axis == "x" else ax.yaxis
-    return f"{line.at:.{_tick_decimals(axis) + 1}f}"
+    path = f"layers.{line.name}.label.format"
+    return _number_text(gt, line.axis, axis, line.fmt, path, extra=1)(line.at)
+
+
+def _number_text(
+    gt: dict[str, Any], name: str, axis: Any, given: Any, path: str, extra: int = 0
+) -> Any:
+    """How a label writes a value on axis name: in its own format; auto, in the axis's tick
+    label format if that's set, otherwise with as many decimals as the tick labels show,
+    plus extra."""
+    if given == "auto":
+        given, path = gt[f"axis.{name}.tick.label.format"], f"axis.{name}.tick.label.format"
+    if given != "auto":
+        checked = axis_data.number_format(str(given), path)
+        return lambda v: axis_data.format_number(float(v), checked)
+    places = _tick_decimals(axis) + extra
+    return lambda v: f"{float(v):.{places}f}"
 
 
 def _tick_decimals(axis: Any) -> int:
@@ -585,7 +605,9 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
         gt,
         style,
         r.base,
-        _value_text(gt, axis),
+        _number_text(
+            gt, r.value, axis, gt["series.value_label.format"], "series.value_label.format"
+        ),
     )
     lines_shown = bool(gt["mark.line.show"])
     gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
@@ -600,17 +622,6 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
         )
         or widened
     )
-
-
-def _value_text(gt: dict[str, Any], axis: Any) -> Any:
-    """How a value label writes its number: series.value_label.format, or with as many
-    decimals as the value axis's tick labels show."""
-    fmt = gt["series.value_label.format"]
-    if fmt != "auto":
-        checked = axis_data.number_format(str(fmt), "series.value_label.format")
-        return lambda v: axis_data.format_number(float(v), checked)
-    places = _tick_decimals(axis)
-    return lambda v: f"{float(v):.{places}f}"
 
 
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:

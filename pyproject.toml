@@ -1,14 +1,14 @@
 [project]
 name = "forgegraph"
 version = "0.2.0"
-description = "Consistent, high-quality graphs from pandas DataFrames, for people and AI agents. Early development."
+description = "Fast, consistent, publication-quality graphs from pandas DataFrames, usable by people and AI agents."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE", "src/forgegraph/themes/fonts/OFL-SourceSans3.md", "src/forgegraph/themes/fonts/OFL-IBMPlexSerif.txt", "src/forgegraph/themes/fonts/OFL-Roboto.txt"]
+license = "MIT AND OFL-1.1"
+license-files = ["LICENSE", "src/forgegraph/fonts/OFL-SourceSans3.md", "src/forgegraph/fonts/OFL-IBMPlexSerif.txt", "src/forgegraph/fonts/OFL-Roboto.txt"]
 authors = [{ name = "Steven Kaye" }]
 requires-python = ">=3.12"
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -17,17 +17,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Visualization",
 ]
 dependencies = [
-    "matplotlib>=3.9",
+    "matplotlib>=3.11.2",  # text.py reads the line layout of 3.11 and later
     "pandas>=2.2",
     "pydantic>=2.7",
     "ruamel.yaml>=0.18",
     "pyarrow>=17",
-    "typer>=0.12",
+    "typer>=0.15.4",  # earlier versions allow a click whose help they can't show
     "packaging>=23",
 ]
 
 [project.urls]
 Repository = "https://github.com/sskaye/forgegraph"
+Issues = "https://github.com/sskaye/forgegraph/issues"
+Changelog = "https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md"
 
 [project.scripts]
 forgegraph = "forgegraph.cli:app"

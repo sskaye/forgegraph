@@ -211,6 +211,73 @@ def test_a_line_per_series_in_its_color():
     assert len({ln.get_color() for ln in lines}) == 2
 
 
+TWO_Y = pd.DataFrame(
+    {"x": [1.0, 2.0, 3.0, 4.0, 5.0], "a": [10.0, 100, 1000, 300, 50], "b": [20.0, 40, 60, 80, 100]}
+)
+AGGREGATES = {
+    "mean": np.mean,
+    "median": np.median,
+    "sum": np.sum,
+    "min": np.min,
+    "max": np.max,
+    "stddev": lambda v: np.std(v, ddof=1),
+}
+
+
+@pytest.mark.parametrize("how", sorted(AGGREGATES))
+@pytest.mark.parametrize("y", [["a"], ["a", "b"], ["b", "a"]])
+def test_a_line_at_an_aggregate_counts_each_row_once(how, y):
+    """However many y columns are drawn, a column's aggregate is of its rows, each once."""
+    g = graph(
+        {
+            "t": {
+                "type": "reference_line",
+                "axis": "y",
+                "value": "b",
+                "aggregation": {"function": how},
+            }
+        },
+        TWO_Y,
+        **{
+            "axis.x.data.column": "x",
+            "axis.y.data.column": y,
+            "axis.y.title": "v",
+            "legend.method": "key",
+            "legend.key.inside": False,
+            "legend.key.title.text": "None",
+        },
+    )
+    [line] = layer_lines(g, REFERENCE)
+    assert line.get_ydata()[0] == pytest.approx(AGGREGATES[how](TWO_Y["b"]))
+
+
+def test_a_line_per_series_at_an_aggregate_counts_each_row_once():
+    df = pd.concat([TWO_Y.assign(g="p"), TWO_Y.assign(g="q", b=TWO_Y["b"] * 2)])
+    g = graph(
+        {
+            "t": {
+                "type": "reference_line",
+                "axis": "y",
+                "value": "b",
+                "per_series": True,
+                "aggregation": {"function": "sum"},
+            }
+        },
+        df,
+        **{
+            "axis.x.data.column": "x",
+            "axis.y.data.column": ["b"],
+            "encoding.color": "g",
+            "legend.method": "key",
+            "legend.key.inside": False,
+            "legend.key.title.text": "None",
+        },
+    )
+    assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == pytest.approx(
+        [300.0, 600.0]
+    )
+
+
 @pytest.mark.parametrize(
     ("layer", "message"),
     [
@@ -280,6 +347,66 @@ def test_error_bars_of_the_spread_of_aggregated_rows():
         stem = next(ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None")
         y = np.asarray(stem.get_ydata(), dtype=float)
         assert (y[1] - y[0]) / 2 == pytest.approx(2.0 * factor, abs=0.01)  # sd of 10, 12, 14
+
+
+DAYS = pd.DataFrame(
+    {
+        "day": pd.to_datetime(["2026-03-01", "2026-03-02", "2026-03-03"] * 3),
+        "rate": [10.0, 20.0, 30.0, 12.0, 22.0, 33.0, 14.0, 24.0, 36.0],
+        "sd": [1.0, 2.0, 3.0] * 3,
+    }
+)
+
+
+def _stems(g: fg.Graph) -> list:
+    return [ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None"]
+
+
+def _ends(stem) -> list[tuple[float, float, float]]:
+    """Each bar of a stem line as (place, low, high)."""
+    xy = np.asarray(stem.get_xydata(), dtype=float)
+    return [(a[0], a[1], b[1]) for a, b in zip(xy[0::3], xy[1::3], strict=True)]
+
+
+def test_error_bars_on_a_date_axis_stand_on_their_points():
+    rows = DAYS.iloc[:3]
+    g = graph(
+        {
+            "e": {
+                "type": "error_bar",
+                "value": {"lower": "sd", "upper": "sd", "aggregation": {"function": "None"}},
+            }
+        },
+        rows,
+        **{"axis.x.data.column": "day"},
+    )
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_gid() not in (ERROR_BAR,)]
+    points = np.asarray(line.get_xydata(), dtype=float)
+    [stem] = _stems(g)
+    assert [e[0] for e in _ends(stem)] == pytest.approx(points[:, 0])
+    assert [(e[1], e[2]) for e in _ends(stem)] == pytest.approx([(9, 11), (18, 22), (27, 33)])
+    low, high = g.axes.get_xlim()
+    assert low <= points[0, 0] and points[-1, 0] <= high <= points[-1, 0] + 1  # not stretched
+
+
+def test_error_bars_of_aggregated_rows_on_a_date_axis():
+    g = graph(
+        {
+            "e": {
+                "type": "error_bar",
+                "value": {"lower": "rate", "upper": "rate", "aggregation": {"function": "stddev"}},
+            }
+        },
+        DAYS,
+        **{"axis.x.data.column": "day", "axis.y.data.aggregation": "mean"},
+    )
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_gid() not in (ERROR_BAR,)]
+    points = np.asarray(line.get_xydata(), dtype=float)
+    [stem] = _stems(g)
+    ends = _ends(stem)
+    assert [e[0] for e in ends] == pytest.approx(points[:, 0])
+    spreads = [np.std(DAYS.rate[DAYS.day == d], ddof=1) for d in DAYS.day.unique()]
+    assert [(e[2] - e[1]) / 2 for e in ends] == pytest.approx(spreads)
 
 
 @pytest.mark.parametrize(

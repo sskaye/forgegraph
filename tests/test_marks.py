@@ -166,6 +166,26 @@ def test_negative_values_stack_downward():
     assert segments(y) == [(0, 0, -2), (1, -1, -5)]
 
 
+SHARES = pd.DataFrame({"x": ["a", "b", "c"], "v": [0.25, 0.5, 0.75]})
+
+
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [
+        ({}, ["0.2", "0.5", "0.8"]),  # as the tick labels: one decimal
+        ({"axis.y.tick.label.format": ".0%"}, ["25%", "50%", "75%"]),  # the axis's format
+        (
+            {"axis.y.tick.label.format": ".0%", "series.value_label.format": ".2f"},
+            ["0.25", "0.50", "0.75"],
+        ),  # their own format first
+    ],
+)
+def test_value_labels_write_numbers_as_the_value_axis_does(settings, expected):
+    shown = {"series.value_label.show": True, "series.value_label.position": "outside"}
+    g = fg.xy(SHARES, "x", "v", parameters={**BARS, **shown, **settings})
+    assert value_labels(g) == expected
+
+
 def test_value_labels_and_the_axis_grows_to_fit_them():
     g = graph(
         color=None,

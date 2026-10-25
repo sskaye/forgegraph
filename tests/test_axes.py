@@ -261,6 +261,21 @@ def test_tick_step_rules(settings, message):
         render(settings)
 
 
+@pytest.mark.parametrize("zone", ["UTC", "Europe/Berlin", "America/New_York"])
+def test_times_with_a_time_zone_are_drawn_at_their_own_clock_time(zone):
+    """A time zone doesn't move the points: each is drawn at the time its clock shows, as the
+    same times without one are."""
+    from matplotlib.dates import date2num
+
+    aware = pd.date_range("2026-03-27", periods=72, freq="h", tz=zone)  # Berlin changes on the 29th
+    naive = aware.tz_localize(None)  # the times its clocks show
+    g = graph(pd.DataFrame({"when": aware, "value": np.arange(72.0)}), "when", "value")
+    plain = graph(pd.DataFrame({"when": naive, "value": np.arange(72.0)}), "when", "value")
+    [line] = g.axes.get_lines()
+    assert date2num(line.get_xdata()) == pytest.approx(date2num(naive))
+    assert labels(g) == labels(plain)
+
+
 def test_a_date_step_on_numbers_is_an_error():
     with pytest.raises(fg.SpecError, match="'3 month' is a date step, but this axis isn't dates"):
         render({"axis.x.tick.algorithm": "manual", "axis.x.tick.step": "3 month"})

@@ -137,7 +137,8 @@ def stack(series: list[Any], how: str, log: bool) -> list[Stacked]:
     return out
 
 
-def _key(place: float) -> float:
+def key(place: float) -> float:
+    """A place as a dictionary key: equal places, computed different ways, compare equal."""
     return round(float(place), 9)
 
 
@@ -166,7 +167,7 @@ def slots(series: list[Any], gt: dict[str, Any], style: Style) -> list[dict[floa
     for i, s in enumerate(series):
         for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
             if np.isfinite(p) and np.isfinite(v):
-                at.setdefault(_key(p), []).append(i)
+                at.setdefault(key(p), []).append(i)
     out: list[dict[float, float]] = [{} for _ in series]
     for place, present in at.items():
         each = [widths(series[i], gt, style) for i in present]
@@ -195,7 +196,7 @@ class PlaceShift(Transform):
         out = np.array(self.ax.transData.transform(flat), dtype=float)
         px = self.ax.figure.dpi / 72  # type: ignore[union-attr]
         out[:, self.k] += [
-            self.shifts.get(_key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in flat[:, self.k]
+            self.shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in flat[:, self.k]
         ]
         return out.reshape(points.shape)
 
@@ -268,7 +269,7 @@ class Bars(PolyCollection):
                 continue
             a = self.ax.transData.transform((p, lo) if vertical else (lo, p))
             b = self.ax.transData.transform((p, hi) if vertical else (hi, p))
-            shift = self.shifts.get(_key(p), 0.0) * px
+            shift = self.shifts.get(key(p), 0.0) * px
             start, end = sorted((a[1 - k], b[1 - k]))
             if tick is None:
                 near, far = a[k] + shift - half, a[k] + shift + half
@@ -374,7 +375,7 @@ def check_room(
         w = widths(s, gt, style)
         for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
             if np.isfinite(p) and np.isfinite(v):
-                at.setdefault(_key(p), []).append(w)
+                at.setdefault(key(p), []).append(w)
     places = sorted(at)
     if len(places) < 2:
         return
@@ -478,7 +479,7 @@ def value_labels(
         ):
             if not (np.isfinite(value) and np.isfinite(top)):
                 continue
-            off = shifts.get(_key(place), 0.0)
+            off = shifts.get(key(place), 0.0)
             text = text_of(value)
             sign = 1.0 if value >= 0 else -1.0
             if how != "none":

@@ -17,6 +17,7 @@ from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, data_path, render
 from forgegraph.spec.layers import resolve_layers
+from forgegraph.spec.loaded import Loaded
 from forgegraph.spec.parameters import NONE, Parameter, definitions, tree_has, tree_set
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
@@ -91,7 +92,8 @@ def draw(
             reg.add(kind, _child(kind, listed["specifications"][kind], values))
             listed["specifications"][kind] = "catalog"
     home = reg.paths["graphspec"].get(spec)
-    where = data_path(doc, reg, home.parent if home is not None else Path.cwd())
+    folder = home.parent if home is not None else Path.cwd()
+    where = data_path(Loaded("graphspec", doc, reg, folder))
     if where is not None:  # the copy is drawn from memory: its data found where the original's is
         tree_set(listed, "data.file", str(where))
     footnoted = any(c.path == FOOTNOTED for c in _flat(changes))

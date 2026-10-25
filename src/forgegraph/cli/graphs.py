@@ -83,8 +83,7 @@ def explain(
     import forgegraph as fg
     from forgegraph.layouts import explain_layout, is_layout, nonstandard_packs_of
     from forgegraph.spec.access import nonstandard_note, packs_used
-    from forgegraph.spec.explain import explain as explain_values
-    from forgegraph.spec.registry import load_document
+    from forgegraph.spec.loaded import load_document
     from forgegraph.spec.resolve import Values
     from forgegraph.spec.validate import validate
 
@@ -101,11 +100,12 @@ def explain(
             values.update({f"{where}.{kind}": v for kind, v in explained.kinds().items()})
         packs = nonstandard_packs_of(graphspec)
     else:
-        doc, reg, _ = load_document("graphspec", graphspec)
+        loaded = load_document("graphspec", graphspec)
+        doc, reg = loaded.doc, loaded.reg
         problems = validate("graphspec", doc, reg)
         if problems:
             fail(problems, as_json)
-        values = explain_values(doc, reg).kinds()
+        values = loaded.explain().kinds()
         packs = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
     note = nonstandard_note(packs) if packs else None
     rows = [

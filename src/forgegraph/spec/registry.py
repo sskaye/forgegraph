@@ -2,8 +2,7 @@
 
 ForgeGraph's graph types and layer types and the base pack are always known; a file being
 drawn also knows the packs its configs list (see packs), and the installed pip packs their
-specs build on. load_document reads a file of any kind with the registry it's checked
-against.
+specs build on.
 """
 
 from __future__ import annotations
@@ -165,25 +164,6 @@ def registry_for(start: Path) -> Registry:
     reg.configs = found.configs
     reg.nonstandard = found.nonstandard
     return reg
-
-
-def load_document(
-    kind: str, spec: dict[str, Any] | str | Path, registry: Registry | None = None
-) -> tuple[Any, Registry, Path]:
-    """A document of a kind, given as a file path or the document itself; the registry it's
-    checked against (registry, or else its folder's), holding it if it's named; and the
-    folder its own relative paths are found from. registry itself is never changed."""
-    if isinstance(spec, str | Path):
-        path = Path(spec)
-        doc = load_yaml(path)
-        reg = (registry or registry_for(path.parent)).copy()
-        if isinstance(doc, dict) and "name" in doc:
-            reg.add(kind, doc, path)
-        return doc, reg, path.parent
-    reg = (registry or registry_for(Path.cwd())).copy()
-    if isinstance(spec, dict) and "name" in spec and spec["name"] not in reg.docs[kind]:
-        reg.add(kind, spec)
-    return spec, reg, Path.cwd()
 
 
 def _specs_named(kind: str, doc: dict[str, Any]) -> list[Any]:

@@ -270,13 +270,13 @@ def _drawn(final: Path) -> tuple[Any, pd.DataFrame | None, str]:
     """The final GraphSpec drawn, its Parquet data, and why either failed."""
     import forgegraph as fg
     from forgegraph.graph import data_path
-    from forgegraph.spec.registry import load_yaml, registry_for
+    from forgegraph.spec.loaded import load_document
 
     try:
         graph = fg.render(final)
     except Exception as e:
         return None, None, f"{type(e).__name__}: {e}"
-    where = data_path(load_yaml(final), registry_for(final.parent), final.parent)
+    where = data_path(load_document("graphspec", final))
     frame = pd.read_parquet(where) if where is not None and where.is_file() else None
     return graph, frame, ""
 
@@ -291,8 +291,8 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     """The final layout: it draws, its tabs and tiles, a spanning tile, a blank cell, its
     column widths, and its lint."""
     import forgegraph as fg
-    from forgegraph.layouts import load_layout
     from forgegraph.spec.layout import BLANK, tabs
+    from forgegraph.spec.loaded import load_document
 
     layouts = _named(ws, ".layout.yaml")
     if not layouts:
@@ -300,8 +300,8 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     final = layouts[-1]
     try:
         drawn = fg.layout(final)
-        doc, reg, _ = load_layout(final, None)
-        listed = tabs(doc, reg)
+        loaded = load_document("layout", final)
+        listed = tabs(loaded.doc, loaded.reg)
     except Exception as e:
         return [Check("layout draws", False, f"{final.name}: {type(e).__name__}: {e}")]
     checks = [Check("layout draws", True, final.name)]
@@ -427,12 +427,10 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         ok = bool(specs) and bool(images)
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.registry import load_yaml, registry_for
+            from forgegraph.spec.loaded import load_document
 
             try:
-                data = data_path(
-                    load_yaml(specs[-1]), registry_for(specs[-1].parent), specs[-1].parent
-                )
+                data = data_path(load_document("graphspec", specs[-1]))
             except Exception as e:
                 data, where = None, f"{type(e).__name__}: {e}"
             inside = (  # resolved both sides: macOS's temporary folder is a link
@@ -583,10 +581,10 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         evidence, ok = "no GraphSpec in the project", False
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.registry import load_yaml, registry_for
+            from forgegraph.spec.loaded import load_document
 
             final = specs[-1]
-            where = data_path(load_yaml(final), registry_for(final.parent), final.parent)
+            where = data_path(load_document("graphspec", final))
             if where is not None and where.is_file():
                 frame = pd.read_parquet(where)
                 kinds = {

@@ -32,11 +32,12 @@ from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.explain import Explained, explain
+from forgegraph.spec.explain import Explained
+from forgegraph.spec.loaded import Loaded, load_document
 from forgegraph.spec.parameters import NAMES, NONE, tree_set
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, created, plain
-from forgegraph.spec.registry import Registry, load_document
-from forgegraph.spec.resolve import Values, chain, folder_of, resolve, setter
+from forgegraph.spec.registry import Registry
+from forgegraph.spec.resolve import Values, chain
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
@@ -344,8 +345,8 @@ def prepare(
     """Check and resolve a GraphSpec, given as a file path or a document, and read its data:
     `data` if given, otherwise the Parquet file its data.file names. With `format` (resolved
     format values, as from a layout), those replace the format's."""
-    # folder: where a relative data.file the document itself sets is found
-    doc, reg, folder = load_document("graphspec", spec, registry)
+    loaded = load_document("graphspec", spec, registry)
+    doc, reg = loaded.doc, loaded.reg
     problems = validate("graphspec", doc, reg)
     if problems:
         raise SpecError(problems)
@@ -355,9 +356,9 @@ def prepare(
     problems = drawing_problems(doc, reg)
     if problems:
         raise SpecError(problems)
-    explained = explain(doc, reg, format)
+    explained = loaded.explain(format)
     values = explained.plain()
-    frame, record = _data(doc, values, reg, data, folder)
+    frame, record = _data(loaded, values, data)
     gt = reg.docs["graph_type"][values["graphspec"]["specifications.graph_type"]]
     module = GRAPH_TYPES[str(chain("graph_type", gt, reg)[-1]["name"])]
     fixed = frozenset(p for p, r in explained.theme.items() if r.fixed)
@@ -428,34 +429,22 @@ def _limit(value: Any) -> float | None:
     return None if value is None or value == NONE else float(value)
 
 
-def data_path(doc: dict[str, Any], reg: Registry, folder: Path) -> Path | None:
-    """Where the Parquet file a GraphSpec's data.file names is, or None if it names none.
-    `~` is the home folder; a relative path is found from the folder of the GraphSpec file
-    that sets it: `folder` for doc itself, or the file of a GraphSpec it extends."""
-    file = resolve("graphspec", doc, reg).value("data.file")
-    if file in (None, NONE):
-        return None
-    where = Path(str(file)).expanduser()
-    if where.is_absolute():
-        return where
-    return (
-        folder_of("graphspec", setter("graphspec", doc, reg, "data.file"), doc, reg, folder) / where
-    )
+def data_path(graphspec: Loaded) -> Path | None:
+    """Where the Parquet file a GraphSpec's data.file names is, or None if it names none: a
+    relative path is found from the folder of the GraphSpec file that sets it (see
+    Loaded.place)."""
+    return graphspec.place("data.file")
 
 
 def _data(
-    doc: dict[str, Any],
-    values: dict[str, dict[str, Any]],
-    reg: Registry,
-    data: pd.DataFrame | None,
-    folder: Path,
+    graphspec: Loaded, values: dict[str, dict[str, Any]], data: pd.DataFrame | None
 ) -> tuple[pd.DataFrame, DataRecord]:
     """The DataFrame to draw: the one given, or the one in the Parquet file data.file names."""
     preprocessing = values["graphspec"]["data.preprocessing"]
     reference = None if preprocessing in (None, NONE) else str(preprocessing)
     if data is not None:
         return data, DataRecord(preprocessing=reference, rows_read=len(data))
-    where = data_path(doc, reg, folder)
+    where = data_path(graphspec)
     if where is None:
         raise SpecError(["data.file: None, so pass the data as a DataFrame"])
     if not where.is_file():

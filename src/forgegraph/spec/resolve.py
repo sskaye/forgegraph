@@ -9,7 +9,6 @@ graph type only and beat the general ones in the same file.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from forgegraph.spec.common import kind_label, suggest
@@ -152,17 +151,6 @@ def setter(kind: str, doc: dict[str, Any], reg: Registry, path: str) -> dict[str
         if any(p == path for _, _, p, _ in entries(kind, d, reg)):
             return d
     return None
-
-
-def folder_of(
-    kind: str, source: dict[str, Any] | None, doc: dict[str, Any], reg: Registry, folder: Path
-) -> Path:
-    """The folder relative paths in source, a file in doc's extends chain, are found from:
-    its file's folder; `folder` for doc itself (or a file the registry has no path for)."""
-    if source is None or source is doc:
-        return folder
-    known = reg.paths[kind].get(source["name"])
-    return known.parent if known is not None else folder
 
 
 def named(kind: str, doc: dict[str, Any], reg: Registry) -> dict[str, Any]:

@@ -616,23 +616,24 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     never changed."""
     from ruamel.yaml import YAML
 
-    from forgegraph.spec.registry import builtin, load_document
+    from forgegraph.spec.loaded import load_document
+    from forgegraph.spec.registry import builtin
 
     doc = {**builtin().docs["graphspec"]["forgegraph_base/polarization"], "name": "mine"}
     path = tmp_path / "mine.yaml"
     with path.open("w", encoding="utf-8") as f:  # its descriptions hold subscripts
         YAML().dump(doc, f)
-    loaded, reg, folder = load_document("graphspec", path)
-    assert loaded["name"] == "mine" and reg.paths["graphspec"]["mine"] == path
-    assert folder == tmp_path
+    loaded = load_document("graphspec", path)
+    assert loaded.doc["name"] == "mine" and loaded.reg.paths["graphspec"]["mine"] == path
+    assert loaded.folder == tmp_path
 
     given = builtin()
-    loaded, reg, folder = load_document("graphspec", doc, given)
-    assert reg.docs["graphspec"]["mine"] is doc and "mine" not in given.docs["graphspec"]
+    loaded = load_document("graphspec", doc, given)
+    assert loaded.reg.docs["graphspec"]["mine"] is doc and "mine" not in given.docs["graphspec"]
     monkeypatch.chdir(tmp_path)
-    assert load_document("graphspec", doc)[2] == tmp_path
+    assert load_document("graphspec", doc).folder == tmp_path
 
     named = builtin().docs["graphspec"]["forgegraph_base/polarization"]
     stranger = {**named, "description": "a document of a name the registry holds"}
-    _, reg, _ = load_document("graphspec", stranger, builtin())
+    reg = load_document("graphspec", stranger, builtin()).reg
     assert reg.docs["graphspec"]["forgegraph_base/polarization"] is not stranger

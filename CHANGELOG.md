@@ -2,6 +2,23 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.1.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
+## Unreleased
+
+### Changed
+
+- One name is one pack. A config can't give a built-in pack's name, or a name the main config already gives, to another folder. Before, a folder config's copy of a pack replaced the one the main config lists, and what it drew wasn't marked non-standard.
+- ForgeGraph needs matplotlib 3.11.2 and typer 0.15.4 or later; earlier versions installed but didn't work.
+- The package's description and classifiers say what it is now: released, in alpha.
+
+### Fixed
+
+- Error bars on a date axis stand on their points, and error bars of aggregated rows on a date axis draw.
+- Times with a time zone are drawn at the times their clocks show. Before, they raised an error.
+- A reference line at a column's sum or standard deviation counts each row once when several y columns are drawn.
+- Value labels written with format auto use the value axis's tick label format when it's set, as reference lines do.
+- The catalog's record of what it was built from covers every module it draws with, so a change to the drawing code marks the catalog out of date.
+- The package's metadata lists the bundled fonts' licences.
+
 ## 0.2.0 (2026-10-24)
 
 Images that changed: the [visual changelog](review/visual-changelog/0.2.0.html).

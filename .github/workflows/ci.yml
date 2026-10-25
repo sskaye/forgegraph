@@ -49,6 +49,18 @@ jobs:
         env:
           FORGEGRAPH_REQUIRE_NODE: "1"
 
+  tests-lowest:
+    name: Tests (lowest dependency versions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.12"
+      # every direct dependency at the lowest version pyproject allows
+      - run: uv venv && uv pip install --resolution lowest-direct -e . --group dev
+      - run: .venv/bin/python -m pytest
+
   tests-other-os:
     name: Tests (${{ matrix.os }}, Python 3.12)
     runs-on: ${{ matrix.os }}

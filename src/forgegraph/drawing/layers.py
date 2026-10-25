@@ -116,6 +116,16 @@ def _aggregate(values: np.ndarray, how: str) -> float:
     }[how](v)
 
 
+ROW = "__forgegraph_row__"  # the long-form frame's column of each row's data row
+
+
+def _each_row_once(frame: pd.DataFrame, column: str) -> np.ndarray:
+    """A column's values, one per data row: the long form repeats each row once per value
+    column it draws."""
+    rows = frame.drop_duplicates(ROW)
+    return np.asarray(pd.to_numeric(rows[column], errors="coerce"), dtype=float)
+
+
 def reference_lines(
     ax: Axes,
     layers: dict[str, dict[str, Any]],
@@ -145,19 +155,17 @@ def reference_lines(
                 )
             if value not in frame.columns:
                 raise DrawError(f"{where}.value: no column '{value}' in the data")
-            column = cast(pd.Series, pd.to_numeric(frame[value], errors="coerce"))
             if layer["per_series"]:  # each named series, with all its replicates
                 named: dict[tuple[bool, Any], list[Any]] = {}
                 for s in series:
                     if s.rows is not None:
                         named.setdefault((s.benchmark, s.label), []).append(s)
                 for members in named.values():
-                    rows = np.concatenate(
-                        [np.asarray(column.loc[m.rows], dtype=float) for m in members]
-                    )
-                    groups.append((multiplier * _aggregate(rows, how), members[0].color))
+                    rows = frame.loc[np.concatenate([m.rows for m in members])]
+                    at = _aggregate(_each_row_once(rows, value), how)
+                    groups.append((multiplier * at, members[0].color))
             else:
-                groups.append((multiplier * _aggregate(np.asarray(column, dtype=float), how), ""))
+                groups.append((multiplier * _aggregate(_each_row_once(frame, value), how), ""))
         else:
             if not unset(how):
                 raise DrawError(
@@ -370,7 +378,7 @@ def error_bars(
                 raise DrawError(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
                 )
-            places = np.asarray(s.x if along_value else s.y, dtype=float)
+            places = marks.numbers(s.x if along_value else s.y)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted(offset), t)
 
 
@@ -398,12 +406,14 @@ def _distances(
                 "value.aggregation.function"
             )
         rows = frame.loc[s.rows]
-        groups = rows.groupby(rows[s.place_column], sort=False)[given]
+        groups = rows.groupby(marks.numbers(rows[s.place_column]), sort=False)[given]
         spreads = {
-            float(k): spread(np.asarray(pd.to_numeric(g, errors="coerce"), dtype=float), str(how))
+            marks.key(k): spread(
+                np.asarray(pd.to_numeric(g, errors="coerce"), dtype=float), str(how)
+            )
             for k, g in groups
         }
-        out = np.array([multiplier * spreads.get(float(p), np.nan) for p in s.x])
+        out = np.array([multiplier * spreads.get(marks.key(p), np.nan) for p in marks.numbers(s.x)])
     else:
         out = np.asarray(column.loc[s.rows], dtype=float)
     if bool((out[np.isfinite(out)] < 0).any()):

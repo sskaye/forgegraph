@@ -19,3 +19,6 @@ dist/
 htmlcov/
 .ipynb_checkpoints/
 .cache/
+
+# Claude Code's local settings
+.claude/

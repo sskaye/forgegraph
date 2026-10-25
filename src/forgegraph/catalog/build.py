@@ -52,16 +52,17 @@ def inputs_hash(pack: Pack | None = None) -> str:
     root = Path(str(files("forgegraph")))
     sources = [(root, "", _depends_on)]
     if pack is not None:
-        sources.append((pack.folder, "pack/", lambda rel: ".git" not in rel.parts))
+        sources.append((pack.folder, "pack/", lambda rel: True))
     for base, prefix, counts in sources:
         # in the same order everywhere: Windows sorts paths ignoring case
         for f in sorted(base.rglob("*"), key=lambda f: f.relative_to(base).as_posix()):
             rel = f.relative_to(base)
-            if not f.is_file() or "__pycache__" in rel.parts or not counts(rel):
+            hidden = any(part.startswith(".") for part in rel.parts)  # .git, .DS_Store
+            if not f.is_file() or hidden or "__pycache__" in rel.parts or not counts(rel):
                 continue
             data = f.read_bytes()
-            if f.suffix in (".py", ".yaml", ".md", ".txt", ".csv"):
-                data = data.replace(b"\r\n", b"\n")  # the same on a Windows checkout
+            if b"\0" not in data:  # text, of any kind: the same on a Windows checkout
+                data = data.replace(b"\r\n", b"\n")
             digest.update((prefix + rel.as_posix()).encode() + b"\0" + data + b"\0")
     return digest.hexdigest()
 

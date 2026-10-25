@@ -78,8 +78,23 @@ def test_a_packs_catalog_follows_its_own_files(package):
     assert build.inputs_hash(pack) != before
 
 
-def test_line_endings_dont_count(package):
+@pytest.mark.parametrize(
+    "name", ["drawing/xy.py", "packs/config.toml", "skill/forgegraph/SKILL.md"]
+)
+def test_line_endings_dont_count(package, name):
+    """Whatever kind of text file: a Windows checkout writes CRLF line endings."""
     before = build.inputs_hash()
-    target = package / "drawing" / "xy.py"
-    target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+    target = package / name
+    lf = target.read_bytes().replace(b"\r\n", b"\n")  # however it was checked out
+    target.write_bytes(lf.replace(b"\n", b"\r\n"))
+    assert build.inputs_hash() == before
+    target.write_bytes(lf)
+    assert build.inputs_hash() == before
+
+
+@pytest.mark.parametrize("name", [".DS_Store", "drawing/.DS_Store", "packs/.hidden"])
+def test_hidden_files_dont_count(package, name):
+    """A file a desktop or editor leaves, which a clean checkout doesn't have."""
+    before = build.inputs_hash()
+    (package / name).write_bytes(b"\0\1")
     assert build.inputs_hash() == before

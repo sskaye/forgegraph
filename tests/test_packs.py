@@ -346,7 +346,7 @@ def test_a_folder_copy_of_a_main_config_pack_is_an_error(tmp_path, monkeypatch):
     work = tmp_path / "work"
     shutil.copytree(ACME, work / "acme")
     allow(work, "./acme")
-    with pytest.raises(PackError, match=r"'acme' .*work/acme.*already.*/acme"):
+    with pytest.raises(PackError, match=r"'acme' .*work[\\/]acme.*already.*[\\/]acme"):
         pack_setup(work)
 
 

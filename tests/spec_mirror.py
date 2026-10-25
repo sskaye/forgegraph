@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from forgegraph import forgemark
+
 ROOT = Path(__file__).parents[1]
 PACKAGE = ROOT / "src" / "forgegraph"
 # A pack's spec folders: the kind of spec each holds, as titles name it.
@@ -133,8 +135,6 @@ MIRRORS = {
 }
 NBSP = chr(0xA0)  # non-breaking space
 GAP = 10
-COMMENTS = "<!-- forgemark-comments"
-_REVIEW_MARK = re.compile(r"<!-- /?fmc:\d+ -->")
 
 
 def mirror_path(kind: str) -> Path:
@@ -204,16 +204,14 @@ def page(kind: str) -> str:
 def body(markdown: str) -> str:
     """A mirror page without Forgemark's comment markers and stored comments. Forgemark escapes
     some tildes when it saves a page, so an escaped tilde counts as a tilde."""
-    page = _REVIEW_MARK.sub("", markdown.split(COMMENTS)[0]).replace("\\~", "~")
-    return page.rstrip("\n") + "\n"
+    return forgemark.strip(markdown).replace("\\~", "~").rstrip("\n") + "\n"
 
 
 def write(kind: str) -> bool:
     """Regenerate a mirror, keeping any stored review comments. True if it changed."""
     path = mirror_path(kind)
     old = path.read_text(encoding="utf-8") if path.exists() else ""
-    stored = old[old.index(COMMENTS) :] if COMMENTS in old else ""
-    new = page(kind) + ("\n" + stored if stored else "")
+    new = forgemark.keep(page(kind), old)
     if body(old) == body(new):
         return False
     path.parent.mkdir(parents=True, exist_ok=True)

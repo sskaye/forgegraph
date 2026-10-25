@@ -17,8 +17,9 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from forgegraph import forgemark
+
 ROOT = Path(__file__).parents[1]
-COMMENTS = "<!-- forgemark-comments"
 STYLE = """
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
         --good:#1a7f37; --bad:#cf222e; }
@@ -117,9 +118,8 @@ def main() -> None:
     for arg in sys.argv[2:]:
         label, path = arg.split("=", 1)
         columns.append((label, json.loads(Path(path).read_text())))
-    text = page(columns)
-    if out.exists() and COMMENTS in (old := out.read_text(encoding="utf-8")):
-        text = text.rstrip("\n") + "\n\n" + old[old.index(COMMENTS) :]
+    old = out.read_text(encoding="utf-8") if out.exists() else ""
+    text = forgemark.keep(page(columns), old)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
     print(f"wrote {out}")

@@ -15,8 +15,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from forgegraph import __version__
-from forgegraph.catalog_build import forgemark
+from forgegraph import __version__, forgemark
 from forgegraph.catalog_build.cards import Drawings, place, show
 from forgegraph.catalog_build.files import Catalog, CatalogError, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
@@ -25,7 +24,6 @@ from forgegraph.packs import BASE, Pack
 from forgegraph.spec.documents import Registry, builtin, resolve
 from forgegraph.spec.parameters import NONE, Parameter, graph_type_files
 
-COMMENTS = "<!-- forgemark-comments"
 # Package files that can't change what the catalog shows. Every other file counts, so a new
 # module counts without being listed; built-in packs other than the base pack count only
 # for their own catalog.
@@ -228,32 +226,7 @@ def html(pack: Pack | None = None) -> str:
     return page(kinds(pack), inputs_hash(pack), title, version)
 
 
-def keep_comments(new: str, old: str) -> str:
-    """The new page with the old page's Forgemark comment block carried over."""
-    if COMMENTS not in old:
-        return new
-    return new.rstrip("\n") + "\n\n" + old[old.index(COMMENTS) :]
-
-
-def write(path: Path, text: str) -> str:
-    """Write a rebuilt page, keeping the comments the old one had. Returns Forgemark's lint
-    report, or "" when the page has no comments."""
-    old = path.read_text(encoding="utf-8") if path.exists() else ""
-    if COMMENTS in old:
-        forgemark.ready()  # fail before writing if the comments couldn't be put back
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(keep_comments(text, old), encoding="utf-8", newline="\n")
-    if COMMENTS not in old:
-        return ""
-    forgemark.run("reattach", str(path), "--all", check=False)
-    path.write_text(
-        open_commented(path.read_text(encoding="utf-8")), encoding="utf-8", newline="\n"
-    )
-    lint = forgemark.run("lint", str(path), check=False)
-    return (lint.stdout + lint.stderr).strip()
-
-
 def build(path: Path, pack: Pack | None = None) -> str:
     """Build the catalog at path: ForgeGraph's, or a pack's. Returns Forgemark's lint report
     ("" with no comments)."""
-    return write(path, html(pack))
+    return forgemark.rewrite(path, html(pack), reopen=open_commented)

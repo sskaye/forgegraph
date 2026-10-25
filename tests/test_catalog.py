@@ -17,9 +17,10 @@ from pack_helpers import cli_problems, needs_node, write_pack
 from typer.testing import CliRunner
 
 import forgegraph
-from forgegraph.catalog_build import build, forgemark
+from forgegraph import forgemark
+from forgegraph.catalog_build import build
 from forgegraph.catalog_build.files import CatalogError, read
-from forgegraph.catalog_build.page import Card, Instance, Kind, Row, page
+from forgegraph.catalog_build.page import Card, Instance, Kind, Row, open_commented, page
 from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
 from forgegraph.spec.documents import builtin
@@ -63,7 +64,7 @@ def test_comments_survive_a_rebuild(tmp_path):
     shutil.copy(FIXTURE, page_path)
     before = comments(page_path)
     assert len(before) >= 5
-    lint = build.write(page_path, small_page())
+    lint = forgemark.rewrite(page_path, small_page(), reopen=open_commented)
     after = comments(page_path)
     orphans = [c for c in after if c.get("status") == "orphaned" or c.get("orphaned")]
     assert orphans == [], lint
@@ -121,7 +122,7 @@ def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeyp
     old = page_path.read_text(encoding="utf-8")
     monkeypatch.setattr(forgemark.shutil, "which", lambda name: None)
     with pytest.raises(forgemark.ForgemarkError, match="Node 18"):
-        build.write(page_path, small_page())
+        forgemark.rewrite(page_path, small_page(), reopen=open_commented)
     assert page_path.read_text(encoding="utf-8") == old
 
 

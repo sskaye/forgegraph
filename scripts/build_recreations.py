@@ -24,7 +24,7 @@ import tempfile  # noqa: E402
 
 from recreations import LAYOUT_RECREATIONS, RECREATIONS  # noqa: E402
 
-from forgegraph.catalog_build.build import write  # noqa: E402
+from forgegraph import forgemark  # noqa: E402
 from forgegraph.drawing.export import KEY  # noqa: E402
 from forgegraph.drawing.style import isolated  # noqa: E402
 
@@ -122,5 +122,5 @@ if __name__ == "__main__":
         baselines()
     else:
         out = ROOT / "review" / "phase-02" / "recreations.html"
-        lint = write(out, page())  # keeps the page's comments
+        lint = forgemark.rewrite(out, page())  # keeps the page's comments
         print(f"wrote {out.relative_to(ROOT)}" + (f"\n{lint}" if lint else ""))

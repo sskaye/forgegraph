@@ -1,4 +1,9 @@
-"""Run Forgemark's command-line tool, pinned to one version.
+"""Forgemark's file format, and its command-line tool, pinned to one version.
+
+A Forgemark document (Markdown, or an HTML page) holds its review comments as a pair of
+markers around the text each one is on (MARKER) and one comment block at its end
+(COMMENTS). keep() carries the block onto a rebuilt document, strip() takes the review
+markup out, and rewrite() writes a rebuilt document and puts its comments back with the tool.
 
     uv run python scripts/forgemark.py lint review/phase-02/recreations.html
     uv run python scripts/forgemark.py reattach docs/specs/theme/base_theme.md --all
@@ -12,10 +17,15 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
+
+COMMENTS = "<!-- forgemark-comments"  # the start of a document's comment block
+MARKER = re.compile(r"<!-- /?fmc:\d+ -->")  # a comment's start or end marker
 
 VERSION = "1.12.0"
 SHA256 = "6963b01c8ddf64f159aeb8edf2cc29c0aca630d373072688e96b06284137916a"
@@ -57,3 +67,35 @@ def run(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     if node is None:
         raise ForgemarkError("forgemark needs Node 18 or later on the PATH")
     return subprocess.run([node, str(tool()), *args], text=True, capture_output=True, check=check)
+
+
+def keep(new: str, old: str) -> str:
+    """The new document with the old one's comment block carried over."""
+    if COMMENTS not in old:
+        return new
+    return new.rstrip("\n") + "\n\n" + old[old.index(COMMENTS) :]
+
+
+def strip(text: str) -> str:
+    """A document without review markup: its comment block and markers."""
+    if COMMENTS in text:
+        text = text[: text.index(COMMENTS)].rstrip("\n") + "\n"
+    return MARKER.sub("", text)
+
+
+def rewrite(path: Path, text: str, reopen: Callable[[str], str] | None = None) -> str:
+    """Write a rebuilt document, keeping the comments the old one had: carried over, put
+    back by their element's id or their text (`reattach --all`), then the document passed
+    through reopen if given. Returns the tool's lint report, or "" when there are no comments."""
+    old = path.read_text(encoding="utf-8") if path.exists() else ""
+    if COMMENTS in old:
+        ready()  # fail before writing if the comments couldn't be put back
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(keep(text, old), encoding="utf-8", newline="\n")
+    if COMMENTS not in old:
+        return ""
+    run("reattach", str(path), "--all", check=False)
+    if reopen is not None:
+        path.write_text(reopen(path.read_text(encoding="utf-8")), encoding="utf-8", newline="\n")
+    lint = run("lint", str(path), check=False)
+    return (lint.stdout + lint.stderr).strip()

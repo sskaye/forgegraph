@@ -200,7 +200,7 @@ def catalog_build(
     graph types, layer types and base pack), or with --pack, that pack's themes and formats."""
     from forgegraph.catalog_build.build import build
     from forgegraph.catalog_build.files import CatalogError
-    from forgegraph.catalog_build.forgemark import ForgemarkError
+    from forgegraph.forgemark import ForgemarkError
     from forgegraph.packs import BASE
 
     chosen = _pack(pack, as_json)

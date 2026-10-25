@@ -12,12 +12,12 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "tests"))
 from spec_mirror import MIRRORS, mirror_path, write
 
 sys.path.insert(0, str(Path(__file__).parent))
-from forgegraph.catalog_build import forgemark
+from forgegraph import forgemark
 
 for kind in MIRRORS:
     changed = write(kind)
     print(("updated " if changed else "unchanged ") + str(mirror_path(kind)))
-    if changed and "<!-- forgemark-comments" in mirror_path(kind).read_text(encoding="utf-8"):
+    if changed and forgemark.COMMENTS in mirror_path(kind).read_text(encoding="utf-8"):
         print(
             forgemark.run("reattach", str(mirror_path(kind)), "--all", check=False).stdout, end=""
         )

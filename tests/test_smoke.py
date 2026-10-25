@@ -34,6 +34,35 @@ def test_bundled_fonts_are_registered():
     assert font_dir() in Path(found).parents
 
 
+class _Counted(list):
+    """matplotlib's list of fonts, counting how often it is read through."""
+
+    reads = 0
+
+    def __iter__(self):
+        type(self).reads += 1
+        return super().__iter__()
+
+
+def test_registering_again_doesnt_read_through_every_font(monkeypatch):
+    register_fonts()
+    manager = font_manager.fontManager
+    monkeypatch.setattr(manager, "ttflist", _Counted(manager.ttflist))
+    _Counted.reads = 0
+    for _ in range(5):
+        register_fonts()
+    assert _Counted.reads == 0
+
+
+def test_fonts_taken_away_from_matplotlib_are_registered_again(monkeypatch):
+    register_fonts()
+    manager = font_manager.fontManager
+    bundled = {str(p) for p in register_fonts()}
+    monkeypatch.setattr(manager, "ttflist", [f for f in manager.ttflist if f.fname not in bundled])
+    register_fonts()
+    assert bundled <= {f.fname for f in manager.ttflist}
+
+
 def _render_text_png() -> np.ndarray:
     register_fonts()
     with matplotlib.rc_context(matplotlib.rcParamsDefault):

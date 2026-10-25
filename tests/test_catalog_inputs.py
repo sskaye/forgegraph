@@ -98,3 +98,25 @@ def test_hidden_files_dont_count(package, name):
     before = build.inputs_hash()
     (package / name).write_bytes(b"\0\1")
     assert build.inputs_hash() == before
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{}, {"legend.method": "key", "legend.key.inside": False}],
+    ids=["plain", "key outside"],
+)
+@pytest.mark.parametrize("dpi", [72 * 1.5, 100.0, 93.7])
+def test_a_cards_pixels_are_its_pngs(settings, dpi):
+    """A card is quantized from the graph's pixels, taken as they're drawn: the same
+    pixels its PNG would hold."""
+    import io
+
+    from PIL import Image
+    from render_helpers import render
+
+    from forgegraph.catalog.examples import image, png
+
+    g = render(settings=settings, format={"figure.width": 83.3})
+    decoded = Image.open(io.BytesIO(png(g, dpi))).convert("RGBA")
+    taken = image(g, dpi)
+    assert taken.size == decoded.size and taken.tobytes() == decoded.tobytes()

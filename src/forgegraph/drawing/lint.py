@@ -167,13 +167,21 @@ def _key_over_data(ax: Axes) -> list[Issue]:
             )
             radius = line.get_markersize() / 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
             near = box.expanded(1, 1).padded(radius)
-            marked = line.get_marker() not in (None, "None", "none", "") and any(
-                near.contains(x, y) for x, y in np.asarray(path.vertices)
+            marked = line.get_marker() not in (None, "None", "none", "") and bool(
+                _inside(near, np.asarray(path.vertices)).any()
             )
             if crosses or marked:
                 issues.append(Issue("key-over-data", "a key covers a line or marker"))
                 break
     return issues
+
+
+def _inside(box: Any, points: np.ndarray) -> np.ndarray:
+    """Which points a box holds, edges included: matplotlib's Bbox.contains, for many."""
+    x, y = points[:, 0], points[:, 1]
+    across = ((box.x0 <= x) & (x <= box.x1)) | ((box.x0 >= x) & (x >= box.x1))
+    down = ((box.y0 <= y) & (y <= box.y1)) | ((box.y0 >= y) & (y >= box.y1))
+    return across & down
 
 
 def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
@@ -264,8 +272,8 @@ def check(
 
 
 def figure_issues(fig: Figure, font_problems: list[str]) -> list[Issue]:
-    """The issues of a figure as a whole: its texts, wherever they are, and its fonts."""
-    fig.canvas.draw()
+    """The issues of a figure as a whole, just drawn: its texts, wherever they are, and its
+    fonts."""
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     found = _texts(fig)
     boxes = [(t, text.footprint(t, renderer)) for t, _ in found]

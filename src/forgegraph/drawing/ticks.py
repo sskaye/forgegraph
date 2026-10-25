@@ -27,14 +27,32 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from functools import lru_cache, wraps
 from itertools import pairwise
 from typing import Any, cast
 
 import numpy as np
-from matplotlib.text import Text
 from matplotlib.ticker import Locator, LogLocator, MaxNLocator
 
+from forgegraph.drawing import text
+
 EPS = 1e-10
+
+
+def _remembered(algorithm: Callable[..., np.ndarray]) -> Any:
+    """A published tick algorithm, remembering what it found: it's a pure function of its
+    arguments, and a render asks for the same ticks many times (matplotlib asks the locator
+    on every get_major_ticks). Arguments of different types never share an answer, and each
+    caller gets its own copy."""
+    found = lru_cache(maxsize=1024, typed=True)(algorithm)
+
+    @wraps(algorithm)
+    def remembered(*args: Any, **kwargs: Any) -> np.ndarray:
+        return found(*args, **kwargs).copy()
+
+    remembered.cache_clear = found.cache_clear  # type: ignore[attr-defined]
+    remembered.cache_info = found.cache_info  # type: ignore[attr-defined]
+    return remembered
 
 
 def _whole(step: float) -> bool:
@@ -42,6 +60,7 @@ def _whole(step: float) -> bool:
     return step >= 1 - 1e-9 and abs(step - round(step)) < 1e-9
 
 
+@_remembered
 def extended_wilkinson(
     dmin: float,
     dmax: float,
@@ -127,6 +146,7 @@ def extended_wilkinson(
     return np.arange(lmin, lmax + step / 2, step)
 
 
+@_remembered
 def wilkinson(
     dmin: float,
     dmax: float,
@@ -174,6 +194,7 @@ def _nice(x: float, rounded: bool) -> float:
     return nf * 10.0**e
 
 
+@_remembered
 def heckbert(dmin: float, dmax: float, m: int, integer: bool = False) -> np.ndarray:
     """A nice range, then a nice step for m labels across it (1, 2 or 5 times a power of ten).
     With integer, a step below 1 becomes 1."""
@@ -185,6 +206,7 @@ def heckbert(dmin: float, dmax: float, m: int, integer: bool = False) -> np.ndar
     return np.arange(lmin, lmax + step / 2, step)
 
 
+@_remembered
 def nelder(
     dmin: float,
     dmax: float,
@@ -222,6 +244,7 @@ def nelder(
     return np.arange(lmin, lmax + step / 2, step)
 
 
+@_remembered
 def r_pretty(dmin: float, dmax: float, m: int, integer: bool = False) -> np.ndarray:
     """R's pretty(): about m - 1 intervals of 1, 2, 5 or 10 times a power of ten,
     preferring 1 and 10. With integer, a unit below 1 becomes 1."""
@@ -468,14 +491,13 @@ class LogTicks(Locator):
         sample = axis.get_major_ticks(1)[0].label1
         along_x = axis.axis_name == "x"
         spans = []
+        prop = sample.get_fontproperties()
         for v in ticks:
-            label = Text(text=formatter(v), fontproperties=sample.get_fontproperties())
-            label.set_figure(figure)
-            box = label.get_window_extent()  # matplotlib finds the renderer, any backend
+            width, height = text.extent(formatter(v), prop, figure.dpi)
             at = axis.axes.transData.transform((v, 1.0) if along_x else (1.0, v))[
                 0 if along_x else 1
             ]
-            half = (box.width if along_x else box.height) / 2
+            half = (width if along_x else height) / 2
             spans.append((at - half, at + half))
         gap = self.gap * figure.dpi / 72
         spans.sort()

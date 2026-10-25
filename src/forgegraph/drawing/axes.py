@@ -43,6 +43,7 @@ from matplotlib.dates import date2num, num2date
 from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator
 
+from forgegraph.drawing import text as text_module
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, target
@@ -534,14 +535,8 @@ class Wrapped(Formatter):
 
 
 def _measure(sample: Text, ax: Axes) -> Any:
-    figure = ax.figure
-
-    def width(text: str) -> float:
-        probe = Text(text=text, fontproperties=sample.get_fontproperties())
-        probe.set_figure(figure)
-        return probe.get_window_extent().width  # matplotlib finds the renderer, any backend
-
-    return width
+    prop, dpi = sample.get_fontproperties(), ax.figure.dpi  # type: ignore[union-attr]
+    return lambda label: text_module.extent(label, prop, dpi)[0]
 
 
 def ticks_and_labels(

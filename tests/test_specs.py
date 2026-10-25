@@ -540,3 +540,57 @@ def test_impossible_requests_are_errors():
     ]
     tree_set(theme["fixed_parameters"], "legend.key.title.weight", "bold")
     assert validate("theme", theme, reg_with(("theme", theme))) == []
+
+
+# --- reading files ----------------------------------------------------------------------------
+
+
+def test_an_unchanged_file_is_parsed_once(tmp_path, monkeypatch):
+    from forgegraph.spec import documents
+
+    path = tmp_path / "t.yaml"
+    path.write_text("a: 1\nb: [x, y]\n")
+    parsed = []
+    parse = documents._yaml.load
+    monkeypatch.setattr(documents._yaml, "load", lambda f: parsed.append(1) or parse(f))
+    first = documents.load(path)
+    first["a"] = 99  # a caller changing what it was given
+    first["b"].append("z")
+    assert documents.load(path) == {"a": 1, "b": ["x", "y"]}
+    assert len(parsed) == 1
+
+
+def test_an_edited_file_is_parsed_again(tmp_path):
+    import os
+
+    from forgegraph.spec import documents
+
+    path = tmp_path / "t.yaml"
+    path.write_text("a: 1\n")
+    assert documents.load(path) == {"a": 1}
+    path.write_text("a: 2\n")  # the same size: only the time tells
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+    assert documents.load(path) == {"a": 2}
+
+
+def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
+    from forgegraph.spec import documents
+
+    doc = documents.builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    calls = []
+    explain = documents.explain
+    monkeypatch.setattr(documents, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
+    assert documents.validate("graphspec", doc) == []
+    assert len(calls) == 1
+
+
+def test_a_graphspecs_own_parameters_are_worked_out_once(monkeypatch):
+    from forgegraph.spec import parameters
+
+    first = parameters.definitions("graphspec")
+    calls = []
+    files = parameters.graph_type_files
+    monkeypatch.setattr(parameters, "graph_type_files", lambda: calls.append(1) or files())
+    assert parameters.definitions("graphspec") == first
+    assert calls == []

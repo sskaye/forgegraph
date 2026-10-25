@@ -433,9 +433,14 @@ def definitions(kind: str, name: str | None = None) -> dict[str, Parameter]:
     """Every parameter of a kind, by path. A graph type's and a layer type's come from their
     own file (name); a GraphSpec's are those of the reference GraphSpec that no other kind
     defines."""
-    params = _read(kind, name or REFERENCE[kind])[1]
-    if kind != "graphspec":
-        return params
+    if kind == "graphspec":
+        return _graphspec_definitions(name or REFERENCE[kind])
+    return _read(kind, name or REFERENCE[kind])[1]
+
+
+@cache
+def _graphspec_definitions(name: str) -> dict[str, Parameter]:
+    params = _read("graphspec", name)[1]
     others = {p.split(".")[0] for k in ("theme", "format") for p in definitions(k)}
     for gt in graph_type_files():
         others |= {p.split(".")[0] for p in definitions("graph_type", gt)}

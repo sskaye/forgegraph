@@ -17,7 +17,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from pack_helpers import allow, write_pack
 from PIL import Image
-from render_helpers import BASE, png, polarization, render
+from render_helpers import BASE, painted_draws, png, polarization, render
 
 import forgegraph as fg
 from forgegraph.drawing import xy
@@ -392,7 +392,6 @@ def test_scales_limits_and_titles():
     assert ax.get_title() == "P$_{max}$"
 
 
-@pytest.mark.slow
 def test_too_many_groups_warns():
     frame = pd.DataFrame(
         {
@@ -560,6 +559,74 @@ def test_an_unchanged_graph_stays_standard_however_it_is_drawn_or_saved(tmp_path
     saved = g.save(tmp_path / "g")
     assert not g.nonstandard and not _watermarked(g)
     assert all(fg.load(p)["nonstandard"] is False for p in saved)  # type: ignore[index]
+
+
+def _horizontal_bars() -> fg.Graph:
+    """Bars along y, which are fitted to the pixel grid by the renderer's height."""
+    counts = pd.DataFrame({"n": [44, 124, 56], "kind": ["Adelie", "Gentoo", "Chinstrap"]})
+    bars = {"mark.bar.show": True, "mark.line.show": False, "mark.marker.show": False}
+    return fg.xy(counts, "n", "kind", parameters={**bars, "series.base_axis": "y"})
+
+
+@pytest.mark.parametrize("make", [render, _horizontal_bars], ids=["lines", "horizontal bars"])
+def test_the_record_of_a_figures_pixels_is_what_its_canvas_draws(make):
+    import hashlib
+
+    g = make()
+    with isolated(g.style):  # as ForgeGraph draws and saves it: in the theme's settings
+        g.figure.canvas.draw()
+    assert hashlib.sha256(bytes(g.figure.canvas.buffer_rgba())).hexdigest() == g._drawn
+    assert not g.nonstandard
+
+
+def test_rendering_draws_the_figure_once_its_layout_is_final(monkeypatch):
+    """Lint and the record of the figure's pixels share the one draw that follows layout."""
+    from forgegraph import graph as graph_module
+    from forgegraph.drawing.figure import GraphFigure
+
+    draws, laid_out = [], []
+    lay_out = graph_module._lay_out_and_label
+
+    def counting_lay_out(*args, **kwargs):
+        laid_out.clear()
+        lay_out(*args, **kwargs)
+        laid_out.append(True)
+
+    original = GraphFigure.draw
+
+    def counting_draw(self, renderer):
+        if laid_out:
+            draws.append(renderer)
+        original(self, renderer)
+
+    monkeypatch.setattr(graph_module, "_lay_out_and_label", counting_lay_out)
+    monkeypatch.setattr(GraphFigure, "draw", counting_draw)
+    render()
+    assert len(draws) == 1
+
+
+def test_only_the_last_draw_of_a_render_paints(monkeypatch):
+    painted = painted_draws(monkeypatch)
+    render(settings={"legend.method": "direct"})  # direct labels: many measuring draws
+    assert len(painted) == 1
+
+
+def test_one_save_inspects_the_figure_once_whatever_it_writes(tmp_path, monkeypatch):
+    g = render(format={"output.file_types": list(FILE_TYPES)})
+    hashes = []
+    pixels = g._pixels
+    monkeypatch.setattr(g, "_pixels", lambda: hashes.append(1) or pixels())
+    saved = g.save(tmp_path / "g")
+    assert len(saved) == len(FILE_TYPES) and len(hashes) == 1
+
+
+def test_a_change_between_saves_is_still_found(tmp_path):
+    g = render()
+    [first] = g.save(tmp_path / "first.png")
+    g.axes.axhline(0.7)
+    [second] = g.save(tmp_path / "second.png")
+    assert fg.load(first)["nonstandard"] is False  # type: ignore[index]
+    assert fg.load(second)["nonstandard"] is True and _watermarked(g)  # type: ignore[index]
 
 
 def test_saving_through_matplotlib_still_watermarks_and_records(tmp_path):
@@ -777,3 +844,36 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     assert g.labelling == "direct"
     ticks = [t for t in g.axes.get_xticks() if t <= g.axes.get_xlim()[1]]
     assert max(ticks) <= 100  # the data ends at 100; the room beyond holds labels only
+
+
+# --- matplotlib's settings while drawing ------------------------------------------------------
+
+
+def test_drawing_settings_are_the_defaults_and_the_style_whatever_the_users_are():
+    g = render()
+    expected = matplotlib.RcParams({**dict.copy(matplotlib.rcParamsDefault), **g.style.rc()})
+    with matplotlib.rc_context({"lines.linewidth": 7.0, "font.size": 3.0}):
+        with isolated(g.style):
+            inside = dict.copy(matplotlib.rcParams)
+        after = (matplotlib.rcParams["lines.linewidth"], matplotlib.rcParams["font.size"])
+    assert {k: v for k, v in inside.items() if k != "backend"} == {
+        k: v for k, v in dict.items(expected) if k != "backend"
+    }
+    assert after == (7.0, 3.0)
+
+
+def test_drawing_settings_are_checked_once_per_style(monkeypatch):
+    g = render()
+    with isolated(g.style):
+        pass
+    checked = []
+    setitem = matplotlib.RcParams.__setitem__
+    monkeypatch.setattr(
+        matplotlib.RcParams,
+        "__setitem__",
+        lambda self, k, v: checked.append(k) or setitem(self, k, v),
+    )
+    for _ in range(3):
+        with isolated(g.style):
+            pass
+    assert checked == []

@@ -6,6 +6,7 @@ themes axis.tick.label.*)."""
 from __future__ import annotations
 
 import re
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ from matplotlib.dates import num2date
 from render_helpers import render
 
 import forgegraph as fg
+from forgegraph.drawing.ticks import ALGORITHMS
 from forgegraph.spec.documents import builtin
 
 
@@ -452,3 +454,31 @@ def test_the_benchmark_keeps_its_side_whatever_the_order(side, at):
             }
         )
         assert labels(g)[at] == "Benchmark"
+
+
+# --- the tick algorithms, remembered -------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(ALGORITHMS))
+def test_a_tick_algorithm_remembers_what_it_found(name):
+    """A render asks for the same ticks many times; the answer is worked out once, and is
+    the same as working it out afresh, whatever the caller does with it."""
+    algorithm: Any = ALGORITHMS[name]
+    algorithm.cache_clear()
+    rng = np.random.default_rng(0)
+    for _ in range(200):
+        lo = float(rng.uniform(-100, 100))
+        hi = lo + float(rng.choice([0.01, 0.7, 13.0, 2e5]))
+        m, integer = int(rng.integers(2, 11)), bool(rng.integers(0, 2))
+        try:
+            expected = algorithm.__wrapped__(lo, hi, m, integer=integer)
+        except ValueError:  # an algorithm with no answer here has none remembered either
+            with pytest.raises(ValueError):
+                algorithm(lo, hi, m, integer=integer)
+            continue
+        first = algorithm(lo, hi, m, integer=integer)
+        assert np.array_equal(first, expected)
+        first[:] = -1  # a caller changing its copy
+        assert np.array_equal(algorithm(lo, hi, m, integer=integer), expected)
+    assert algorithm.cache_info().hits >= algorithm.cache_info().currsize > 0
+    assert np.array_equal(algorithm(np.float64(0.0), np.float64(1.0), 5), algorithm(0.0, 1.0, 5))

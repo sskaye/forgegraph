@@ -1,5 +1,6 @@
 """The bundled fonts, and those of the packs in use."""
 
+from functools import cache
 from importlib.resources import files
 from pathlib import Path
 
@@ -15,15 +16,28 @@ def font_dir() -> Path:
 
 def register_fonts() -> list[Path]:
     """Register the bundled fonts with matplotlib, once, and return their paths. (Adding a
-    font clears matplotlib's font lookup cache, so adding them on every call is slow.)"""
+    font clears matplotlib's font lookup cache, so adding them on every call is slow.) It
+    looks again whenever matplotlib's list of fonts has changed since."""
+    global _registered_with
     from matplotlib import font_manager
 
-    paths = sorted(font_dir().glob("*.ttf"))
-    known = {f.fname for f in font_manager.fontManager.ttflist}
-    for path in paths:
-        if str(path) not in known:
-            font_manager.fontManager.addfont(str(path))
-    return paths
+    manager = font_manager.fontManager
+    paths = _bundled()
+    if _registered_with != (id(manager), len(manager.ttflist)):
+        known = {f.fname for f in manager.ttflist}
+        for path in paths:
+            if str(path) not in known:
+                manager.addfont(str(path))
+        _registered_with = (id(manager), len(manager.ttflist))
+    return list(paths)
+
+
+_registered_with: tuple[int, int] | None = None  # the font list register_fonts last checked
+
+
+@cache
+def _bundled() -> tuple[Path, ...]:
+    return tuple(sorted(font_dir().glob("*.ttf")))
 
 
 def register_pack_fonts(paths: list[Path]) -> None:

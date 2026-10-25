@@ -26,6 +26,7 @@ definitions (see parameters.py).
 
 from __future__ import annotations
 
+import copy
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -78,8 +79,17 @@ CHOICE = {
 
 
 def load(path: Path) -> Any:
-    with path.open(encoding="utf-8") as f:
-        return _yaml.load(f)
+    """A YAML file's contents. Each file is parsed once while it's unchanged (same size and
+    modification time); every caller gets its own copy."""
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+    if key not in _parsed:
+        with path.open(encoding="utf-8") as f:
+            _parsed[key] = _yaml.load(f)
+    return copy.deepcopy(_parsed[key])
+
+
+_parsed: dict[tuple[str, int, int], Any] = {}  # by path, modification time and size
 
 
 @dataclass
@@ -388,9 +398,7 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
             return errors
         errors += _inherited_fixed(doc, reg)
         if not errors:
-            errors += (
-                _method_allowed(doc, reg) + _benchmark_complete(doc, reg) + _graph_rules(doc, reg)
-            )
+            errors += _graphspec_rules(resolve_graphspec(doc, reg))
     if kind == "layout":
         from forgegraph.spec.layout import layout_problems
 
@@ -624,7 +632,8 @@ def explain(doc: dict[str, Any], reg: Registry | None = None) -> dict[str, dict[
     reg = reg or builtin()
     spec = resolve_detailed("graphspec", doc, reg)
     chosen = _choices(doc, reg)
-    out = {"graphspec": {p: r for p, r in spec.items() if p in definitions("graphspec")}}
+    own = definitions("graphspec")
+    out = {"graphspec": {p: r for p, r in spec.items() if p in own}}
     out["layers"] = {
         name: Resolved(_with_defaults(r.value), r.fixed, r.origin)
         for name, r in resolve_layers(doc, reg).items()
@@ -648,8 +657,12 @@ def resolve_graphspec(
     }
 
 
-def _method_allowed(doc: dict[str, Any], reg: Registry) -> list[str]:
-    values = resolve_graphspec(doc, reg)
+def _graphspec_rules(values: dict[str, dict[str, Any]]) -> list[str]:
+    """What a GraphSpec's values, resolved once, may not combine."""
+    return _method_allowed(values) + _benchmark_complete(values) + _graph_rules(values)
+
+
+def _method_allowed(values: dict[str, dict[str, Any]]) -> list[str]:
     method = values["graph_type"].get("legend.method")
     methods = values["theme"]["legend.methods"]
     if method is None or method in methods:
@@ -658,17 +671,17 @@ def _method_allowed(doc: dict[str, Any], reg: Registry) -> list[str]:
     return [f"legend.method: theme '{theme}' allows only {', '.join(methods)}"]
 
 
-def _benchmark_complete(doc: dict[str, Any], reg: Registry) -> list[str]:
-    values = resolve_graphspec(doc, reg)["graph_type"]
-    column, value = values.get("benchmark.data_column"), values.get("benchmark.value")
+def _benchmark_complete(values: dict[str, dict[str, Any]]) -> list[str]:
+    gt = values["graph_type"]
+    column, value = gt.get("benchmark.data_column"), gt.get("benchmark.value")
     if (column in (None, NONE)) == (value in (None, NONE)):
         return []
     return ["benchmark: set data_column and value together, or neither"]
 
 
-def _graph_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
+def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
     """Combinations of graph-type values that ask for something impossible."""
-    v = resolve_graphspec(doc, reg)["graph_type"]
+    v = values["graph_type"]
     errors = []
     columns = v.get("axis.y.data.column")
     several = isinstance(columns, list) and len(columns) > 1

@@ -13,9 +13,8 @@ it first checks whether it's still as ForgeGraph left it, and watermarks every t
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -23,7 +22,6 @@ from typing import Any, cast
 import matplotlib
 import pandas as pd
 from matplotlib.axes import Axes
-from matplotlib.backends.backend_agg import RendererAgg
 
 from forgegraph import __version__
 from forgegraph.drawing import export, lint, page
@@ -50,6 +48,7 @@ from forgegraph.graph import (
     _artists,
     _created,
     _plain,
+    pixel_hash,
     prepare,
     recorded,
     spec_record,
@@ -114,6 +113,7 @@ class TabFigure:
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     _snapshot: tuple[int, ...] = ()
     _drawn: str = ""
+    _held: bool = False  # inspected already, during one save (see Graph.inspected_once)
     _font_problems: list[str] = field(default_factory=list)
 
     @property
@@ -136,15 +136,22 @@ class TabFigure:
 
     def inspect(self) -> bool:
         """Check whether the figure is still as ForgeGraph drew it (see Graph.inspect)."""
-        if not self.changed:
+        if not self.changed and not self._held:
             self.changed = _artists(self.figure) != self._snapshot or self._pixels() != self._drawn
         return self.changed
 
+    @contextmanager
+    def inspected_once(self) -> Iterator[None]:
+        """See Graph.inspected_once."""
+        self.inspect()
+        self._held = True
+        try:
+            yield
+        finally:
+            self._held = False
+
     def _pixels(self) -> str:
-        renderer = RendererAgg(*self.figure.bbox.size, self.figure.dpi)
-        with isolated(self.style), lint.font_messages():
-            self.figure.draw(renderer)
-        return hashlib.sha256(bytes(renderer.buffer_rgba())).hexdigest()
+        return pixel_hash(self.figure, self.style)
 
     def check(self) -> list[lint.Issue]:
         """Lint the tab's figure as it is now, and return the issues (also kept in `issues`).
@@ -261,47 +268,56 @@ class Layout:
         dpi = int(self.format["output.dpi"])
         one = len(self.tabs) == 1
         out = []
-        for kind in kinds:
-            path = stem.with_name(f"{stem.name}.{kind}")
-            if kind == "html":
-                rule = float(self.values["separators.line.width"]) * float(
-                    self.format["figure.base_size"]
-                )
-                framed = not one and bool(self.values["separators.line.border"])
-                with self.tabs[0].saving():
-                    shown = [
-                        page.Shown(
-                            None if one else t.name,
-                            None if one else t.slug,
-                            _framed(t, export.svg(t.figure, dpi), rule)
-                            if framed
-                            else export.svg(t.figure, dpi),
-                        )
-                        for t in self.tabs
-                    ]
-                color = self.values["separators.color"]
-                out.append(
-                    page.write(
-                        path,
-                        str(self.spec.get("name", stem.name)),
-                        shown,
-                        self.record(),
-                        "transparent" if unset(color) else str(color),
-                        str(self.values["separators.line.color"]),
-                        rule,
-                        framed,
-                        self.freshness,
+        with ExitStack() as held:
+            for t in self.tabs:
+                held.enter_context(t.inspected_once())
+            for kind in kinds:
+                out += self._write_one(stem, kind, dpi, one)
+        return out
+
+    def _write_one(self, stem: Path, kind: str, dpi: int, one: bool) -> list[Path]:
+        """The files of one file type (see save_all)."""
+        out = []
+        path = stem.with_name(f"{stem.name}.{kind}")
+        if kind == "html":
+            rule = float(self.values["separators.line.width"]) * float(
+                self.format["figure.base_size"]
+            )
+            framed = not one and bool(self.values["separators.line.border"])
+            with self.tabs[0].saving():
+                shown = [
+                    page.Shown(
+                        None if one else t.name,
+                        None if one else t.slug,
+                        _framed(t, export.svg(t.figure, dpi), rule)
+                        if framed
+                        else export.svg(t.figure, dpi),
                     )
+                    for t in self.tabs
+                ]
+            color = self.values["separators.color"]
+            out.append(
+                page.write(
+                    path,
+                    str(self.spec.get("name", stem.name)),
+                    shown,
+                    self.record(),
+                    "transparent" if unset(color) else str(color),
+                    str(self.values["separators.line.color"]),
+                    rule,
+                    framed,
+                    self.freshness,
                 )
-            elif kind == "pdf":
-                with self.tabs[0].saving():
-                    figures = [t.figure for t in self.tabs]
-                    out.append(export.save_pages(figures, path, dpi, self.record()))
-            else:
-                for t in self.tabs:
-                    target = path if one else stem.with_name(f"{stem.name}-{t.slug}.{kind}")
-                    with t.saving():
-                        out.append(export.save(t.figure, target, dpi))
+            )
+        elif kind == "pdf":
+            with self.tabs[0].saving():
+                figures = [t.figure for t in self.tabs]
+                out.append(export.save_pages(figures, path, dpi, self.record()))
+        else:
+            for t in self.tabs:
+                target = path if one else stem.with_name(f"{stem.name}-{t.slug}.{kind}")
+                with t.saving():
+                    out.append(export.save(t.figure, target, dpi))
         return out
 
     def _repr_png_(self) -> bytes:
@@ -562,7 +578,6 @@ def _draw_tab(
         backgrounds(fig, grid, placed)
         place_footnote(fig, edge, edge)
         apply_separators(fig, grid, layout.values, float(fmt["figure.base_size"]))
-        fig.canvas.draw()
     tiles = {}
     for p in placed:
         prep = prepared[p.name]
@@ -585,9 +600,9 @@ def _draw_tab(
     result.nonstandard_packs = sorted({*layout._own_packs, *used})
     result.changed = bool(result.nonstandard_packs)  # drawn with a pack not in the main config
     result._font_problems = font_problems
-    result.check()
+    result.check()  # the one draw after layout, which the record of its pixels shares
     result._snapshot = _artists(fig)
-    result._drawn = result._pixels()
+    result._drawn = pixel_hash(fig, result.style, redraw=False)
     fig.graph = result  # from here on, drawing or saving the figure inspects it first
     return result
 

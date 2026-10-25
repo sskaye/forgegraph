@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import matplotlib
-from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from PIL import Image
 
@@ -96,6 +95,8 @@ def svg(fig: Figure, dpi: int) -> bytes:
 
 def save_pages(figs: Sequence[Figure], path: Path, dpi: int, record: dict[str, Any] | None) -> Path:
     """Save figures as the pages of one PDF, whose document record is `record`."""
+    from matplotlib.backends.backend_pdf import PdfPages  # its font subsetter is slow to load
+
     path.parent.mkdir(parents=True, exist_ok=True)
     metadata = {"Subject": "ForgeGraph provenance", KEY: json.dumps(record, sort_keys=True)}
     with warnings.catch_warnings():

@@ -31,6 +31,6 @@ variations:          *# Every parameter of the layer type: its card's 
         multiplier: {value: 0.9, from: aggregated}          *# \[float\]; What the aggregate is multiplied by, e.g. 2 for twice the stddev.*\
     per_series: {value: true, from: aggregated}          *# \[true, false\]; With a column: one line per named series, its replicates together, in its color.*\
     label:\
-        text: Target          *# \[None, aggregation, value, aggregation_value, text\]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9.*\
+        text: Target          *# \[None, aggregation, value, aggregation_value, text\]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.*\
         position: {value: start_below, from: labelled}          *# \[auto, start_above, start_below, center_above, center_below, end_above, end_below\]; auto: the first clear one.*\
         format: {value: ".3f", from: valued}          *# \[auto, text\]; Number format of the value, e.g. ".2f". auto: one decimal more than the axis's tick labels.*

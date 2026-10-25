@@ -1,7 +1,7 @@
 """Run Forgemark's command-line tool, pinned to one version.
 
     uv run python scripts/forgemark.py lint review/phase-02/recreations.html
-    uv run python scripts/forgemark.py reattach docs/specs/theme/default.md --all
+    uv run python scripts/forgemark.py reattach docs/specs/theme/base_theme.md --all
 
 The tool is one JavaScript file from Forgemark's GitHub release (MIT licence), needing only
 Node 18+. It's downloaded once into the user's cache folder, checked against the SHA-256

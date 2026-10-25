@@ -83,7 +83,7 @@ baselines:          # Numbered baselines: the baseline with one or more changes,
 variations:          # Every parameter of the theme, by category: its card's value. {value, from, with}: start from a numbered baseline, or change other parameters too. no_card: no card.
     font:
         family: IBM Plex Serif          # [text]; Typeface for all text.
-        weight: light          # [light, regular, medium, semibold, bold]; Weight of text without its own: tick labels, value labels, notes.
+        weight: light          # [light, regular, medium, semibold, bold]; Weight of text without its own: tick labels, value labels, notes, key names, footnotes.
         color: "#D62728"          # [hex color]; Text color, unless set elsewhere.
     background:
         color: "#D62728"          # [None, hex color]; Figure and plot background. None: transparent.
@@ -108,7 +108,7 @@ variations:          # Every parameter of the theme, by category: its card's val
                 gap: 1          # [positive float]; Gap from tick to label, × base size.
                 x_rotation: 45          # [0-90]; x tick label angle, degrees. 0: horizontal.
                 date_order: {value: day_month, from: dated}          # [month_day, day_month]; Day and month in automatic date tick labels: Jul 6, or 6 Jul.
-                max_wrap: {value: 0, from: wrapped}          # [int]; Times a label may wrap onto a new line. 0: never.
+                max_wrap: {value: 0, from: wrapped}          # [int]; Times an x tick label may wrap to fit beside its neighbors (not dates). 0: never.
             minor:
                 num: 4          # [int]; Minor ticks between major ticks. 0: none.
                 length: {value: 0.3, from: minor_ticks}          # [positive float]; Minor tick length, × base size.
@@ -118,7 +118,7 @@ variations:          # Every parameter of the theme, by category: its card's val
         line_color: "#D62728"          # [hex color]; Border line color.
         line_width: 0.144          # [positive float]; Border line width, × base size.
         aspect: 2          # [positive float]; Plot area width ÷ height.
-        margin: 0.3          # [0-1]; Gap between data and the plot area's edge, × axis range.
+        margin: 0.3          # [0-1]; Gap between data and the plot area's edge, × the data's range.
     grid:
         show: true          # [true, false]; Draw a grid.
         line_style: {value: dashed, from: grid_shown}          # [solid, dashed, dotted]; Grid line style.
@@ -161,10 +161,10 @@ variations:          # Every parameter of the theme, by category: its card's val
                 edge_color: {value: "#CC0000", from: bars}          # [None, hex color]; Benchmark bar outline color. None: none.
                 edge_width: {value: 0.2, from: bars}          # [positive float]; Benchmark bar outline width, × base size.
     legend:
-        methods: no_card          # [auto, direct, key, none]; Methods graphs may use to name series, in auto's order of preference. direct: names beside the lines. key: a boxed list.
+        methods: no_card          # [auto, direct, key, none]; Methods graphs may use to name series; auto tries direct and key, in this list's order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.
         label:
             size: 1.5          # [positive float]; Series name size, × base size.
-            weight: light          # [light, regular, medium, semibold, bold]; Series name weight.
+            weight: light          # [light, regular, medium, semibold, bold]; Direct label weight; key names use font.weight.
         direct:
             clearance: 0.4          # [positive float]; Minimum gap around a direct label, × base size.
             max_relative_distance: 0.5          # [0-1]; Most a label's distance to its series may be, ÷ its distance to the next nearest.

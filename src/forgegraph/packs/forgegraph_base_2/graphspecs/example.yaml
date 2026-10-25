@@ -10,4 +10,4 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
         theme: forgegraph_base_2/base_theme          # [theme];
         format: forgegraph_base_2/compact_format          # [format];
     data:
-        file: polarization.parquet          # [None, text]; Parquet file holding the DataFrame to draw.
+        file: polarization.parquet          # [None, text]; Parquet file holding the DataFrame to draw: an absolute path, one starting with ~, or one relative to the folder of the file that sets it. None: passed through the Python API.

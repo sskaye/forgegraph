@@ -15,7 +15,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.colors import to_hex
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from pack_helpers import allow, write_pack
+from pack_helpers import allow, dump, write_pack
 from PIL import Image
 from render_helpers import BASE, painted_draws, png, polarization, render
 
@@ -551,6 +551,7 @@ def test_any_change_after_rendering_makes_the_graph_non_standard(change, tmp_pat
     assert _watermarked(g)
 
 
+@pytest.mark.slow
 def test_an_unchanged_graph_stays_standard_however_it_is_drawn_or_saved(tmp_path):
     g = render(format={"output.file_types": list(FILE_TYPES)})
     g.check()
@@ -695,10 +696,9 @@ def test_xy_draws_into_any_axes_so_layouts_can_place_it():
 
 
 def _write_graphspec(path, **kw) -> None:
-    from ruamel.yaml import YAML
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    YAML().dump(fg.graphspec(path.stem, "xy", settings=BASE, **kw), path.open("w"))
+    dump(fg.graphspec(path.stem, "xy", settings=BASE, **kw), path)
 
 
 def test_data_file_relative_to_the_graphspec(tmp_path):
@@ -761,7 +761,6 @@ def test_column_types_survive_parquet(tmp_path):
         }
     )
     frame.to_parquet(tmp_path / "d.parquet")
-    from ruamel.yaml import YAML
 
     doc = fg.graphspec(
         "d",
@@ -769,7 +768,7 @@ def test_column_types_survive_parquet(tmp_path):
         data_file="d.parquet",
         settings={"axis.x.data.column": "when", "axis.y.data.column": "value"},
     )
-    YAML().dump(doc, (tmp_path / "d.yaml").open("w"))
+    dump(doc, tmp_path / "d.yaml")
     g = fg.render(tmp_path / "d.yaml")
     assert g.data.rows_read == 3 and g.data.rows_dropped == {"missing x or y": 1}
 

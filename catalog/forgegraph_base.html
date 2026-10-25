@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="forgegraph-inputs" content="269513d5850aa1f8b40097324ba04e0fbf60e056f1a2fe5b9b8b0937a072cf0c">
+<meta name="forgegraph-inputs" content="76fc7e20f0a84aabb05ed71e43a3bff4ffff687b41a45672f7310e6e969661e6">
 <title>forgegraph_base Catalog</title>
 <style>
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
@@ -89,7 +89,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <details class="category" id="theme-forgegraph_base-base_theme-category-font"><summary style="padding-left:0.5rem" title="font">font</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="theme-forgegraph_base-base_theme-param-font-family"><td class="path" style="padding-left:1.6rem" title="font.family">family</td><td>Roboto</td><td>text</td><td>fixed</td><td>Typeface for all text.</td></tr>
-<tr id="theme-forgegraph_base-base_theme-param-font-weight"><td class="path" style="padding-left:1.6rem" title="font.weight">weight</td><td>regular</td><td>light | regular | medium | semibold | bold</td><td>fixed</td><td>Weight of text without its own: tick labels, value labels, notes.</td></tr>
+<tr id="theme-forgegraph_base-base_theme-param-font-weight"><td class="path" style="padding-left:1.6rem" title="font.weight">weight</td><td>regular</td><td>light | regular | medium | semibold | bold</td><td>fixed</td><td>Weight of text without its own: tick labels, value labels, notes, key names, footnotes.</td></tr>
 <tr id="theme-forgegraph_base-base_theme-param-font-color"><td class="path" style="padding-left:1.6rem" title="font.color">color</td><td>#000000</td><td>hex color code</td><td>fixed</td><td>Text color, unless set elsewhere.</td></tr>
 </table>
 </details>
@@ -128,7 +128,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <tr id="theme-forgegraph_base-base_theme-param-axis-tick-label-gap"><td class="path" style="padding-left:4.1rem" title="axis.tick.label.gap">gap</td><td>0.3</td><td>float &gt; 0</td><td>fixed</td><td>Gap from tick to label, × base size.</td></tr>
 <tr id="theme-forgegraph_base-base_theme-param-axis-tick-label-x_rotation"><td class="path" style="padding-left:4.1rem" title="axis.tick.label.x_rotation">x_rotation</td><td>0</td><td>float, 0-90</td><td>fixed</td><td>x tick label angle, degrees. 0: horizontal.</td></tr>
 <tr id="theme-forgegraph_base-base_theme-param-axis-tick-label-date_order"><td class="path" style="padding-left:4.1rem" title="axis.tick.label.date_order">date_order</td><td>month_day</td><td>month_day | day_month</td><td>fixed</td><td>Day and month in automatic date tick labels: Jul 6, or 6 Jul.</td></tr>
-<tr id="theme-forgegraph_base-base_theme-param-axis-tick-label-max_wrap"><td class="path" style="padding-left:4.1rem" title="axis.tick.label.max_wrap">max_wrap</td><td>1</td><td>int ≥ 0</td><td>fixed</td><td>Times a label may wrap onto a new line. 0: never.</td></tr>
+<tr id="theme-forgegraph_base-base_theme-param-axis-tick-label-max_wrap"><td class="path" style="padding-left:4.1rem" title="axis.tick.label.max_wrap">max_wrap</td><td>1</td><td>int ≥ 0</td><td>fixed</td><td>Times an x tick label may wrap to fit beside its neighbors (not dates). 0: never.</td></tr>
 </table>
 </details>
 <details class="category" id="theme-forgegraph_base-base_theme-category-axis-tick-minor"><summary style="padding-left:3rem" title="axis.tick.minor">minor</summary>
@@ -146,7 +146,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <tr id="theme-forgegraph_base-base_theme-param-plot_area-line_color"><td class="path" style="padding-left:1.6rem" title="plot_area.line_color">line_color</td><td>#000000</td><td>hex color code</td><td>fixed</td><td>Border line color.</td></tr>
 <tr id="theme-forgegraph_base-base_theme-param-plot_area-line_width"><td class="path" style="padding-left:1.6rem" title="plot_area.line_width">line_width</td><td>0.08</td><td>float &gt; 0</td><td>fixed</td><td>Border line width, × base size.</td></tr>
 <tr id="theme-forgegraph_base-base_theme-param-plot_area-aspect"><td class="path" style="padding-left:1.6rem" title="plot_area.aspect">aspect</td><td>1.1</td><td>float &gt; 0</td><td>fixed</td><td>Plot area width ÷ height.</td></tr>
-<tr id="theme-forgegraph_base-base_theme-param-plot_area-margin"><td class="path" style="padding-left:1.6rem" title="plot_area.margin">margin</td><td>0.05</td><td>float, 0-1</td><td>fixed</td><td>Gap between data and the plot area&#x27;s edge, × axis range.</td></tr>
+<tr id="theme-forgegraph_base-base_theme-param-plot_area-margin"><td class="path" style="padding-left:1.6rem" title="plot_area.margin">margin</td><td>0.05</td><td>float, 0-1</td><td>fixed</td><td>Gap between data and the plot area&#x27;s edge, × the data&#x27;s range.</td></tr>
 </table>
 </details>
 <details class="category" id="theme-forgegraph_base-base_theme-category-grid"><summary style="padding-left:0.5rem" title="grid">grid</summary>
@@ -222,12 +222,12 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 <details class="category" id="theme-forgegraph_base-base_theme-category-legend"><summary style="padding-left:0.5rem" title="legend">legend</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="theme-forgegraph_base-base_theme-param-legend-methods"><td class="path" style="padding-left:1.6rem" title="legend.methods">methods</td><td>[auto, direct, key]</td><td>[auto | direct | key | none]</td><td>fixed</td><td>Methods graphs may use to name series, in auto&#x27;s order of preference. direct: names beside the lines. key: a boxed list.</td></tr>
+<tr id="theme-forgegraph_base-base_theme-param-legend-methods"><td class="path" style="padding-left:1.6rem" title="legend.methods">methods</td><td>[auto, direct, key]</td><td>[auto | direct | key | none]</td><td>fixed</td><td>Methods graphs may use to name series; auto tries direct and key, in this list&#x27;s order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.</td></tr>
 </table>
 <details class="category" id="theme-forgegraph_base-base_theme-category-legend-label"><summary style="padding-left:1.75rem" title="legend.label">label</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="theme-forgegraph_base-base_theme-param-legend-label-size"><td class="path" style="padding-left:2.85rem" title="legend.label.size">size</td><td>1</td><td>float &gt; 0</td><td>fixed</td><td>Series name size, × base size.</td></tr>
-<tr id="theme-forgegraph_base-base_theme-param-legend-label-weight"><td class="path" style="padding-left:2.85rem" title="legend.label.weight">weight</td><td>semibold</td><td>light | regular | medium | semibold | bold</td><td>fixed</td><td>Series name weight.</td></tr>
+<tr id="theme-forgegraph_base-base_theme-param-legend-label-weight"><td class="path" style="padding-left:2.85rem" title="legend.label.weight">weight</td><td>semibold</td><td>light | regular | medium | semibold | bold</td><td>fixed</td><td>Direct label weight; key names use font.weight.</td></tr>
 </table>
 </details>
 <details class="category" id="theme-forgegraph_base-base_theme-category-legend-direct"><summary style="padding-left:1.75rem" title="legend.direct">direct</summary>
@@ -452,7 +452,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 <details class="category" id="format-forgegraph_base-base_format-category-provenance"><summary style="padding-left:0.5rem" title="provenance">provenance</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="format-forgegraph_base-base_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>Which entries of the provenance record (docs/specs/provenance) each saved file carries. off: none.</td></tr>
+<tr id="format-forgegraph_base-base_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.</td></tr>
 </table>
 </details>
 </div>
@@ -485,7 +485,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 <details class="category" id="format-forgegraph_base-base_layout_format-category-provenance"><summary style="padding-left:0.5rem" title="provenance">provenance</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="format-forgegraph_base-base_layout_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>Which entries of the provenance record (docs/specs/provenance) each saved file carries. off: none.</td></tr>
+<tr id="format-forgegraph_base-base_layout_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.</td></tr>
 </table>
 </details>
 </div>
@@ -528,8 +528,8 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-axis-x-title"><td class="path" style="padding-left:2.85rem" title="axis.x.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>Axis title. column_name: the column&#x27;s name. None: none.</td></tr>
 <tr id="graphtype-xy-param-axis-x-scale"><td class="path" style="padding-left:2.85rem" title="axis.x.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>Axis scale.</td></tr>
-<tr id="graphtype-xy-param-axis-x-min"><td class="path" style="padding-left:2.85rem" title="axis.x.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: lowest value − plot_area.margin.</td></tr>
-<tr id="graphtype-xy-param-axis-x-max"><td class="path" style="padding-left:2.85rem" title="axis.x.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: highest value + plot_area.margin.</td></tr>
+<tr id="graphtype-xy-param-axis-x-min"><td class="path" style="padding-left:2.85rem" title="axis.x.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-x-max"><td class="path" style="padding-left:2.85rem" title="axis.x.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
 </table>
 <details class="category" id="graphtype-xy-category-axis-x-tick"><summary style="padding-left:3rem" title="axis.x.tick">tick</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -560,8 +560,8 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-axis-y-title"><td class="path" style="padding-left:2.85rem" title="axis.y.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>Axis title. column_name: the column&#x27;s name; with several columns, use text or None. None: none.</td></tr>
 <tr id="graphtype-xy-param-axis-y-scale"><td class="path" style="padding-left:2.85rem" title="axis.y.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>Axis scale.</td></tr>
-<tr id="graphtype-xy-param-axis-y-min"><td class="path" style="padding-left:2.85rem" title="axis.y.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: lowest value − plot_area.margin.</td></tr>
-<tr id="graphtype-xy-param-axis-y-max"><td class="path" style="padding-left:2.85rem" title="axis.y.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: highest value + plot_area.margin.</td></tr>
+<tr id="graphtype-xy-param-axis-y-min"><td class="path" style="padding-left:2.85rem" title="axis.y.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-y-max"><td class="path" style="padding-left:2.85rem" title="axis.y.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
 </table>
 <details class="category" id="graphtype-xy-category-axis-y-tick"><summary style="padding-left:3rem" title="axis.y.tick">tick</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -614,7 +614,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-mark-line-show"><td class="path" style="padding-left:2.85rem" title="mark.line.show">show</td><td>true</td><td>true | false</td><td>variable</td><td>Draw lines.</td></tr>
 <tr id="graphtype-xy-param-mark-line-connect_order"><td class="path" style="padding-left:2.85rem" title="mark.line.connect_order">connect_order</td><td>x</td><td>x | data</td><td>variable</td><td>Point order along each line: by x, or by row.</td></tr>
-<tr id="graphtype-xy-param-mark-line-missing_values"><td class="path" style="padding-left:2.85rem" title="mark.line.missing_values">missing_values</td><td>drop</td><td>drop | gap</td><td>variable</td><td>Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in provenance.</td></tr>
+<tr id="graphtype-xy-param-mark-line-missing_values"><td class="path" style="padding-left:2.85rem" title="mark.line.missing_values">missing_values</td><td>drop</td><td>drop | gap</td><td>variable</td><td>Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in lint&#x27;s dropped-rows.</td></tr>
 </table>
 </details>
 <details class="category" id="graphtype-xy-category-mark-marker"><summary style="padding-left:1.75rem" title="mark.marker">marker</summary>
@@ -956,7 +956,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="layer-note-param-text"><td class="path" style="padding-left:0.5rem" title="text">text</td><td>None</td><td>text</td><td>required</td><td>The note, in label markup; a line break starts a new line. A GraphSpec must set it.</td></tr>
-<tr id="layer-note-param-position"><td class="path" style="padding-left:0.5rem" title="position">position</td><td>auto</td><td>auto | top_left | top_center | top_right | bottom_left | bottom_center | bottom_right</td><td>variable</td><td>auto: the first clear one.</td></tr>
+<tr id="layer-note-param-position"><td class="path" style="padding-left:0.5rem" title="position">position</td><td>auto</td><td>auto | top_left | top_center | top_right | bottom_left | bottom_center | bottom_right</td><td>variable</td><td>auto: the first clear place inside the plot area; set a position when inside is false.</td></tr>
 <tr id="layer-note-param-inside"><td class="path" style="padding-left:0.5rem" title="inside">inside</td><td>true</td><td>true | false</td><td>variable</td><td>Inside the plot area, or outside it.</td></tr>
 </table>
 </div>
@@ -1001,7 +1001,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <details class="category" id="layer-reference_line-category-label"><summary style="padding-left:0.5rem" title="label">label</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="layer-reference_line-param-label-text"><td class="path" style="padding-left:1.6rem" title="label.text">text</td><td>None</td><td>text | aggregation | value | aggregation_value | None</td><td>variable</td><td>aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9.</td></tr>
+<tr id="layer-reference_line-param-label-text"><td class="path" style="padding-left:1.6rem" title="label.text">text</td><td>None</td><td>text | aggregation | value | aggregation_value | None</td><td>variable</td><td>aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.</td></tr>
 <tr id="layer-reference_line-param-label-position"><td class="path" style="padding-left:1.6rem" title="label.position">position</td><td>auto</td><td>auto | start_above | start_below | center_above | center_below | end_above | end_below</td><td>variable</td><td>auto: the first clear one.</td></tr>
 <tr id="layer-reference_line-param-label-format"><td class="path" style="padding-left:1.6rem" title="label.format">format</td><td>auto</td><td>text | auto</td><td>variable</td><td>Number format of the value, e.g. &quot;.2f&quot;. auto: one decimal more than the axis&#x27;s tick labels.</td></tr>
 </table>

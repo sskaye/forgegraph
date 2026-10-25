@@ -1,5 +1,5 @@
-"""Write the example GraphSpecs' data: graphspecs/polarization.parquet, fanned.parquet,
-reinforced.parquet and dated.parquet, and the skill's examples/xy.parquet (the polarization
+"""Write the example GraphSpecs' data, into each built-in pack's graphspecs/ (polarization,
+fanned, reinforced and dated .parquet), and the skill's examples/xy.parquet (the polarization
 data).
 
 uv run python scripts/build_example_data.py
@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 PACKAGE = Path(__file__).parents[1] / "src" / "forgegraph"
-DATA = PACKAGE / "graphspecs"
+PACKS = sorted(p for p in (PACKAGE / "packs").iterdir() if (p / "pack.yaml").is_file())
 SKILL_EXAMPLES = PACKAGE / "skill" / "forgegraph" / "examples"
 
 
@@ -90,13 +90,14 @@ def reinforced() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    for out, frame in (
-        (DATA / "polarization.parquet", polarization()),
-        (DATA / "fanned.parquet", fanned()),
-        (DATA / "reinforced.parquet", reinforced()),
-        (DATA / "dated.parquet", dated()),
-        (SKILL_EXAMPLES / "xy.parquet", polarization()),
-    ):
+    frames = {"polarization": polarization(), "fanned": fanned(), "reinforced": reinforced()}
+    frames["dated"] = dated()
+    written = [
+        (pack / "graphspecs" / f"{name}.parquet", frame)
+        for pack in PACKS
+        for name, frame in frames.items()
+    ]
+    for out, frame in (*written, (SKILL_EXAMPLES / "xy.parquet", polarization())):
         out.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(out, index=False)
         print(f"wrote {out.relative_to(Path.cwd())}")

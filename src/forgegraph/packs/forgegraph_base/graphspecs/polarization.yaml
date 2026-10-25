@@ -26,8 +26,8 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
                     direction: ascending          # [ascending, descending]; The category order's direction.
             title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name. None: none.
             scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float]; Axis minimum. None: lowest value − plot_area.margin.
-            max: None          # [None, float]; Axis maximum. None: highest value + plot_area.margin.
+            min: None          # [None, float]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.
+            max: None          # [None, float]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                 step: None          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
@@ -43,8 +43,8 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
                     direction: ascending          # [ascending, descending]; The category order's direction.
             title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.
             scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float]; Axis minimum. None: lowest value − plot_area.margin.
-            max: None          # [None, float]; Axis maximum. None: highest value + plot_area.margin.
+            min: None          # [None, float]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.
+            max: None          # [None, float]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                 step: None          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
@@ -66,7 +66,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
         line:
             show: true          # [true, false]; Draw lines.
             connect_order: x          # [x, data]; Point order along each line: by x, or by row.
-            missing_values: drop          # [drop, gap]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in provenance.
+            missing_values: drop          # [drop, gap]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in lint's dropped-rows.
         marker:
             show: true          # [true, false]; Draw markers.
         bar:
@@ -122,7 +122,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
     output:
         file_types: [png]          # [png, jpg, tiff, svg, pdf, html]; File types saved.
     provenance:
-        level: full          # [full, minimal, off]; Which entries of the provenance record (docs/specs/provenance) each saved file carries. off: none.
+        level: full          # [full, minimal, off]; What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.
     layer:
         error_bar:
             color: "#000000"          # [series, hex color]; Error bar color. series: the series' color.
@@ -132,7 +132,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
             axis: y          # [x, y]; Axis the value is on: y draws a horizontal line.
             value: 1.2          # [float, column]; The line's value, or a column to aggregate.
             label:
-                text: Target 1.2 V          # [None, aggregation, value, text]; The line's label.
+                text: Target 1.2 V          # [None, aggregation, value, aggregation_value, text]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.
         conditions:
             type: note          # [layer type]; The layer's type: one of the graph type's layer.types.
-            text: "60 °C, 1 atm, H₂/air"          # [text]; The note, in label markup.
+            text: "60 °C, 1 atm, H₂/air"          # [text]; The note, in label markup; a line break starts a new line.

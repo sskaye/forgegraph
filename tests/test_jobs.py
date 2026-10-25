@@ -14,21 +14,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pack_helpers import allow, write_pack
+from pack_helpers import allow, dump, needs_node, write_pack
 from render_helpers import BASE, polarization
-from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph.drawing.figure import FOOTNOTE
 from forgegraph.drawing.page import STALE_ID
 from forgegraph.jobs import run as job_run
 from forgegraph.jobs import status as status_file
-
-
-def _dump(doc: dict[str, Any], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
-        YAML().dump(doc, f)
 
 
 def schedule_doc(name: str = "lab", **variable: Any) -> dict[str, Any]:
@@ -50,8 +43,8 @@ def project(tmp_path, monkeypatch):
     polarization().to_parquet(tmp_path / "p.parquet")
     doc = fg.graphspec("p", "xy", data_file="p.parquet", settings=BASE)
     doc["variable_parameters"]["output"] = {"file_types": ["png", "html"]}
-    _dump(doc, tmp_path / "p.yaml")
-    _dump(schedule_doc(), tmp_path / "lab.schedule.yaml")
+    dump(doc, tmp_path / "p.yaml")
+    dump(schedule_doc(), tmp_path / "lab.schedule.yaml")
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -84,20 +77,20 @@ def test_paths_a_parent_schedule_sets_are_found_from_its_folder(project):
     schedules = write_pack(project / "packs") / "schedules"
     (schedules / "graphs").mkdir(parents=True)
     polarization().to_parquet(schedules / "graphs" / "q.parquet")
-    _dump(
+    dump(
         fg.graphspec("q", "xy", data_file="q.parquet", settings=BASE),
         schedules / "graphs" / "q.yaml",
     )
     parent = schedule_doc("lab")
     parent["variable_parameters"]["targets"] = {"files": ["graphs/q.yaml"], "output_folder": "made"}
-    _dump(parent, schedules / "lab.yaml")
+    dump(parent, schedules / "lab.yaml")
     work = project / "work"
     work.mkdir()
     allow(work, "forgegraph_base", "../packs/house")
     child = schedule_doc("weekly")
     child["extends"] = "house/lab"
     del child["variable_parameters"]["targets"]
-    _dump(child, work / "weekly.schedule.yaml")
+    dump(child, work / "weekly.schedule.yaml")
     assert job_run.run(work / "weekly.schedule.yaml") == 0
     assert (schedules / "made" / "q.png").is_file()
 
@@ -130,7 +123,7 @@ def test_the_footnote_says_when_the_data_is_from(project):
 
 @pytest.mark.slow
 def test_no_stamp_when_freshness_stamp_is_off(project):
-    _dump(schedule_doc(freshness={"stamp": False}), project / "lab.schedule.yaml")
+    dump(schedule_doc(freshness={"stamp": False}), project / "lab.schedule.yaml")
     job_run.run(project / "lab.schedule.yaml")
     plain = fg.render(project / "p.yaml")
     plain.save(project / "plain.png")
@@ -144,7 +137,7 @@ def test_one_target_failing_leaves_the_others_and_fires_on_failure(project):
         "-c",
         f"import os; open({str(hook)!r}, 'w').write(os.environ['FORGEGRAPH_ERROR'])",
     ]
-    _dump(
+    dump(
         schedule_doc(
             targets={"files": ["p.yaml", "q.yaml"], "output_folder": "out"},
             on_failure={"command": command},
@@ -163,10 +156,40 @@ def test_one_target_failing_leaves_the_others_and_fires_on_failure(project):
     assert (project / "out" / "p.png").is_file()
 
 
+def test_job_run_says_what_it_saved_and_exits_1_when_a_target_fails(project):
+    from typer.testing import CliRunner
+
+    from forgegraph.cli import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["job", "run", "lab.schedule.yaml"])
+    assert result.exit_code == 0, result.output
+    saved = [line.removeprefix("saved ") for line in result.output.splitlines()]
+    assert [Path(p).name for p in saved] == ["p.png", "p.html"]
+    targets = {"files": ["p.yaml", "q.yaml"], "output_folder": "out"}
+    dump(schedule_doc(targets=targets), project / "lab.schedule.yaml")
+    (project / "q.yaml").write_text(
+        (project / "p.yaml").read_text().replace("p.parquet", "gone.parquet")
+    )
+    result = runner.invoke(app, ["job", "run", "lab.schedule.yaml"])
+    assert result.exit_code == 1
+    assert "error: q.yaml: data.file: no file at" in result.output
+    assert "p.png" in result.output  # the other target still saved
+    result = runner.invoke(app, ["job", "run", "lab.schedule.yaml", "--json"])
+    assert result.exit_code == 1
+    out = json.loads(result.output)
+    assert not out["ok"] and [t["ok"] for t in out["status"]["targets"]] == [True, False]
+    dump(schedule_doc(interval=7), project / "lab.schedule.yaml")  # 7 days: not allowed
+    result = runner.invoke(app, ["job", "run", "lab.schedule.yaml", "--json"])
+    assert result.exit_code == 1
+    [problem] = json.loads(result.output)["problems"]
+    assert problem.startswith("variable_parameters.interval: ")
+
+
 @pytest.mark.slow
 def test_on_success_runs_and_a_slow_command_is_stopped(project):
     slow = [sys.executable, "-c", "import time; time.sleep(5)"]
-    _dump(
+    dump(
         schedule_doc(on_success={"command": slow, "timeout_seconds": 1}),
         project / "lab.schedule.yaml",
     )
@@ -176,7 +199,7 @@ def test_on_success_runs_and_a_slow_command_is_stopped(project):
 
 
 def test_a_missing_command_is_recorded(project):
-    _dump(
+    dump(
         schedule_doc(on_success={"command": ["no-such-program-xyz"]}), project / "lab.schedule.yaml"
     )
     job_run.run(project / "lab.schedule.yaml")
@@ -203,7 +226,7 @@ def test_two_runs_never_overlap(project):
     ],
 )
 def test_a_schedule_that_cant_run_is_an_error(project, variable, message):
-    _dump(schedule_doc(**variable), project / "lab.schedule.yaml")
+    dump(schedule_doc(**variable), project / "lab.schedule.yaml")
     with pytest.raises(job_run.ScheduleError, match=message):
         job_run.run(project / "lab.schedule.yaml")
 
@@ -228,8 +251,8 @@ def test_a_layout_target_takes_its_oldest_tiles_time(project):
             }
         },
     }
-    _dump(layout, project / "both.layout.yaml")
-    _dump(
+    dump(layout, project / "both.layout.yaml")
+    dump(
         schedule_doc(targets={"files": ["both.layout.yaml"], "output_folder": "out"}),
         project / "lab.schedule.yaml",
     )
@@ -257,8 +280,8 @@ def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
             "tabs": {"T": {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}}
         },
     }
-    _dump(layout, project / "tiled.layout.yaml")
-    _dump(
+    dump(layout, project / "tiled.layout.yaml")
+    dump(
         schedule_doc(targets={"files": ["tiled.layout.yaml"], "output_folder": "out"}),
         project / "lab.schedule.yaml",
     )
@@ -269,12 +292,6 @@ def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
 
 
 # --- the stale banner, under a simulated clock ------------------------------------------------
-
-
-needs_node = pytest.mark.skipif(
-    shutil.which("node") is None and not os.environ.get("FORGEGRAPH_REQUIRE_NODE"),
-    reason="needs Node to run the page's script",
-)
 
 
 def _stale(page: Path, now: datetime) -> str | None:
@@ -304,7 +321,7 @@ def test_failure_injection_status_hook_and_banner(project):
     the last good page's banner turns stale on schedule."""
     hook = project / "fired.txt"
     command = [sys.executable, "-c", f"open({str(hook)!r}, 'w').write('fired')"]
-    _dump(schedule_doc(on_failure={"command": command}), project / "lab.schedule.yaml")
+    dump(schedule_doc(on_failure={"command": command}), project / "lab.schedule.yaml")
     made = datetime(2026, 10, 19, 5, 0).astimezone()  # Monday
     os.utime(project / "p.parquet", (made.timestamp(), made.timestamp()))
     assert job_run.run(project / "lab.schedule.yaml") == 0
@@ -328,7 +345,7 @@ def test_failure_injection_status_hook_and_banner(project):
 @needs_node
 def test_a_weekday_job_isnt_stale_over_the_weekend(project):
     weekdays = ["mon 06:00", "tue 06:00", "wed 06:00", "thu 06:00", "fri 06:00"]
-    _dump(
+    dump(
         schedule_doc(cadence={"interval_unit": "week", "at": weekdays}),
         project / "lab.schedule.yaml",
     )

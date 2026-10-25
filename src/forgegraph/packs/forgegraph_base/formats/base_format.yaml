@@ -15,4 +15,4 @@ variable_parameters:          # List of variable parameters for the format, None
     output:
         file_types: [png]          # [png, jpg, tiff, svg, pdf, html]; File types saved.
     provenance:
-        level: full          # [full, minimal, off]; Which entries of the provenance record (docs/specs/provenance) each saved file carries. off: none.
+        level: full          # [full, minimal, off]; What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.

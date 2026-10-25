@@ -1,11 +1,19 @@
 # Changelog
 
-ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.1.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
+ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
 ## Unreleased
 
+### Added
+
+- `fg.blank` takes `registry=`, as `fg.render` does, and a blank canvas's `save` path is optional, as a graph's is: with none, it saves `canvas.png` and the format's other file types.
+
 ### Changed
 
+- Drawing and saving are about 3.7 times faster. Graphs and their files are the same as before.
+- A pack's fonts are registered when a file drawn uses one of its specs, not whenever a config lists the pack.
+- `forgegraph --help` gives each command a one-sentence summary, and `forgegraph catalog --help` names every kind it lists.
+- The internal package `forgegraph.catalog` is `forgegraph.catalog_build`. The API is unchanged.
 - One name is one pack. A config can't give a built-in pack's name, or a name the main config already gives, to another folder. Before, a folder config's copy of a pack replaced the one the main config lists, and what it drew wasn't marked non-standard.
 - ForgeGraph needs matplotlib 3.11.2 and typer 0.15.4 or later; earlier versions installed but didn't work.
 - The package's description and classifiers say what it is now: released, in alpha.
@@ -21,7 +29,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ## 0.2.0 (2026-10-24)
 
-Images that changed: the [visual changelog](review/visual-changelog/0.2.0.html).
+Images that changed: the [visual changelog](docs/visual-changelog/0.2.0.html).
 
 ### Changed
 

@@ -1,0 +1,5 @@
+name: ops          # [text]; The pack's name, which its specs' names start with (pack/name); a pip pack's must match its entry point.
+version: 1.0.0          # [text]; The pack's release version.
+description: The ops dashboard's page format.          # [text]; One line, describing what the pack is.
+issues: https://example.com/ops/issues          # [text]; Where to file feature requests and bug reports about the pack's specs.
+requires: None          # [None, version specifier]; The ForgeGraph versions the pack works with, as a pip version specifier. None: any.

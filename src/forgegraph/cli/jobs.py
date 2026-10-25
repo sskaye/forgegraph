@@ -13,7 +13,9 @@ from forgegraph.cli import Json, fail, job_app, json_errors
 ScheduleFile = Annotated[Path, typer.Argument(help="A schedule file (.schedule.yaml).")]
 
 
-@job_app.command("run")
+@job_app.command(
+    "run", short_help="Run a schedule once: render its targets and write its status file."
+)
 @json_errors
 def job_run(
     schedule: ScheduleFile,

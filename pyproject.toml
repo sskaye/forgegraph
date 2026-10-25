@@ -53,8 +53,9 @@ build-backend = "hatchling.build"
 packages = ["src/forgegraph"]
 
 [tool.hatch.build.targets.sdist]
-# The review pages and generated catalogs belong to the repository, not the package.
-exclude = ["/review", "/catalog", "/evals", "/.github"]
+# The review pages, generated catalogs and visual changelogs belong to the repository, not the
+# package.
+exclude = ["/review", "/catalog", "/evals", "/.github", "/docs/visual-changelog"]
 
 [tool.ruff]
 line-length = 100
@@ -65,7 +66,6 @@ extend-exclude = ["*.md", "review"]  # review pages and notebooks are generated
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/build_api_notebook.py" = ["E501"]  # the notebook's prose cells stay on one line each
 # Pydantic copies field defaults per instance, so mutable defaults are safe on models.
 "src/forgegraph/spec/*.py" = ["RUF012"]
 

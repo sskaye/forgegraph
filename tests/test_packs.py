@@ -10,9 +10,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from pack_helpers import allow, write_pack
+from pack_helpers import allow, dump, write_config, write_pack
 from render_helpers import BASE, polarization
-from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph import packs
@@ -30,15 +29,13 @@ def graphspec(folder: Path, theme: str, fmt: str = "forgegraph_base/base_format"
     polarization().to_parquet(folder / "p.parquet")
     doc = fg.graphspec("g", "xy", theme=theme, format=fmt, data_file="p.parquet", settings=BASE)
     path = folder / "g.yaml"
-    YAML().dump(doc, path.open("w"))
+    dump(doc, path)
     return path
 
 
 def user(tmp_path: Path, monkeypatch, *listed: str) -> Path:
     """A main config listing these packs (paths from its folder)."""
-    path = tmp_path / "home" / "config.toml"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("packs = [" + ", ".join(f"'{p}'" for p in listed) + "]\n")  # literal strings
+    path = write_config(tmp_path / "home" / "config.toml", *listed)
     monkeypatch.setenv(packs.MAIN_CONFIG_VARIABLE, str(path))
     return path
 
@@ -220,7 +217,7 @@ def test_a_layout_and_its_tiles_use_the_layouts_configs(tmp_path):
             "tabs": {"T": {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}}
         },
     }
-    YAML().dump(layout, (tmp_path / "fig.layout.yaml").open("w"))
+    dump(layout, tmp_path / "fig.layout.yaml")
     drawn = fg.layout(tmp_path / "fig.layout.yaml")
     assert drawn.specs["layout"]["name"] == "fig" and drawn.specs["format"]["name"] == "acme/slide"
 
@@ -240,7 +237,7 @@ def test_a_layout_drawn_with_a_nonstandard_pack_is_watermarked(tmp_path, monkeyp
             "tabs": {"T": {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}}
         },
     }
-    YAML().dump(layout, (tmp_path / "fig.layout.yaml").open("w"))
+    dump(layout, tmp_path / "fig.layout.yaml")
     drawn = fg.layout(tmp_path / "fig.layout.yaml")
     assert drawn.nonstandard and drawn.nonstandard_packs == ["acme"]
     [path] = drawn.save(tmp_path / "fig.png")
@@ -409,8 +406,8 @@ def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
 
 def test_the_reference_config_and_base_pack_are_valid():
     assert packs.read_config(ROOT / "src" / "forgegraph" / "packs" / "config.toml").packs
-    base = read_pack(packs.base_folder(), "built in", "forgegraph_base")
-    assert base.version == fg.__version__  # the base pack is released with ForgeGraph
+    for name in packs.BUILT_IN:  # the built-in packs are released with ForgeGraph
+        assert read_pack(packs.built_in_folder(name), "built in", name).version == fg.__version__
 
 
 # --- everything works under a pack ---------------------------------------------------------

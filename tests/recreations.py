@@ -11,6 +11,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -393,15 +394,8 @@ class LayoutRecreation:
         path = folder / f"{self.name}.layout.yaml"
         with path.open("w", encoding="utf-8") as f:
             yaml.dump(doc, f)
-        main = os.environ.get(MAIN_CONFIG_VARIABLE)
-        os.environ[MAIN_CONFIG_VARIABLE] = str(folder / "main.toml")
-        try:
+        with mock.patch.dict(os.environ, {MAIN_CONFIG_VARIABLE: str(folder / "main.toml")}):
             return fg.layout(path, data={name: r.data for name, r in self.tiles.items()})
-        finally:
-            if main is None:
-                del os.environ[MAIN_CONFIG_VARIABLE]
-            else:
-                os.environ[MAIN_CONFIG_VARIABLE] = main
 
 
 SLIDE = {"width": 254, "height": 110, "base_size": 12}

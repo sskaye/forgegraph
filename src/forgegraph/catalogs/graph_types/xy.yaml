@@ -92,8 +92,8 @@ variations:          # Every parameter of the graph type, by category: its card'
     axis:
         x:
             data:
-                column: "Power Density (mW/cm²)"          # [column]; Horizontal axis column. A GraphSpec must set it.
-                type: {value: categorical, from: temperatures}          # [auto, decimal, integer, categorical]; The column's type. auto: categorical for text, else decimal or integer.
+                column: "Power Density (mW/cm²)"          # [column]; Horizontal axis column.
+                type: {value: categorical, from: temperatures}          # [auto, decimal, integer, datetime, categorical]; The column's type. auto: datetime for dates, categorical for text, else decimal or integer.
                 aggregation: no_card          # [none, mean, median, sum, min, max]; Rows at one place in a series, combined. none: each drawn.
                 order:
                     method:          # [source, alphanumeric, value]; Category order: as in the data, natural, or by the other axis's value.
@@ -102,36 +102,36 @@ variations:          # Every parameter of the graph type, by category: its card'
                     direction: {value: descending, from: sorted}          # [ascending, descending]; The category order's direction.
             title: "Current (mA/cm^2)"          # [None, column_name, text]; Axis title. column_name: the column's name. None: none.
             scale: log          # [linear, log]; Axis scale.
-            min: 20          # [None, float]; Axis minimum. None: lowest value − plot_area.margin.
-            max: 60          # [None, float]; Axis maximum. None: highest value + plot_area.margin.
+            min: 20          # [None, float]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.
+            max: 60          # [None, float]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.
             tick:
-                algorithm:          # [auto, all, manual]; auto: the theme's algorithm. all: one per value. manual: every tick.step.
+                algorithm:          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                     value: manual
                     with:
                         axis.x.tick.step: 20
-                step: {value: 50, from: x_manual}          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "3 month"; on log, a factor.
+                step: {value: 50, from: x_manual}          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
                 label:
-                    format: ".1f"          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values.
+                    format: ".1f"          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
         y:
             data:
-                column: "iR-Free Voltage (V)"          # [columns]; Vertical axis column, or columns for one series each. A GraphSpec must set it.
-                type: no_card          # [auto, decimal, integer, categorical]; The column's type. auto: categorical for text, else decimal or integer.
+                column: "iR-Free Voltage (V)"          # [columns]; Vertical axis column, or columns for one series each.
+                type: no_card          # [auto, decimal, integer, datetime, categorical]; The column's type. auto: datetime for dates, categorical for text, else decimal or integer.
                 aggregation: {value: mean, from: bars}          # [none, mean, median, sum, min, max]; Rows at one place in a series, combined. none: each drawn.
                 order:
                     method: no_card          # [source, alphanumeric, value]; Category order: as in the data, natural, or by the other axis's value.
                     direction: no_card          # [ascending, descending]; The category order's direction.
             title: "Voltage (V)"          # [None, column_name, text]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.
             scale: log          # [linear, log]; Axis scale.
-            min: 1.2          # [None, float]; Axis minimum. None: lowest value − plot_area.margin.
-            max: 1.5          # [None, float]; Axis maximum. None: highest value + plot_area.margin.
+            min: 1.2          # [None, float]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.
+            max: 1.5          # [None, float]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.
             tick:
-                algorithm:          # [auto, all, manual]; auto: the theme's algorithm. all: one per value. manual: every tick.step.
+                algorithm:          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                     value: manual
                     with:
                         axis.y.tick.step: 0.05
-                step: {value: 0.2, from: y_manual}          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "3 month"; on log, a factor.
+                step: {value: 0.2, from: y_manual}          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
                 label:
-                    format: ".2f"          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values.
+                    format: ".2f"          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
     encoding:
         color: Cell Size          # [None, column_name, column]; A color per value of this column. column_name: per y column. None: one color.
         color_type: {value: categorical, from: colored_by_run}          # [auto, categorical, continuous]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.
@@ -175,7 +175,7 @@ variations:          # Every parameter of the graph type, by category: its card'
         line:
             show: false          # [true, false]; Draw lines.
             connect_order: data          # [x, data]; Point order along each line: by x, or by row.
-            missing_values: gap          # [drop, gap]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in provenance.
+            missing_values: gap          # [drop, gap]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in lint's dropped-rows.
         marker:
             show: false          # [true, false]; Draw markers.
         bar:

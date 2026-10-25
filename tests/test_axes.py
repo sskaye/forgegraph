@@ -331,17 +331,23 @@ def test_a_date_format_can_drop_the_leading_zero():
     assert labels(g) == ["1/2 0", "1/4 0", "1/6 0", "1/8 0", "1/10 0"]  # ticks at midnight
 
 
-def test_month_names_are_english_whatever_the_locale(monkeypatch):
+def test_month_names_are_english_whatever_the_locale():
     import locale
 
+    previous = locale.setlocale(locale.LC_TIME)
     try:
         locale.setlocale(locale.LC_TIME, "de_DE.UTF-8")
     except locale.Error:
         pytest.skip("no German locale on this machine")
     try:
-        test_a_date_step_is_a_count_and_a_unit()
+        months = pd.date_range("2025-01-01", "2025-12-31", freq="MS")
+        df = pd.DataFrame({"when": months, "value": np.arange(len(months))})
+        settings = {"axis.x.tick.algorithm": "manual", "axis.x.tick.step": "2 month"}
+        g = graph(df, "when", "value", **settings, **{"axis.x.tick.label.format": "%b"})
+        assert labels(g) == ["Jan", "Mar", "May", "Jul", "Sep", "Nov"]  # German: Mär, Mai
     finally:
-        locale.setlocale(locale.LC_TIME, "")
+        locale.setlocale(locale.LC_TIME, previous)
+    assert locale.setlocale(locale.LC_TIME) == previous
 
 
 def test_text_categories_take_no_format():

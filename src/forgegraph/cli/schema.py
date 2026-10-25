@@ -11,7 +11,7 @@ import typer
 from forgegraph.cli import Json, app, fail, json_errors
 
 
-@app.command()
+@app.command(short_help="Show every parameter of a kind: its default, range and description.")
 @json_errors
 def schema(
     kind: Annotated[

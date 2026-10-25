@@ -17,8 +17,9 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 catalog_app = typer.Typer(
-    help="What's available: graph types, layer types, themes, formats, layouts and GraphSpecs "
-    "to extend. Also builds and checks the review catalog.",
+    help="What's available here: graph types, layer types, themes, formats, GraphSpecs, "
+    "layouts, schedules, packs and their reference notes. Also builds and checks the catalog "
+    "pages.",
     invoke_without_command=True,
 )
 app.add_typer(catalog_app, name="catalog")

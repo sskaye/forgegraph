@@ -1,4 +1,5 @@
-"""Rendering a GraphSpec: the Python API (`render`, `xy`, `load`) and the Graph it returns."""
+"""Rendering a GraphSpec: the Python API (`render`, `xy`, `graphspec`, `load`) and the Graph it
+returns."""
 
 from __future__ import annotations
 

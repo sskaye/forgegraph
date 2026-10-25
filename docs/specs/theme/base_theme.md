@@ -11,7 +11,7 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
     font:\
         family: Roboto          *# \[text\]; Typeface for all text.*\
         color: "#000000"          *# \[hex color\]; Text color, unless set elsewhere.*\
-        weight: regular          *# \[light, regular, medium, semibold, bold\]; Weight of text without its own: tick labels, value labels, notes.*\
+        weight: regular          *# \[light, regular, medium, semibold, bold\]; Weight of text without its own: tick labels, value labels, notes, key names, footnotes.*\
     background:\
         color: "#FFFFFF"          *# \[None, hex color\]; Figure and plot background. None: transparent.*\
     title:\
@@ -35,7 +35,7 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
                 gap: 0.3          *# \[positive float\]; Gap from tick to label, × base size.*\
                 x_rotation: 0          *# \[0-90\]; x tick label angle, degrees. 0: horizontal.*\
                 date_order: month_day          *# \[month_day, day_month\]; Day and month in automatic date tick labels: Jul 6, or 6 Jul.*\
-                max_wrap: 1          *# \[int\]; Times a label may wrap onto a new line. 0: never.*\
+                max_wrap: 1          *# \[int\]; Times an x tick label may wrap to fit beside its neighbors (not dates). 0: never.*\
             minor:\
                 num: 0          *# \[int\]; Minor ticks between major ticks. 0: none.*\
                 length: 0.15          *# \[positive float\]; Minor tick length, × base size.*\
@@ -45,7 +45,7 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
         line_width: 0.08          *# \[positive float\]; Border line width, × base size.*\
         line_color: "#000000"          *# \[hex color\]; Border line color.*\
         aspect: 1.1          *# \[positive float\]; Plot area width ÷ height.*\
-        margin: 0.05          *# \[0-1\]; Gap between data and the plot area's edge, × axis range.*\
+        margin: 0.05          *# \[0-1\]; Gap between data and the plot area's edge, × the data's range.*\
     grid:\
         color: "#E6E6E6"          *# \[hex color\]; Grid color.*\
         line_width: 0.05          *# \[positive float\]; Grid line width, × base size.*\
@@ -73,10 +73,10 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
             bar:\
                 edge_color: "#000000"          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
     legend:\
-        methods: \[auto, direct, key\]          *# \[auto, direct, key, none\]; Methods graphs may use to name series, in auto's order of preference. direct: names beside the lines. key: a boxed list.*\
+        methods: \[auto, direct, key\]          *# \[auto, direct, key, none\]; Methods graphs may use to name series; auto tries direct and key, in this list's order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.*\
         label:\
             size: 1.0          *# \[positive float\]; Series name size, × base size.*\
-            weight: semibold          *# \[light, regular, medium, semibold, bold\]; Series name weight.*\
+            weight: semibold          *# \[light, regular, medium, semibold, bold\]; Direct label weight; key names use font.weight.*\
         key:\
             frame: false          *# \[true, false\]; Box around the key.*\
             frame_width: 0.06          *# \[positive float\]; Frame line width, × base size.*\

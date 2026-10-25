@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
 import pytest
-from pack_helpers import allow, write_pack
+from pack_helpers import allow, dump, write_pack
+from PIL import Image, PngImagePlugin
 from render_helpers import BASE, polarization
-from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -28,7 +29,7 @@ def project(tmp_path, monkeypatch):
     doc = fg.graphspec(
         "p", "xy", data_file="../data/p.parquet", title="Polarization", settings=BASE
     )
-    YAML().dump(doc, (tmp_path / "graphspecs" / "p.yaml").open("w"))
+    dump(doc, tmp_path / "graphspecs" / "p.yaml")
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -151,6 +152,20 @@ def test_skill_install(tmp_path):
     assert _json(["skill", "install", "--dest", str(folder), "--force"])["result"] == "updated"
 
 
+def test_skill_install_refuses_two_destinations_and_a_file_in_the_way(tmp_path):
+    folder = tmp_path / "skills"
+    args = ["skill", "install", "--project", "--dest", str(folder), "--json"]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 1
+    assert json.loads(result.output)["problems"] == ["use --project or --dest, not both"]
+    folder.mkdir()
+    (folder / "forgegraph").write_text("not a folder")
+    result = runner.invoke(app, ["skill", "install", "--dest", str(folder), "--json"])
+    assert result.exit_code == 1
+    [problem] = json.loads(result.output)["problems"]
+    assert problem == f"{folder / 'forgegraph'} exists and isn't a folder"
+
+
 @pytest.mark.slow
 def test_skill_examples_render(tmp_path):
     """The skill's example GraphSpecs and layout render as packaged, and its example schedule
@@ -216,7 +231,7 @@ def _files(project, name: str, frame, settings: dict) -> None:
     """data/<name>.parquet, and a GraphSpec drawing it."""
     frame.to_parquet(project / "data" / f"{name}.parquet")
     doc = fg.graphspec(name, "xy", data_file=f"../data/{name}.parquet", settings=settings)
-    YAML().dump(doc, (project / "graphspecs" / f"{name}.yaml").open("w"))
+    dump(doc, project / "graphspecs" / f"{name}.yaml")
 
 
 def test_dates_on_the_x_axis(project):
@@ -375,6 +390,75 @@ def test_every_import_form_gives_the_module_and_the_api_its_functions():
         "assert all(callable(f) and not isinstance(f, types.ModuleType) for f in api)\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_every_command_summary_is_one_sentence(monkeypatch):
+    """forgegraph --help, and each group's, lists every command with one sentence on one
+    line, not a docstring broken across lines."""
+    monkeypatch.setenv("COLUMNS", "250")  # wide enough that nothing wraps
+    for group in ([], ["catalog"], ["skill"], ["job"]):
+        out = CliRunner().invoke(app, [*group, "--help"]).output
+        out = re.sub(r"\x1b\[[0-9;]*m", "", out)  # colors, which rich forces on CI
+        panel = out.split("Commands")[-1]
+        rows = [r.strip("│ ").rstrip() for r in panel.splitlines() if r.startswith("│")]
+        names = [r for r in rows if r and not r.startswith(" ")]
+        continuation = [r for r in rows if r and r.startswith(" ")]
+        assert names and continuation == [], (group, rows)
+        assert all(r.endswith(".") for r in names), (group, names)
+
+
+def _png(path: Path, record: dict | None) -> Path:
+    """A PNG carrying this ForgeGraph record, or none."""
+    info = PngImagePlugin.PngInfo()
+    if record is not None:
+        info.add_text("ForgeGraph", json.dumps(record))
+    Image.new("RGB", (2, 2)).save(path, pnginfo=info)
+    return path
+
+
+@pytest.mark.parametrize(
+    ("record", "args", "problem"),
+    [
+        (None, [], "plain.png has no ForgeGraph record"),
+        ({"layout": {"name": "l"}}, ["--graphspec", "g.yaml"], "plain.png records a layout"),
+        ({"created": "now"}, ["--graphspec", "g.yaml"], "plain.png records no GraphSpec"),
+    ],
+)
+def test_load_failures_are_errors(project, record, args, problem):
+    _png(project / "plain.png", record)
+    for as_json in ([], ["--json"]):
+        result = runner.invoke(app, ["load", "plain.png", *args, *as_json])
+        assert result.exit_code == 1
+        if as_json:
+            [reported] = json.loads(result.output)["problems"]
+            assert problem in reported
+        else:
+            assert f"error: {problem}" in result.output
+    assert not (project / "g.yaml").exists()
+
+
+def test_load_of_a_file_it_cant_read_is_an_error(project):
+    (project / "p.webp").write_bytes(b"")
+    result = runner.invoke(app, ["load", "p.webp", "--json"])
+    assert result.exit_code == 1
+    assert json.loads(result.output)["problems"] == [
+        "ValueError: can't read .webp; file types are png, jpg, tiff, svg, pdf, html"
+    ]
+    result = runner.invoke(app, ["load", "missing.png", "--json"])
+    assert result.exit_code == 1
+    assert json.loads(result.output)["problems"][0].startswith("FileNotFoundError")
+
+
+def test_explain_reports_a_graphspec_that_fails_validation(project):
+    doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=BASE)
+    doc["variable_parameters"]["text"]["colour"] = "red"
+    dump(doc, project / "graphspecs" / "bad.yaml")
+    result = runner.invoke(app, ["explain", "graphspecs/bad.yaml", "--json"])
+    assert result.exit_code == 1
+    [problem] = json.loads(result.output)["problems"]
+    assert problem.startswith("variable_parameters.text.colour: unknown parameter")
+    result = runner.invoke(app, ["explain", "graphspecs/bad.yaml"])
+    assert result.exit_code == 1 and f"error: {problem}" in result.output
 
 
 def test_every_commands_help_shows():

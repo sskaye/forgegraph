@@ -11,7 +11,7 @@ import typer
 from forgegraph.cli import Json, fail, json_errors, skill_app
 
 
-@skill_app.command("install")
+@skill_app.command("install", short_help="Install the ForgeGraph skill for agents.")
 @json_errors
 def skill_install(
     here: Annotated[

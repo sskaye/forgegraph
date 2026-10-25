@@ -695,7 +695,7 @@ def _run_one(
     ws.mkdir(parents=True)
     for name in case["data"]:
         shutil.copy2(DATA / name, ws / name)
-    for name in case.get("packs", []):  # folder packs, and the project config allowing them
+    for name in case.get("packs", []):  # folder packs, and the folder config allowing them
         source = next(base / name for base in PACKS if (base / name).is_dir())
         shutil.copytree(source, ws / name, ignore=shutil.ignore_patterns("catalogs"))
     if "config" in case:

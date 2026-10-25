@@ -565,17 +565,32 @@ def draw(
         s.stack, s.y = st, st.top  # lines and markers sit at the top of their stack
     for s, shifts in zip(series, marks.slots(series, gt, style), strict=True):
         s.shifts = shifts
+    drawn.label_groups, norm = _draw_marks(ax, series, gt, style, r)
+    layers.error_bars(ax, listed, series, frame, gt, style, r)
+    lines = layers.reference_lines(ax, listed, series, frame, style, drawn.kinds)
+    _axes(ax, series, lines, gt, style, drawn, r)
+    drawn.y_title = _decorate(ax, gt, style, r, title, norm)
+    drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = series, r, lines, listed
+    drawn.style_keys = _style_keys(gt, frame, style)
+    layers.notes_outside(ax, listed, style)
+    return drawn
+
+
+def _as_xy(r: Roles, base: Any, value: Any) -> tuple[Any, Any]:
+    """Base and value as x and y."""
+    return (base, value) if r.base == "x" else (value, base)
+
+
+def _draw_marks(
+    ax: Axes, series: list[Series], gt: dict[str, Any], style: Style, r: Roles
+) -> tuple[list[labelling.Labelled], Normalize | None]:
+    """Each series' line, markers and bars (a numeric encoding.color's markers on its color
+    scale); returns the names to label, with what's drawn under each, and the color scale's
+    range, if there is one."""
     bars_shown = bool(gt["mark.bar.show"])
-
-    def as_xy(base: Any, value: Any) -> tuple[Any, Any]:
-        """Base and value as x and y."""
-        return (base, value) if r.base == "x" else (value, base)
-
     lines_shown, markers_shown = bool(gt["mark.line.show"]), bool(gt["mark.marker.show"])
     cmap, norm = style.colormap(), None
-    color_col = gt["encoding.color"]
-    numeric = any(s.values is not None for s in series)
-    if numeric:
+    if any(s.values is not None for s in series):
         all_values = np.concatenate([s.values for s in series if s.values is not None])
         norm = Normalize(float(np.nanmin(all_values)), float(np.nanmax(all_values)))
     handles: dict[str, Line2D | marks.Bars] = {}
@@ -588,7 +603,7 @@ def draw(
             line_color = cmap(norm(float(np.nanmean(s.values))))
         open_marker = s.fill == "open"
         rim, rim_width = look.edge, look.edge_width
-        px, py = as_xy(s.x, s.y)
+        px, py = _as_xy(r, s.x, s.y)
         (line,) = ax.plot(
             px,
             py,
@@ -626,14 +641,25 @@ def draw(
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)
             paths.setdefault(s.label, []).append(np.c_[marks.numbers(px), marks.numbers(py)])
+    groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
+    return groups, norm
 
-    layers.error_bars(ax, listed, series, frame, gt, style, r)
-    lines = layers.reference_lines(ax, listed, series, frame, style, drawn.kinds)
 
+def _axes(
+    ax: Axes,
+    series: list[Series],
+    lines: list[layers.RefLine],
+    gt: dict[str, Any],
+    style: Style,
+    drawn: Drawn,
+    r: Roles,
+) -> None:
+    """Each axis's scale, ticks and limits: bars stand on the value axis, and an automatic
+    axis reaches every reference line."""
     ax.set_xscale(gt["axis.x.scale"])
     ax.set_yscale(gt["axis.y.scale"])
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
-        along = [np.asarray(as_xy(s.x, s.y)[0 if name == "x" else 1]) for s in series]
+        along = [np.asarray(_as_xy(r, s.x, s.y)[0 if name == "x" else 1]) for s in series]
         values = marks.numbers(np.concatenate(along)) if along else np.array([])
         kind = drawn.kinds[name]
         axis_data.ticks_and_labels(ax, name, kind, gt, style, drawn.categories.get(name), values)
@@ -648,16 +674,27 @@ def draw(
         else:
             ticks.minor_ticks(axis, style)
     _limits(ax, gt)
-    if bars_shown and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
-        floor = 1.0 if log_values else 0.0
+    if bool(gt["mark.bar.show"]) and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
+        floor = 1.0 if gt[f"axis.{r.value}.scale"] == "log" else 0.0
         get = ax.get_ylim if r.value == "y" else ax.get_xlim
         put = ax.set_ylim if r.value == "y" else ax.set_xlim
-        ends = np.concatenate([np.r_[st.bottom, st.top] for st in stacked]) if stacked else []
-        ends = np.asarray(ends, dtype=float)
+        stacks = [np.r_[s.stack.bottom, s.stack.top] for s in series if s.stack is not None]
+        ends = np.asarray(np.concatenate(stacks) if stacks else [], dtype=float)
         if len(ends) and np.nanmin(ends) >= floor:
             put(floor, get()[1])
     layers.include(ax, lines, gt)
-    drawn.ref_lines = lines
+
+
+def _decorate(
+    ax: Axes,
+    gt: dict[str, Any],
+    style: Style,
+    r: Roles,
+    title: str | None,
+    norm: Normalize | None,
+) -> str | None:
+    """The axis titles and the title, the plot box's sides and ticks, the grid, and the
+    color bar for a color scale's range (norm); returns the value axis's title."""
     columns = {r.base: [r.base_column], r.value: r.value_columns}
     xt = _title(gt["axis.x.title"], columns["x"][0] if len(columns["x"]) == 1 else None)
     yt = _title(gt["axis.y.title"], columns["y"][0] if len(columns["y"]) == 1 else None)
@@ -671,21 +708,13 @@ def draw(
     if bool(style.theme["grid.show"]):
         ax.grid(True)
         ax.set_axisbelow(True)
-    if numeric and norm is not None:
+    if norm is not None:
+        color_col = gt["encoding.color"]
         bar_title = _title(
             gt["legend.color_bar.title.text"], None if unset(color_col) else str(color_col)
         )
-        colorbar.add(ax, norm, cmap, bar_title, style)
-    drawn.series = series
-    drawn.label_groups = [
-        labelling.Labelled(name, colors[name], paths[name], handles[name]) for name in handles
-    ]
-    drawn.style_keys = _style_keys(gt, frame, style)
-    drawn.y_title = yt if r.value == "y" else xt
-    drawn.roles = r
-    drawn.layers = listed
-    layers.notes_outside(ax, listed, style)
-    return drawn
+        colorbar.add(ax, norm, style.colormap(), bar_title, style)
+    return yt if r.value == "y" else xt
 
 
 def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:

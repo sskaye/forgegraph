@@ -12,19 +12,18 @@ axes' settings.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any, cast
 
 from matplotlib.axes import Axes
-from matplotlib.axis import Axis
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
 from forgegraph.drawing import spacing, text
-from forgegraph.drawing.figure import WATERMARK, texts_of, tick_marks
+from forgegraph.drawing.figure import WATERMARK
+from forgegraph.drawing.layout import texts_of, tick_marks
 from forgegraph.drawing.style import Style
-from forgegraph.drawing.ticks import NiceTicks
+from forgegraph.drawing.ticks import NiceTicks, minor_ticks
 
 TITLE_ABOVE, TITLE_ALONG, BELOW = "title_above", "title_along", "below"
 
@@ -69,10 +68,9 @@ def add(
     cmap: Colormap,
     title: str | None,
     style: Style,
-    minor_ticks: Callable[[Axis], None],
 ) -> Axes:
-    """Draw the color bar for ax, with its title if given, and return its Axes. minor_ticks
-    sets its long axis's minor ticks as the plot's."""
+    """Draw the color bar for ax, with its title if given, and return its Axes. Its long
+    axis has the plot's minor ticks."""
     layout = str(style.theme["legend.color_bar.layout"])
     prop = spacing.axis_title_font(style)
     edges = text.edges(title, prop) if title else None
@@ -83,7 +81,7 @@ def add(
     orientation = "horizontal" if layout == BELOW else "vertical"
     bar = ax.figure.colorbar(ScalarMappable(norm=norm, cmap=cmap), cax=cax, orientation=orientation)
     bar.locator = NiceTicks(str(style.theme["axis.tick.algorithm"]))
-    minor_ticks(bar.long_axis)
+    minor_ticks(bar.long_axis, style)
     if edges is None or not title:
         return cax
     if layout == TITLE_ALONG:  # reads downward: its letters face away from the bar

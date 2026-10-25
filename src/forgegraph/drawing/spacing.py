@@ -22,18 +22,15 @@ from forgegraph.drawing.style import Style
 
 
 def tick_font(style: Style) -> FontProperties:
-    family, size = str(style.theme["font.family"]), style.pt("axis.tick.label.size")
-    return text.font(family, size, style.weight("font.weight"))
+    return style.font("axis.tick.label.size", "font.weight")
 
 
 def axis_title_font(style: Style) -> FontProperties:
-    family = str(style.theme["font.family"])
-    return text.font(family, style.pt("axis.title.size"), style.weight("axis.title.weight"))
+    return style.font("axis.title.size", "axis.title.weight")
 
 
 def title_font(style: Style) -> FontProperties:
-    family = str(style.theme["font.family"])
-    return text.font(family, style.pt("title.size"), style.weight("title.weight"))
+    return style.font("title.size", "title.weight")
 
 
 def _in_view(axis: Axis) -> list:

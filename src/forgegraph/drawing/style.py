@@ -15,7 +15,9 @@ from typing import Any
 
 import matplotlib
 from matplotlib.colors import Colormap, LinearSegmentedColormap, to_rgb
+from matplotlib.font_manager import FontProperties
 
+from forgegraph.drawing import text
 from forgegraph.fonts import WEIGHTS, register_fonts
 from forgegraph.spec.parameters import NONE
 
@@ -87,6 +89,12 @@ class Style:
     def weight(self, path: str) -> int:
         """A theme weight, as a font weight number."""
         return WEIGHTS[self.theme[path]]
+
+    def font(self, size: str | float, weight: str) -> FontProperties:
+        """The theme's font (font.family) at a theme size's path (or a size in points) and
+        a theme weight's path."""
+        points = self.pt(size) if isinstance(size, str) else float(size)
+        return text.font(str(self.theme["font.family"]), points, self.weight(weight))
 
     def color(self, path: str) -> str:
         value = self.theme[path]

@@ -95,7 +95,8 @@ variable_parameters:
             data:
                 column: voltage
     encoding:
-        color: cell
+        color:
+            column: cell
 ```
 
 ```bash

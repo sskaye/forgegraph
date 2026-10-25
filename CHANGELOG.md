@@ -10,6 +10,20 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ### Changed
 
+- **Breaking for existing specs:** parameters follow one naming system. `_` joins words that name one thing (`error_bar`, `plot_area`), `.` goes from a thing to its parts and properties (`line.width`), an on/off switch is the thing's `.show`, and nothing is abbreviated. A spec still using an old name is an error that suggests the new one, for most names. The Python API's keyword arguments (`fg.xy`'s `color=`, `line_style=`, `marker_shape=`, `marker_fill=`, `detail=`) are unchanged and set the new paths. Graphs draw the same as before. The renames, old → new:
+  1. `grid.line_style` → `grid.line.style`; `grid.line_width` → `grid.line.width`
+  2. `plot_area.line_color` → `plot_area.line.color`; `plot_area.line_width` → `plot_area.line.width`
+  3. `layer.error_bar.line_width` → `layer.error_bar.line.width`; `layer.error_bar.cap_size` → `layer.error_bar.cap.width`
+  4. `layer.reference_line.line_style` → `layer.reference_line.line.style`; `layer.reference_line.line_width` → `layer.reference_line.line.width`
+  5. `series.marker.edge_color`, `series.marker.edge_width` → `series.marker.edge.color`, `series.marker.edge.width`, and the same in `series.bar`, `series.benchmark.marker` and `series.benchmark.bar`
+  6. `legend.key.frame_width` → `legend.key.frame.width`
+  7. `legend.key.sample.marker_size` → `legend.key.sample.marker.size`
+  8. `legend.key.frame` → `legend.key.frame.show`
+  9. `series.value_label.total` → `series.value_label.total.show`
+  10. `axis.tick.minor.num` → `axis.tick.minor.count`
+  11. `encoding.color` → `encoding.color.column`; `encoding.color_type` → `encoding.color.type`; `encoding.line_style` → `encoding.line.style.column`; `encoding.marker_shape` → `encoding.marker.shape.column`; `encoding.marker_fill` → `encoding.marker.fill.column`; `encoding.detail` → `encoding.detail.column` (`encoding.order` is unchanged)
+  12. Layouts: `separators.line.border` → `separators.border.show`
+  13. Schedules: `freshness.stamp` → `freshness.stamp.show`; `cadence.interval` → `cadence.interval.count`; `cadence.interval_unit` → `cadence.interval.unit`
 - Drawing and saving are about 3.7 times faster. Graphs and their files are the same as before.
 - A pack's fonts are registered when a file drawn uses one of its specs, not whenever a config lists the pack.
 - `forgegraph --help` gives each command a one-sentence summary, and `forgegraph catalog --help` names every kind it lists.

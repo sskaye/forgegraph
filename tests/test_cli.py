@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from pack_helpers import allow, cli, cli_problems, dump, graphspec_file, write_pack
+from pack_helpers import allow, cli, cli_problems, dump, graphspec_file, write_config, write_pack
 from PIL import Image, PngImagePlugin
 from render_helpers import BASE
 from typer.testing import CliRunner
@@ -180,6 +180,40 @@ def test_render_keeps_dots_in_the_name(project):
 def test_json_errors_are_json(project):
     [problem] = cli_problems("render", "graphspecs/p.yaml", "-o", "out/p.pnf")
     assert problem.startswith("ValueError: can't save as .pnf")
+
+
+def _unknown_packs(folder: Path) -> list[str]:
+    """A folder config there naming two packs that aren't installed; the problems it gives."""
+    write_config(folder / "forgegraph.toml", "forgegraph_base", "nowhere", "elsewhere")
+    config = folder / "forgegraph.toml"
+    return [
+        f"{config}: packs: no pack '{name}' is installed; a folder pack is written as a path, "
+        f"e.g. ./{name}"
+        for name in ("nowhere", "elsewhere")
+    ]
+
+
+@pytest.mark.parametrize("command", ["catalog", "pack-notes", "schema"])
+def test_a_pack_problem_is_reported_as_problems(tmp_path, command):
+    expected = _unknown_packs(tmp_path)
+    args = [command, "--folder", str(tmp_path)]
+    if command == "schema":
+        args += ["graphspec", *BASE_NAMES]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
+    assert result.output.splitlines() == [f"error: {p}" for p in expected]
+
+
+def test_a_pack_problem_is_reported_as_json_problems(tmp_path):
+    expected = _unknown_packs(tmp_path)
+    assert cli_problems("pack-notes", "--folder", str(tmp_path)) == expected
+
+
+def test_explain_reports_a_pack_problem(project):
+    expected = _unknown_packs(project)
+    assert cli_problems("explain", "graphspecs/p.yaml") == expected
+    result = runner.invoke(app, ["explain", "graphspecs/p.yaml"])
+    assert result.output.splitlines() == [f"error: {p}" for p in expected]
 
 
 BASE_NAMES = ["--graph-type", "xy", "--theme", "forgegraph_base/base_theme",

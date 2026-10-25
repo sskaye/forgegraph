@@ -5,7 +5,8 @@ from __future__ import annotations
 import functools
 import json
 from collections.abc import Callable
-from typing import Annotated, Any
+from pathlib import Path
+from typing import Annotated, Any, NoReturn
 
 import typer
 
@@ -32,6 +33,9 @@ job_app = typer.Typer(
 )
 app.add_typer(job_app, name="job")
 Json = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
+Folder = Annotated[
+    Path | None, typer.Option("--folder", help="The folder whose configs apply (default: here).")
+]
 
 
 def _show_version(value: bool) -> None:
@@ -49,7 +53,20 @@ def main(
     """ForgeGraph command-line interface."""
 
 
-def fail(problems: list[str], as_json: bool) -> None:
+class Failed(Exception):
+    """A command's problems, which json_errors reports."""
+
+    def __init__(self, problems: list[str]) -> None:
+        self.problems = problems
+        super().__init__("\n".join(problems))
+
+
+def fail(problems: list[str]) -> NoReturn:
+    """Stop the command with these problems."""
+    raise Failed(problems)
+
+
+def _show(problems: list[str], as_json: bool) -> NoReturn:
     if as_json:
         typer.echo(json.dumps({"ok": False, "problems": problems}, indent=2))
     else:
@@ -58,21 +75,54 @@ def fail(problems: list[str], as_json: bool) -> None:
     raise typer.Exit(1)
 
 
+def _problems(e: Exception) -> list[str] | None:
+    """The problems an error lists or names, if it's one of ForgeGraph's that does."""
+    from forgegraph.forgemark import ForgemarkError
+    from forgegraph.skill import InstallError
+    from forgegraph.spec.common import ProblemsError
+
+    if isinstance(e, ProblemsError):
+        return e.problems
+    if isinstance(e, (InstallError, ForgemarkError)):
+        return [str(e)]
+    return None
+
+
 def json_errors(command: Callable[..., None]) -> Callable[..., None]:
-    """With --json, report any error as JSON problems rather than a traceback."""
+    """Report a command's problems, and the problems of any error that lists them, as
+    problems (error: lines, or JSON with --json), exiting 1; with --json, any other error
+    too, rather than a traceback."""
 
     @functools.wraps(command)
     def run(*args: Any, **kwargs: Any) -> None:
+        as_json = bool(kwargs.get("as_json"))
         try:
             command(*args, **kwargs)
         except (typer.Exit, typer.Abort):
             raise
+        except Failed as e:
+            _show(e.problems, as_json)
         except Exception as e:
-            if not kwargs.get("as_json"):
+            problems = _problems(e)
+            if problems is None and not as_json:
                 raise
-            fail([f"{type(e).__name__}: {e}"], True)
+            _show(problems if problems is not None else [f"{type(e).__name__}: {e}"], as_json)
 
     return run
+
+
+def report(
+    result: dict[str, Any],
+    as_json: bool,
+    text: Callable[[], None],
+    default: Callable[[Any], Any] | None = None,
+) -> None:
+    """Print a command's result: as JSON with --json (default: json.dumps's), otherwise as
+    text() prints it."""
+    if as_json:
+        typer.echo(json.dumps(result, indent=2, default=default))
+    else:
+        text()
 
 
 # Each command group's module registers its commands on the app above.

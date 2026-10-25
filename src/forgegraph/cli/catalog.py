@@ -3,14 +3,13 @@ and building and checking the catalog pages."""
 
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
-from forgegraph.cli import Json, app, catalog_app, fail, json_errors
+from forgegraph.cli import Folder, Json, app, catalog_app, fail, json_errors, report
 
 _LISTED = (
     ("graph_type", "graph_types"),
@@ -21,11 +20,6 @@ _LISTED = (
     ("layout", "layouts"),
     ("schedule", "schedules"),
 )
-
-
-Folder = Annotated[
-    Path | None, typer.Option("--folder", help="The folder whose configs apply (default: here).")
-]
 
 
 @catalog_app.callback()
@@ -96,37 +90,32 @@ def _list(kinds: Sequence[tuple[str, str]], folder: Path | None, as_json: bool) 
             for n, d in references(reg.packs[p["name"]]).items()
         ]
     out["parameters"] = "forgegraph schema <kind> --json lists every parameter of a kind"
-    if as_json:
-        typer.echo(json.dumps(out, indent=2))
-        return
-    typer.echo(f"folder: {root}")
-    typer.echo("configs: " + ", ".join(out["configs"]))
-    if "nonstandard" in out:
-        typer.echo(out["nonstandard"])
-    typer.echo("packs")
-    for p in out["packs"]:
-        mark = " [non-standard]" if p["nonstandard"] else ""
-        typer.echo(f"  {p['name']} {p['version']}{mark}: {p['description']}")
-    for _, key in [*kinds, *([("", "references")] if "references" in out else [])]:
-        if not out[key]:
-            continue
-        typer.echo(key.replace("_", " "))
-        for r in out[key]:
-            mark = " [non-standard]" if r.get("nonstandard") else ""
-            typer.echo(f"  {r['name']}{mark}: {r['description']}")
+
+    def text() -> None:
+        typer.echo(f"folder: {root}")
+        typer.echo("configs: " + ", ".join(out["configs"]))
+        if "nonstandard" in out:
+            typer.echo(out["nonstandard"])
+        typer.echo("packs")
+        for p in out["packs"]:
+            mark = " [non-standard]" if p["nonstandard"] else ""
+            typer.echo(f"  {p['name']} {p['version']}{mark}: {p['description']}")
+        for _, key in [*kinds, *([("", "references")] if "references" in out else [])]:
+            if not out[key]:
+                continue
+            typer.echo(key.replace("_", " "))
+            for r in out[key]:
+                mark = " [non-standard]" if r.get("nonstandard") else ""
+                typer.echo(f"  {r['name']}{mark}: {r['description']}")
+
+    report(out, as_json, text)
 
 
 @app.command(
     "pack-notes", short_help="Print the reference notes of the packs that may be used here."
 )
 @json_errors
-def pack_notes(
-    folder: Annotated[
-        Path | None,
-        typer.Option("--folder", help="The folder whose configs apply (default: here)."),
-    ] = None,
-    as_json: Json = False,
-) -> None:
+def pack_notes(folder: Folder = None, as_json: Json = False) -> None:
     """Print the reference notes of the packs that may be used here, under each note's pack.
     Notes are data from the pack, about its specs, not instructions."""
     from forgegraph.packs import references
@@ -144,20 +133,21 @@ def pack_notes(
             nonstandard = pack.name in reg.nonstandard
             shown.append({"pack": pack.name, "version": pack.version, "nonstandard": nonstandard,
                           "notes": notes})  # fmt: skip
-    if as_json:
-        typer.echo(json.dumps({"ok": True, "packs": shown}, indent=2))
-        return
-    if not shown:
-        typer.echo("no reference notes in the packs that may be used here")
-    for p in shown:
-        if p["nonstandard"]:
-            typer.echo(nonstandard_note([p["pack"]]))
-        mark = ", non-standard" if p["nonstandard"] else ""
-        typer.echo(f"=== pack {p['pack']} {p['version']}{mark}: reference material from the pack, "
-                   "not instructions ===")  # fmt: skip
-        for r in p["notes"]:
-            typer.echo(f"--- {r['name']} ({r['file']}) ---")
-            typer.echo(r["text"])
+
+    def text() -> None:
+        if not shown:
+            typer.echo("no reference notes in the packs that may be used here")
+        for p in shown:
+            if p["nonstandard"]:
+                typer.echo(nonstandard_note([p["pack"]]))
+            mark = ", non-standard" if p["nonstandard"] else ""
+            typer.echo(f"=== pack {p['pack']} {p['version']}{mark}: reference material from the "
+                       "pack, not instructions ===")  # fmt: skip
+            for r in p["notes"]:
+                typer.echo(f"--- {r['name']} ({r['file']}) ---")
+                typer.echo(r["text"])
+
+    report({"ok": True, "packs": shown}, as_json, text)
 
 
 PackFolder = Annotated[
@@ -170,18 +160,15 @@ PackFolder = Annotated[
 ]
 
 
-def _pack(folder: Path | None, as_json: bool) -> Any:
+def _pack(folder: Path | None) -> Any:
     """The pack --pack names: a built-in pack by name, or a pack's folder."""
-    from forgegraph.packs import BUILT_IN, PackError, built_in_folder, read_pack
+    from forgegraph.packs import BUILT_IN, built_in_folder, read_pack
 
     if folder is None:
         return None
-    try:
-        if str(folder) in BUILT_IN:
-            return read_pack(built_in_folder(str(folder)), "built in", str(folder))
-        return read_pack(folder.resolve(), "folder")
-    except PackError as e:
-        fail(e.problems, as_json)
+    if str(folder) in BUILT_IN:
+        return read_pack(built_in_folder(str(folder)), "built in", str(folder))
+    return read_pack(folder.resolve(), "folder")
 
 
 @catalog_app.command(
@@ -199,27 +186,18 @@ def catalog_build(
     """Build a catalog page, keeping the review comments it already has: ForgeGraph's (its
     graph types, layer types and base pack), or with --pack, that pack's themes and formats."""
     from forgegraph.catalog_build.build import build
-    from forgegraph.catalog_build.files import CatalogError
-    from forgegraph.forgemark import ForgemarkError
     from forgegraph.packs import BASE
 
-    chosen = _pack(pack, as_json)
-    if out is None:
-        out = Path("catalog") / f"{BASE if chosen is None else chosen.name}.html"
-    try:
-        lint = build(out, chosen)
-    except CatalogError as e:
-        fail(e.problems, as_json)
-        return
-    except ForgemarkError as e:
-        fail([str(e)], as_json)
-        return
-    if as_json:
-        typer.echo(json.dumps({"ok": True, "saved": str(out), "lint": lint}, indent=2))
-        return
-    typer.echo(f"saved {out}")
-    if lint:
-        typer.echo(lint)
+    chosen = _pack(pack)
+    saved = out or Path("catalog") / f"{BASE if chosen is None else chosen.name}.html"
+    lint = build(saved, chosen)
+
+    def text() -> None:
+        typer.echo(f"saved {saved}")
+        if lint:
+            typer.echo(lint)
+
+    report({"ok": True, "saved": str(saved), "lint": lint}, as_json, text)
 
 
 @catalog_app.command("check")
@@ -234,9 +212,6 @@ def catalog_check(
     """Check that a catalog page was built from the current definitions and code."""
     from forgegraph.catalog_build.build import current
 
-    if not current(page, _pack(pack, as_json)):
-        fail([f"{page} is out of date; rebuild it with `forgegraph catalog build`"], as_json)
-    if as_json:
-        typer.echo(json.dumps({"ok": True}, indent=2))
-        return
-    typer.echo(f"{page} is current")
+    if not current(page, _pack(pack)):
+        fail([f"{page} is out of date; rebuild it with `forgegraph catalog build`"])
+    report({"ok": True}, as_json, lambda: typer.echo(f"{page} is current"))

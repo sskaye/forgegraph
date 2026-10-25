@@ -26,6 +26,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 - Value labels written with format auto use the value axis's tick label format when it's set, as reference lines do.
 - The catalog's record of what it was built from covers every module it draws with, so a change to the drawing code marks the catalog out of date.
 - The package's metadata lists the bundled fonts' licences.
+- A config naming a pack that can't be found, or another pack problem, stops `catalog`, `pack-notes`, `schema` and `explain` with its problems listed (`error:` lines, exit 1), not a traceback; with `--json`, one problem each, not one joined line.
 
 ## 0.2.0 (2026-10-24)
 

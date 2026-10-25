@@ -1,5 +1,5 @@
 """Regenerate the Markdown mirrors of the specification files (docs/specs/<type>/*.md, and the
-deliverables' pages beside their files in review/).
+examples' pages beside their files in examples/).
 
 Run after changing a default file:  uv run python scripts/mirror_specs.py
 """

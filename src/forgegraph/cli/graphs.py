@@ -13,7 +13,7 @@ from ruamel.yaml import YAML
 from forgegraph.cli import Json, app, fail, json_errors
 
 
-@app.command()
+@app.command(short_help="Draw a GraphSpec or layout and save it in its format's file types.")
 @json_errors
 def render(
     graphspec: Annotated[
@@ -68,7 +68,9 @@ def render(
         typer.echo(f"lint {i.check}: {i.message}")
 
 
-@app.command()
+@app.command(
+    short_help="Show every value a graph is drawn with, whether it's fixed, and which file set it."
+)
 @json_errors
 def explain(
     graphspec: Annotated[

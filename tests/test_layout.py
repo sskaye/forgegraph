@@ -6,15 +6,16 @@ from __future__ import annotations
 import base64
 import json
 import re
+import shutil
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
 from matplotlib.lines import Line2D
-from pack_helpers import allow, write_pack
+from pack_helpers import allow, dump, write_pack
 from PIL import Image
 from render_helpers import BASE, painted_draws, polarization
-from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -26,12 +27,6 @@ from forgegraph.spec.layout import slug
 
 runner = CliRunner()
 FORMAT = {"width": 200, "height": "auto", "base_size": 10}
-
-
-def _dump(doc: dict[str, Any], path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
-        YAML().dump(doc, f)
 
 
 def _format(name: str, **figure: Any) -> dict[str, Any]:
@@ -63,8 +58,8 @@ def project(tmp_path, monkeypatch):
             data_file="p.parquet",
             settings=settings,
         )
-        _dump(doc, tmp_path / f"{name}.yaml")
-    _dump(
+        dump(doc, tmp_path / f"{name}.yaml")
+    dump(
         {
             "name": "bright",
             "version": 0,
@@ -75,8 +70,8 @@ def project(tmp_path, monkeypatch):
         },
         tmp_path / "house" / "themes" / "bright.yaml",
     )
-    _dump(_format("auto"), tmp_path / "house" / "formats" / "auto.yaml")
-    _dump(_format("fixed", height=150), tmp_path / "house" / "formats" / "fixed.yaml")
+    dump(_format("auto"), tmp_path / "house" / "formats" / "auto.yaml")
+    dump(_format("fixed", height=150), tmp_path / "house" / "formats" / "fixed.yaml")
     write_pack(tmp_path)
     allow(tmp_path, "forgegraph_base", "./house")
     monkeypatch.chdir(tmp_path)
@@ -96,7 +91,7 @@ def write_layout(
         "variable_parameters": {"specifications": {"format": fmt}, **variable, "tabs": tabs},
     }
     path = folder / f"{name}.layout.yaml"
-    _dump(doc, path)
+    dump(doc, path)
     return path
 
 
@@ -131,6 +126,7 @@ def test_only_the_last_draw_of_a_tab_paints(project, monkeypatch):
     assert len(painted) == 1
 
 
+@pytest.mark.slow
 def test_one_save_inspects_each_tab_once_whatever_it_writes(project, monkeypatch):
     tabs = {"A": tab([["volt"]], volt="volt.yaml"), "B": tab([["power"]], power="power.yaml")}
     layout = fg.layout(write_layout(project, tabs, fmt="forgegraph_base/base_layout_format"))
@@ -144,6 +140,7 @@ def test_one_save_inspects_each_tab_once_whatever_it_writes(project, monkeypatch
     assert len(hashes) == 3 * len(layout.tabs)  # once per tab, for each save
 
 
+@pytest.mark.slow
 def test_a_layouts_checks_records_and_saves(project, tmp_path, monkeypatch):
     """What Graph offers, a layout offers too: lint by tab, non-standard by tab, a record
     (none with provenance off), a save under its own name, and a PNG for notebooks."""
@@ -167,7 +164,7 @@ def test_tiles_a_parent_layout_lists_are_found_from_its_folder(project):
     layouts = project / "house" / "layouts"
     (layouts / "graphs").mkdir(parents=True)
     polarization().to_parquet(layouts / "graphs" / "p.parquet")
-    _dump(
+    dump(
         fg.graphspec("v", "xy", data_file="p.parquet", settings=BASE), layouts / "graphs" / "v.yaml"
     )
     parent = write_layout(layouts, {"Figure": tab([["v"]], v="graphs/v.yaml")}, name="shared")
@@ -183,7 +180,7 @@ def test_tiles_a_parent_layout_lists_are_found_from_its_folder(project):
         "fixed_parameters": "None",
         "variable_parameters": "None",
     }
-    _dump(child, work / "mine.layout.yaml")
+    dump(child, work / "mine.layout.yaml")
     layout = fg.layout(work / "mine.layout.yaml")
     assert list(layout.tabs[0].tiles) == ["v"]
 
@@ -249,7 +246,7 @@ def test_with_height_auto_each_plot_keeps_its_aspect_or_more(project):
 
 
 def test_with_width_auto_each_plot_keeps_its_aspect_too(project):
-    _dump(_format("tall", width="auto", height=150), project / "house" / "formats" / "tall.yaml")
+    dump(_format("tall", width="auto", height=150), project / "house" / "formats" / "tall.yaml")
     path = write_layout(
         project,
         {"T": tab([["volt"], ["power"]], volt="volt.yaml", power="power.yaml")},
@@ -305,7 +302,7 @@ def test_a_blank_cell_is_left_empty(project):
 
 
 def test_too_small_a_format_names_the_tiles_that_dont_fit(project):
-    _dump(_format("tiny", width=40), project / "house" / "formats" / "tiny.yaml")
+    dump(_format("tiny", width=40), project / "house" / "formats" / "tiny.yaml")
     path = write_layout(
         project,
         {
@@ -345,7 +342,7 @@ def test_the_layouts_format_replaces_each_tiles(project):
 
 def test_a_tile_can_be_drawn_from_a_dataframe(project):
     doc = fg.graphspec("frame", "xy", settings=BASE)
-    _dump(doc, project / "frame.yaml")
+    dump(doc, project / "frame.yaml")
     path = write_layout(project, {"T": tab([["f"]], f="frame.yaml")})
     assert fg.layout(path, data={"f": polarization()}).tabs[0].tiles["f"].data.rows_read == 96
     with pytest.raises(fg.SpecError, match="data: no tile 'g'"):
@@ -357,7 +354,7 @@ def test_lint_names_the_tile(project):
     frame.loc[0, "cell_voltage"] = np.nan
     frame.to_parquet(project / "gaps.parquet")
     doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=BASE)
-    _dump(doc, project / "gaps.yaml")
+    dump(doc, project / "gaps.yaml")
     path = write_layout(project, {"T": tab([["volt", "gaps"]], volt="volt.yaml", gaps="gaps.yaml")})
     messages = fg.layout(path).warnings
     assert any(m.startswith("tile 'gaps': ") and "left out" in m for m in messages), messages
@@ -437,7 +434,7 @@ def test_the_separator_color_fills_the_gaps(project):
 @pytest.mark.slow
 def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     types = {"output": {"file_types": ["png", "pdf", "html"]}}
-    _dump(
+    dump(
         {**_format("all"), "variable_parameters": types}, project / "house" / "formats" / "all.yaml"
     )
     path = write_layout(
@@ -486,7 +483,7 @@ def test_a_layout_cant_set_its_formats_fixed_parameters():
 
 @pytest.mark.slow
 def test_with_a_border_the_tab_bars_line_is_its_top(project):
-    _dump(
+    dump(
         {**_format("page"), "variable_parameters": {"output": {"file_types": ["html"]}}},
         project / "house" / "formats" / "page.yaml",
     )
@@ -626,11 +623,21 @@ def test_tile_names_are_unique_and_tab_names_give_distinct_files():
     found = _check({"tabs": {"One": tab([["a"]], a="a.yaml"), "one": tab([["a"]], a="b.yaml")}})
     assert any("gives the same file names and links as tab 'One'" in p for p in found)
     assert any("tiles.a: also a tile in tab 'One'" in p for p in found)
+    found = _check({"tabs": {"!!": tab([["a"]], a="a.yaml")}})
+    assert any("tabs.!!: a tab's name needs a letter or digit" in p for p in found)
+
+
+def test_cli_explain_reports_a_layout_that_fails(project):
+    path = write_layout(project, {"T": tab([["volt"]], volt="missing.yaml")})
+    result = runner.invoke(app, ["explain", str(path), "--json"])
+    assert result.exit_code == 1
+    [problem] = json.loads(result.output)["problems"]
+    assert "missing.yaml" in problem
 
 
 @pytest.mark.slow
 def test_a_layouts_tabs_replace_those_it_inherits(project):
-    _dump(
+    dump(
         {
             "name": "base",
             "version": 0,
@@ -652,7 +659,7 @@ def test_a_layouts_tabs_replace_those_it_inherits(project):
         "fixed_parameters": "None",
         "variable_parameters": {"tabs": {"New": tab([["power"]], power="power.yaml")}},
     }
-    _dump(doc, project / "child.layout.yaml")
+    dump(doc, project / "child.layout.yaml")
     layout = fg.layout(project / "child.layout.yaml")
     assert [t.name for t in layout.tabs] == ["New"]
 
@@ -707,3 +714,18 @@ def test_cli_renders_explains_and_loads_a_layout(project):
     result = runner.invoke(app, ["schema", "layout", "--json"])
     params = [p["parameter"] for p in json.loads(result.output)["layout"]]
     assert "tabs.<tab>.grid.areas" in params and "tabs.<tab>.tiles.<tile>" in params
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("folder", "layout"),
+    [("paper", "cell_performance.layout.yaml"), ("dashboard", "lab_throughput.layout.yaml")],
+)
+def test_the_example_layouts_render(folder, layout, tmp_path, monkeypatch):
+    """examples/layouts: each a folder project with its format in a folder pack."""
+    source = Path(__file__).parents[1] / "examples" / "layouts" / folder
+    work = tmp_path / folder
+    shutil.copytree(source, work)
+    monkeypatch.chdir(work)
+    drawn = fg.layout(work / layout)
+    assert drawn.tabs and not drawn.issues

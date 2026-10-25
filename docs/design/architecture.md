@@ -1,7 +1,7 @@
 # ForgeGraph — Architecture
 
-**Status:** Approved 2026-10-17 · **Owner:** Steven Kaye · **Author:** Claude (with Steven Kaye)
-**Inputs:** *initial specification*, the 21 example graphs in *Graph Examples* and *Graph Examples - 2*.
+**Owner:** Steven Kaye · **Author:** Claude (with Steven Kaye)
+**Inputs:** the [initial specification](initial-specification.md) and a private set of example graphs.
 
 ---
 
@@ -13,18 +13,17 @@ The core ideas, and why:
 
 | # | Idea | Why |
 | --- | --- | --- |
-| 1 | **Packs**: themes, formats, presets and skill reference notes can come from outside the repo (data only; graph types stay in the core), layered built-in → packs → user → project | Organisations need their own house styles and reference notes. A public tool can't keep house style in its own repo |
+| 1 | **Packs**: themes, formats, GraphSpecs, layouts, schedules and reference notes can come from outside the repo (data only; graph types stay in the core); configs say which packs may be used | Organisations need their own house styles and reference notes. A public tool can't keep house style in its own repo |
 | 2 | **Style has two axes, theme × format**. A theme is the look (fonts, palette, spines); a format is the destination (slide, journal column, dashboard tile: size, base font size, file type) | One graph must render correctly for a slide *and* a paper without being re-specified. Journals specify sizes, not palettes |
-| 3 | **Presets**: saved settings without data (graph type, columns, options, layers, theme, format), reused through `extends:` (e.g. `acme/polarization-curve`) | The cheapest way to get consistency for recurring graphs. No code, so orgs can write them |
+| 3 | **GraphSpecs to extend**: saved settings without data (graph type, columns, parameters, layers, theme, format), reused through `extends:` (e.g. `acme/polarization-curve`) | The cheapest way to get consistency for recurring graphs. No code, so orgs can write them |
 | 4 | **The input is a DataFrame**: passed through the Python API, or read from a Parquet file the GraphSpec names. Preparing it is the user's and the agent's work | ForgeGraph stays about graphing, and rendering a GraphSpec never runs code |
 | 5 | **Agent interface = CLI with JSON output + Agent Skill**, with a render → look → lint loop | The spec lists "AI agents via their standard interfaces", not just Claude Code. Graph quality has to be checkable by the agent itself |
 | 6 | **Desktop app planned for**: a local, Tableau-like "Studio" where people make graphs without an AI, built last | It's a listed interface. Designing the schema for it now costs nothing; building it later costs less |
 
 Also:
 
-- Graph-type definitions sit next to their code.
+- Each graph type and layer type is defined by one file, which its drawing code reads.
 - The review catalog is a tabbed HTML page; Forgemark supports per-tab comments.
-- Annotations are library primitives that the agent *places*.
 - Company-specific material stays out of the repo: it lives in a private org pack, and `acme` is a neutral public example.
 
 ### 0.1 Decisions at a glance
@@ -32,10 +31,10 @@ Also:
 | Area | Decision |
 | --- | --- |
 | Renderer (D1) | matplotlib only; no interactivity in the MVP |
-| Core API (D2) | Spec-first: `render(spec)`; Python functions build specs. Pydantic models are the source; JSON Schema is generated from them |
+| Core API (D2) | Spec-first: `render(spec)`; Python functions build specs. The definition files are the source; `forgegraph schema`, the catalog pages and the docs/specs mirrors are generated from them |
 | Style (D3) | Theme × format, layered and explainable; themes hold fixed parameters (graphs can't change them) and variable parameters with defaults (graphs can change them) |
 | Extension (D4) | Packs, data only, are the only source of named specs; the main and folder configs say which may be used, and a pack only a folder config lists is non-standard; graph types and layers stay in the core |
-| Graph types (D5) | `graph_type.yaml` (or `layer.yaml`) next to its code is the source of truth |
+| Graph types (D5) | Each graph type's and layer type's definition file (graph_types/xy.yaml, layers/<type>.yaml) is the source of truth |
 | Review (D6) | Tabbed HTML catalog with Forgemark comments |
 | Input (D7) | A pandas DataFrame, from the Python API or a Parquet file named by the GraphSpec; an optional reference to the code that made it |
 | Labels (D8) | Lightweight sub/superscript markup, applied to explicit labels only |
@@ -43,11 +42,11 @@ Also:
 | Non-standard (D10) | Agent draws it with an always-on watermark; requests as GitHub issues, filed by the agent as the skill's reference file says |
 | Layouts (D11) | One layout engine for multi-panel figures and dashboards, in PNG, PDF and HTML |
 | Scheduling (D12) | A schedule file, rendered by `forgegraph job run`, which the agent schedules by the environment's own means; freshness stamped in the image and shown at view time |
-| Provenance (D13) | Embedded in every output via matplotlib's built-in metadata; paths relativised; reduced or off on request |
+| Provenance (D13) | Embedded in every output via matplotlib's built-in metadata; full, minimal or off |
 | Studio (D14) | Tableau-like drag and drop plus a house-style editor; built after everything else works |
 | Stability (D15) | Versioned specs, library-level semver, visual changelog, pinning via lockfiles |
 | Licence and name (§9) | MIT; the name kept by Steven Kaye via `TRADEMARKS.md` |
-| Phasing (§8) | Set by the [build plan](build-plan.md) |
+| What's planned | [To do](todo.md) |
 
 ---
 
@@ -58,7 +57,7 @@ Also:
    - **Fixed style**: house style, set by the theme and format (by the org, journal or user), never by an individual graph. Each value is a **parameter**, e.g. `plot_area.sides` or `series.colors`; a theme may also leave some parameters variable, for graphs to change.
    - **Options**: what an individual graph may vary. Each is documented with a default, except the data itself (the data file and the required mappings such as `x` and `y`), which every graph must specify.
    - **Escape hatch**: raw matplotlib on a themed figure, always marked non-standard.
-3. **One source per fact; everything else is generated.** The document formats are defined by pydantic models. Each graph type's and layer's options are defined by its `graph_type.yaml` or `layer.yaml`, from which typed model code is generated. The JSON Schema, catalog pages and galleries come from these, and the skill reads them at run time. Nothing generated is edited by hand.
+3. **One source per fact; everything else is generated.** Each kind of document is defined by its definition file (§8): every parameter with its default, range and description. The code reads them; `forgegraph schema`, the catalog pages and the docs/specs mirrors are generated from them, and the skill reads them at run time. Nothing generated is edited by hand.
 4. **Renderer code holds no style constants.** Every visual value is read from the resolved spec. Editing a default in YAML changes the output without editing code, and tests check that each value actually changes something (§7).
 5. **Extensible without forking.** Anything an organisation would want to customise can be supplied by a pack.
 6. **Reproducible by default.** A rendered file carries its own spec and provenance. A saved spec plus a data reference re-renders the same graph tomorrow, or with tomorrow's data.
@@ -70,15 +69,15 @@ Also:
 
 | Term | What it is | Where it lives |
 | --- | --- | --- |
-| **GraphSpec** | One specific graph: data, graph type, column mappings, options, layers | `*.graph.yaml`, embedded in the output image |
-| **Graph type** | A kind of graph (`xy`, `bar`): columns, options, style parameters used, examples. YAML plus a render module | `src/forgegraph/graph_types/<type>/` (core only) |
-| **Layer** | An optional addition that compatible charts accept (`reference_line`, `note`). Same structure as a graph type, in `layer.yaml` | `src/forgegraph/layers/<name>/` (core only) |
-| **Preset** | Saved settings without data, with a name and a description, reused by a GraphSpec through `extends:`. E.g. "polarization curve" = `xy` + its columns + axis titles | a pack's `presets/`, or a preset file in the project |
+| **GraphSpec** | One specific graph: data, graph type, column mappings, parameters, layers | a YAML file, embedded in the saved graph |
+| **Graph type** | A kind of graph (`xy`): the parameters a GraphSpec chooses, in its definition file, drawn by its module in drawing/ | `src/forgegraph/graph_types/<type>.yaml` (core only) |
+| **Layer** | An addition drawn on a graph (`reference_line`, `note`, `error_bar`), defined by its own file | `src/forgegraph/layers/<type>.yaml` (core only) |
+| **GraphSpec to extend** | A GraphSpec without data, reused by others through `extends:`. E.g. "polarization curve" = `xy` + its columns + axis titles | a pack's `graphspecs/` |
 | **Theme** | The look: fixed style (fonts, palettes, spines, ticks, legend style), plus defaults for options | a pack's `themes/` |
-| **Format** | The destination: figure size, base font size, line-weight scale, file type, dpi, provenance level | a pack's `formats/` |
+| **Format** | The destination: figure size, base font size, file types, dpi, provenance level | a pack's `formats/` |
 | **Layout** | Several graphs on one canvas, used for both multi-panel figures and dashboards | `*.layout.yaml` |
-| **Pack** | A folder or pip package that bundles presets, themes, formats, fonts and skill reference notes. Data only, no code | anywhere; listed in the main config or a folder config |
-| **Scheduled render** | A GraphSpec or layout re-rendered on a schedule by the operating system's scheduler | the scheduler; outputs wherever the owner chooses |
+| **Pack** | A folder or pip package that bundles themes, formats, GraphSpecs, layouts, schedules, fonts and reference notes. Data only, no code | anywhere; listed in the main config or a folder config |
+| **Scheduled render** | A schedule file's GraphSpecs and layouts, rendered by `forgegraph job run`, which whatever the environment offers runs on a schedule | a `*.schedule.yaml`; outputs wherever it says |
 
 ---
 
@@ -87,7 +86,7 @@ Also:
 ```
  Interfaces   Python API · CLI (forgegraph) · Agent Skill · Studio desktop app (later) · OS scheduler
                     │ all build / read
- Documents    GraphSpec · Layout          (YAML or JSON, versioned schema)
+ Documents    GraphSpec · Layout · Schedule    (YAML, each spec versioned)
                     │
  Pipeline     resolve ──► read ──► validate ──► render ──► lint ──► export
                │           │          │             │          │         │
@@ -95,46 +94,53 @@ Also:
                │       or Parquet  contract    engine      clipping, + provenance
                │       file        check                   palette…
                │
- Registry     graph types · layers · presets · themes · formats · references
+ Registry     graph types · layer types · packs (themes · formats · GraphSpecs · layouts · schedules · notes)
                ▲
-               └── built-in  ◄  packs  ◄  main config  ◄  folder config  ◄  extends  ◄  the spec itself
+               ├── which packs may be used: the main config, then the folder config
+               └── values: graph type  ◄  theme  ◄  format  ◄  extends  ◄  the spec itself
 ```
 
-**Resolve** merges, in order: the graph type's defaults, then the theme, the format, any spec named in `extends:`, and finally the spec itself. Each field has a defined merge rule (replace by default; `layers` merge by name, so a GraphSpec adds layers or changes an inherited one by naming it), set in the GraphSpec specification. Resolve records where each value came from. `forgegraph explain my.graph.yaml` prints the resolved spec with an origin for every value (like `git config --show-origin`). When someone asks "why is my legend frameless?", the answer is one command away.
+**Resolve** merges, in order: the graph type's defaults, then the theme, the format, any spec named in `extends:`, and finally the spec itself. Each field has a defined merge rule (replace by default; `layers` merge by name, so a GraphSpec adds layers or changes an inherited one by naming it), set in the GraphSpec specification. Resolve records where each value came from. `forgegraph explain my.yaml` prints the resolved spec with an origin for every value (like `git config --show-origin`). When someone asks "why is my legend frameless?", the answer is one command away.
 
-**Read** takes the DataFrame passed in, or reads the Parquet file the GraphSpec's `data.file` names. **Validate** checks the frame against the graph type's columns and fails with messages an agent can act on ("`y` column `voltage` not found; nearest: `Voltage (V)`"). **Lint** inspects the rendered figure as part of every render (D9). **Export** writes the files and embeds provenance.
+**Read** takes the DataFrame passed in, or reads the Parquet file the GraphSpec's `data.file` names. **Validate** checks the frame against the graph type's columns and fails with messages an agent can act on ("axis.y.data.column: no column 'Voltage' in the data; columns are …"). **Lint** inspects the rendered figure as part of every render (D9). **Export** writes the files and embeds provenance.
 
 ### 3.1 What it looks like to use
 
-These examples are illustrative. The exact fields of every document format are settled in separate, reviewed format specifications before anything is built (§8).
-
-**GraphSpec:**
-
-
+**GraphSpec** (docs/specs/graphspec/polarization.md lists every parameter):
 
 ```yaml
-spec_version: 1                   # GraphSpec format version
-graph_type: xy
-extends: acme/polarization-curve  # optional preset
-data:
-  file: results/polarization.parquet   # or a DataFrame passed through the Python API
-  preprocessing: scripts/prepare.py    # optional: the code that made it
-columns:                          # which data column goes where
-  x: current_density
-  y: cell_voltage
-  color_by: cell
-options:                          # how the graph is drawn
-  labels: interior
-  benchmark: "6 cm2"
-  x_label: "Cell Current (mA/cm^2)"
-  y_label: "Cell Voltage (V)"
-layers:
-  - {type: reference_line, y: 1.0, label: "MVP target"}
-theme: acme/acme                  # required: a theme from a pack the configs allow
-format: acme/slide                # required, likewise
+name: voltage
+version: 0
+description: Cell voltage over a test, one line per cell.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme      # from a pack the configs allow
+        format: forgegraph_base/base_format
+    text:
+        title: Cell voltage
+    data:
+        file: runs.parquet      # or a DataFrame passed through the Python API
+        preprocessing: None
+    axis:
+        x:
+            data:
+                column: hours
+        y:
+            data:
+                column: voltage
+    encoding:
+        color: cell
+    layers:
+        target:
+            type: reference_line
+            axis: y
+            value: 0.7
+            label:
+                text: Target
 ```
-
-
 
 **Python:**
 
@@ -143,19 +149,19 @@ import forgegraph as fg
 
 g = fg.xy(df, x="current_density", y="cell_voltage", color="cell")
 g                                  # renders inline in Jupyter
-g.save("polarization.png")         # PNG with the spec embedded
-g.spec.save("polarization.graph.yaml")
-g = fg.load("polarization.png")    # recover the spec from a rendered image
+g.save("polarization.png")         # PNG with its GraphSpec embedded
+record = fg.load("polarization.png")
+record["graphspec"]                # the GraphSpec, recovered from the image
 ```
 
 **CLI** (every command has `--json` for agents):
 
 ```
 forgegraph catalog                     # what the configs allow: graph types, themes, formats, ...
-forgegraph catalog themes              # one kind: graph-types, themes, formats or graphspecs
+forgegraph catalog themes              # one kind: graph-types, layers, themes, formats, graphspecs, layouts or schedules
 forgegraph schema graphspec --graph-type xy --theme acme/acme --format acme/slide   # what a GraphSpec can set
-forgegraph render polarization.graph.yaml   # lint warnings come back with every render
-forgegraph explain polarization.graph.yaml
+forgegraph render polarization.yaml    # lint warnings come back with every render
+forgegraph explain polarization.yaml
 forgegraph load out/polarization.png   # print the spec embedded in an image
 ```
 
@@ -173,14 +179,9 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 
 ### D2. Spec-first core, Python sugar
 
-`fg.render(spec, data=None) → Graph` is the real API. `fg.xy(df, …)` builds a spec and calls it. A `Graph` holds `.spec`, `.figure` and `.axes` (the escape hatch), `.warnings` (lint) and `.provenance`, and shows itself as an image in notebooks.
+`fg.render(spec, data=None) → Graph` is the real API. `fg.xy(df, …)` builds a spec and calls it. A `Graph` holds `.spec`, `.figure` and `.axes` (the escape hatch), `.issues` (lint; `.warnings` as messages) and `.record()` (provenance), and shows itself as an image in notebooks.
 
-**Where the models come from.**
-
-- The document formats (GraphSpec, theme, format, layout) are hand-written pydantic models.
-- Each graph type's and layer's options come from its `graph_type.yaml` or `layer.yaml`. A generator turns these into committed, typed pydantic code, so notebooks and IDEs get autocompletion for `fg.xy(…)`. CI checks that the generated code is current; it's plain text, so the comparison is exact.
-- JSON Schema is produced from the models (`forgegraph schema`) and never written by hand.
-- GraphSpec validation is discriminated on `graph_type`, so an error names only the fields of the graph type in use.
+**Where the definitions come from.** Each kind of document is defined by its definition file (§8); spec/parameters.py reads every parameter, range and description from it, and validation, `forgegraph schema` and the catalog all use what it reads. A GraphSpec is checked against the graph type it names, so an error names only that graph type's parameters. The provenance record and a job's status file are pydantic models.
 
 **Rendering is isolated from the user's matplotlib state.**
 
@@ -198,8 +199,7 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 
 Every size in a theme is a multiple of the format's base font ("tick labels = 0.9 × base"), so a theme renders correctly in any format. That matters because graphs go to many destinations, not mainly slides (so no `.pptx` export: the examples were collected on slides only for convenience).
 
-
-**Starting default theme:** a reasonable look to begin with, modelled on the example graphs: a Source Sans–style OFL font, four black spines, outward ticks, a muted tab10-like palette, frameless legend, direct labels where they fit. It gets tuned once there's a gallery to look at. The `acme` example pack has a *deliberately different* house style (serif font, two spines, inward ticks, grid, framed legend outside the plot), so it proves that a pack can change the look completely.
+**The base theme** (forgegraph_base/base_theme): Roboto, a full box, outward ticks, the Okabe–Ito palette, a frameless key, direct labels where they fit. The `acme` example pack has a *deliberately different* house style (IBM Plex Serif, two sides of the box, a grid, Paul Tol's muted palette), so it shows that a pack can change the look completely.
 
 **Fonts and PDFs:**
 
@@ -207,7 +207,7 @@ Every size in a theme is a multiple of the format's base font ("tick labels = 0.
 - Maths in labels uses the theme font, upright rather than italic.
 - PDF and PostScript output embed TrueType (Type 42) fonts rather than matplotlib's default Type 3, which many journal submission checks reject.
 
-*The default files are the specification (§8).*
+*The base pack's files are the specification (§8).*
 
 ### D4. Packs: extension without forking
 
@@ -225,11 +225,10 @@ acme-forgegraph/
 
 - **Packs are the only source of named specs.** Every theme, format, GraphSpec, layout or schedule that a file names, under specifications or in extends, comes from a pack and is named `pack/name`. ForgeGraph's own specs are the pack `forgegraph_base`: `base_theme`, `base_format`, `base_layout_format`, `base_layout`, `base_schedule` and example GraphSpecs. Specs of your own are a folder pack. The files you draw (GraphSpecs, layouts and schedules, a layout's tiles and a schedule's targets) are given by path.
 - **Graph types and layer types** are ForgeGraph's code, not pack data, so they're named without a prefix (`xy`) and can always be used.
-- **The config says which packs may be used.** Its one setting is `packs`.
-  - The main config, `~/.config/forgegraph/config.toml` or the file `FORGEGRAPH_CONFIG` names, covers all work; when there's none, ForgeGraph writes it, listing the built-in packs. A folder config, `forgegraph.toml`, covers the files in its folder and every folder below it; a drawn file uses the nearest one, in its own folder or the closest above it.
-  - With a folder config, a drawn file may use only the packs it lists. A pack it lists that the main config doesn't is non-standard: it works, but whatever is drawn with it is watermarked and its record names the pack, and `render`, `explain`, `catalog`, `pack-notes` and `schema` say so. That way someone who can't change an organization's main config can still make and try a pack, and nothing drawn with it passes as standard.
+- **The config says which packs may be used** (packs/__init__.py has the rules): the main config for all work, and a folder config, `forgegraph.toml`, for the files below it.
+  - A pack only a folder config lists is non-standard: it works, but whatever is drawn with it is watermarked and its record names the pack. That way someone who can't change an organization's main config can still make and try a pack, and nothing drawn with it passes as standard.
   - Configs are found from the drawn file and the user, not the working folder, so a scheduled run is checked the same way.
-- **Configs restrict use, not access.** A drawn file may name only the allowed packs' specs. A pack's specs may build on any spec ForgeGraph can find, in a pack a config that applies lists or in an installed pip pack: extend it, or name it as a theme or format. `forgegraph catalog` and `pack-notes` show only the allowed packs; `schema graphspec` shows any spec it can find.
+- **Configs restrict use, not access.** A drawn file may name only the allowed packs' specs, but a pack's specs may build on any spec ForgeGraph can find, so a pack can extend another without every user allowing both.
 - **Extending** creates a new spec, so it isn't narrowing: a spec is usable only if its own pack is allowed. The narrowing always allowed is a GraphSpec setting the variable parameters of the theme and format it names.
 - **No defaults.** Every GraphSpec names its graph type, theme and format, itself or through the GraphSpec it extends; a layout names its format. The base specs are what other specs extend.
 - **Distribution:** a local folder, or a pip package that declares a `forgegraph.packs` entry point. Pip already handles git URLs (`pip install git+https://…`) and versions, so ForgeGraph has no fetching or caching of its own.
@@ -240,41 +239,32 @@ acme-forgegraph/
   - **Reference notes:** the skill treats them as reference data, not as instructions.
   - **Trust:** installing a pip package is still a trust decision, as for any package.
 
-### D5. Graph-type definitions live with their code
+### D5. Graph types and layer types: one definition file each
 
-A graph type is defined by its own file in `src/forgegraph/graph_types/`, starting with `xy.yaml`; its drawing code lives beside it. Its parameters are what a GraphSpec chooses for one graph: the data column for each axis, the encodings, the marks and the legend. Things drawn on top of the graph, including those computed from its data (error bars, a reference line at the mean, a fitted curve), are layers. A parameter defined as None with no None in its range is required: a GraphSpec must set it. Style values never live in a graph type: the renderer reads them from the theme, so the theme stays the single place where style values live. The graph code receives a DataFrame; loading and preparing data happens before it.
+A graph type is defined by its own file in `src/forgegraph/graph_types/`, starting with `xy.yaml`, and drawn by drawing/xy.py; a layer type by its file in `src/forgegraph/layers/`, drawn by drawing/layers.py. Its parameters are what a GraphSpec chooses for one graph: the data column for each axis, the encodings, the marks and the legend. Things drawn on top of the graph, including those computed from its data (error bars, a reference line at the mean, a fitted curve), are layers. A parameter defined as None with no None in its range is required: a GraphSpec must set it. Style values never live in a graph type: the renderer reads them from the theme, so the theme stays the single place where style values live. The graph code receives a DataFrame; loading and preparing data happens before it.
 
 **Series labels come from a set of labelling methods.** Each method either places every label cleanly or reports that it can't. The theme lists the methods it allows, in order of preference, and a graph's `legend.method: auto` uses the first that fits. A method chosen by name that doesn't fit, or `auto` with nothing that fits, is an error that says what to change: ForgeGraph never draws labels over data as a fallback. The first methods are:
 
 - `direct`: labels inside the plot, each beside its own series, touching no line, marker or other label;
-- `key`: a boxed key at the first of the GraphSpec's legend.key.positions that covers no data, or outside the plot area (legend.key.inside: false);
+- `key`: a key at the first of the GraphSpec's legend.key.positions that covers no data, or outside the plot area (legend.key.inside: false);
 - `none`.
 
 A single series is named too, unless its name is the y-axis title's text, which already names it. A numeric `encoding.color` is drawn on a color scale with a color bar, or with palette colors and labels when `encoding.color_type` is `categorical`; with lines shown, a line joins only points of one color.
 
-Placement is deterministic. Direct labels follow six rules, using the theme's legend.direct parameters:
-
-1. Never in the margins.
-2. Next to its own series: that series is the nearest one to the label, at most max\_relative\_distance of the distance to any other, and within one and a half label heights.
-3. Touching nothing: at least clearance from every line and marker (its own included) and from every other label.
-4. In open space: among the positions that pass, prefer those close to its own series and far from the others, with a slight preference for either end of the line.
-5. If nothing passes, the x-axis may grow by up to max\_axis\_extension of its range, and placement is tried again.
-6. Otherwise direct doesn't fit.
-
-When encoding.line\_style is set, line styles are explained by a small key at the next free position. Inside the plot area, a key takes the first of legend.key.positions whose box no line, marker, bar, error bar or text passes through; if none is clear, key doesn't fit. Outside it (legend.key.inside: false), top\_\* puts the key above the plot area under the title, bottom\_\* below the x-axis title, and right\_\* to its right; the figure is laid out again with room for it, and everything placed after layout is placed again. An outside key that runs into a title, tick labels, a note or a color bar is an error. Existing labelling libraries were tried in the phase 1 spike and not adopted.
+Placement is deterministic. A direct label sits inside the plot, beside its own series, touching nothing; drawing/labels.py lists the rules. A key, and the style key that explains encoding.line_style, sits inside the plot area at the first position that covers no data, or outside it, with the figure laid out again around it; drawing/key.py places it. Existing labelling libraries (matplotlib-label-lines, adjustText) don't meet these rules.
 
 ### D6. Review surface: tabbed HTML catalog, Forgemark comments
 
-- `forgegraph catalog build` generates one **HTML catalog** with a tab per graph type, layer, preset and theme. Each tab shows the generated tables, the baseline example, and one image per variable parameter, with that parameter changed. This is what the spec suggested. Forgemark supports per-tab comments in HTML.
+- `forgegraph catalog build` generates one **HTML catalog** per pack, with a tab per kind (themes, formats, graph types, layers). Each spec shows its generated table, its baseline, and one image per variable parameter, with that parameter changed. Forgemark supports per-tab comments in HTML.
 - **Comments survive rebuilds.**
   - The build gives every section, table row and figure a stable `id` (`#xy-param-labels`, `#xy-example-labels-direct`), and carries the trailing `forgemark-comments` block across verbatim.
   - It then re-attaches each comment by its recorded anchor text, using Forgemark's own `reattach`. Only comments whose text actually changed stay orphaned.
   - `forgemark lint` reports any orphans.
 - **Size and freshness.**
   - Catalog images are embedded at screen resolution, which keeps the file small enough to commit.
-  - The page records a hash of its inputs (definitions, theme, library version). CI checks that hash rather than comparing pixels, which differ slightly between machines.
+  - The page records a hash of its inputs (the package's files and the library version). CI checks that hash rather than comparing pixels, which differ slightly between machines.
 - **Packs build their own catalog.** An org reviews its house style the same way the project reviews the core.
-- **GitHub:** a PR shows `graph_type.yaml` diffs as text and changed gallery baseline PNGs as image diffs, which is enough for code review. There are no separate per-chart README files to keep in sync.
+- **GitHub:** a PR shows definition-file diffs as text and changed baseline PNGs as image diffs, which is enough for code review. There are no separate per-chart README files to keep in sync.
 - **Requests don't need a PR.** PRs are for contributors who write code. Anyone else asks for a new graph type through a GitHub issue, which the agent can file for them (D10).
 
 **Why HTML, not another format.** Alternatives considered:
@@ -284,7 +274,7 @@ When encoding.line\_style is set, line styles are explained by a small key at th
 - **Notebooks** review poorly.
 - **PDF** is static, and its comments don't map back to the source.
 
-A single self-contained HTML file opens anywhere offline, embeds its images, supports tabs (and later a theme switcher), and Forgemark can comment on it.
+A single self-contained HTML file opens anywhere offline, embeds its images, supports tabs, and Forgemark can comment on it.
 
 ### D7. Input: a DataFrame
 
@@ -299,7 +289,7 @@ Drawing reads the DataFrame and checks it against the GraphSpec: the named colum
 
 ### D8. Text: lightweight markup for scientific labels
 
-Every example uses units with super- and subscripts. **Explicit labels** (`x_label`, `y_label`, titles, layer labels) accept a small markup, rendered in the theme font:
+Every example uses units with super- and subscripts. **Explicit labels** (`text.title`, `axis.x.title`, `axis.y.title`, key titles and layers' text) accept a small markup, rendered in the theme font:
 
 - **Superscripts** with braces, or `^` followed directly by an optional minus sign and digits: `mA/cm^2`, `L^-1 s^-1`, `10^{-3}`.
 - **Subscripts** only with braces: `P_{max}`, `KOH_{aq}`, `ΔV_{Al}`.
@@ -312,23 +302,17 @@ Labels default to the column name, and those defaults are shown **literally**: `
 - **CLI with `--json` is the universal agent interface.** Any agent with a shell can use it: Claude Code, Codex, Claude or ChatGPT desktop with code execution, CI.
 - **The skill** is an Agent Skill folder (`SKILL.md` and example GraphSpecs), a format several agent platforms now read.
   - **It ships inside the Python package:** `forgegraph skill install` copies it into the agent's skills folder.
-  - **`SKILL.md` is a short workflow.** Everything that depends on the installed version is fetched at run time with `forgegraph catalog` and `forgegraph schema`: graph types, themes, formats, every parameter with its range and description, presets, packs and reference notes. The skill therefore always matches the installed library and packs, and nothing needs regenerating.
+  - **`SKILL.md` is a short workflow.** Everything that depends on the installed version is fetched at run time with `forgegraph catalog` and `forgegraph schema`: graph types, themes, formats, every parameter with its range and description, GraphSpecs to extend, packs and reference notes. The skill therefore always matches the installed library and packs, and nothing needs regenerating.
 - **MCP server: deferred** (§11).
-- **The loop the skill follows:**
-  1. Select or prepare the DataFrame as a Parquet file.
-  2. Select the graph type, theme and format (`forgegraph catalog`); the base pack's if unclear. The agent doesn't create or change themes or formats unless the user asks, and says so when a fixed parameter stands in the way.
-  3. Write the GraphSpec, structured like the examples, with any parameter `forgegraph schema graphspec` lists.
-  4. `forgegraph render --json`, which returns output paths and lint issues; then look at the image itself.
-  5. Iterate until the graph meets the request and shows the data well. Saved specs make "the one from earlier, but log y" trivial.
-  6. Save the GraphSpec, the graph and the Parquet file in the user's folder, if there is one.
-- **Lint** runs as part of every render and catches what an agent often misses: overlapping or clipped text, a legend covering data, more categories than the palette has colours, a log axis with non-positive values, points outside fixed limits, fonts too small for the format, a missing font replaced by a fallback, and rows silently dropped.
+- **The loop the skill follows** is SKILL.md's workflow: choose, write the GraphSpec, render, look, lint, and iterate until the graph meets the request.
+- **Lint** runs as part of every render and catches what an agent often misses, such as overlapping or clipped text, a key covering data and fonts too small for the format; drawing/lint.py lists every check.
 
 ### D10. Non-standard graphs and the request flow
 
 When a request isn't in the catalog, the agent says so plainly, then:
 
-1. **Compose first** when the request is a variation of something supported: the closest graph type + layers + annotations.
-2. **Draw it anyway** when nothing is close, e.g. a violin plot when only `xy` and `bar` exist. The *agent* writes raw matplotlib on a themed canvas (`fg.blank(theme, format)`), so the result is at least on-style. The requester never writes code.
+1. **Compose first** when the request is a variation of something supported: the closest graph type + layers.
+2. **Draw it anyway** when nothing is close, e.g. a violin plot when only `xy` exists. The *agent* writes raw matplotlib on a themed canvas (`fg.blank(theme, format)`), so the result is at least on-style. The requester never writes code.
 3. **Watermark it.** Every non-standard output gets a prominent diagonal, semi-transparent "NON-STANDARD" watermark across the plot area, plus `nonstandard: true` in provenance, and a warning to the user. The watermark is **always on**, and a GraphSpec can't change it: its parameters are fixed in the theme. A theme's author can restyle it, even out of sight, so an organisation that wants it required keeps it in its own theme. This also covers changes made after rendering: whatever draws or saves the figure, ForgeGraph or matplotlib directly, first checks that it still has the artists it had when rendering finished, drawing the same pixels. If anything was drawn or changed through `.axes` or `.figure`, the output is marked non-standard, because its embedded spec no longer reproduces it, and it stays non-standard.
 4. **Offer a request.** With the user's OK, the agent files a feature request or bug report as a GitHub issue, as the skill's reference file says. Graph types live only in the core (D4), so every request goes upstream, where the maintainer handles it.
 
@@ -338,11 +322,11 @@ When a request isn't in the catalog, the agent says so plainly, then:
 name: lab_throughput
 version: 0
 description: Daily operations view of lab throughput.
-extends: default
+extends: forgegraph_base/base_layout
 fixed_parameters: None
 variable_parameters:
     specifications:
-        format: dashboard
+        format: ops/dashboard
     separators:
         line:
             show: true
@@ -368,7 +352,7 @@ variable_parameters:
                 icp_oes_01: runs_icp_oes_01.yaml
 ```
 
-**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specs/layout/default.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
+**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specs/layout/base_layout.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
 
 - **Format, no theme.** The layout's format (by default the base pack's base_layout_format: the base format at 300 mm) sets the size and output of the whole figure, and replaces each tile's own format, so every tile is drawn at one base size. The layout can set the format's variable parameters, such as its file types. Each tile keeps its own theme.
 - **The grid.** grid.areas draws the grid as rows of tile names, as CSS `grid-template-areas`, matplotlib's `subplot_mosaic` and patchwork do: a name repeated over a rectangle of cells spans it, and `.` is a blank cell. column_widths and row_heights are ratios of plot boxes.
@@ -380,11 +364,11 @@ variable_parameters:
 - **Rendering:** each tab renders as one matplotlib figure, each tile drawn into its own Axes in its own theme's settings.
 - **What's given up:** pages don't reflow on phones. Panel labels, shared axes and one legend for several tiles aren't drawn yet.
 
-Paper figures (Ex1 p3 and Ex2 p1, p5–7 are side-by-side panels) and ops dashboards differ only in their format and defaults.
+Paper figures and ops dashboards differ only in their format and defaults; examples/layouts has one of each.
 
 ### D12. Scheduled graphs and dashboards
 
-A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/default.md): the GraphSpec and layout files to render, where to save them, and when. It extends the default schedule like any other definition file, so it can be reviewed, kept in version control and checked like any parameter.
+A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/base_schedule.md): the GraphSpec and layout files to render, where to save them, and when. It extends the base schedule like any other spec, so it can be reviewed, kept in version control and checked like any parameter.
 
 - **Cadence.** `interval` counts `interval_unit` (minute, hour, day, week, month or year), and `at` says when in each unit, one time or a list: ":30", "06:00", "mon 06:00", "1 06:00", "Jan 1 06:00". `interval` divides 60, 24 and 12 for minutes, hours and months, and is 1 otherwise, so every form maps exactly onto every scheduler. Times are the machine's local time.
 - **`forgegraph job run lab.schedule.yaml`** runs a schedule once. Whatever the environment offers schedules that command: the machine's scheduler (launchd, systemd, cron, Task Scheduler), a GitHub Actions workflow, a Claude scheduled task. ForgeGraph writes no scheduler entries itself, so every user's path is the same.
@@ -394,26 +378,24 @@ A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/d
   - **HTML pages** show a stale banner on their own when the data is older than `freshness.stale_after_hours` (by default, the longest gap between runs plus 25 %), so a job that silently stopped can't look current. This works where the page's script runs (a local browser or a web host). File-sharing previews often don't run scripts, so the in-image footnote is what always shows.
 - **The skill** has the agent write the schedule file and schedule `forgegraph job run <schedule>` by the method of its choice.
 - **Data:** the job renders; keeping the targets' Parquet files current is the user's job.
-- **Platform caveats** go in the docs, e.g. macOS needs Full Disk Access for background jobs that write into cloud-synced folders.
+- **macOS:** a background job that writes into a cloud-synced folder needs Full Disk Access.
 
 ### D13. Provenance and reproducibility
 
-Every output embeds a provenance record, at its format's provenance.level, as docs/specs/provenance lists it: the GraphSpec as written, each spec used by name and version, the ForgeGraph version and a timestamp; at full also every resolved value, and the data file and preprocessing reference as the GraphSpec gives them.
+Every output embeds a provenance record, at its format's provenance.level (full, minimal or off), so a graph can be traced and redrawn; docs/specs/provenance/provenance.md lists what each level records.
 
-- **Carriers.** Provenance is one JSON record written through matplotlib's own metadata support: a PNG text chunk, a JPEG comment, the TIFF image description, the SVG Dublin Core `Description` field, and the PDF Info dictionary. HTML pages carry it in `<script type="application/json">`. The provenance section of the GraphSpec specification fixes the exact mechanism.
+- **Carriers.** Provenance is one JSON record written through matplotlib's own metadata support: a PNG text chunk, a JPEG comment, the TIFF image description, the SVG Dublin Core `Description` field, and the PDF Info dictionary. HTML pages carry it in `<script type="application/json">`. drawing/export.py writes it.
 - **Layouts.** A layout's files record the layout as written and, for each tab they show, each tile's GraphSpec file and the same entries as a GraphSpec's.
-- **Privacy.**
-  - `provenance: minimal` leaves out the resolved values, the data file and the preprocessing reference; `provenance: off` embeds nothing.
-  - The built-in formats use `full`, so published figures stay reproducible and traceable; `minimal` is for formats whose files must not reveal where their data is.
+- **Privacy.** The built-in formats use `full`, so published figures stay reproducible and traceable; `minimal` is for formats whose files must not reveal where their data is.
 - **Determinism.** Exports honour `SOURCE_DATE_EPOCH` and a fixed SVG hash salt, so tests can produce stable files.
-- **Recovery.** `forgegraph load image.png` recovers the spec. Because PowerPoint and Slack strip metadata, the skill also saves the spec in the project's `graphs/` folder.
+- **Recovery.** `forgegraph load image.png` recovers the spec. Because PowerPoint and Slack strip metadata, the skill also saves the GraphSpec beside the graph, in the user's folder.
 
 ### D14. Desktop app: "Studio"
 
 **Purpose:** let a person make a graph without an AI, through a Tableau-like interface.
 
 ```
-┌ Data ──────────┐ ┌ Graph: [xy ▾]  Preset: [— ▾]  Theme: [acme ▾]  Format: [slide-double ▾] ┐ ┌ Options ──────────┐
+┌ Data ──────────┐ ┌ Graph: [xy ▾]  Extends: [— ▾] Theme: [acme ▾]  Format: [slide-double ▾] ┐ ┌ Options ──────────┐
 │ # current_dens │ │  X      [ current_density            ]                               │ │ mode  [lines+mk ▾]│
 │ # cell_voltage │ │  Y      [ cell_voltage               ]                               │ │ labels [direct ▾] │
 │ A cell         │ │  Color  [ cell                       ]                               │ │ x scale [linear ▾]│
@@ -427,28 +409,28 @@ Every output embeds a provenance record, at its format's provenance.level, as do
 - **Data:** Studio opens a GraphSpec, or a Parquet file to start a new one.
 - **Fields panel:** the DataFrame's columns, typed as numeric, categorical or date.
 - **Shelves:** drag fields onto X, Y, Color, Style, Series and Error. These write the GraphSpec's mappings.
-- **Options panel:** generated from the graph type's JSON Schema, so every new option appears automatically. Values that the theme controls are shown read-only, with the reason.
-- **Live preview:** each change re-renders through the same pipeline (debounced; matplotlib takes about 0.1–0.5 s per graph).
+- **Options panel:** generated from the graph type's definition file, so every new parameter appears automatically. Values that the theme controls are shown read-only, with the reason.
+- **Live preview:** each change re-renders through the same pipeline.
 - **Theme and format editor**, for whoever owns the house style. It edits a pack's `themes/` and `formats/` files and previews the result across the whole gallery.
-- **Round trip with the AI:** Studio opens any `.graph.yaml`, or any ForgeGraph PNG via its embedded spec, so a graph the agent made can be tweaked by hand and vice versa. Saving writes the spec, keeping the user's comments and key order.
+- **Round trip with the AI:** Studio opens any GraphSpec, or any ForgeGraph PNG via its embedded spec, so a graph the agent made can be tweaked by hand and vice versa. Saving writes the spec, keeping the user's comments and key order.
 - **Later:** a layout editor for dashboards and multi-panel figures, and a catalog browser.
 
-**Build:** a local web app (`forgegraph studio`: a Python server running the library, plus a frontend with drag-and-drop), packaged later as a desktop app. The UI framework is chosen in the phase's UI plan, trying a Python UI framework (e.g. NiceGUI) first before committing to a separate TypeScript frontend. It's still a GUI over specs: schema-described options are what make it feasible.
+**Build:** a local web app (`forgegraph studio`: a Python server running the library, plus a frontend with drag-and-drop), packaged as a desktop app. The UI framework is chosen in its UI plan, trying a Python UI framework (e.g. NiceGUI) first before committing to a separate TypeScript frontend. It's still a GUI over specs: schema-described options are what make it feasible.
 
-**When:** after everything else works. It's the last phase.
+**When:** after everything else works (see [to do](todo.md)).
 
 - **Ready for it from the start:** options are described by the schema.
 - **Built with Studio:** the shelf-mapping code and its round-trip tests.
-- **Not mappable:** a spec using something shelves can't show, such as a `derive` expression, opens with that part shown read-only.
+- **Not mappable:** a spec using something shelves can't show opens with that part shown read-only.
 - **Validation:** once built, it gets a hands-on trial to judge whether it's sufficient.
 
 ### D15. Stability for a public library
 
-- **Specs are versioned** (`spec_version: 1`). `forgegraph migrate` is written when spec version 2 exists.
-- **One version number: the library's**, using semver. Graph types and core themes ship inside it, so they don't carry their own versions; each `graph_type.yaml` keeps a changelog instead. Packs have their own versions, like any package.
+- **Specs are versioned.** Every spec file has a `version`, and provenance records it, with a pack spec's pack version. `forgegraph migrate` is written when a spec change needs it.
+- **One version number: the library's**, using semver. The built-in packs are released with it and carry its version; other packs have their own, like any package.
   - **Major:** a breaking change to a spec format.
   - **Minor:** releases may change how graphs look.
-- **Visual changelog:** each release lists every appearance change, with before and after images of every gallery example that changed.
+- **Visual changelog:** each release lists every appearance change, with before and after images of every catalog card and regression graph that changed.
 - **Pinning:** projects and scheduled renders pin versions through their lockfile, so a dashboard can't change appearance overnight.
 - **No telemetry.** Feature requests come from the request flow and GitHub issues.
 
@@ -456,76 +438,39 @@ Every output embeds a provenance record, at its format's provenance.level, as do
 
 ## 5. Scope and coverage of the examples
 
-**First graph types** (build plan phases 2 and 5):
+**Graph types:** `xy` draws lines, markers and bars: grouped, stacked, 100 % stacked and horizontal, with value labels.
 
-- `xy` covers both scatter and line plots; `scatter` and `line` are built-in presets of `xy` with the familiar names.
-- `bar` is vertical or horizontal, grouped or stacked, with error bars and direct value labels.
+**Layers:** `reference_line` (horizontal or vertical, labelled), `note` (the "conditions" text block) and `error_bar`. Error bars are a layer, drawn from DataFrame columns or the spread of aggregated rows: the specification names their absence as a failing of Tableau.
 
-**First layers:**
+| Capability | Status |
+| --- | --- |
+| lines and markers, color by a column, direct labels, a benchmark series | built |
+| markers-only scatter with many points | built |
+| replicates: several lines per color group (encoding.detail) | built |
+| line style by a column, with a key for the styles | built |
+| log axes, unit markup | built |
+| color by a numeric column, with a color bar | built |
+| wide data (several y columns) | built |
+| bars: grouped, stacked, horizontal, with value labels | built |
+| reference lines, notes and error bars | built |
+| multi-panel figures and dashboards (layouts) | built |
+| target regions, fill between, stacked decomposition | on request |
+| annotations: arrows, braces, highlights, leader callouts | on request |
+| the distribution graph type (box plus strip, categorical x) | planned |
+| iso-curves (x·y = c) and a fit layer | planned |
 
-- `reference_line`: horizontal or vertical, labelled.
-- `note`: the "conditions" text block that appears on half the examples.
-
-Error bars are in the first release for both graph types: the spec names their absence as a failing of Tableau. They're a layer, arriving with the other first layers in phase 5, drawn from error columns in the DataFrame.
-
-| Capability | Seen in examples | Build plan phase |
-| --- | --- | --- |
-| xy lines+markers, colour by a column, direct labels, a benchmark series | most | 2 |
-| markers-only scatter, many points | Ex1 p3 | 2 |
-| replicates: several lines per colour group (encoding.detail) | Ex2 p3, p4, p7 | 2 |
-| line style by a column + split legend (colour direct, style in a key) | Ex2 p9–12 | 2 |
-| log axes with 10ⁿ ticks; unit markup | Ex1 p4; all | 2 |
-| colour by a numeric column + colour bar | Ex2 p5, p6 | 2 |
-| wide data (several `y` columns) | typical Excel | 2 |
-| bar with direct labels; computed error bars | Ex1 p3 | 5 |
-| `reference_line`, `note` and error-bar layers | Ex1 p4, Ex2 p6; `note` on most of Ex2; error bars a spec requirement | 5 |
-| multi-panel figures with panel titles | Ex1 p3; Ex2 p1, p5–7 | 7 |
-| target region (dashed corner box), `fill_between` / stacked decomposition | Ex1 p2; Ex2 p2 | on request |
-| annotations: arrow, brace (ΔV), ellipse highlight, delta marker, coloured rich text, leader callouts | Ex1 p2; most of Ex2 | on request |
-| `distribution` chart (box + strip, categorical x) | Ex2 p5, p6 | 11 |
-| iso-curves (x·y = c), `fit` layer | Ex2 p1; Ex1 p3 | 11 |
-
-Ex1 = *Graph Examples.pdf*, Ex2 = *Graph Examples - 2.pdf*; p = page.
-
-**Annotations** aren't in the first release; they're built when someone asks for them. Producing them deterministically at good quality is hard, so the problem is split in two. The *drawing* is deterministic: `arrow`, `brace`, `ellipse`, `text`, `delta` are layers anchored in data coordinates, stored in the spec, and re-render identically. The *judgement* — what to call out and where to put it — is the agent's, checked by lint for overlaps. That makes annotations reproducible and reviewable while still using the agent for what it's good at.
+**Annotations** aren't in the first release; they're built when someone asks for them. Producing them deterministically at good quality is hard, so the problem is split in two. The *drawing* is deterministic: `arrow`, `brace`, `ellipse`, `text` and `delta` would be layers anchored in data coordinates, stored in the spec, and re-render identically. The *judgement* — what to call out and where to put it — is the agent's, checked by lint for overlaps. That makes annotations reproducible and reviewable while still using the agent for what it's good at.
 
 ---
 
 ## 6. Repository layout
 
-Repo `sskaye/forgegraph`, private until the first public release; distribution `forgegraph` (free on PyPI as of 2026-10-13); import `forgegraph`; CLI `forgegraph`.
-
-```
-forgegraph/
-├── src/forgegraph/
-│   ├── spec/          # document models, generated graph-type/layer models, resolve, explain
-│   ├── graph_types/   # xy/, bar/ — graph_type.yaml + render.py + samples/
-│   ├── layers/        # reference_line/, note/, … — layer.yaml + render.py
-│   ├── fonts/         # bundled fonts
-│   ├── drawing/       # matplotlib engine, text markup, lint, export, provenance
-│   ├── layouts/       # multi-panel figures and dashboards
-│   ├── jobs/          # running a schedule, status files
-│   ├── packs/         # finding packs and configs; the built-in packs forgegraph_base/ and forgegraph_base_2/
-│   ├── catalog/       # HTML catalog, Forgemark carry-over
-│   ├── skill/         # SKILL.md + references, installed by `forgegraph skill install`
-│   └── cli/
-├── docs/              # specification, architecture, build plan, specs/, decisions.md
-├── examples/
-│   ├── packs/acme/    # example org pack: a deliberately different house style
-│   └── notebooks/
-├── catalog/           # generated catalog, reviewed in place (committed, so comments are versioned)
-├── review/            # other review deliverables, one folder per phase
-├── tests/
-├── LICENSE            # MIT
-├── TRADEMARKS.md      # name-use policy (§9)
-└── .github/           # CI, PR template
-```
+Repo `sskaye/forgegraph`; distribution, import and CLI `forgegraph`. The README's repository map describes each folder.
 
 **Dependencies:**
 
-- **Core:** matplotlib, pandas, pyarrow (Parquet), pydantic, ruamel.yaml, and typer for the CLI.
+- **Core:** matplotlib, pandas, pyarrow (Parquet), pydantic, ruamel.yaml, packaging, and typer for the CLI.
 - **ruamel.yaml instead of PyYAML:** it follows YAML 1.2, so `18:00` stays a time string rather than becoming `1080`, `1.10` isn't read as `1.1`, and `NO` isn't read as false. It also keeps comments and key order when Studio or `forgegraph` rewrites a file.
-- **Optional extras:** `[studio]`.
 - **Python ≥ 3.12.** It's the default on current long-term-support Linux (Ubuntu 24.04) and widely supported across the scientific stack. The minimum is reviewed at each release.
 
 ---
@@ -535,10 +480,10 @@ forgegraph/
 - **Image regression, in two tiers.**
   - On the same platform and lockfile, output must be pixel-identical.
   - Across platforms, it must be within a tolerance: anti-aliasing and compression differ slightly between Linux CI and a Mac.
-  - Baselines are generated by a CI job and change only through that job, with the image diffs shown in the PR.
-- **Contract tests:** every option in `graph_type.yaml` is accepted by the renderer, and vice versa.
+  - Baselines are drawn with `scripts/build_recreations.py --baselines`; changes show as image diffs in the PR.
+- **Contract tests:** every parameter a definition file lists is read by the code, its range's edges are checked, and the reference GraphSpec sets every variable parameter.
 - **Perturbation tests:** for every option and style parameter a graph type declares, render with a changed value, in its declared active state, and check that the effect appears. Checks assert on the figure's artists where possible, e.g. tick-label font size equals the resolved value. Those checks are exact and platform-independent; otherwise images are compared in-process at exact pixel equality.
-- **"Hostile style" test:** render the whole gallery after loading an extreme matplotlib style, and assert that nothing changes. This catches style values the theme forgot to set, which perturbation tests can't, and proves the isolation in D2.
+- **"Hostile style" test:** render a graph under an extreme matplotlib style, and assert that nothing changes. This catches style values the theme forgot to set, which perturbation tests can't, and proves the isolation in D2.
 - **PDF font test:** PDFs embed TrueType fonts with the expected name, and no Type 3 fonts.
 - **Resolution tests:** layering order, merge rules, `extends`, and the `explain` origins.
 - **Input tests:** drawing from a DataFrame and from a Parquet file; absolute, `~` and relative paths, including one set by a GraphSpec extended; column types through Parquet; each input error.
@@ -547,22 +492,22 @@ forgegraph/
 
 ---
 
-## 8. Phasing and format specifications
+## 8. Specifications
 
-Phases, validation and review gates are set by the [build plan](build-plan.md).
+Each kind of document is specified by its definition file: every parameter with its default, range and description. The code reads it, and tests check the code against it, including the edges of every range. docs/specs/ mirrors each file for review.
 
-Each kind of document is specified by its definition file before its code is written: the file lists every parameter with its default, range and description, and tests check the code against it, including the edges of every range. Phase 1 specifies four kinds. Later phases add further kinds, each written the same way and reviewed at the start of its phase, and further files of each kind (new graph types, themes, formats):
-
-| Specification | Definition file, or what it will cover | Build plan phase |
-| --- | --- | --- |
-| **Theme** | src/forgegraph/packs/forgegraph_base/themes/base_theme.yaml | 1 |
-| **Format** | src/forgegraph/packs/forgegraph_base/formats/base_format.yaml | 1 |
-| **Graph type** | src/forgegraph/graph_types/xy.yaml | 1 |
-| **GraphSpec** | src/forgegraph/packs/forgegraph_base/graphspecs/polarization.yaml | 1 |
-| **Layer** | reference lines, notes, error bars, and later annotations | 5 |
-| **Packs and config** | src/forgegraph/packs/forgegraph_base/pack.yaml, src/forgegraph/packs/config.toml | 6 |
-| **Layout** | multi-panel figures and dashboards | 7 |
-| **Schedule** | cadence, status file, on\_failure | 8 |
+| Specification | Definition file |
+| --- | --- |
+| **Theme** | src/forgegraph/packs/forgegraph_base/themes/base_theme.yaml |
+| **Format** | src/forgegraph/packs/forgegraph_base/formats/base_format.yaml |
+| **Graph type** | src/forgegraph/graph_types/xy.yaml |
+| **GraphSpec** | src/forgegraph/packs/forgegraph_base/graphspecs/polarization.yaml |
+| **Layer type** | src/forgegraph/layers/, a file per type |
+| **Layout** | src/forgegraph/packs/forgegraph_base/layouts/base_layout.yaml |
+| **Schedule** | src/forgegraph/packs/forgegraph_base/schedules/base_schedule.yaml |
+| **Pack and config** | src/forgegraph/packs/forgegraph_base/pack.yaml, src/forgegraph/packs/config.toml |
+| **Provenance record** | src/forgegraph/spec/provenance.yaml |
+| **Catalog** | src/forgegraph/catalogs/, and each pack's catalogs/ |
 
 ---
 
@@ -572,10 +517,8 @@ Each kind of document is specified by its definition file before its code is wri
 - **Graphs are free.** The README and docs say, outside the licence text: *"Graphs and other output you make with ForgeGraph are yours. No attribution or licence terms apply to them."* Graphs carry no visible ForgeGraph credit, and provenance metadata can be switched off (D13).
 - **The name stays Steven Kaye's.** The licence covers the code, not the name.
   - A `TRADEMARKS.md` states that "ForgeGraph" is owned by Steven Kaye. Forks and products may say "based on ForgeGraph", but must use their own name.
-  - Hold the namespaces: `forgegraph` on PyPI and `sskaye/forgegraph` on GitHub (and a domain, optionally). Publish the first real release reasonably early.
-  - Before investing in the name, search for existing "ForgeGraph" trademarks or products.
+  - The namespaces are held: `forgegraph` on PyPI and `sskaye/forgegraph` on GitHub.
   - Trademark registration is optional. It makes enforcement much easier.
-- **Contributions:** decide on a contributor licence agreement before accepting the first outside PR, if a commercial edition is ever a possibility.
 - **Dependencies:** matplotlib, pandas and the bundled OFL fonts are compatible with MIT; the fonts keep their own licence file.
 
 ---
@@ -584,8 +527,8 @@ Each kind of document is specified by its definition file before its code is wri
 
 | Risk | Mitigation |
 | --- | --- |
-| Spec and code drift | Models are the single source; generated code checked in CI; contract and perturbation tests |
-| Option sprawl in `xy` | Three-tier rule; new options only via the request flow; prefer layers and presets over flags |
+| Spec and code drift | Definition files are the single source, read by the code; contract, comment and perturbation tests |
+| Option sprawl in `xy` | Three-tier rule; new options only via the request flow; prefer layers and GraphSpecs to extend over flags |
 | House-style changes silently alter scheduled outputs | Version pinning through lockfiles; visual changelog |
 | Someone else ships a product called ForgeGraph | `TRADEMARKS.md`; held namespaces; optional registration |
 | A pack is malicious or compromised | Packs are data only and never imported; YAML loaded safely; reference notes treated as data by the skill |
@@ -604,7 +547,7 @@ Each kind of document is specified by its definition file before its code is wri
 ## 11. Deferred
 
 - interactive backend and live-filter dashboards (post-MVP)
-- responsive HTML dashboards (D11); `forgegraph migrate` (until spec version 2)
+- responsive HTML dashboards (D11); `forgegraph migrate` (until a spec change needs it)
 - in layouts: panel labels, axes shared between tiles, and one legend for several tiles (D11)
 - stat or KPI tiles for ops dashboards
 - MCP server, for agents that can't run `forgegraph` themselves (e.g. cloud chat apps)

@@ -22,3 +22,6 @@ htmlcov/
 
 # Claude Code's local settings
 .claude/
+
+# Each build phase's review pages: kept outside this repository
+/review/

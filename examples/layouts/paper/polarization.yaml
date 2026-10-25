@@ -1,0 +1,26 @@
+name: polarization
+version: 0
+description: Polarization curves after the durability test.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: None
+    data:
+        file: cell_polarization.parquet
+        preprocessing: prep_cells.py (sample-data CSVs, unchanged)
+    axis:
+        x:
+            data:
+                column: current_density_a_cm2
+            title: Current density (A/cm²)
+        y:
+            data:
+                column: voltage_v
+            title: Cell voltage (V)
+    encoding:
+        color: cell

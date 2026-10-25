@@ -12,79 +12,79 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-# Each mirror page, by its path without .md, and the title and source file it shows.
+PACKAGE = ROOT / "src" / "forgegraph"
+# A pack's spec folders: the kind of spec each holds, as titles name it.
+TITLES = {
+    "themes": "Theme",
+    "formats": "Format",
+    "graphspecs": "GraphSpec",
+    "layouts": "Layout",
+    "schedules": "Schedule",
+}
+BASE_PACK = "forgegraph_base"
+
+
+def _built_in() -> dict[str, tuple[str, str]]:
+    """A mirror page for every built-in spec file: the graph types, the layer types, every
+    built-in pack's specs and pack.yaml, and every catalog file."""
+    out: dict[str, tuple[str, str]] = {}
+
+    def add(page: str, title: str, path: Path) -> None:
+        out[page] = (title, path.relative_to(ROOT).as_posix())
+
+    for path in sorted((PACKAGE / "graph_types").glob("*.yaml")):
+        add(f"docs/specs/graph_type/{path.stem}", f"Graph type specification: {path.stem}", path)
+    for path in sorted((PACKAGE / "layers").glob("*.yaml")):
+        add(f"docs/specs/layer/{path.stem}", f"Layer specification: {path.stem}", path)
+    for path in sorted((PACKAGE / "catalogs" / "graph_types").glob("*.yaml")):
+        add(
+            f"docs/specs/catalog/graph_type_{path.stem}",
+            f"Catalog specification: {path.stem}",
+            path,
+        )
+    for path in sorted((PACKAGE / "catalogs" / "layers").glob("*.yaml")):
+        title = f"Catalog specification: {path.stem} layer"
+        add(f"docs/specs/catalog/layer_{path.stem}", title, path)
+    for pack in sorted(p for p in (PACKAGE / "packs").iterdir() if (p / "pack.yaml").is_file()):
+        base = pack.name == BASE_PACK  # the base pack's pages are the specification's own
+        where = "docs/specs" if base else f"docs/specs/pack/{pack.name}"
+        page = f"docs/specs/pack/{pack.name}" if base else f"{where}/pack"
+        add(page, f"Pack specification: {pack.name}'s pack.yaml", pack / "pack.yaml")
+        for folder, kind in TITLES.items():
+            for path in sorted((pack / folder).glob("*.yaml")):
+                page = (
+                    f"{where}/{kind.lower()}/{path.stem}"
+                    if base
+                    else f"{where}/{folder}/{path.stem}"
+                )
+                title = (
+                    f"{kind} specification: {path.stem}"
+                    if base
+                    else f"{kind}: {pack.name}/{path.stem}"
+                )
+                add(page, title, path)
+        for path in sorted((pack / "catalogs").glob("*/*.yaml")):
+            page = (
+                f"docs/specs/catalog/{path.stem}"
+                if base
+                else f"{where}/catalogs/{path.parent.name}/{path.stem}"
+            )
+            title = (
+                f"Catalog specification: {path.stem}"
+                if base
+                else f"Catalog: {pack.name}'s {path.stem}"
+            )
+            add(page, title, path)
+    return out
+
+
+# Each mirror page, by its path without .md, and the title and source file it shows: every
+# built-in spec file, and these.
 MIRRORS = {
-    "docs/specs/theme/base_theme": (
-        "Theme specification: base_theme",
-        "src/forgegraph/packs/forgegraph_base/themes/base_theme.yaml",
-    ),
-    "docs/specs/format/base_format": (
-        "Format specification: base_format",
-        "src/forgegraph/packs/forgegraph_base/formats/base_format.yaml",
-    ),
-    "docs/specs/format/base_layout_format": (
-        "Format specification: base_layout_format",
-        "src/forgegraph/packs/forgegraph_base/formats/base_layout_format.yaml",
-    ),
-    "docs/specs/graph_type/xy": (
-        "Graph type specification: xy",
-        "src/forgegraph/graph_types/xy.yaml",
-    ),
-    "docs/specs/graphspec/polarization": (
-        "GraphSpec specification: polarization",
-        "src/forgegraph/packs/forgegraph_base/graphspecs/polarization.yaml",
-    ),
-    "docs/specs/layout/base_layout": (
-        "Layout specification: base_layout",
-        "src/forgegraph/packs/forgegraph_base/layouts/base_layout.yaml",
-    ),
-    "docs/specs/schedule/base_schedule": (
-        "Schedule specification: base_schedule",
-        "src/forgegraph/packs/forgegraph_base/schedules/base_schedule.yaml",
-    ),
-    "docs/specs/layer/reference_line": (
-        "Layer specification: reference_line",
-        "src/forgegraph/layers/reference_line.yaml",
-    ),
-    "docs/specs/layer/note": (
-        "Layer specification: note",
-        "src/forgegraph/layers/note.yaml",
-    ),
-    "docs/specs/layer/error_bar": (
-        "Layer specification: error_bar",
-        "src/forgegraph/layers/error_bar.yaml",
-    ),
-    "docs/specs/catalog/base_theme": (
-        "Catalog specification: base_theme",
-        "src/forgegraph/packs/forgegraph_base/catalogs/themes/base_theme.yaml",
-    ),
-    "docs/specs/catalog/base_format": (
-        "Catalog specification: base_format",
-        "src/forgegraph/packs/forgegraph_base/catalogs/formats/base_format.yaml",
-    ),
-    "docs/specs/catalog/graph_type_xy": (
-        "Catalog specification: xy",
-        "src/forgegraph/catalogs/graph_types/xy.yaml",
-    ),
-    "docs/specs/catalog/layer_reference_line": (
-        "Catalog specification: reference_line layer",
-        "src/forgegraph/catalogs/layers/reference_line.yaml",
-    ),
-    "docs/specs/catalog/layer_note": (
-        "Catalog specification: note layer",
-        "src/forgegraph/catalogs/layers/note.yaml",
-    ),
-    "docs/specs/catalog/layer_error_bar": (
-        "Catalog specification: error_bar layer",
-        "src/forgegraph/catalogs/layers/error_bar.yaml",
-    ),
+    **_built_in(),
     "docs/specs/provenance/provenance": (
         "Provenance specification: the record in every saved file",
         "src/forgegraph/spec/provenance.yaml",
-    ),
-    "docs/specs/pack/forgegraph_base": (
-        "Pack specification: forgegraph_base's pack.yaml",
-        "src/forgegraph/packs/forgegraph_base/pack.yaml",
     ),
     "docs/specs/config/config": (
         "Config specification: config.toml and forgegraph.toml",
@@ -114,21 +114,21 @@ MIRRORS = {
         "Pack example: acme/workday, a schedule to extend",
         "examples/packs/acme/schedules/workday.yaml",
     ),
-    "review/phase-07/deliverable/paper/cell_performance.layout": (
+    "examples/layouts/paper/cell_performance.layout": (
         "Layout example: cell_performance, a paper figure",
-        "review/phase-07/deliverable/paper/cell_performance.layout.yaml",
+        "examples/layouts/paper/cell_performance.layout.yaml",
     ),
-    "review/phase-07/deliverable/dashboard/lab_throughput.layout": (
+    "examples/layouts/dashboard/lab_throughput.layout": (
         "Layout example: lab_throughput, an ops dashboard",
-        "review/phase-07/deliverable/dashboard/lab_throughput.layout.yaml",
+        "examples/layouts/dashboard/lab_throughput.layout.yaml",
     ),
-    "review/phase-07/deliverable/paper/formats/journal-double": (
-        "Format example: journal-double",
-        "review/phase-07/deliverable/paper/formats/journal-double.yaml",
+    "examples/layouts/paper/journal/formats/journal-double": (
+        "Format example: journal/journal-double",
+        "examples/layouts/paper/journal/formats/journal-double.yaml",
     ),
-    "review/phase-07/deliverable/dashboard/formats/dashboard": (
-        "Format example: dashboard",
-        "review/phase-07/deliverable/dashboard/formats/dashboard.yaml",
+    "examples/layouts/dashboard/ops/formats/dashboard": (
+        "Format example: ops/dashboard",
+        "examples/layouts/dashboard/ops/formats/dashboard.yaml",
     ),
 }
 NBSP = chr(0xA0)  # non-breaking space

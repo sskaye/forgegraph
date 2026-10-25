@@ -23,8 +23,8 @@ variable_parameters:          *# List of variable parameters for the g
                     direction: ascending          *# \[ascending, descending\]; The category order's direction.*\
             title: column_name          *# \[None, column_name, text\]; Axis title. column_name: the column's name. None: none.*\
             scale: linear          *# \[linear, log\]; Axis scale.*\
-            min: None          *# \[None, float\]; Axis minimum. None: lowest value − plot_area.margin.*\
-            max: None          *# \[None, float\]; Axis maximum. None: highest value + plot_area.margin.*\
+            min: None          *# \[None, float\]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.*\
+            max: None          *# \[None, float\]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
                 step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
@@ -40,8 +40,8 @@ variable_parameters:          *# List of variable parameters for the g
                     direction: ascending          *# \[ascending, descending\]; The category order's direction.*\
             title: column_name          *# \[None, column_name, text\]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.*\
             scale: linear          *# \[linear, log\]; Axis scale.*\
-            min: None          *# \[None, float\]; Axis minimum. None: lowest value − plot_area.margin.*\
-            max: None          *# \[None, float\]; Axis maximum. None: highest value + plot_area.margin.*\
+            min: None          *# \[None, float\]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.*\
+            max: None          *# \[None, float\]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
                 step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
@@ -72,7 +72,7 @@ variable_parameters:          *# List of variable parameters for the g
         line:\
             show: true          *# \[true, false\]; Draw lines.*\
             connect_order: x          *# \[x, data\]; Point order along each line: by x, or by row.*\
-            missing_values: drop          *# \[drop, gap\]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in provenance.*\
+            missing_values: drop          *# \[drop, gap\]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in lint's dropped-rows.*\
         marker:\
             show: true          *# \[true, false\]; Draw markers.*\
         bar:\
@@ -87,4 +87,3 @@ variable_parameters:          *# List of variable parameters for the g
         color_bar:\
             title:\
                 text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color column's name. None: none.*
-

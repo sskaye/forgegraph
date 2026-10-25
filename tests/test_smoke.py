@@ -1,4 +1,6 @@
 import io
+import subprocess
+import sys
 from importlib.metadata import version
 from pathlib import Path
 
@@ -79,3 +81,10 @@ def test_text_rendering_is_pixel_identical_across_runs():
     first, second = _render_text_png(), _render_text_png()
     assert (first < 0.5).any(), "expected visible text"
     assert np.array_equal(first, second)
+
+
+def test_python_m_forgegraph_runs_the_command():
+    result = subprocess.run(
+        [sys.executable, "-m", "forgegraph", "--version"], capture_output=True, text=True
+    )
+    assert result.returncode == 0 and forgegraph.__version__ in result.stdout

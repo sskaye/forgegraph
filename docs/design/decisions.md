@@ -1,6 +1,6 @@
 # Decision log
 
-Decisions made while building that refine or depart from [architecture.md](architecture.md) or the [build plan](build-plan.md). Each entry says what, why, and what else was considered.
+Decisions made while building that refine or depart from [architecture.md](architecture.md). Each entry says what, why, and what else was considered.
 
 ## Phase 0
 
@@ -8,7 +8,7 @@ Decisions made while building that refine or depart from [architecture.md](archi
 
 ## Phase 1
 
-**Review pages and the catalog are exempt from the large-file check.** They are self-contained HTML files with embedded images (architecture D6), so they routinely exceed the 600 KB limit that guards against accidentally committed binaries. The exemption applies only to `review/` and `catalog/`.
+**Review pages and the catalog are exempt from the large-file check.** They are self-contained HTML files with embedded images (architecture D6), so they routinely exceed the 600 KB limit that guards against accidentally committed binaries. The exemption applies only to `review/`, `catalog/` and `docs/visual-changelog/`.
 
 **The deny-list check skips embedded base64 images.** Review pages and the catalog embed images as base64 text, which can contain a short deny-listed term purely by chance (a review page did). The contents of `;base64,` data are skipped; all other text is still checked.
 

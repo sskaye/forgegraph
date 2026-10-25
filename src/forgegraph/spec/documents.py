@@ -1,5 +1,5 @@
-"""Check and resolve theme, format, graph type and GraphSpec files against their
-definitions (see parameters.py).
+"""Check and resolve theme, format, graph type, GraphSpec, layout and schedule files against
+their definitions (see parameters.py).
 
 - Every file has exactly the header fields name, version, description, extends,
   fixed_parameters and variable_parameters; the header's ranges come from the definition

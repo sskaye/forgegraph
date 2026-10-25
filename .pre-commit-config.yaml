@@ -5,12 +5,12 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
-        exclude: \.md$|^(review|catalog)/
+        exclude: \.md$|^(review|catalog|docs/visual-changelog)/
       - id: trailing-whitespace
-        exclude: \.md$|^(review|catalog)/
+        exclude: \.md$|^(review|catalog|docs/visual-changelog)/
       - id: check-added-large-files
         args: [--maxkb=600]
-        exclude: ^(review|catalog)/  # self-contained HTML pages embed their images
+        exclude: ^(review|catalog|docs/visual-changelog)/  # self-contained HTML pages embed images
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.1
     hooks:

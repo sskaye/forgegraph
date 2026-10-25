@@ -1,0 +1,26 @@
+name: runs_hplc_02
+version: 0
+description: Completed runs per week on HPLC-02.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: HPLC-02
+    data:
+        file: weekly_hplc_02.parquet
+        preprocessing: prep_lab_dashboard.py (lab_runs.xlsx, Runs sheet; Status normalized; in-progress runs left out)
+    axis:
+        x:
+            data:
+                column: Week
+            title: Week starting
+        y:
+            data:
+                column: Completed runs
+            min: 0
+    grid:
+        show: true

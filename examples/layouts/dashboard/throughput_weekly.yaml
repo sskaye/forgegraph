@@ -1,0 +1,29 @@
+name: throughput_weekly
+version: 0
+description: Completed runs per week (Mon–Sun, by finish time) for each instrument.
+extends: None
+fixed_parameters: None
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text:
+        title: Completed runs per week
+    data:
+        file: weekly_runs.parquet
+        preprocessing: prep_lab_dashboard.py (lab_runs.xlsx, Runs sheet; Status normalized; in-progress runs left out)
+    axis:
+        x:
+            data:
+                column: Week
+            title: Week starting
+        y:
+            data:
+                column: Completed runs
+            title: Runs
+            min: 0
+    encoding:
+        color: Instrument
+    grid:
+        show: true

@@ -1,4 +1,4 @@
-"""A schedule's cadence: when a scheduled job runs (docs/specs/schedule/default.md).
+"""A schedule's cadence: when a scheduled job runs (docs/specs/schedule/base_schedule.md).
 
 cadence.interval counts cadence.interval_unit (minute, hour, day, week, month or year), and
 cadence.at says when in each unit the job runs, as one time or a list:

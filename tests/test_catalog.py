@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
+import io
 import json
 import os
 import re
@@ -10,9 +13,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from pack_helpers import write_pack
+from pack_helpers import needs_node, write_pack
 from typer.testing import CliRunner
 
+import forgegraph
 from forgegraph.catalog_build import build, forgemark
 from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, page
@@ -29,10 +33,6 @@ FIXTURE = Path(__file__).parent / "fixtures" / "catalog_comments.html"
 DOT = bytes.fromhex(
     "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
     "1f15c4890000000d49444154789c63f8ffff3f0005fe02fea7d6a4d90000000049454e44ae426082"
-)
-needs_node = pytest.mark.skipif(
-    shutil.which("node") is None and not os.environ.get("FORGEGRAPH_REQUIRE_NODE"),
-    reason="Forgemark needs Node",
 )
 
 
@@ -112,7 +112,7 @@ def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
-    assert '<p id="version" class="version">version 0.2.0</p>' in text
+    assert f'<p id="version" class="version">version {forgegraph.__version__}</p>' in text
 
 
 def test_a_page_with_comments_is_not_rebuilt_without_forgemark(tmp_path, monkeypatch):
@@ -142,6 +142,31 @@ def test_cli_build(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["catalog", "build", "--out", str(out), "--json"])
     assert result.exit_code == 0, result.output
     assert out.read_text(encoding="utf-8") == small_page()
+
+
+def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
+    def problems(*args):
+        result = CliRunner().invoke(app, ["catalog", "build", *args, "--json"])
+        assert result.exit_code == 1, result.output
+        return json.loads(result.output)["problems"]
+
+    (tmp_path / "empty").mkdir()
+    [problem] = problems("--pack", str(tmp_path / "empty"))
+    assert "pack.yaml" in problem
+    folder = write_pack(tmp_path)  # a theme without its catalog file
+    (folder / "themes").mkdir()
+    (folder / "themes" / "plain.yaml").write_text(
+        "name: plain\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_theme\n"
+        "fixed_parameters: None\nvariable_parameters: None\n"
+    )
+    [problem] = problems("--pack", str(folder), "--out", str(tmp_path / "house.html"))
+    assert "plain" in problem and "catalog" in problem
+    page_path = tmp_path / "commented.html"  # comments to keep, and no Node to keep them
+    shutil.copy(FIXTURE, page_path)
+    monkeypatch.setattr(build, "html", lambda root=None: small_page())
+    monkeypatch.setattr(forgemark.shutil, "which", lambda name: None)
+    [problem] = problems("--out", str(page_path))
+    assert "Node 18" in problem
 
 
 def make_fixture() -> None:
@@ -234,13 +259,20 @@ def test_catalog_rules_are_errors(tmp_path):
     assert any("from: no numbered baseline 'nowhere'" in p for p in problems)
 
 
-def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
+def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path, monkeypatch):
     from forgegraph.catalog_build.build import instance
 
     catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
         "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
     )
     reg = _project(tmp_path, catalog, kind_folder="themes")
+
+    def only_grid_show(*args):  # leave out the inherited cards, which draw differently
+        found = read(*args)
+        kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
+        return dataclasses.replace(found, variations=kept)
+
+    monkeypatch.setattr(build, "read", only_grid_show)
     with pytest.raises(CatalogError, match=r"Baseline \+ grid.show = false draws the same"):
         instance("theme", "house/plain", "Theme > plain", reg)
 
@@ -288,3 +320,22 @@ def test_commented_categories_are_open():
     opened = open_commented(page_)
     assert opened.count(" open") == 2 and 'category" open id="c"' not in opened
     assert open_commented(opened) == opened
+
+
+def test_forgemark_is_downloaded_once_and_refused_if_its_checksum_differs(tmp_path, monkeypatch):
+    served = []
+
+    def urlopen(url, timeout):
+        served.append(url)
+        return io.BytesIO(body)
+
+    monkeypatch.setattr(forgemark, "CACHE", tmp_path)
+    monkeypatch.setattr(forgemark.urllib.request, "urlopen", urlopen)
+    body = b"not the pinned tool"
+    with pytest.raises(forgemark.ForgemarkError, match=r"checksum mismatch.*not running it"):
+        forgemark.tool()
+    assert not list(tmp_path.iterdir())  # nothing kept
+    monkeypatch.setattr(forgemark, "SHA256", hashlib.sha256(body).hexdigest())
+    path = forgemark.tool()
+    assert path.read_bytes() == body and forgemark.tool() == path
+    assert served == [forgemark.URL, forgemark.URL]  # the second good call used the cache

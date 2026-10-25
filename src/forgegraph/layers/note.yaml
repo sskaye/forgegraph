@@ -4,5 +4,5 @@ description: A block of text by the plot area, such as test conditions.         
 
 parameters:          # The layer's parameters, which a GraphSpec's layers entry sets after its type.
     text: None          # [text]; The note, in label markup; a line break starts a new line. A GraphSpec must set it.
-    position: auto          # [auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right]; auto: the first clear one.
+    position: auto          # [auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right]; auto: the first clear place inside the plot area; set a position when inside is false.
     inside: true          # [true, false]; Inside the plot area, or outside it.

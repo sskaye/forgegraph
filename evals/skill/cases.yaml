@@ -1,6 +1,5 @@
-# Skill evals: the cases in review/phase-04/skill-evals.md, review/phase-05/skill-evals.md and
-# review/phase-08/skill-evals.md, each scored by
-# scripts/run_skill_evals.py. A case's folder holds its `data` files from examples/sample-data;
+# Skill evals: the cases in the skill-evals.md review pages of phases 4, 5, 8 and 9, each scored
+# by scripts/run_skill_evals.py. A case's folder holds its `data` files from examples/sample-data;
 # its `turns` are sent one after another in one conversation, the last one followed by
 # `closing`.
 #

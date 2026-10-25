@@ -42,7 +42,7 @@ def _list_one(kind: str, key: str) -> None:
         _list([(kind, key)], folder, as_json)
 
     command.__doc__ = (
-        "List ForgeGraph's GraphSpecs, to extend."
+        "List the GraphSpecs available here, to extend."
         if kind == "graphspec"
         else f"List the {key.replace('_', ' ')} available here."
     )
@@ -116,7 +116,9 @@ def _list(kinds: Sequence[tuple[str, str]], folder: Path | None, as_json: bool) 
             typer.echo(f"  {r['name']}{mark}: {r['description']}")
 
 
-@app.command("pack-notes")
+@app.command(
+    "pack-notes", short_help="Print the reference notes of the packs that may be used here."
+)
 @json_errors
 def pack_notes(
     folder: Annotated[
@@ -160,7 +162,11 @@ def pack_notes(
 
 PackFolder = Annotated[
     Path | None,
-    typer.Option("--pack", help="A built-in pack's name, or a pack's folder: its catalog."),
+    typer.Option(
+        "--pack",
+        metavar="<name or path>",
+        help="A built-in pack's name, or a pack's folder: its catalog.",
+    ),
 ]
 
 
@@ -178,7 +184,9 @@ def _pack(folder: Path | None, as_json: bool) -> Any:
         fail(e.problems, as_json)
 
 
-@catalog_app.command("build")
+@catalog_app.command(
+    "build", short_help="Build a catalog page, keeping the review comments it already has."
+)
 @json_errors
 def catalog_build(
     out: Annotated[

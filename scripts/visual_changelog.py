@@ -2,7 +2,7 @@
 
 uv run python scripts/visual_changelog.py main            # main against the working tree
 uv run python scripts/visual_changelog.py v0.1.0 v0.2.0   # between two commits
-    [--out review/visual-changelog.html]
+    [--out docs/visual-changelog/<version>.html]
 
 Compares the regression baselines (tests/baselines/*.png) and each catalog page's figures (by
 id), and writes one page showing each changed, added or removed image.
@@ -16,6 +16,8 @@ import html
 import re
 import subprocess
 from pathlib import Path
+
+import forgegraph
 
 ROOT = Path(__file__).parents[1]
 BASELINES = "tests/baselines"
@@ -127,8 +129,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Images that changed between two commits.")
     parser.add_argument("before", help="A commit, branch or tag.")
     parser.add_argument("after", nargs="?", help="Another; the working tree if left out.")
-    parser.add_argument("--out", type=Path, default=ROOT / "review" / "visual-changelog.html")
+    parser.add_argument("--out", type=Path, help="Default: docs/visual-changelog/<version>.html.")
     args = parser.parse_args()
+    args.out = args.out or ROOT / "docs" / "visual-changelog" / f"{forgegraph.__version__}.html"
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(page(args.before, args.after), encoding="utf-8")
     print(f"wrote {args.out}")

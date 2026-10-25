@@ -19,10 +19,10 @@ The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec'
 
 ## Commands
 
-- `forgegraph catalog`: lists the packs available, with each of their graph types, layer types, themes, formats, layouts, GraphSpecs, and reference notes.
+- `forgegraph catalog`: lists the packs available, with each of their graph types, layer types, themes, formats, layouts, schedules, GraphSpecs, and reference notes.
 - `forgegraph pack-notes`: prints the reference notes from the available packs, labelled by pack.
 - `forgegraph schema graphspec --graph-type <type> --theme <theme> --format <format>`: lists every parameter a GraphSpec can set (its own, and the variable ones of the graph type, theme and format), with default, allowed values and description.
-- `forgegraph schema theme`, `forgegraph schema format`, `forgegraph schema layer`, `forgegraph schema graph_type`, `forgegraph schema layout`, `forgegraph schema pack`, `forgegraph schema config`: lists every parameter of the schema with their type, description, default value, and whether it is fixed or can be changed by the GraphSpec.
+- `forgegraph schema theme`, `forgegraph schema format`, `forgegraph schema layer`, `forgegraph schema graph_type`, `forgegraph schema layout`, `forgegraph schema schedule`, `forgegraph schema pack`, `forgegraph schema config`: lists every parameter of the schema with their type, description, default value, and whether it is fixed or can be changed by the GraphSpec.
 - `forgegraph render <graphspec or layout> --json`: saves the graph or layout files and lists lint issues. A layout file ends in `.layout.yaml`.
 - `forgegraph explain <graphspec or layout>`: lists every value the graph or layout is drawn with, and which file set it.
 - `forgegraph job run <schedule>`: renders the GraphSpecs and layouts a schedule file names.

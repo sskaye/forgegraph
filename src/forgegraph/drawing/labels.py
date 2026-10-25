@@ -1,11 +1,11 @@
-"""Series labelling methods (architecture D5): interior labels and a clear-corner legend.
+"""Series labelling methods (architecture D5): direct labels (interior here) and a key.
 
 Each method either places every label cleanly or reports that it can't, so a graph never
 gets a partial or overlapping result. legend.method picks a method; auto tries the theme's
 legend.methods in order and uses the first that fits. A named method that doesn't fit,
 or auto with nothing that fits, is an error (xy.label raises it); there's no fallback.
 
-Interior labels follow six rules:
+Direct labels follow six rules, using the theme's legend.direct parameters:
 1. never in the margins;
 2. next to its own series: its series is the nearest one, at most max_relative_distance of
    the distance to any other, and within one and a half label heights;
@@ -15,7 +15,7 @@ Interior labels follow six rules:
    slight preference for either end of the line;
 5. if nothing passes, the x-axis grows by as little as it takes, up to max_axis_extension of
    its range;
-6. otherwise interior doesn't fit.
+6. otherwise direct doesn't fit.
 """
 
 from __future__ import annotations

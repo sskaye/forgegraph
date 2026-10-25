@@ -4,7 +4,8 @@ uv run python scripts/build_recreations.py              # review/phase-02/recrea
 uv run python scripts/build_recreations.py --baselines  # tests/baselines/*.png
 
 --baselines also draws the side-by-side examples as layouts (LAYOUT_RECREATIONS), into
-tests/baselines and review/phase-07/deliverable/recreations.
+tests/baselines. Baselines carry no provenance record, so an unchanged drawing gives the
+same file.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ import tempfile  # noqa: E402
 from recreations import LAYOUT_RECREATIONS, RECREATIONS  # noqa: E402
 
 from forgegraph.catalog_build.build import write  # noqa: E402
+from forgegraph.drawing.export import KEY  # noqa: E402
 from forgegraph.drawing.style import isolated  # noqa: E402
 
 BASELINE_DPI = 72
@@ -33,7 +35,7 @@ CSS_DPI = 96  # a CSS inch, so images show at the figure's real size
 def _png(graph, dpi: int) -> bytes:
     buffer = io.BytesIO()
     with isolated(graph.style):
-        graph.figure.savefig(buffer, format="png", dpi=dpi)
+        graph.figure.savefig(buffer, format="png", dpi=dpi, metadata={KEY: None})
     return buffer.getvalue()
 
 
@@ -43,15 +45,14 @@ def baselines() -> None:
     for r in RECREATIONS:
         (folder / f"{r.name}.png").write_bytes(_png(r.render(), BASELINE_DPI))
         print(f"wrote tests/baselines/{r.name}.png")
-    review = ROOT / "review" / "phase-07" / "deliverable" / "recreations"
-    review.mkdir(parents=True, exist_ok=True)
     for lr in LAYOUT_RECREATIONS:
         with tempfile.TemporaryDirectory() as folder:
             tab = lr.render(Path(folder)).tabs[0]
             with tab.saving():
-                tab.figure.savefig(baseline(lr.name), format="png", dpi=BASELINE_DPI)
-                tab.figure.savefig(review / f"{lr.name}.png", format="png", dpi=2 * CSS_DPI)
-        print(f"wrote tests/baselines/{lr.name}.png and {review.relative_to(ROOT)}/{lr.name}.png")
+                tab.figure.savefig(
+                    baseline(lr.name), format="png", dpi=BASELINE_DPI, metadata={KEY: None}
+                )
+        print(f"wrote tests/baselines/{lr.name}.png")
 
 
 def baseline(name: str) -> Path:

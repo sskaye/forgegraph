@@ -15,8 +15,8 @@ RANGE lists the alternatives a value may take, separated by commas:
 - a number range `min-max`, inclusive;
 - a type word: text, int (a whole number, 0 or more), positive int, float, positive float,
   hex color, hex colors (a list of one or more), two hex colors, column, columns, graph type,
-  theme, format, graphspec, layer type, layer types, layout, texts (a list of text), positive
-  floats (a list of them), text grid (a list of rows, each a list of text);
+  theme, format, graphspec, layer type, layer types, layout, schedule, texts (a list of text),
+  positive floats (a list of them), text grid (a list of rows, each a list of text);
 - any other word is a literal value (None, true, auto, linear, ...).
 
 A parameter whose value in the definition is a list takes a list of one or more items, each

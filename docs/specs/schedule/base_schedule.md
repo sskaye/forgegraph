@@ -12,7 +12,7 @@ fixed_parameters: None          *# List of fixed parameters for the sc
 variable_parameters:          *# List of variable parameters for the schedule, None if none.*\
     targets:\
         files: None          *# \[texts\]; GraphSpec and layout files rendered each run: absolute, from ~, or relative to this file. A schedule must set it.*\
-        output_folder: None          *# \[None, text\]; Folder the outputs are saved in. None: beside each target file.*\
+        output_folder: None          *# \[None, text\]; Folder the outputs are saved in: absolute, starting with ~, or relative to the file that sets it. None: beside each target file.*\
     cadence:          *# When the job runs, in the machine's local time.*\
         interval: 1          *# \[positive int\]; Units between runs: a divisor of 60 (minute), 24 (hour) or 12 (month); otherwise 1.*\
         interval_unit: day          *# \[minute, hour, day, week, month, year\]; The unit interval counts in.*\
@@ -21,7 +21,7 @@ variable_parameters:          *# List of variable parameters for the s
         stamp: true          *# \[true, false\]; Draw the "data as of" stamp, with the cadence, in every output.*\
         stale_after_hours: auto          *# \[auto, positive float\]; Data age after which the HTML page shows the stale banner. auto: a period plus 25%.*\
     status:\
-        file: auto          *# \[auto, text\]; The status file. auto: \<name>.status.json in output_folder, or beside this file.*\
+        file: auto          *# \[auto, text\]; The status file: absolute, starting with ~, or relative to the file that sets it. auto: \<name>.status.json in output_folder, or beside this file.*\
     on_failure:\
         command: None          *# \[None, texts\]; Program and arguments run, without a shell, when a run fails. None: none.*\
         timeout_seconds: 60          *# \[positive int\]; Time allowed for the command before it's stopped.*\

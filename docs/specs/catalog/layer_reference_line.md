@@ -5,32 +5,18 @@ This page mirrors src/forgegraph/catalogs/layers/reference_line.yaml, which is t
 name: reference_line          *# \[layer type\]; The layer type this catalog shows.*\
 version: 0          *# \[int\]; The version number of the specification.*\
 description: Cards for the reference_line layer.          *# \[text\]; The description of the catalog.*\
-extends: None          *# \[None, catalog\]; Each parameter not listed is taken from this catalog. If None, this file must list every parameter.*\
+extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
 baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
 settings: None          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
 layer:          *# The layer every card draws, named after its type: its parameters. None: its defaults.*\
     axis: y          *# \[x, y\]; Axis the value is on: y draws a horizontal line.*\
     value: 1.45          *# \[float, column\]; The line's value, or a column to aggregate.*\
  \
-baselines:          *# Numbered baselines: the baseline with one or more changes, named for variations' from. None if none.*\
-    power: {axis.y.data.column: "Power Density (mW/cm²)", layers.reference_line.value: 50}          *# \[parameters and their values, or non-standard\]; Power density, whose values suit a line on either axis.*\
+baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
     aggregated:          *# \[parameters and their values, or non-standard\]; A line at the highest cell voltage.*\
         layers.reference_line.value: "Cell Voltage (V)"\
         layers.reference_line.aggregation.function: max\
     valued:          *# \[parameters and their values, or non-standard\]; A line at the mean cell voltage, labelled with it.*\
         layers.reference_line.value: "Cell Voltage (V)"\
         layers.reference_line.aggregation.function: mean\
-        layers.reference_line.label.text: aggregation_value\
-    labelled: {layers.reference_line.label.text: Target}          *# \[parameters and their values, or non-standard\]; The line, labelled.*\
- \
-variations:          *# Every parameter of the layer type: its card's value. {value, from, with}: change other parameters too; a layer's own may be named alone. no_card: no card.*\
-    axis: {value: x, from: power}          *# \[x, y\]; Axis the value is on: y draws a horizontal line.*\
-    value: 1.3          *# \[float, column\]; The line's value, or a column to aggregate.*\
-    aggregation:\
-        function: {value: mean, from: aggregated}          *# \[None, mean, median, sum, min, max, stddev\]; The aggregate. None: value is a number.*\
-        multiplier: {value: 0.9, from: aggregated}          *# \[float\]; What the aggregate is multiplied by, e.g. 2 for twice the stddev.*\
-    per_series: {value: true, from: aggregated}          *# \[true, false\]; With a column: one line per named series, its replicates together, in its color.*\
-    label:\
-        text: Target          *# \[None, aggregation, value, aggregation_value, text\]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.*\
-        position: {value: start_below, from: labelled}          *# \[auto, start_above, start_below, center_above, center_below, end_above, end_below\]; auto: the first clear one.*\
-        format: {value: ".3f", from: valued}          *# \[auto, text\]; Number format of the value, e.g. ".2f". auto: one decimal more than the axis's tick labels.*
+        layers.reference_line.label.text: aggregation_value

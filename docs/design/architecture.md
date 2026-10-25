@@ -255,7 +255,7 @@ Placement is deterministic. A direct label sits inside the plot, beside its own 
 
 ### D6. Review surface: tabbed HTML catalog, Forgemark comments
 
-- `forgegraph catalog build` generates one **HTML catalog** per pack, with a tab per kind (themes, formats, graph types, layers). Each spec shows its generated table, its baseline, and one image per variable parameter, with that parameter changed. Forgemark supports per-tab comments in HTML.
+- `forgegraph catalog build` generates one **HTML catalog** per pack, with a tab per kind (themes, formats, graph types, layers). Each spec shows its generated table, its baseline, and one image per variable parameter, with that parameter changed. A rule chooses each image's value and the baseline it's drawn on, not a hand-picked list, so the catalog files hold only generic baselines. Every parameter gets such a card, fixed ones included, and the perturbation tests draw them all; a format's output and provenance parameters, which change only the saved files, and a graph type's layer.types, which only permits layers, get none. Forgemark supports per-tab comments in HTML.
 - **Comments survive rebuilds.**
   - The build gives every section, table row and figure a stable `id` (`#xy-param-labels`, `#xy-example-labels-direct`), and carries the trailing `forgemark-comments` block across verbatim.
   - It then re-attaches each comment by its recorded anchor text, using Forgemark's own `reattach`. Only comments whose text actually changed stay orphaned.
@@ -263,7 +263,7 @@ Placement is deterministic. A direct label sits inside the plot, beside its own 
 - **Size and freshness.**
   - Catalog images are embedded at screen resolution, which keeps the file small enough to commit.
   - The page records a hash of its inputs (the package's files and the library version). CI checks that hash rather than comparing pixels, which differ slightly between machines.
-- **Packs build their own catalog.** An org reviews its house style the same way the project reviews the core.
+- **Packs build their own catalog.** An org reviews its house style the same way the project reviews the core. A pack's catalog draws every card with its own theme's and format's values, not those its GraphSpecs set.
 - **GitHub:** a PR shows definition-file diffs as text and changed baseline PNGs as image diffs, which is enough for code review. There are no separate per-chart README files to keep in sync.
 - **Requests don't need a PR.** PRs are for contributors who write code. Anyone else asks for a new graph type through a GitHub issue, which the agent can file for them (D10).
 

@@ -1,22 +1,13 @@
 name: error_bar          # [layer type]; The layer type this catalog shows.
 version: 0          # [int]; The version number of the specification.
 description: Cards for the error_bar layer.          # [text]; The description of the catalog.
-extends: None          # [None, catalog]; Each parameter not listed is taken from this catalog. If None, this file must list every parameter.
+extends: None          # [None, catalog]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.
 baseline: forgegraph_base/polarization          # [graphspec]; The GraphSpec every card changes, without its own layers.
 settings: {axis.y.data.aggregation: mean, encoding.detail: None}          # GraphSpec parameters every card sets so the layer can be drawn. None if none.
 layer: None          # The layer every card draws, named after its type: its parameters. None: its defaults.
 
-baselines:          # Numbered baselines: the baseline with one or more changes, named for variations' from. None if none.
+baselines:          # Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.
     power:          # [parameters and their values, or non-standard]; Power density, whose values suit distances along either axis.
         axis.y.data.column: "Power Density (mW/cm²)"
         layers.error_bar.value.lower: 4
         layers.error_bar.value.upper: 4
-
-variations:          # Every parameter of the layer type: its card's value. {value, from, with}: change other parameters too; a layer's own may be named alone. no_card: no card.
-    axis: {value: x, from: power}          # [x, y]; Axis the bars extend along.
-    value:
-        lower: 0.03          # [data_column, float, column]; Distance below each value: a number or a column. data_column: the axis's data column.
-        upper: 0.03          # [data_column, float, column]; Distance above each value: a number or a column. data_column: the axis's data column.
-        aggregation:
-            function: ci          # [None, stddev, stderr, ci]; The aggregate; ci: half the 95 % confidence interval. None: the column's values as given.
-            multiplier: 3          # [float]; What the aggregate is multiplied by, e.g. 2 for two standard deviations.

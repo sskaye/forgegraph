@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import os
 import shutil
@@ -11,13 +10,10 @@ from pathlib import Path
 
 import pytest
 from pack_helpers import cli_problems, needs_node, write_pack
-from test_catalog_files import HEADER, catalog_project
 from typer.testing import CliRunner
 
 from forgegraph import forgemark
 from forgegraph.catalog_build import build
-from forgegraph.catalog_build.build import instance
-from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, open_commented, page
 from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
@@ -139,18 +135,6 @@ def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
     monkeypatch.setattr(forgemark.shutil, "which", lambda name: None)
     [problem] = problems("--out", str(page_path))
     assert "Node 18" in problem
-
-
-def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
-    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
-        "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
-    )
-    reg = catalog_project(tmp_path, catalog, kind_folder="themes")
-    found = read("theme", "house/plain", reg)
-    # only grid.show: leave out the inherited cards, which draw differently
-    kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
-    with pytest.raises(CatalogError, match=r"Baseline \+ grid.show = false draws the same"):
-        instance(dataclasses.replace(found, variations=kept), "Theme > plain", reg)
 
 
 def make_fixture() -> None:

@@ -34,13 +34,12 @@ def _load(path: Path) -> Any:
 
 
 def _comments(node: Any, prefix: str = "") -> Iterator[tuple[str, str | None]]:
-    """(dotted path, comment) of every parameter under node; a catalog card's {value, from,
-    with} is one parameter."""
+    """(dotted path, comment) of every parameter under node."""
     if not hasattr(node, "items"):
         return
     for key in node:
         value, path = node[key], f"{prefix}.{key}" if prefix else str(key)
-        if hasattr(value, "items") and not set(value) <= {"value", "from", "with"}:
+        if hasattr(value, "items"):
             yield from _comments(value, path)
         else:
             yield path, _comment(node, key)
@@ -87,9 +86,9 @@ def _kind(path: Path) -> str:
 def _drifted(path: Path) -> Iterator[tuple[str, str, str]]:
     """Each parameter whose comment in this file isn't its definition's."""
     data, rel, kind = _load(path), path.relative_to(PKG), _kind(path)
-    if "catalogs" in rel.parts:  # its cards, a layer catalog's layer, and its settings
+    if "catalogs" in rel.parts:  # a layer catalog's layer, and its settings
         own = LAYER[data["name"]] if kind == "layer" else RESTATES[kind]
-        found = [(p, c, own) for s in ("variations", "layer") for p, c in _comments(data.get(s))]
+        found = [(p, c, own) for p, c in _comments(data.get("layer"))]
         found += [(p, c, RESTATES["graphspec"]) for p, c in _comments(data.get("settings"))]
     else:
         found = []

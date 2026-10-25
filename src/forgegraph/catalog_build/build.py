@@ -13,16 +13,16 @@ import hashlib
 import re
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
 
 from forgegraph import __version__, forgemark
 from forgegraph.catalog_build.cards import Drawings, place, show
 from forgegraph.catalog_build.files import Catalog, CatalogError, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.graph import Graph
-from forgegraph.packs import BASE, Pack
-from forgegraph.spec.documents import Registry, builtin, resolve
-from forgegraph.spec.parameters import NONE, Parameter, graph_type_files
+from forgegraph.packs import Pack
+from forgegraph.spec.parameters import BASE, NONE, Parameter, graph_type_files
+from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.resolve import Values, resolve
 
 # Package files that can't change what the catalog shows. Every other file counts, so a new
 # module counts without being listed; built-in packs other than the base pack count only
@@ -119,11 +119,11 @@ def _status(p: Parameter, fixed: bool) -> str:
     return "fixed" if fixed else "variable"
 
 
-def _own_values(kind: str, name: str, reg: Registry) -> dict[str, tuple[Any, bool]]:
+def _own_values(kind: str, name: str, reg: Registry) -> Values:
     """The values a theme, format or graph type is drawn with, and whether each is fixed,
     by parameter: its own, not the definition's defaults (a pack's theme isn't the base's)."""
     if kind not in ("theme", "format", "graph_type"):
-        return {}
+        return Values()
     return resolve(kind, reg.docs[kind][name], reg)
 
 
@@ -149,22 +149,19 @@ def instance(
     baseline: Graph = first_drawn
     own = _own_values(kind, name, reg)
 
-    def value(p: Parameter) -> tuple[Any, bool]:
-        return own.get(p.path, (p.default, p.fixed))
-
     rows = tuple(
         Row(
             p.path,
-            show(value(p)[0]),
+            show(own.value(p.path, p.default)),
             allowed(p),
-            _status(p, value(p)[1]),
+            _status(p, own.fixed(p.path, p.fixed)),
             p.description,
         )
         for p, _ in catalog.variations
     )
     # Only a variable parameter's card is shown; every card is still drawn by the
     # perturbation test.
-    shown = {p.path for p, _ in catalog.variations if not value(p)[1]}
+    shown = {p.path for p, _ in catalog.variations if not own.fixed(p.path, p.fixed)}
     cards = []
     problems = []
     for planned in place(catalog, shown):

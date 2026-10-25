@@ -17,7 +17,7 @@ from render_helpers import render
 
 import forgegraph as fg
 from forgegraph.drawing.ticks import ALGORITHMS
-from forgegraph.spec.documents import builtin
+from forgegraph.spec.registry import builtin
 
 
 def graph(df: pd.DataFrame, x: str, y: str | list[str], **parameters) -> fg.Graph:

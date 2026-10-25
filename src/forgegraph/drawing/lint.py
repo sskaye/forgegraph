@@ -249,19 +249,9 @@ def _fonts(messages: list[str]) -> list[Issue]:
     return issues
 
 
-def check(
-    fig: Figure,
-    ax: Axes,
-    *,
-    fixed_limits: dict[str, tuple[Any, Any]],
-    rows_dropped: dict[str, int],
-    font_problems: list[str],
-    drawing: Sequence[Issue] = (),
-) -> list[Issue]:
-    """Every issue in a drawn figure. fixed_limits: each axis's set minimum and maximum (None
-    where automatic); drawing: issues the drawing code found, such as repeated colors."""
-    figure = figure_issues(fig, font_problems)
-    plot = plot_issues(ax, fixed_limits=fixed_limits, rows_dropped=rows_dropped, drawing=drawing)
+def ordered(figure: list[Issue], plot: list[Issue]) -> list[Issue]:
+    """Every issue in a drawn graph, from its figure's (figure_issues) and its plot's
+    (plot_issues): text problems first, and dropped rows last."""
     texts = ("overlapping-text", "clipped-text")  # first; dropped rows last
     return [
         *(i for i in figure if i.check in texts),
@@ -288,7 +278,9 @@ def plot_issues(
     rows_dropped: dict[str, int],
     drawing: Sequence[Issue] = (),
 ) -> list[Issue]:
-    """The issues of one plot: its key, its data and what drawing it found."""
+    """The issues of one plot: its key, its data and what drawing it found. fixed_limits:
+    each axis's set minimum and maximum (None where automatic); drawing: issues the drawing
+    code found, such as repeated colors."""
     issues = [*_key_over_data(ax), *drawing, *_log_values(ax), *_limits(ax, fixed_limits)]
     issues += [
         Issue("dropped-rows", f"{n} {'row' if n == 1 else 'rows'} left out: {reason}")

@@ -187,7 +187,7 @@ def _specs(ws: Path) -> list[tuple[Path, str, dict[str, Any]]]:
     """The spec files the agent wrote, each with its kind: layout or schedule by its suffix;
     theme or format by its pack folder; GraphSpec if it names a graph type or extends a
     GraphSpec; otherwise "style", a theme or format outside a pack."""
-    from forgegraph.spec.documents import registry_for
+    from forgegraph.spec.registry import registry_for
 
     yaml = YAML(typ="safe")
     given, out = _given(ws), []
@@ -229,12 +229,13 @@ def _graphspecs(ws: Path) -> list[Path]:
 
 
 def _resolved(spec: Path) -> dict[str, dict[str, Any]]:
-    from forgegraph.spec.documents import explain, load_yaml, registry_for
+    from forgegraph.spec.explain import explain
+    from forgegraph.spec.registry import load_yaml, registry_for
 
     doc = load_yaml(spec)
     reg = registry_for(spec.parent).copy()
     reg.add("graphspec", doc, spec)
-    return {kind: {p: r.value for p, r in v.items()} for kind, v in explain(doc, reg).items()}
+    return explain(doc, reg).plain()
 
 
 def _matches(actual: Any, expected: Any) -> bool:
@@ -315,12 +316,11 @@ class Project:
 
     @cached_property
     def data(self) -> tuple[Path | None, Exception | None]:
-        from forgegraph.graph import data_path
-        from forgegraph.spec.documents import load_yaml, registry_for
+        from forgegraph.data import data_path
+        from forgegraph.spec.loaded import load_document
 
-        final = self.final
         try:
-            return data_path(load_yaml(final), registry_for(final.parent), final.parent), None
+            return data_path(load_document("graphspec", self.final)), None
         except Exception as e:
             return None, e
 
@@ -348,8 +348,8 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     """The final layout: it draws, its tabs and tiles, a spanning tile, a blank cell, its
     column widths, and its lint."""
     import forgegraph as fg
-    from forgegraph.layouts import load_layout
     from forgegraph.spec.layout import BLANK, tabs
+    from forgegraph.spec.loaded import load_document
 
     layouts = _named(ws, ".layout.yaml")
     if not layouts:
@@ -357,8 +357,8 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     final = layouts[-1]
     try:
         drawn = fg.layout(final)
-        doc, reg, _ = load_layout(final, None)
-        listed = tabs(doc, reg)
+        loaded = load_document("layout", final)
+        listed = tabs(loaded.doc, loaded.reg)
     except Exception as e:
         return [Check("layout draws", False, f"{final.name}: {type(e).__name__}: {e}")]
     checks = [Check("layout draws", True, final.name)]

@@ -6,7 +6,7 @@ pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
 formats/base_format.yaml, layouts/base_layout.yaml, schedules/base_schedule.yaml) and its
 reference GraphSpec (graphspecs/polarization.yaml). A layer file has
 only a name, version and description, and its parameters. A GraphSpec's layers and a
-layout's tabs are collections keyed by name, checked by spec/documents.py and spec/layout.py,
+layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
 (tab_definitions). Every line of those files, header included, is
 `name: value          # [RANGE]; DESCRIPTION`.
@@ -54,10 +54,11 @@ REFERENCE = {
     "schedule": "base_schedule",
 }
 CORE_KINDS = ("graph_type", "layer")  # ForgeGraph's code; every other kind comes from packs
-BASE_PACK = "forgegraph_base"
+BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_KINDS
 HEADER = ("name", "version", "description", "extends", "fixed_parameters", "variable_parameters")
 LAYER_HEADER = ("name", "version", "description", "parameters")
 COLLECTIONS = {"graphspec": ("layers",), "layout": ("tabs",)}  # categories keyed by chosen names
+NAMES = {"graphspec": ("graph_type", "theme", "format"), "layout": ("format",)}  # specs it names
 SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
@@ -271,7 +272,7 @@ def check_parameter(
 ) -> list[tuple[str, str]]:
     """Problems as (suffix, message); suffix is '' or '[i]' for a list item."""
     if p.required and value in (None, NONE):
-        return []  # unset; drawing needs it, see documents.drawing_problems
+        return []  # unset; drawing needs it, see validate.drawing_problems
     if p.takes_list:
         if value in (None, NONE) and NONE in p.range.literals:
             return []  # a list parameter whose range allows None, e.g. no tick sides
@@ -329,10 +330,15 @@ def tree_has(tree: Any, path: str) -> bool:
     return tree_get(tree, path, marker) is not marker
 
 
+def base_folder() -> Path:
+    """The base pack's folder, in this package."""
+    return Path(str(files("forgegraph") / "packs" / BASE))
+
+
 def definition_file(kind: str, name: str | None = None) -> Path:
     """A graph type's or layer type's own file, or the base pack's file defining a kind."""
-    root = files("forgegraph") if kind in CORE_KINDS else files("forgegraph") / "packs" / BASE_PACK
-    return Path(str(root / KINDS[kind] / f"{name or REFERENCE[kind]}.yaml"))
+    root = Path(str(files("forgegraph"))) if kind in CORE_KINDS else base_folder()
+    return root / KINDS[kind] / f"{name or REFERENCE[kind]}.yaml"
 
 
 def _comment(node: Any, key: str) -> str | None:
@@ -433,10 +439,19 @@ def definitions(kind: str, name: str | None = None) -> dict[str, Parameter]:
 @cache
 def _graphspec_definitions(name: str) -> dict[str, Parameter]:
     params = _read("graphspec", name)[1]
-    others = {p.split(".")[0] for k in ("theme", "format") for p in definitions(k)}
-    for gt in graph_type_files():
-        others |= {p.split(".")[0] for p in definitions("graph_type", gt)}
+    others = categories("theme", "format", "graph_type")
     return {path: p for path, p in params.items() if path.split(".")[0] not in others}
+
+
+@cache
+def categories(*kinds: str) -> frozenset[str]:
+    """The top-level categories of these kinds' parameters; for graph_type, every graph
+    type's."""
+    paths = []
+    for kind in kinds:
+        names = graph_type_files() if kind == "graph_type" else (None,)
+        paths += [p for name in names for p in definitions(kind, name)]
+    return frozenset(p.split(".")[0] for p in paths)
 
 
 @cache

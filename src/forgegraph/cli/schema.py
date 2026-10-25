@@ -38,8 +38,8 @@ def schema(
     For layer, every layer type's parameters, as type.parameter: what a GraphSpec's layers
     set, under a name of its choosing. For layout, its parameters, its format's variable
     parameters, then a tab's, as tabs.<tab>.<parameter>, and a tile's, tabs.<tab>.tiles.<tile>."""
-    from forgegraph.spec.documents import builtin
     from forgegraph.spec.parameters import KINDS, definitions, tab_definitions
+    from forgegraph.spec.registry import builtin
 
     def builtin_layers() -> list[str]:
         return list(builtin().docs["layer"])
@@ -135,7 +135,7 @@ def _pack_fields(kind: str) -> list[dict[str, Any]]:
     config: each with its example value, range and description."""
     import re
 
-    from forgegraph.packs import base_folder
+    from forgegraph.spec.parameters import base_folder
 
     source = base_folder() / "pack.yaml" if kind == "pack" else base_folder().parent / "config.toml"
     rows = []
@@ -153,8 +153,10 @@ def _settable(
     """Every parameter a GraphSpec can set, with the value it has unless the GraphSpec sets
     it, and which file gives that value; and notes on any spec named whose pack is
     non-standard here, or may not be used here."""
-    from forgegraph.spec.documents import found_problems, nonstandard_note, registry_for, resolve
+    from forgegraph.spec.access import found_problems, nonstandard_note
     from forgegraph.spec.parameters import NONE, definitions
+    from forgegraph.spec.registry import registry_for
+    from forgegraph.spec.resolve import resolve
 
     reg = registry_for(root)
     chosen_names = (("graph_type", graph_type), ("theme", theme), ("format", format))
@@ -190,12 +192,12 @@ def _settable(
         }
         for p in definitions("graphspec").values()
     ]
-    methods = resolve("theme", reg.docs["theme"][theme], reg, graph_type)["legend.methods"][0]
+    methods = resolve("theme", reg.docs["theme"][theme], reg, graph_type)["legend.methods"].value
     for kind, name in chosen_names:
         params = definitions(kind, graph_type if kind == "graph_type" else None)
         values = resolve(kind, reg.docs[kind][name], reg, graph_type)
-        for path, (value, fixed) in values.items():
-            if fixed or path not in params:
+        for path, r in values.items():
+            if r.fixed or path not in params:
                 continue
             p = params[path]
             allowed = p.range.describe()
@@ -204,7 +206,7 @@ def _settable(
             rows.append(
                 {
                     "parameter": path,
-                    "value": value,
+                    "value": r.value,
                     "range": allowed,
                     "required": p.required,
                     "description": p.description,

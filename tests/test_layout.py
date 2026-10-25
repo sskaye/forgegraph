@@ -22,8 +22,9 @@ import forgegraph as fg
 from forgegraph.cli import app
 from forgegraph.drawing.figure import WATERMARK, visible_extent
 from forgegraph.layouts import Layout, explain_layout
-from forgegraph.spec.documents import builtin, validate
 from forgegraph.spec.layout import slug
+from forgegraph.spec.registry import builtin
+from forgegraph.spec.validate import validate
 
 runner = CliRunner()
 FORMAT = {"width": 200, "height": "auto", "base_size": 10}
@@ -432,7 +433,7 @@ def test_a_layout_sets_its_formats_variable_parameters(project):
     )
     saved = fg.layout(path).save_all(project / "out" / "fig")
     assert sorted(p.name for p in saved) == ["fig.html", "fig.png"]
-    tile = explain_layout(path)["tabs.Overview.tiles.volt.format"]["output.file_types"]
+    tile = explain_layout(path)[1]["Overview", "volt"].format["output.file_types"]
     assert tile.value == ["html", "png"] and tile.origin == "layout 'fig'"
 
 

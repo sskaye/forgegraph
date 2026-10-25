@@ -27,26 +27,18 @@ def render(
     """Draw a GraphSpec or a layout and save it in its format's file types. A layout with
     several tabs saves a file per tab (name-<tab>.png), a PDF with a page per tab, and an
     HTML page with every tab."""
-    import forgegraph as fg
-    from forgegraph.layouts import is_layout, stem
-    from forgegraph.spec.documents import nonstandard_note
+    from forgegraph.layouts import draw_file, stem
+    from forgegraph.spec.access import nonstandard_note
 
-    drawn: Any = fg.layout(graphspec) if is_layout(graphspec) else fg.render(graphspec)
+    drawn: Any = draw_file(graphspec)
     if out is not None:
         saved = drawn.save(out)
-    elif isinstance(drawn, fg.Layout):
-        saved = drawn.save_all(graphspec.parent / stem(graphspec))
     else:
-        saved = drawn.save_all(graphspec.parent / graphspec.stem)
-    labelling = (
-        {f"{t.name}.{n}": tile.labelling for t in drawn.tabs for n, tile in t.tiles.items()}
-        if isinstance(drawn, fg.Layout)
-        else drawn.labelling
-    )
-    result = {
+        saved = drawn.save_all(graphspec.parent / stem(graphspec))
+    result: dict[str, Any] = {
         "ok": True,
         "saved": [str(p) for p in saved],
-        "labelling": labelling,
+        "labelling": drawn.labelling_by_name,
         "lint": [i.as_dict() for i in drawn.issues],
     }
     if drawn.nonstandard_packs:
@@ -76,23 +68,26 @@ def explain(
     """Show every value a graph is drawn with, whether it's fixed, and which file set it. For
     a layout: its own values, then each tile's, under tabs.<tab>.tiles.<tile>."""
     from forgegraph.layouts import explain_layout, is_layout, nonstandard_packs_of
-    from forgegraph.spec.documents import explain as explain_values
-    from forgegraph.spec.documents import (
-        load_document,
-        nonstandard_note,
-        packs_used,
-        validate,
-    )
+    from forgegraph.spec.access import nonstandard_note, packs_used
+    from forgegraph.spec.loaded import load_document
+    from forgegraph.spec.resolve import Values
+    from forgegraph.spec.validate import validate
 
+    values: dict[str, Values]  # by kind; a tile's as tabs.<tab>.tiles.<tile>.<kind>
     if is_layout(graphspec):
-        values = explain_layout(graphspec)
+        own, tiles = explain_layout(graphspec)
+        values = {"layout": own}
+        for (tab, tile), explained in tiles.items():
+            where = f"tabs.{tab}.tiles.{tile}"
+            values.update({f"{where}.{kind}": v for kind, v in explained.kinds().items()})
         packs = nonstandard_packs_of(graphspec)
     else:
-        doc, reg, _ = load_document("graphspec", graphspec)
+        loaded = load_document("graphspec", graphspec)
+        doc, reg = loaded.doc, loaded.reg
         problems = validate("graphspec", doc, reg)
         if problems:
             fail(problems)
-        values = explain_values(doc, reg)
+        values = loaded.explain().kinds()
         packs = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
     note = nonstandard_note(packs) if packs else None
     rows = [

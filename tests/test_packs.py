@@ -17,8 +17,10 @@ from forgegraph import packs
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.packs import PackError, read_pack
 from forgegraph.packs import setup as pack_setup  # pytest would run a module's setup()
-from forgegraph.spec import documents
-from forgegraph.spec.documents import name_problems, registry_for, validate
+from forgegraph.spec import registry
+from forgegraph.spec.access import name_problems
+from forgegraph.spec.registry import registry_for
+from forgegraph.spec.validate import validate
 
 ROOT = Path(__file__).parents[1]
 ACME = ROOT / "examples" / "packs" / "acme"
@@ -180,7 +182,7 @@ def test_a_pack_spec_builds_on_a_pack_it_may_not_use(tmp_path, monkeypatch):
 
 def test_a_pack_spec_builds_on_an_installed_pip_pack(tmp_path, monkeypatch):
     shutil.copytree(ACME, tmp_path / "site" / "acme")
-    monkeypatch.setattr(documents, "pip_packs", lambda: {"acme": tmp_path / "site" / "acme"})
+    monkeypatch.setattr(registry, "pip_packs", lambda: {"acme": tmp_path / "site" / "acme"})
     _loud(tmp_path)
     allow(tmp_path, "./house")
     reg = registry_for(tmp_path)

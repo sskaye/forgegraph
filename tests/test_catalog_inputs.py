@@ -10,7 +10,7 @@ import pytest
 
 import forgegraph
 from forgegraph.catalog_build import build
-from forgegraph.packs import BASE
+from forgegraph.spec.parameters import BASE
 
 PACKAGE = Path(forgegraph.__file__).parent
 
@@ -34,7 +34,7 @@ def _edit(path: Path) -> None:
         "drawing/xy.py",
         "drawing/marks.py",
         "graph.py",
-        "spec/documents.py",
+        "spec/resolve.py",
         "graph_types/xy.yaml",
         "layers/error_bar.yaml",
         f"packs/{BASE}/themes/base_theme.yaml",

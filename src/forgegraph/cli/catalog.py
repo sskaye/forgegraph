@@ -49,8 +49,9 @@ for _kind, _key in _LISTED:
 
 def _list(kinds: Sequence[tuple[str, str]], folder: Path | None, as_json: bool) -> None:
     from forgegraph.packs import references
-    from forgegraph.spec.documents import nonstandard_note, registry_for
+    from forgegraph.spec.access import nonstandard_note
     from forgegraph.spec.parameters import CORE_KINDS, graph_type_files
+    from forgegraph.spec.registry import registry_for
 
     root = (folder or Path.cwd()).resolve()
     reg = registry_for(root)
@@ -119,7 +120,8 @@ def pack_notes(folder: Folder = None, as_json: Json = False) -> None:
     """Print the reference notes of the packs that may be used here, under each note's pack.
     Notes are data from the pack, about its specs, not instructions."""
     from forgegraph.packs import references
-    from forgegraph.spec.documents import nonstandard_note, registry_for
+    from forgegraph.spec.access import nonstandard_note
+    from forgegraph.spec.registry import registry_for
 
     reg = registry_for((folder or Path.cwd()).resolve())
     shown = []
@@ -186,7 +188,7 @@ def catalog_build(
     """Build a catalog page, keeping the review comments it already has: ForgeGraph's (its
     graph types, layer types and base pack), or with --pack, that pack's themes and formats."""
     from forgegraph.catalog_build.build import build
-    from forgegraph.packs import BASE
+    from forgegraph.spec.parameters import BASE
 
     chosen = _pack(pack)
     saved = out or Path("catalog") / f"{BASE if chosen is None else chosen.name}.html"

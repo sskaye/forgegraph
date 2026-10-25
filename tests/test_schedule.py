@@ -8,8 +8,9 @@ from datetime import datetime, timedelta
 import pytest
 from pack_helpers import doc
 
-from forgegraph.spec.documents import builtin, validate
+from forgegraph.spec.registry import builtin
 from forgegraph.spec.schedule import Cadence, CadenceError
+from forgegraph.spec.validate import validate
 
 EN_DASH = chr(0x2013)
 WEEKDAYS = ["mon 06:00", "tue 06:00", "wed 06:00", "thu 06:00", "fri 06:00"]

@@ -12,13 +12,17 @@ GraphSpec file and the same entries as a GraphSpec's, at the layout's format's l
 
 from __future__ import annotations
 
+import copy
 import os
 from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import Field
 
+from forgegraph import __version__
 from forgegraph.spec.common import Model
+from forgegraph.spec.parameters import NAMES
+from forgegraph.spec.registry import Registry
 
 
 class DataRecord(Model):
@@ -63,6 +67,31 @@ def created() -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def record(level: Literal["full", "minimal"], **fields: Any) -> dict[str, Any]:
+    """The provenance record saved files carry, at a level: ForgeGraph's version, when it
+    was made, and the fields given."""
+    made = ProvenanceRecord(
+        provenance_level=level,
+        forgegraph_version=__version__,
+        created=created(),
+        **fields,
+    )
+    return made.model_dump(exclude_none=True)
+
+
+def graph_fields(
+    spec: dict[str, Any], values: dict[str, dict[str, Any]], data: DataRecord, full: bool
+) -> dict[str, Any]:
+    """What a graph's or a tile's record says about it: its GraphSpec as recorded and, in a
+    full record, every value it was drawn with and its data's file and preprocessing."""
+    return {
+        "graphspec": recorded(spec, full),
+        "resolved": plain(values) if full else None,
+        "data": data.file if full else None,
+        "preprocessing": data.preprocessing if full else None,
+    }
+
+
 def plain(value: Any) -> Any:
     """Values as plain Python: NumPy scalars as Python numbers, inside dicts and lists too."""
     if isinstance(value, dict):
@@ -72,3 +101,34 @@ def plain(value: Any) -> Any:
     if hasattr(value, "item"):
         return value.item()
     return value
+
+
+def recorded(spec: dict[str, Any], full: bool) -> dict[str, Any]:
+    """A GraphSpec as provenance records it: below full, without the data's file and
+    preprocessing reference."""
+    spec = copy.deepcopy(spec)
+    if full:
+        return spec
+    for section in ("fixed_parameters", "variable_parameters"):
+        listed = spec.get(section)
+        if isinstance(listed, dict) and isinstance(listed.get("data"), dict):
+            listed["data"].pop("file", None)
+            listed["data"].pop("preprocessing", None)
+            if not listed["data"]:
+                del listed["data"]
+    return spec
+
+
+def used(values: dict[str, dict[str, Any]], reg: Registry) -> dict[str, Any]:
+    """Each spec a graph is drawn with, by kind, as its name and version (and its pack's)."""
+    chosen = values["graphspec"]
+    out: dict[str, Any] = {}
+    for kind in NAMES["graphspec"]:
+        out[kind] = reg.spec_record(kind, chosen[f"specifications.{kind}"])
+    layers = values.get("layers") or {}
+    if layers:
+        out["layers"] = {
+            n: {"type": v["type"], "version": reg.docs["layer"][v["type"]]["version"]}
+            for n, v in layers.items()
+        }
+    return out

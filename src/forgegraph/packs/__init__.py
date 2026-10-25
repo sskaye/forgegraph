@@ -39,20 +39,14 @@ from ruamel.yaml import YAML
 
 from forgegraph import __version__
 from forgegraph.spec.common import ProblemsError
+from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS
 
-BASE = "forgegraph_base"
 FOLDER_CONFIG = "forgegraph.toml"
 MAIN_CONFIG_VARIABLE = "FORGEGRAPH_CONFIG"
 BUILT_IN = (BASE, "forgegraph_base_2")  # the packs ForgeGraph ships, which a new main config lists
 ENTRY_POINTS = "forgegraph.packs"
 FIELDS = ("name", "version", "description", "issues", "requires")
-FOLDERS = {
-    "theme": "themes",
-    "format": "formats",
-    "graphspec": "graphspecs",
-    "layout": "layouts",
-    "schedule": "schedules",
-}
+FOLDERS = {kind: folder for kind, folder in KINDS.items() if kind not in CORE_KINDS}
 _yaml = YAML(typ="safe", pure=True)
 
 
@@ -124,10 +118,6 @@ def write_main_config(path: Path) -> None:
 def built_in_folder(name: str) -> Path:
     """A built-in pack's folder, in this package."""
     return Path(str(files(__package__) / name))
-
-
-def base_folder() -> Path:
-    return built_in_folder(BASE)
 
 
 def read_pack(folder: Path, source: str, expected: str | None = None) -> Pack:

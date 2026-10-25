@@ -23,8 +23,8 @@ from forgegraph.drawing.export import KEY
 from forgegraph.drawing.style import isolated
 from forgegraph.layouts import Layout
 from forgegraph.packs import MAIN_CONFIG_VARIABLE
-from forgegraph.spec.documents import Registry, builtin
 from forgegraph.spec.parameters import NONE
+from forgegraph.spec.registry import Registry, builtin
 
 BASELINE_DPI = 72
 

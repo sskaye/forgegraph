@@ -16,8 +16,8 @@ from PIL import Image
 from forgegraph.catalog_build.examples import NONSTANDARD, draw, image
 from forgegraph.catalog_build.page import CSS_DPI
 from forgegraph.graph import Graph, SpecError
-from forgegraph.spec.documents import Registry
 from forgegraph.spec.parameters import NONE, Parameter
+from forgegraph.spec.registry import Registry
 
 if TYPE_CHECKING:  # catalog_build.files imports this module, so only to check types
     from forgegraph.catalog_build.files import Catalog

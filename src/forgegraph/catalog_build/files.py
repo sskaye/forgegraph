@@ -23,10 +23,18 @@ from forgegraph.catalog_build.cards import Change, Variation
 from forgegraph.catalog_build.examples import SPECIAL
 from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.documents import Registry, load_yaml, resolve
-from forgegraph.spec.parameters import NONE, Parameter, check_parameter, definitions, flatten
+from forgegraph.spec.parameters import (
+    KINDS,
+    NONE,
+    Parameter,
+    check_parameter,
+    definitions,
+    flatten,
+)
+from forgegraph.spec.registry import Registry, load_yaml
+from forgegraph.spec.resolve import resolve
 
-FOLDERS = {"theme": "themes", "format": "formats", "graph_type": "graph_types", "layer": "layers"}
+FOLDERS = {kind: KINDS[kind] for kind in ("theme", "format", "graph_type", "layer")}
 HEADER = ("name", "version", "description", "extends", "baseline", "baselines", "variations")
 LAYER_HEADER = (*HEADER[:5], "settings", "layer", *HEADER[5:])
 NO_CARD = "no_card"
@@ -141,9 +149,8 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
     baseline = next(d["baseline"] for d in chain if d.get("baseline") not in (None, NONE))
     if baseline not in reg.docs["graphspec"]:
         raise CatalogError([f"{label}: baseline: no GraphSpec '{baseline}'"])
-    drawn = str(
-        resolve("graphspec", reg.docs["graphspec"][baseline], reg)["specifications.graph_type"][0]
-    )
+    values = resolve("graphspec", reg.docs["graphspec"][baseline], reg)
+    drawn = str(values["specifications.graph_type"].value)
     graph_type = name if kind == "graph_type" else drawn
     if kind == "graph_type" and drawn != name:
         problems.append(f"{label}: baseline: '{baseline}' draws {drawn}, not {name}")

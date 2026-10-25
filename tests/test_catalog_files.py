@@ -7,7 +7,7 @@ from pack_helpers import write_pack
 
 from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.packs import read_pack
-from forgegraph.spec.documents import builtin
+from forgegraph.spec.registry import builtin
 
 HEADER = (
     "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"

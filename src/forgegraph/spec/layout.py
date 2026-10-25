@@ -15,12 +15,11 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from forgegraph.spec.parameters import NONE, SECTIONS, check_parameter, tab_definitions
-
-if TYPE_CHECKING:  # spec.documents imports this module, so only to check types
-    from forgegraph.spec.documents import Registry
+from forgegraph.spec.registry import Registry
+from forgegraph.spec.resolve import chain, resolve
 
 BLANK = "."
 TAB_KEYS = ("grid", "tiles")
@@ -88,16 +87,10 @@ def _listed(d: dict[str, Any]) -> tuple[str, Any] | None:
     return None
 
 
-def _layout_chain(doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
-    from forgegraph.spec.documents import chain
-
-    return chain("layout", doc, reg)
-
-
 def tabs_source(doc: dict[str, Any], reg: Registry) -> dict[str, Any]:
     """The file in a layout's extends chain whose tabs it ends up with: the nearest listing
     any."""
-    found = _layout_chain(doc, reg)
+    found = chain("layout", doc, reg)
     return next((d for d in found if _listed(d) is not None), found[-1])
 
 
@@ -166,7 +159,7 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     """Problems with a layout's tabs, and with the tabs it ends up with."""
     errors: list[str] = []
     listed = _listed(doc)
-    for d in _layout_chain(doc, reg)[1:]:
+    for d in chain("layout", doc, reg)[1:]:
         inherited = _listed(d)
         if listed is not None and inherited is not None and inherited[0] == SECTIONS[0]:
             errors.append(f"{listed[0]}.tabs: fixed by layout '{d.get('name')}'")
@@ -270,16 +263,14 @@ def _sizes_problems(
 ) -> list[str]:
     """With the format's height (or width) auto, rows (columns) take the size their tiles
     need, so row_heights (column_widths) can't also be set."""
-    from forgegraph.spec.documents import resolve
-
-    chosen = resolve("layout", doc, reg).get("specifications.format", (None,))[0]
+    chosen = resolve("layout", doc, reg).value("specifications.format")
     fmt = reg.docs["format"].get(chosen) if chosen is not None else None
     if fmt is None:
         return []
     values = resolve("format", fmt, reg)
     errors = []
     for size, key in (("height", "row_heights"), ("width", "column_widths")):
-        if values.get(f"figure.{size}", (None,))[0] != "auto":
+        if values.value(f"figure.{size}") != "auto":
             continue
         for tab_name, entry in entries.items():
             if entry["grid"].get(key) not in (None, NONE):

@@ -30,17 +30,10 @@ from forgegraph import __version__
 from forgegraph.jobs import status as status_file
 from forgegraph.jobs.status import Attempt, DataFile, HookStatus, JobStatus, TargetStatus
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.documents import (
-    Registry,
-    explain,
-    folder_of,
-    load_document,
-    resolve,
-    setter,
-    validate,
-)
+from forgegraph.spec.loaded import Loaded, load_document, placed
 from forgegraph.spec.parameters import NONE
-from forgegraph.spec.schedule import Cadence, CadenceError
+from forgegraph.spec.schedule import Cadence
+from forgegraph.spec.validate import validate
 
 LOG_LIMIT = 1_000_000  # bytes; a longer log is moved to <name>.log.1
 
@@ -77,52 +70,36 @@ class Schedule:
         return float(value)
 
 
-def _from(doc: dict[str, Any], reg: Registry, path: str, folder: Path) -> Path:
-    """The folder a path parameter's relative values are found from: that of the schedule
-    file that sets it (`folder` for doc itself)."""
-    return folder_of("schedule", setter("schedule", doc, reg, path), doc, reg, folder)
-
-
-def _place(value: str, folder: Path) -> Path:
-    where = Path(value).expanduser()
-    return (where if where.is_absolute() else folder / where).resolve()
-
-
 def load(path: Path) -> Schedule:
     """Read and check a schedule file."""
     path = path.resolve()
     if not path.is_file():
         raise ScheduleError([f"no schedule file at '{path}'"])
-    doc, reg, _ = load_document("schedule", path)
-    problems = validate("schedule", doc, reg)
+    loaded = load_document("schedule", path)
+    doc = loaded.doc
+    problems = validate("schedule", doc, loaded.reg)
     if problems:
         raise ScheduleError(problems)
-    values = {p: v for p, (v, _) in resolve("schedule", doc, reg).items()}
+    values = loaded.resolve().plain()
     files = values["targets.files"]
     if files in (None, NONE):
         raise ScheduleError(
             ["targets.files: must be set: the GraphSpec and layout files to render"]
         )
-    here = _from(doc, reg, "targets.files", path.parent)
-    targets = [_place(str(f), here) for f in files]
+    here = loaded.folder_for(loaded.setter("targets.files"))
+    targets = [placed(f, here).resolve() for f in files]
     problems = [f"targets.files: no file at '{t}'" for t in targets if not t.is_file()]
     if problems:
         raise ScheduleError(problems)
-    try:
-        cadence = Cadence.from_values(values)
-    except CadenceError as e:
-        raise ScheduleError([str(e)]) from None
-    folder_value = values["targets.output_folder"]
-    output = (
-        None
-        if folder_value in (None, NONE)
-        else _place(str(folder_value), _from(doc, reg, "targets.output_folder", path.parent))
-    )
-    file_value = values["status.file"]
-    if file_value == "auto":
+    cadence = Cadence.from_values(values)  # validation found that it can be built
+    output = loaded.place("targets.output_folder")
+    output = output.resolve() if output is not None else None
+    if values["status.file"] == "auto":
         status_path = (output or path.parent) / f"{doc['name']}.status.json"
     else:
-        status_path = _place(str(file_value), _from(doc, reg, "status.file", path.parent))
+        status = loaded.place("status.file")
+        assert status is not None  # its range, auto or text, has no None
+        status_path = status.resolve()
     return Schedule(path, doc, values, cadence, targets, output, status_path)
 
 
@@ -212,19 +189,20 @@ def _is_layout(path: Path) -> bool:
 
 def data_files(target: Path) -> list[Path]:
     """The Parquet files a GraphSpec or layout draws from, as its files name them."""
-    from forgegraph.graph import data_path
+    from forgegraph.data import data_path
 
-    found = [data_path(doc, reg, folder) for doc, reg, folder in _graphspecs(target)]
+    found = [data_path(graphspec) for graphspec in _graphspecs(target)]
     return list(dict.fromkeys(f.resolve() for f in found if f is not None))
 
 
-def _graphspecs(target: Path) -> list[tuple[Any, Registry, Path]]:
+def _graphspecs(target: Path) -> list[Loaded]:
     """The GraphSpecs a target draws, as its render reads them: itself, or a layout's tiles."""
     if not _is_layout(target):
         return [load_document("graphspec", target)]
     from forgegraph.layouts import tile_documents
 
-    return tile_documents(target)
+    tiles = tile_documents(load_document("layout", target))
+    return [tile for tab in tiles.values() for tile in tab.values()]
 
 
 def _date_order(target: Path) -> str:
@@ -232,9 +210,8 @@ def _date_order(target: Path) -> str:
     found = _graphspecs(target)
     if not found:
         return "month_day"
-    doc, reg, _ = found[0]
     try:
-        return str(explain(doc, reg)["theme"]["axis.tick.label.date_order"].value)
+        return str(found[0].explain().theme["axis.tick.label.date_order"].value)
     except Exception:  # the render reports what's wrong with the GraphSpec
         return "month_day"
 
@@ -256,7 +233,7 @@ def stamp(as_of: datetime, cadence: Cadence, order: str) -> str:
 def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
     import forgegraph as fg
     from forgegraph.drawing.page import Freshness
-    from forgegraph.layouts import stem
+    from forgegraph.layouts import draw_file, stem
 
     shown = os.path.relpath(target, schedule.path.parent)
     found: list[DataFile] = []
@@ -280,11 +257,7 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
         file=shown, ok=False, data=found, data_as_of=_iso(as_of) if as_of else None
     )
     try:
-        drawn: Any = (
-            fg.layout(target, footnote=footnote)
-            if _is_layout(target)
-            else fg.render(target, footnote=footnote)
-        )
+        drawn = draw_file(target, footnote=footnote)
     except fg.SpecError as e:
         result.problems = list(e.problems)
         return result
@@ -296,17 +269,12 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
             _iso(as_of), schedule.stale_after_hours, schedule.cadence.describe()
         )
     folder = schedule.output_folder or target.parent
-    name = stem(target) if _is_layout(target) else target.stem
     try:
-        saved = drawn.save_all(folder / name)
+        saved = drawn.save_all(folder / stem(target))
     except Exception as e:
         result.problems = [f"saving: {type(e).__name__}: {e}"]
         return result
-    records = (
-        [tile.data for t in drawn.tabs for tile in t.tiles.values()]
-        if _is_layout(target)
-        else [drawn.data]
-    )
+    records = drawn.data_records
     dropped: dict[str, int] = {}
     for r in records:
         for reason, n in r.rows_dropped.items():

@@ -12,9 +12,8 @@ import re
 import pytest
 from pack_helpers import doc
 
-from forgegraph.spec.documents import Registry, builtin, drawing_problems, resolve, validate
 from forgegraph.spec.parameters import (
-    BASE_PACK,
+    BASE,
     CORE_KINDS,
     HEADER,
     KINDS,
@@ -28,11 +27,14 @@ from forgegraph.spec.parameters import (
     parse_range,
     tree_set,
 )
+from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.resolve import resolve
+from forgegraph.spec.validate import drawing_problems, validate
 
 
 def reference_name(kind: str) -> str:
     """The name of the file that specifies a kind: ForgeGraph's own, or the base pack's."""
-    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE_PACK}/{REFERENCE[kind]}"
+    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE}/{REFERENCE[kind]}"
 
 
 DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layers aren't
@@ -361,7 +363,7 @@ def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
     theme["variable_parameters"] = {"series": {"line": {"width": 0.12}}}
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
-    r = resolve("theme", theme, reg)
+    r = {p: (v.value, v.fixed) for p, v in resolve("theme", theme, reg).items()}
     assert r["axis.tick.direction"] == ("in", True)
     assert r["series.line.width"] == (0.12, False)  # fixed in default, variable here
     assert r["axis.tick.length"] == (0.3, True)  # inherited
@@ -374,8 +376,8 @@ def test_graph_type_heading_in_a_theme():
     theme["fixed_parameters"] = {"axis": left, "xy": {"axis": bottom}}
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
-    assert resolve("theme", theme, reg)["axis.tick.sides"][0] == ["left"]
-    assert resolve("theme", theme, reg, "xy")["axis.tick.sides"][0] == ["bottom"]
+    assert resolve("theme", theme, reg).value("axis.tick.sides") == ["left"]
+    assert resolve("theme", theme, reg, "xy").value("axis.tick.sides") == ["bottom"]
 
 
 def test_graph_type_heading_only_in_themes_and_formats():
@@ -447,6 +449,10 @@ def test_settings_are_checked_against_their_own_range():
 def test_a_graphspec_names_existing_files():
     assert validate("graphspec", spec({"specifications.theme": "loud"})) == [
         "variable_parameters.specifications.theme: must be the name of a theme"
+    ]
+    theme = "forgegraph_base/base_theme"
+    assert validate("graphspec", spec({"specifications.theme": [theme]})) == [
+        "variable_parameters.specifications.theme: must be a single value: the name of a theme"
     ]
 
 
@@ -543,42 +549,43 @@ def test_impossible_requests_are_errors():
 
 
 def test_an_unchanged_file_is_parsed_once(tmp_path, monkeypatch):
-    from forgegraph.spec import documents
+    from forgegraph.spec import registry
 
     path = tmp_path / "t.yaml"
     path.write_text("a: 1\nb: [x, y]\n")
     parsed = []
-    parse = documents._yaml.load
-    monkeypatch.setattr(documents._yaml, "load", lambda f: parsed.append(1) or parse(f))
-    first = documents.load_yaml(path)
+    parse = registry._yaml.load
+    monkeypatch.setattr(registry._yaml, "load", lambda f: parsed.append(1) or parse(f))
+    first = registry.load_yaml(path)
     first["a"] = 99  # a caller changing what it was given
     first["b"].append("z")
-    assert documents.load_yaml(path) == {"a": 1, "b": ["x", "y"]}
+    assert registry.load_yaml(path) == {"a": 1, "b": ["x", "y"]}
     assert len(parsed) == 1
 
 
 def test_an_edited_file_is_parsed_again(tmp_path):
     import os
 
-    from forgegraph.spec import documents
+    from forgegraph.spec import registry
 
     path = tmp_path / "t.yaml"
     path.write_text("a: 1\n")
-    assert documents.load_yaml(path) == {"a": 1}
+    assert registry.load_yaml(path) == {"a": 1}
     path.write_text("a: 2\n")  # the same size: only the time tells
     stat = path.stat()
     os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
-    assert documents.load_yaml(path) == {"a": 2}
+    assert registry.load_yaml(path) == {"a": 2}
 
 
 def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
-    from forgegraph.spec import documents
+    from forgegraph.spec import validate as validation
+    from forgegraph.spec.registry import builtin
 
-    doc = documents.builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    doc = builtin().docs["graphspec"]["forgegraph_base/polarization"]
     calls = []
-    explain = documents.explain
-    monkeypatch.setattr(documents, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
-    assert documents.validate("graphspec", doc) == []
+    explain = validation.explain
+    monkeypatch.setattr(validation, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
+    assert validation.validate("graphspec", doc) == []
     assert len(calls) == 1
 
 
@@ -599,23 +606,24 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     never changed."""
     from ruamel.yaml import YAML
 
-    from forgegraph.spec.documents import builtin, load_document
+    from forgegraph.spec.loaded import load_document
+    from forgegraph.spec.registry import builtin
 
     doc = {**builtin().docs["graphspec"]["forgegraph_base/polarization"], "name": "mine"}
     path = tmp_path / "mine.yaml"
     with path.open("w", encoding="utf-8") as f:  # its descriptions hold subscripts
         YAML().dump(doc, f)
-    loaded, reg, folder = load_document("graphspec", path)
-    assert loaded["name"] == "mine" and reg.paths["graphspec"]["mine"] == path
-    assert folder == tmp_path
+    loaded = load_document("graphspec", path)
+    assert loaded.doc["name"] == "mine" and loaded.reg.paths["graphspec"]["mine"] == path
+    assert loaded.folder == tmp_path
 
     given = builtin()
-    loaded, reg, folder = load_document("graphspec", doc, given)
-    assert reg.docs["graphspec"]["mine"] is doc and "mine" not in given.docs["graphspec"]
+    loaded = load_document("graphspec", doc, given)
+    assert loaded.reg.docs["graphspec"]["mine"] is doc and "mine" not in given.docs["graphspec"]
     monkeypatch.chdir(tmp_path)
-    assert load_document("graphspec", doc)[2] == tmp_path
+    assert load_document("graphspec", doc).folder == tmp_path
 
     named = builtin().docs["graphspec"]["forgegraph_base/polarization"]
     stranger = {**named, "description": "a document of a name the registry holds"}
-    _, reg, _ = load_document("graphspec", stranger, builtin())
+    reg = load_document("graphspec", stranger, builtin()).reg
     assert reg.docs["graphspec"]["forgegraph_base/polarization"] is not stranger

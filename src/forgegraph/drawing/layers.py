@@ -36,7 +36,6 @@ from matplotlib.transforms import Bbox
 from forgegraph.drawing import labels, marks
 from forgegraph.drawing.axes import number_text
 from forgegraph.drawing.errors import DrawError
-from forgegraph.drawing.key import keys
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset
 from forgegraph.drawing.text import measure
@@ -270,7 +269,7 @@ def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style
     again."""
     for a in [t for t in ax.texts if t.get_gid() == REFERENCE]:
         a.remove()
-    lines_shown = bool(gt["mark.line.show"])
+    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
     widened = False
     for line in lines:
@@ -288,7 +287,7 @@ def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style
                 and box.y0 >= plot.y0 - 0.5
                 and box.y1 <= plot.y1 + 0.5
             )
-            if inside and labels.box_clear(ax, box, lines_shown):
+            if inside and labels.box_clear(ax, box, with_lines):
                 break
             if not auto and not inside:  # past the plot's edge: widen, then place again
                 what = f"layers.{line.name}: its label"
@@ -544,8 +543,7 @@ def notes_inside(
 ) -> list[Bbox]:
     """Notes inside the plot area, after layout and keys, each clear of everything drawn,
     the keys and the other notes; return their boxes."""
-    lines_shown = bool(gt["mark.line.show"])
-    taken = [k.bbox() for k in keys(ax)]
+    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     placed: list[Bbox] = []
     inset = style.pt("layer.note.inset")
     for name, layer in layers.items():
@@ -569,9 +567,7 @@ def notes_inside(
             )
             measure(ax.figure)
             box = a.get_window_extent()
-            clear = labels.box_clear(ax, box, lines_shown) and not any(
-                box.overlaps(k) for k in taken
-            )
+            clear = labels.box_clear(ax, box, with_lines, keys=True)
             if clear and not any(box.overlaps(p) for p in placed):
                 placed.append(box)
                 break

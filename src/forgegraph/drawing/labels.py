@@ -21,17 +21,19 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
+from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import text
 from forgegraph.drawing.key import KEY, Entry, Key
+from forgegraph.drawing.key import keys as keys_of
 from forgegraph.drawing.marks import Bars
 from forgegraph.drawing.style import Style
 
@@ -142,16 +144,17 @@ def _overlap(a: tuple, b: tuple, pad: float) -> bool:
     )
 
 
-def _drawn_points(ax: Axes, lines_shown: bool) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """(dense line samples, marker centres) of every drawn series, in display px. A bar is
-    sampled across its whole width."""
+def _drawn_points(ax: Axes, lines: bool) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """(dense line samples, marker centres) of everything drawn but keys, in display px: with
+    lines, along every line drawn with a line style. A bar is sampled across its whole
+    width."""
     dense, centres = [], []
     for line in ax.get_lines():
         if line.get_gid() == KEY:  # a key's own samples aren't data
             continue
         raw = line.get_transform().transform(np.asarray(line.get_xydata(), dtype=float))
         xy = raw[np.isfinite(raw).all(axis=1)]  # dates as numbers
-        if line.get_linestyle() not in ("None", "none", " ", "") and lines_shown:
+        if line.get_linestyle() not in ("None", "none", " ", "") and lines:
             dense.append(_densify(xy, 1.5))
         if line.get_marker() not in ("None", "none", None, ""):
             centres.append(xy)
@@ -167,6 +170,57 @@ def _bar_samples(box: Bbox) -> np.ndarray:
     ys = np.linspace(box.y0, box.y1, max(2, int(box.height / 1.5) + 1))
     gx, gy = np.meshgrid(xs, ys)
     return np.c_[gx.ravel(), gy.ravel()]
+
+
+@dataclass
+class Obstacles:
+    """What a box placed on a plot must keep clear of, in display px: points along lines and
+    filling bars, markers' centres, texts, and named boxes (keys, color bars)."""
+
+    dense: list[np.ndarray] = field(default_factory=list)
+    centres: list[np.ndarray] = field(default_factory=list)
+    texts: list[tuple[Text, Bbox]] = field(default_factory=list)
+    boxes: list[tuple[str, Bbox | None]] = field(default_factory=list)  # what each is, its box
+
+    @classmethod
+    def of(cls, ax: Axes, *, lines: bool, keys: bool, renderer: Any = None) -> Obstacles:
+        """What's drawn inside the plot: every marker and bar; with lines, every line drawn
+        with a line style (the series' lines are drawn only when shown, so with
+        mark.line.show false reference lines and error-bar stems don't count either); the
+        plot's text (value labels, notes, a reference line's label, direct labels); with
+        keys, the keys' frames. A key's own lines and text never count."""
+        dense, centres = _drawn_points(ax, lines)
+        texts = [
+            (t, t.get_window_extent(renderer))
+            for t in ax.texts
+            if t.get_visible() and t.get_text() and t.get_gid() != KEY
+        ]
+        boxes: list[tuple[str, Bbox | None]] = (
+            [(f"the key at {k.position}", k.bbox()) for k in keys_of(ax)] if keys else []
+        )
+        return cls(dense, centres, texts, boxes)
+
+    def hits(self, box: Bbox, pad: float = 0.0) -> list[str]:
+        """What box runs into, in order: "the data" if a point comes within pad px of it,
+        then each text and named box it overlaps. One with exactly box's bounds is box
+        itself, being placed, and doesn't count."""
+        padded = (box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad)
+        found = []
+        if not all(_rect_dist(pts, padded) > 0 for pts in [*self.dense, *self.centres]):
+            found.append("the data")
+        found += [
+            repr(t.get_text()) for t, b in self.texts if b.overlaps(box) and b.bounds != box.bounds
+        ]
+        found += [
+            what
+            for what, b in self.boxes
+            if b is not None and box.overlaps(b) and b.bounds != box.bounds
+        ]
+        return found
+
+    def clear(self, box: Bbox, pad: float = 0.0) -> bool:
+        """Whether box runs into nothing here (see hits)."""
+        return not self.hits(box, pad)
 
 
 def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = True) -> bool:
@@ -191,15 +245,13 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
 
     own_paths = [[ax.transData.transform(p) for p in g.paths] for g in groups]
     own_dense = [np.vstack([_densify(p, 1.5) for p in paths]) for paths in own_paths]
-    all_dense, all_centres = _drawn_points(ax, True)
-    every_line = np.vstack(all_dense) if all_dense else np.empty((0, 2))
-    every_marker = np.vstack(all_centres) if all_centres else np.empty((0, 2))
+    drawn = Obstacles.of(ax, lines=True, keys=False, renderer=renderer)
+    every_line = np.vstack(drawn.dense) if drawn.dense else np.empty((0, 2))
+    every_marker = np.vstack(drawn.centres) if drawn.centres else np.empty((0, 2))
     box = ax.get_window_extent(renderer)
     inner = (box.x0 + 2 * px, box.y0 + 2 * px, box.x1 - 2 * px, box.y1 - 2 * px)
     texts = [  # what layers wrote inside the plot: notes, value labels, a line's label
-        t.get_window_extent(renderer).extents
-        for t in ax.texts
-        if t.get_visible() and t.get_text() and t.get_gid() not in (SERIES_LABEL, KEY)
+        b.extents for t, b in drawn.texts if t.get_gid() != SERIES_LABEL
     ]
 
     steps = np.array(
@@ -318,27 +370,16 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
     return place_interior(ax, groups, style)
 
 
-def _clear_of_data(ax: Axes, key: Key, lines_shown: bool) -> bool:
+def _clear_of_data(ax: Axes, key: Key, lines: bool) -> bool:
     text.measure(ax.figure)
-    return box_clear(ax, key.bbox(), lines_shown)
+    return box_clear(ax, key.bbox(), lines)
 
 
-def box_clear(ax: Axes, bbox: Bbox, lines_shown: bool, texts: bool = True) -> bool:
-    """Whether a box, in display px, keeps clear of every line, marker and bar drawn, and of
-    the plot's other text inside it (value labels, notes, a reference line's label)."""
+def box_clear(ax: Axes, bbox: Bbox, lines: bool, keys: bool = False) -> bool:
+    """Whether a box, in display px, keeps 2 pt clear of what's drawn inside the plot, and
+    off its other text (with keys, its keys too): see Obstacles.of."""
     pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-    box = (bbox.x0 - pad, bbox.y0 - pad, bbox.x1 + pad, bbox.y1 + pad)
-    dense, centres = _drawn_points(ax, lines_shown)
-    if not all(_rect_dist(pts, box) > 0 for pts in [*dense, *centres]):
-        return False
-    if not texts:
-        return True
-    others = [
-        t.get_window_extent()
-        for t in ax.texts
-        if t.get_visible() and t.get_text() and t.get_gid() != KEY
-    ]
-    return not any(o.overlaps(bbox) and o.bounds != bbox.bounds for o in others)
+    return Obstacles.of(ax, lines=lines, keys=keys).clear(bbox, pad)
 
 
 def legend(
@@ -348,7 +389,7 @@ def legend(
     title: str | None,
     *,
     taken: list[Key] | None = None,
-    lines_shown: bool = True,
+    lines: bool = True,
     positions: tuple[str, ...] = ("top_right", "top_left", "bottom_right", "bottom_left"),
     inside: bool = True,
 ) -> Key | None:
@@ -364,7 +405,7 @@ def legend(
             key.place_outside(ax, position)
             return key
         key.place(ax, position)
-        if _clear_of_data(ax, key, lines_shown):
+        if _clear_of_data(ax, key, lines):
             return key
         key.remove()
     return None

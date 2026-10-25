@@ -755,18 +755,20 @@ def check_outside(ax: Axes) -> None:
         return
     plot = ax.get_window_extent()
     renderer = ax.figure.canvas.get_renderer()  # type: ignore[attr-defined]
-    others: list[tuple[str, Any]] = [
-        (repr(t.get_text()), text.footprint(t, renderer))  # to the letters
-        for t in texts_of(ax)
-        if t.get_visible() and t.get_text().strip() and t.get_gid() != KEY
-    ]
-    others += [("the color bar", child.get_tightbbox()) for child in ax.child_axes]
+    around = labelling.Obstacles(
+        texts=[
+            (t, text.footprint(t, renderer))  # to the letters
+            for t in texts_of(ax)
+            if t.get_visible() and t.get_text().strip() and t.get_gid() != KEY
+        ],
+        boxes=[
+            *(("the color bar", child.get_tightbbox()) for child in ax.child_axes),
+            *((f"the key at {o.position}", o.bbox()) for o in outside),
+        ],
+    )
     for k in outside:
         box = k.bbox()
-        hits = [what for what, other in others if other is not None and box.overlaps(other)]
-        hits += [
-            f"the key at {o.position}" for o in outside if o is not k and box.overlaps(o.bbox())
-        ]
+        hits = around.hits(box)  # not k itself, whose box is box
         if box.overlaps(plot):
             hits.append("the plot area")
         if hits:
@@ -778,7 +780,7 @@ def check_outside(ax: Axes) -> None:
 
 def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     groups = drawn.label_groups
-    lines_shown = bool(gt["mark.line.show"])
+    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     taken: list = []
     where = {
         "positions": tuple(gt["legend.key.positions"]),
@@ -791,7 +793,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             style,
             style_key.title,
             taken=taken,
-            lines_shown=lines_shown,
+            lines=with_lines,
             **where,
         )
         if key is None:
@@ -828,7 +830,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
                 style,
                 legend_title,
                 taken=taken,
-                lines_shown=lines_shown,
+                lines=with_lines,
                 **where,
             )
             if leg is not None:

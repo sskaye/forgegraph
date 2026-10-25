@@ -24,7 +24,11 @@ class ProblemsError(ValueError):
 
 
 def suggest(name: str, known: Any) -> str:
-    """'; did you mean ...?' with the known name closest to name, or '' if none is close."""
+    """'; did you mean ...?' with the known names inside name, if it's a category of them,
+    else the known name closest to name, or '' if none is close."""
+    inside = [k for k in known if k.startswith(f"{name}.")]
+    if inside:
+        return f"; did you mean {' or '.join(repr(k) for k in inside)}?"
     close = get_close_matches(name, list(known), n=1)
     return f"; did you mean '{close[0]}'?" if close else ""
 

@@ -320,7 +320,6 @@ def test_unknown_parameter_and_category():
     ("kind", "old", "value", "new"),
     [
         ("theme", "grid.line_width", 0.05, "grid.line.width"),
-        ("theme", "legend.key.frame", True, "legend.key.frame.show"),
         ("theme", "axis.tick.minor.num", 4, "axis.tick.minor.count"),
         ("theme", "series.bar.edge_color", "#000000", "series.bar.edge.color"),
         ("graphspec", "encoding.marker_shape", "Cell", "encoding.marker.shape.column"),
@@ -331,6 +330,25 @@ def test_a_renamed_parameter_suggests_its_new_name(kind, old, value, new):
     assert validate(kind, child(kind, "variable_parameters", {old: value})) == [
         f"variable_parameters.{old}: unknown parameter; did you mean '{new}'?"
     ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "old", "value", "new"),
+    [
+        ("graphspec", "encoding.color", "Cell", "'encoding.color.column' or 'encoding.color.type'"),
+        ("schedule", "cadence.interval", 1, "'cadence.interval.count' or 'cadence.interval.unit'"),
+        ("theme", "legend.key.frame", True, "'legend.key.frame.show' or 'legend.key.frame.width'"),
+        ("layout", "separators.line.border", True, None),
+    ],
+)
+def test_a_name_that_is_now_a_category_suggests_its_parameters(kind, old, value, new):
+    """A renamed parameter whose old name is now a category: its own parameters, not the
+    sibling whose name is spelled closest."""
+    [problem] = validate(kind, child(kind, "variable_parameters", {old: value}))
+    if new is not None:
+        assert problem == f"variable_parameters.{old}: unknown parameter; did you mean {new}?"
+    else:  # not a category: the closest name, as before
+        assert problem.startswith(f"variable_parameters.{old}: unknown parameter; did you mean")
 
 
 def test_a_parameter_is_listed_once():

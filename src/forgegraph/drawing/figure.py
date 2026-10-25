@@ -40,7 +40,7 @@ class LayoutError(ValueError):
     """The format is too small for what has to be drawn around the plot box."""
 
 
-def _inches(value: object) -> float | None:
+def inches(value: object) -> float | None:
     return None if value == "auto" else float(value) / MM_PER_INCH  # type: ignore[arg-type]
 
 
@@ -62,8 +62,24 @@ class GraphFigure(Figure):
         super().draw(renderer)
 
 
-def _watermarked(ax: Axes) -> bool:
+def artists(fig: Figure) -> tuple[int, ...]:
+    """The identities of what the figure draws, but its watermark: what drawing finished
+    with, to compare with later."""
+    return tuple(
+        id(a)
+        for a in [*(c for ax in fig.axes for c in ax.get_children()), *fig.get_children()]
+        if a.get_gid() != WATERMARK
+    )
+
+
+def watermarked(ax: Axes) -> bool:
     return any(a.get_gid() == WATERMARK for a in ax.get_children())
+
+
+def watermark(ax: Axes, style: Style) -> None:
+    """Draw the watermark over the plot box, once."""
+    if not watermarked(ax):
+        ax.add_artist(Watermark(ax, style))
 
 
 class TileAxes(Axes):
@@ -105,8 +121,8 @@ class GraphCanvas(FigureCanvasAgg):
 
 def new_figure(style: Style) -> tuple[GraphFigure, Axes]:
     """A figure with a drawing canvas and one Axes, sized provisionally until `layout()`."""
-    width = _inches(style.format["figure.width"])
-    height = _inches(style.format["figure.height"])
+    width = inches(style.format["figure.width"])
+    height = inches(style.format["figure.height"])
     aspect = float(style.theme["plot_area.aspect"])
     w = width if width is not None else height * aspect  # type: ignore[operator]
     h = height if height is not None else w / aspect
@@ -180,8 +196,8 @@ def layout(fig: Figure, ax: Axes, style: Style) -> None:
     once more with, on each side, the most room either of the last two passes needed: both
     states' labels fit. Earlier passes, made while the figure was still far from its size,
     don't count."""
-    width = _inches(style.format["figure.width"])
-    height = _inches(style.format["figure.height"])
+    width = inches(style.format["figure.width"])
+    height = inches(style.format["figure.height"])
     aspect = float(style.theme["plot_area.aspect"])
     last = both = (0.0, 0.0, 0.0, 0.0)
     for _ in range(PASSES):

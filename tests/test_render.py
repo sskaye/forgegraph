@@ -835,7 +835,7 @@ def test_log_axis_labels_are_plain_or_powers_never_both():
 
 @pytest.mark.slow
 def test_extending_the_x_axis_for_labels_adds_no_ticks():
-    from forgegraph.catalog.examples import Change, draw
+    from forgegraph.catalog_build.examples import Change, draw
 
     fanned = Change("data.file", "fanned.parquet")  # long names: they need room
     g = draw(

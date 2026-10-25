@@ -13,9 +13,9 @@ import pytest
 from pack_helpers import write_pack
 from typer.testing import CliRunner
 
-from forgegraph.catalog import build, forgemark
-from forgegraph.catalog.files import CatalogError, read
-from forgegraph.catalog.page import Card, Instance, Kind, Row, page
+from forgegraph.catalog_build import build, forgemark
+from forgegraph.catalog_build.files import CatalogError, read
+from forgegraph.catalog_build.page import Card, Instance, Kind, Row, page
 from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
 from forgegraph.spec.documents import builtin
@@ -235,7 +235,7 @@ def test_catalog_rules_are_errors(tmp_path):
 
 
 def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
-    from forgegraph.catalog.build import instance
+    from forgegraph.catalog_build.build import instance
 
     catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
         "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
@@ -278,7 +278,7 @@ def test_a_layer_catalogs_settings_are_on_every_card():
 
 
 def test_commented_categories_are_open():
-    from forgegraph.catalog.page import open_commented
+    from forgegraph.catalog_build.page import open_commented
 
     page_ = (
         '<details class="category" id="a"><summary>a</summary>'

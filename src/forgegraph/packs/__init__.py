@@ -38,6 +38,7 @@ from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from ruamel.yaml import YAML
 
 from forgegraph import __version__
+from forgegraph.spec.common import ProblemsError
 
 BASE = "forgegraph_base"
 FOLDER_CONFIG = "forgegraph.toml"
@@ -55,16 +56,14 @@ FOLDERS = {
 _yaml = YAML(typ="safe", pure=True)
 
 
-class PackError(ValueError):
+class PackError(ProblemsError):
     """A pack or config that can't be used; `problems` lists each problem."""
-
-    def __init__(self, problems: list[str]) -> None:
-        self.problems = problems
-        super().__init__("\n".join(problems))
 
 
 @dataclass(frozen=True)
 class Pack:
+    """A pack, as its pack.yaml describes it, and where it is."""
+
     name: str
     version: str
     description: str
@@ -76,6 +75,8 @@ class Pack:
 
 @dataclass(frozen=True)
 class Config:
+    """A config file: where it is, and the packs it lists."""
+
     path: Path
     packs: tuple[str, ...]  # as written
 
@@ -175,6 +176,7 @@ def pip_packs() -> dict[str, Path]:
 
 
 def read_config(path: Path) -> Config:
+    """A config file, checked: TOML holding only a list of packs."""
     try:
         data: dict[str, Any] = tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as e:

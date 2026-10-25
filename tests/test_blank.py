@@ -54,3 +54,50 @@ def test_a_canvas_checks_its_theme_against_the_configs(tmp_path):
     with canvas.drawing():
         [line] = canvas.axes.plot([1, 2], [1, 2])
     assert line.get_color() == "#CC6677"  # tol_muted, as ForgeGraph orders it
+
+
+def test_a_canvas_is_always_non_standard(tmp_path):
+    canvas = fg.blank(THEME, FORMAT, tmp_path)
+    assert canvas.inspect() is True and canvas.changed
+
+
+def test_a_canvas_saved_without_a_file_type_saves_its_formats_image_types(tmp_path):
+    canvas = fg.blank(THEME, FORMAT, tmp_path)
+    with canvas.drawing():
+        canvas.axes.plot([1, 2], [1, 2])
+    listed = canvas.values["format"]["output.file_types"]
+    saved = canvas.save(tmp_path / "c")
+    assert [p.suffix.lstrip(".") for p in saved] == [k for k in listed if k != "html"]
+    assert all(p.is_file() for p in saved)
+
+
+def test_a_canvas_too_big_for_its_format_is_an_error(tmp_path):
+    canvas = fg.blank(THEME, FORMAT, tmp_path)
+    with canvas.drawing():
+        canvas.axes.set_ylabel("\n".join(["a very tall axis title"] * 40))
+    with pytest.raises(fg.SpecError):
+        canvas.save(tmp_path / "c.png")
+
+
+def test_a_notebook_shows_a_canvas_as_a_png(tmp_path):
+    canvas = fg.blank(THEME, FORMAT, tmp_path)
+    assert canvas._repr_png_().startswith(b"\x89PNG")
+
+
+def test_a_canvas_saves_as_a_graph_does(tmp_path, monkeypatch):
+    """With no path, under its own name, every image type its format lists."""
+    canvas = fg.blank(THEME, FORMAT, tmp_path)
+    monkeypatch.chdir(tmp_path)
+    saved = canvas.save()
+    listed = [k for k in canvas.values["format"]["output.file_types"] if k != "html"]
+    assert [p.name for p in saved] == [f"canvas.{k}" for k in listed]
+
+
+def test_a_canvas_takes_a_registry_as_render_does(tmp_path):
+    """Like fg.render and fg.xy, fg.blank can be given the registry to check against."""
+    from forgegraph.spec.documents import registry_for
+
+    shutil.copytree(ACME, tmp_path / "acme")
+    allow(tmp_path, "./acme")
+    canvas = fg.blank("acme/acme", "acme/slide", registry=registry_for(tmp_path))
+    assert canvas.specs["theme"]["name"] == "acme/acme"

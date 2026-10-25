@@ -5,11 +5,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import io
-import os
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,48 +19,125 @@ from forgegraph import __version__
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.figure import (
-    WATERMARK,
     LayoutError,
-    Watermark,
-    _watermarked,
     add_footnote,
+    artists,
     layout,
     new_figure,
+    watermark,
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
+from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.documents import (
     Registry,
     Resolved,
     drawing_problems,
     explain,
+    folder_of,
+    load_document,
     packs_used,
-    registry_for,
     resolve,
     setter,
     validate,
 )
-from forgegraph.spec.documents import (
-    load as load_yaml,
-)
-from forgegraph.spec.parameters import tree_set
-from forgegraph.spec.provenance import DataRecord, ProvenanceRecord
+from forgegraph.spec.parameters import NONE, tree_set
+from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, created, plain
 
-NONE = "None"
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
 PLACE_PASSES = 3  # place, then lay out again, while value labels widen the axis
 
 
-class SpecError(ValueError):
+class SpecError(ProblemsError):
     """A GraphSpec that can't be drawn; `problems` lists each one."""
 
-    def __init__(self, problems: list[str]) -> None:
-        self.problems = problems
-        super().__init__("\n".join(problems))
+
+class Inspected:
+    """Whether a rendered figure is still as ForgeGraph drew it, for graphs and layout tabs:
+    the same artists (_snapshot), drawing the same pixels (_drawn). Once it isn't, it stays
+    non-standard, and every drawing of it carries the watermark. Drawing or saving the
+    figure, by any route, inspects it first."""
+
+    changed: bool
+    _snapshot: tuple[int, ...]
+    _drawn: str
+    _held: bool
+
+    def _shown(self) -> tuple[Figure, Style]:
+        """The figure, and the style it's drawn in."""
+        raise NotImplementedError
+
+    @property
+    def nonstandard(self) -> bool:
+        """True if the figure was drawn on or changed after ForgeGraph finished (the escape
+        hatch), so its specs no longer reproduce it, or it was drawn with a pack the main
+        config doesn't list."""
+        return self.inspect()
+
+    def inspect(self) -> bool:
+        """Check the figure now, unless it's already found changed or held (see
+        inspected_once). Returns `nonstandard`."""
+        if not self.changed and not self._held:
+            figure, _ = self._shown()
+            self.changed = artists(figure) != self._snapshot or self._pixels() != self._drawn
+        return self.changed
+
+    @contextmanager
+    def inspected_once(self) -> Iterator[None]:
+        """Inspect the figure now, and not again until the block ends: saving several files
+        doesn't change it."""
+        self.inspect()
+        self._held = True
+        try:
+            yield
+        finally:
+            self._held = False
+
+    def _pixels(self) -> str:
+        return pixel_hash(*self._shown())
+
+    def saving(self) -> AbstractContextManager[None]:
+        """The matplotlib settings files are saved with."""
+        return isolated(self._shown()[1])
+
+
+class Saved:
+    """Saving by path, for graphs and layouts: a path with a suffix saves that one file
+    type; a path without one (or none: the spec's name) saves every file type the format
+    lists, through save_all."""
+
+    def save(self, path: str | Path | None = None) -> list[Path]:
+        """Save it (see the class)."""
+        if path is None:
+            return self.save_all(Path(self._name()))
+        target = Path(path)
+        if not target.suffix:
+            return self.save_all(target)
+        return self._write(target.with_suffix(""), [target.suffix.lstrip(".")])
+
+    def save_all(self, stem: str | Path) -> list[Path]:
+        raise NotImplementedError
+
+    def _write(self, stem: Path, kinds: list[str]) -> list[Path]:
+        raise NotImplementedError
+
+    def _name(self) -> str:
+        raise NotImplementedError
+
+    def _repr_png_(self) -> bytes:  # what a notebook shows
+        figure, style = self._shown()
+        buffer = io.BytesIO()
+        with isolated(style):
+            figure.savefig(buffer, format="png", dpi=100)
+        return buffer.getvalue()
+
+    def _shown(self) -> tuple[Figure, Style]:
+        """The figure a notebook shows, and its style."""
+        raise NotImplementedError
 
 
 @dataclass
-class Graph:
+class Graph(Inspected, Saved):
     """A drawn graph: its figure, the GraphSpec it came from and every value it used."""
 
     spec: dict[str, Any]
@@ -85,12 +160,7 @@ class Graph:
 
     def mark(self) -> None:
         """Draw the watermark over the plot box, once: the figure has been found changed."""
-        if not _watermarked(self.axes):
-            self.axes.add_artist(Watermark(self.axes, self.style))
-
-    def saving(self) -> AbstractContextManager[None]:
-        """The matplotlib settings files are saved with."""
-        return isolated(self.style)
+        watermark(self.axes, self.style)
 
     def check(self) -> list[lint.Issue]:
         """Lint the figure as it is now, including anything drawn on it since, and return
@@ -103,10 +173,7 @@ class Graph:
             self.issues = lint.check(
                 self.figure,
                 self.axes,
-                fixed_limits={
-                    a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max")))
-                    for a in ("x", "y")
-                },
+                fixed_limits=fixed_limits(gt),
                 rows_dropped=self.data.rows_dropped,
                 font_problems=self._font_problems,
                 drawing=self._drawing,
@@ -118,36 +185,6 @@ class Graph:
         """Lint's findings, as messages."""
         return [i.message for i in self.issues]
 
-    @property
-    def nonstandard(self) -> bool:
-        """True if the figure was drawn on or changed after ForgeGraph finished (the escape
-        hatch), so its GraphSpec no longer reproduces it, or it was drawn with a pack the main
-        config doesn't list."""
-        return self.inspect()
-
-    def inspect(self) -> bool:
-        """Check whether the figure is still as ForgeGraph drew it: the same artists, drawing
-        the same pixels. Once it isn't, the graph stays non-standard, and every drawing of it
-        carries the watermark. Drawing or saving the figure, by any route, checks first.
-        Returns `nonstandard`."""
-        if not self.changed and not self._held:
-            self.changed = _artists(self.figure) != self._snapshot or self._pixels() != self._drawn
-        return self.changed
-
-    @contextmanager
-    def inspected_once(self) -> Iterator[None]:
-        """Inspect the figure now, and not again until the block ends: saving several files
-        doesn't change it."""
-        self.inspect()
-        self._held = True
-        try:
-            yield
-        finally:
-            self._held = False
-
-    def _pixels(self) -> str:
-        return pixel_hash(self.figure, self.style)
-
     def record(self) -> dict[str, Any] | None:
         """The provenance record saved files carry, at the format's provenance.level; None
         with off."""
@@ -158,26 +195,16 @@ class Graph:
         record = ProvenanceRecord(
             provenance_level=level,
             forgegraph_version=__version__,
-            created=_created(),
+            created=created(),
             graphspec=recorded(self.spec, full),
             specs=self.specs,
             nonstandard=self.nonstandard,
             nonstandard_packs=self.nonstandard_packs or None,
-            resolved=_plain(self.values) if full else None,
+            resolved=plain(self.values) if full else None,
             data=self.data.file if full else None,
             preprocessing=self.data.preprocessing if full else None,
         )
         return record.model_dump(exclude_none=True)
-
-    def save(self, path: str | Path | None = None) -> list[Path]:
-        """Save the graph. A path with a suffix saves that one file type; a path without one
-        (or none: the GraphSpec's name, here) saves every file type the format lists."""
-        if path is None:
-            return self.save_all(Path(str(self.spec.get("name", "graph"))))
-        target = Path(path)
-        if not target.suffix:
-            return self.save_all(target)
-        return self._write(target.with_suffix(""), [target.suffix.lstrip(".")])
 
     def save_all(self, stem: str | Path) -> list[Path]:
         """Save every file type the format lists, as stem.png and so on. A dot in stem is part
@@ -208,11 +235,11 @@ class Graph:
                     out.append(export.save(self.figure, path, dpi))
         return out
 
-    def _repr_png_(self) -> bytes:
-        buffer = io.BytesIO()
-        with isolated(self.style):
-            self.figure.savefig(buffer, format="png", dpi=100)
-        return buffer.getvalue()
+    def _name(self) -> str:
+        return str(self.spec.get("name", "graph"))
+
+    def _shown(self) -> tuple[Figure, Style]:
+        return self.figure, self.style
 
 
 def recorded(spec: dict[str, Any], full: bool) -> dict[str, Any]:
@@ -253,30 +280,6 @@ def used(values: dict[str, dict[str, Any]], reg: Registry) -> dict[str, Any]:
             for n, v in layers.items()
         }
     return out
-
-
-def _artists(fig: Figure) -> tuple[int, ...]:
-    return tuple(
-        id(a)
-        for a in [*(c for ax in fig.axes for c in ax.get_children()), *fig.get_children()]
-        if a.get_gid() != WATERMARK
-    )
-
-
-def _created() -> str:
-    epoch = os.environ.get("SOURCE_DATE_EPOCH")
-    moment = datetime.fromtimestamp(int(epoch), UTC) if epoch else datetime.now(UTC)
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _plain(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {k: _plain(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_plain(v) for v in value]
-    if hasattr(value, "item"):
-        return value.item()
-    return value
 
 
 def _lay_out_and_label(
@@ -342,20 +345,8 @@ def prepare(
     """Check and resolve a GraphSpec, given as a file path or a document, and read its data:
     `data` if given, otherwise the Parquet file its data.file names. With `format` (resolved
     format values, as from a layout), those replace the format's."""
-    folder = Path.cwd()  # where a relative data.file the document itself sets is found
-    if isinstance(spec, str | Path):
-        path = Path(spec)
-        folder = path.parent
-        doc = load_yaml(path)
-        reg = registry or registry_for(path.parent)
-        if isinstance(doc, dict) and "name" in doc:
-            reg = reg.copy()
-            reg.add("graphspec", doc, path)
-    else:
-        doc, reg = spec, (registry or registry_for(Path.cwd()))
-        if isinstance(doc, dict) and "name" in doc and doc["name"] not in reg.docs["graphspec"]:
-            reg = reg.copy()
-            reg.add("graphspec", doc)
+    # folder: where a relative data.file the document itself sets is found
+    doc, reg, folder = load_document("graphspec", spec, registry)
     problems = validate("graphspec", doc, reg)
     if problems:
         raise SpecError(problems)
@@ -375,6 +366,7 @@ def prepare(
     fixed = frozenset(p for p, r in resolved["theme"].items() if r.fixed)
     style = Style(values["theme"], values["format"], fixed)
     nonstandard = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
+    reg.use_fonts("graphspec", doc)
     return Prepared(
         doc, resolved, values, frame, record, module, style, used(values, reg), nonstandard
     )
@@ -387,9 +379,11 @@ def render(
     footnote: str | None = None,
 ) -> Graph:
     """Draw a GraphSpec, given as a file path or a document. With `data`, the graph is drawn
-    from that DataFrame; otherwise from the Parquet file its data.file names. A footnote is
-    written small at the bottom right, below everything else (a scheduled run's "data as
-    of" stamp)."""
+    from that DataFrame; otherwise from the Parquet file its data.file names. The specs are
+    checked against `registry` if given, otherwise against the configs found from the
+    GraphSpec file's folder (or, for a document, the working folder). A footnote is written
+    small at the bottom right, below everything else (a scheduled run's "data as of"
+    stamp)."""
     p = prepare(spec, data, registry)
     module, style, gt = p.module, p.style, p.values["graph_type"]
     with isolated(style), lint.font_messages() as font_problems:
@@ -413,7 +407,7 @@ def render(
     graph._drawing = list(drawn.warnings)
     graph._font_problems = font_problems
     graph.check()  # the one draw after layout, which the record of its pixels shares
-    graph._snapshot = _artists(fig)
+    graph._snapshot = artists(fig)
     graph._drawn = pixel_hash(fig, style, redraw=False)
     fig.graph = graph  # from here on, drawing or saving the figure inspects it first
     return graph
@@ -428,6 +422,11 @@ def pixel_hash(fig: Figure, style: Style, *, redraw: bool = True) -> str:
         with isolated(style), lint.font_messages():  # lint reports missing glyphs
             fig.draw(renderer)
     return hashlib.sha256(bytes(renderer.buffer_rgba())).hexdigest()
+
+
+def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | None]]:
+    """Each axis's set min and max (None where automatic), for lint."""
+    return {a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max"))) for a in "xy"}
 
 
 def _limit(value: Any) -> float | None:
@@ -465,14 +464,9 @@ def data_path(doc: dict[str, Any], reg: Registry, folder: Path) -> Path | None:
     where = Path(str(file)).expanduser()
     if where.is_absolute():
         return where
-    depth = setter("graphspec", doc, reg, "data.file")
-    if depth:
-        parent = doc
-        for _ in range(depth):
-            parent = reg.docs["graphspec"][parent["extends"]]
-        known = reg.paths["graphspec"].get(parent["name"])
-        folder = known.parent if known is not None else folder
-    return folder / where
+    return (
+        folder_of("graphspec", setter("graphspec", doc, reg, "data.file"), doc, reg, folder) / where
+    )
 
 
 def _data(
@@ -519,7 +513,8 @@ def xy(
 ) -> Graph:
     """Draw y against x from a DataFrame. color, line_style, marker_shape, marker_fill and
     detail set the encoding parameters of those names; `parameters` sets any other variable
-    parameter by path, e.g. {"mark.line.show": False, "axis.x.scale": "log"}."""
+    parameter by path, e.g. {"mark.line.show": False, "axis.x.scale": "log"}. registry: as
+    for render."""
     settings: dict[str, Any] = {"axis.x.data.column": x, "axis.y.data.column": y}
     for path, value in (
         ("encoding.color", color),
@@ -550,7 +545,10 @@ def graphspec(
     description: str = "",
     settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """A GraphSpec document: the given choices, plus any parameter settings by path."""
+    """A GraphSpec document, named `name`, extending nothing: the graph type, theme and format
+    it's drawn with; data_file, the Parquet file it's drawn from (None: a DataFrame passed
+    to render); preprocessing, a note of how that data was prepared; its title; and
+    `settings`, any other variable parameter by path, e.g. {"axis.x.scale": "log"}."""
     variable: dict[str, dict[str, Any]] = {
         "specifications": {
             "graph_type": graph_type,

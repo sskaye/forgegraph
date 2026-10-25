@@ -23,7 +23,7 @@ import tempfile  # noqa: E402
 
 from recreations import LAYOUT_RECREATIONS, RECREATIONS  # noqa: E402
 
-from forgegraph.catalog.build import write  # noqa: E402
+from forgegraph.catalog_build.build import write  # noqa: E402
 from forgegraph.drawing.style import isolated  # noqa: E402
 
 BASELINE_DPI = 72

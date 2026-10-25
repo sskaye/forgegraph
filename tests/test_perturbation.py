@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from forgegraph.catalog.examples import Change, draw, png
-from forgegraph.catalog.files import read
+from forgegraph.catalog_build.examples import Change, draw, png
+from forgegraph.catalog_build.files import read
 from forgegraph.spec.documents import builtin
 from forgegraph.spec.parameters import graph_type_files
 

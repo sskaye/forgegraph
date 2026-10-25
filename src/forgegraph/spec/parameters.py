@@ -60,6 +60,7 @@ LAYER_HEADER = ("name", "version", "description", "parameters")
 COLLECTIONS = {"graphspec": ("layers",), "layout": ("tabs",)}  # categories keyed by chosen names
 SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
+STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
 TYPE_WORDS = (
     "text", "int", "positive int", "float", "positive float", "hex color", "hex colors",
     "two hex colors",
@@ -343,24 +344,22 @@ def _comment(node: Any, key: str) -> str | None:
     return None
 
 
-def _parse(
-    kind: str, path: str, value: Any, comment: str | None, fixed: bool, where: Path
-) -> Parameter:
+def _parse(path: str, value: Any, comment: str | None, fixed: bool, where: Path) -> Parameter:
     m = _COMMENT.match(comment or "")
     if not m:
         raise ValueError(f"{where.name}: {path} needs '# [RANGE]; DESCRIPTION'")
     return Parameter(path, _plain(value), parse_range(m["range"]), m["description"], fixed)
 
 
-def _walk(kind: str, prefix: str, node: Any, fixed: bool, where: Path) -> list[Parameter]:
+def _walk(prefix: str, node: Any, fixed: bool, where: Path) -> list[Parameter]:
     """The parameters in a category and its sub-categories, in file order."""
     out = []
     for key in node:
         value = node[key]
         if hasattr(value, "items"):
-            out += _walk(kind, f"{prefix}.{key}", value, fixed, where)
+            out += _walk(f"{prefix}.{key}", value, fixed, where)
         else:
-            out.append(_parse(kind, f"{prefix}.{key}", value, _comment(node, key), fixed, where))
+            out.append(_parse(f"{prefix}.{key}", value, _comment(node, key), fixed, where))
     return out
 
 
@@ -371,7 +370,7 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
     data = YAML().load(path.read_text(encoding="utf-8"))
     if kind == "layer":
         header = {
-            k: _parse(kind, k, data[k], _comment(data, k), False, path)
+            k: _parse(k, data[k], _comment(data, k), False, path)
             for k in LAYER_HEADER
             if k != "parameters"
         }
@@ -379,14 +378,12 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
         found: list[Parameter] = []
         for key in tree:
             if hasattr(tree[key], "items"):
-                found += _walk(kind, str(key), tree[key], False, path)
+                found += _walk(str(key), tree[key], False, path)
             else:
-                found.append(_parse(kind, str(key), tree[key], _comment(tree, key), False, path))
+                found.append(_parse(str(key), tree[key], _comment(tree, key), False, path))
         return header, {p.path: p for p in found}
     header = {
-        k: _parse(kind, k, data[k], _comment(data, k), False, path)
-        for k in HEADER
-        if k not in SECTIONS
+        k: _parse(k, data[k], _comment(data, k), False, path) for k in HEADER if k not in SECTIONS
     }
     params: dict[str, Parameter] = {}
     for section in SECTIONS:
@@ -398,7 +395,7 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
                 continue
             if not hasattr(entries, "items"):
                 raise ValueError(f"{path.name}: {section}.{category} must be a category")
-            for p in _walk(kind, str(category), entries, section == SECTIONS[0], path):
+            for p in _walk(str(category), entries, section == SECTIONS[0], path):
                 if p.path in params:
                     raise ValueError(f"{path.name}: {p.path} is listed twice")
                 params[p.path] = p
@@ -413,16 +410,11 @@ def tab_definitions() -> tuple[dict[str, Parameter], Parameter]:
     data = YAML().load(path.read_text(encoding="utf-8"))
     tabs = data[SECTIONS[1]]["tabs"]
     tab = tabs[next(iter(tabs))]
-    grid = {p.path: p for p in _walk("layout", "grid", tab["grid"], False, path)}
+    grid = {p.path: p for p in _walk("grid", tab["grid"], False, path)}
     tiles = tab["tiles"]
     first = next(iter(tiles))
-    tile = _parse("layout", "tile", tiles[first], _comment(tiles, first), False, path)
+    tile = _parse("tile", tiles[first], _comment(tiles, first), False, path)
     return grid, tile
-
-
-def reference_name(kind: str) -> str:
-    """The name of the file defining a kind, as files name it: a pack kind's with its pack."""
-    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE_PACK}/{REFERENCE[kind]}"
 
 
 def header_definitions(kind: str) -> dict[str, Parameter]:

@@ -17,8 +17,8 @@ import matplotlib
 from matplotlib.colors import Colormap, LinearSegmentedColormap, to_rgb
 
 from forgegraph.fonts import WEIGHTS, register_fonts
+from forgegraph.spec.parameters import NONE
 
-NONE = "None"
 MM_PER_INCH = 25.4
 MARKERS = {
     "circle": "o",
@@ -138,7 +138,7 @@ class Style:
             "xtick.major.size": self.pt("axis.tick.length"),
             "ytick.major.size": self.pt("axis.tick.length"),
             "xtick.major.width": self.pt("axis.tick.width"),
-            # tick label pads are set from the visible gap by render.spacing
+            # tick label pads are set from the visible gap by drawing.spacing
             "ytick.alignment": "baseline",
             "xtick.minor.size": self.pt("axis.tick.minor.length"),
             "ytick.minor.size": self.pt("axis.tick.minor.length"),

@@ -155,7 +155,7 @@ uv run pytest --full && uv run ruff check . && uv run pyright
   - **spec/**: reading, checking and resolving specs, and the provenance record.
   - **drawing/**: drawing, layout and lint. **layouts/**: layouts. **jobs/**: scheduled renders.
   - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
-  - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog/**, **catalogs/**: the catalog builder, and each definition's catalog file.
+  - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog_build/**: the catalog builder. **catalogs/**: each definition's catalog file.
   - **skill/forgegraph/**: the agent skill.
 - **catalog/**: the generated catalog pages.
 - **examples/**: sample data, and `packs/acme`, an example pack in a deliberately different style.

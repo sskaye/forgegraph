@@ -29,20 +29,24 @@ from typing import Any
 from forgegraph import __version__
 from forgegraph.jobs import status as status_file
 from forgegraph.jobs.status import Attempt, DataFile, HookStatus, JobStatus, TargetStatus
-from forgegraph.spec.documents import Registry, explain, registry_for, resolve, setter, validate
-from forgegraph.spec.documents import load as load_yaml
+from forgegraph.spec.common import ProblemsError
+from forgegraph.spec.documents import (
+    Registry,
+    explain,
+    folder_of,
+    load_document,
+    resolve,
+    setter,
+    validate,
+)
+from forgegraph.spec.parameters import NONE
 from forgegraph.spec.schedule import Cadence, CadenceError
 
-NONE = "None"
 LOG_LIMIT = 1_000_000  # bytes; a longer log is moved to <name>.log.1
 
 
-class ScheduleError(ValueError):
+class ScheduleError(ProblemsError):
     """A schedule that can't be run; `problems` lists each one."""
-
-    def __init__(self, problems: list[str]) -> None:
-        self.problems = problems
-        super().__init__("\n".join(problems))
 
 
 @dataclass
@@ -76,12 +80,7 @@ class Schedule:
 def _from(doc: dict[str, Any], reg: Registry, path: str, folder: Path) -> Path:
     """The folder a path parameter's relative values are found from: that of the schedule
     file that sets it (`folder` for doc itself)."""
-    depth = setter("schedule", doc, reg, path) or 0
-    parent = doc
-    for _ in range(depth):
-        parent = reg.docs["schedule"][parent["extends"]]
-    known = reg.paths["schedule"].get(parent["name"])
-    return known.parent if depth and known is not None else folder
+    return folder_of("schedule", setter("schedule", doc, reg, path), doc, reg, folder)
 
 
 def _place(value: str, folder: Path) -> Path:
@@ -94,10 +93,7 @@ def load(path: Path) -> Schedule:
     path = path.resolve()
     if not path.is_file():
         raise ScheduleError([f"no schedule file at '{path}'"])
-    doc = load_yaml(path)
-    reg = registry_for(path.parent)
-    if isinstance(doc, dict) and "name" in doc:
-        reg.add("schedule", doc, path)
+    doc, reg, _ = load_document("schedule", path)
     problems = validate("schedule", doc, reg)
     if problems:
         raise ScheduleError(problems)
@@ -218,40 +214,25 @@ def data_files(target: Path) -> list[Path]:
     """The Parquet files a GraphSpec or layout draws from, as its files name them."""
     from forgegraph.graph import data_path
 
-    def of_graphspec(path: Path) -> list[Path]:
-        doc = load_yaml(path)
-        reg = registry_for(path.parent)
-        if isinstance(doc, dict) and "name" in doc:
-            reg.add("graphspec", doc, path)
-        found = data_path(doc, reg, path.parent)
-        return [found.resolve()] if found is not None else []
+    found = [data_path(doc, reg, folder) for doc, reg, folder in _graphspecs(target)]
+    return list(dict.fromkeys(f.resolve() for f in found if f is not None))
 
+
+def _graphspecs(target: Path) -> list[tuple[Any, Registry, Path]]:
+    """The GraphSpecs a target draws, as its render reads them: itself, or a layout's tiles."""
     if not _is_layout(target):
-        return of_graphspec(target)
-    from forgegraph.layouts import _load, _tile_files
+        return [load_document("graphspec", target)]
+    from forgegraph.layouts import tile_documents
 
-    doc, reg, folder = _load(target, None)
-    files, _ = _tile_files(doc, reg, folder)
-    found = [p for tab in files.values() for path in tab.values() for p in of_graphspec(path)]
-    return list(dict.fromkeys(found))
+    return tile_documents(target)
 
 
 def _date_order(target: Path) -> str:
     """The theme's date order for the footnote: the GraphSpec's, or a layout's first tile's."""
-    path = target
-    if _is_layout(target):
-        from forgegraph.layouts import _load, _tile_files
-
-        doc, reg, folder = _load(target, None)
-        files, _ = _tile_files(doc, reg, folder)
-        first = next((p for tab in files.values() for p in tab.values()), None)
-        if first is None:
-            return "month_day"
-        path = first
-    doc = load_yaml(path)
-    reg = registry_for(path.parent)
-    if isinstance(doc, dict) and "name" in doc:
-        reg.add("graphspec", doc, path)
+    found = _graphspecs(target)
+    if not found:
+        return "month_day"
+    doc, reg, _ = found[0]
     try:
         return str(explain(doc, reg)["theme"]["axis.tick.label.date_order"].value)
     except Exception:  # the render reports what's wrong with the GraphSpec

@@ -93,7 +93,7 @@ def _save(run: Run, path: Path) -> None:
     path.write_text(json.dumps(asdict(run) | {"passed": run.passed}, indent=1), encoding="utf-8")
 
 
-def _load(path: Path) -> Run:
+def load_layout(path: Path) -> Run:
     data = json.loads(path.read_text(encoding="utf-8"))
     data.pop("passed", None)
     data["checks"] = [Check(**c) for c in data["checks"]]
@@ -228,8 +228,7 @@ def _graphspecs(ws: Path) -> list[Path]:
 
 
 def _resolved(spec: Path) -> dict[str, dict[str, Any]]:
-    from forgegraph.spec.documents import explain, registry_for
-    from forgegraph.spec.documents import load as load_yaml
+    from forgegraph.spec.documents import explain, load_yaml, registry_for
 
     doc = load_yaml(spec)
     reg = registry_for(spec.parent).copy()
@@ -270,8 +269,7 @@ def _drawn(final: Path) -> tuple[Any, pd.DataFrame | None, str]:
     """The final GraphSpec drawn, its Parquet data, and why either failed."""
     import forgegraph as fg
     from forgegraph.graph import data_path
-    from forgegraph.spec.documents import load as load_yaml
-    from forgegraph.spec.documents import registry_for
+    from forgegraph.spec.documents import load_yaml, registry_for
 
     try:
         graph = fg.render(final)
@@ -292,7 +290,7 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     """The final layout: it draws, its tabs and tiles, a spanning tile, a blank cell, its
     column widths, and its lint."""
     import forgegraph as fg
-    from forgegraph.layouts import _load
+    from forgegraph.layouts import load_layout
     from forgegraph.spec.layout import BLANK, tabs
 
     layouts = _named(ws, ".layout.yaml")
@@ -301,7 +299,7 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
     final = layouts[-1]
     try:
         drawn = fg.layout(final)
-        doc, reg, _ = _load(final, None)
+        doc, reg, _ = load_layout(final, None)
         listed = tabs(doc, reg)
     except Exception as e:
         return [Check("layout draws", False, f"{final.name}: {type(e).__name__}: {e}")]
@@ -428,8 +426,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         ok = bool(specs) and bool(images)
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.documents import load as load_yaml
-            from forgegraph.spec.documents import registry_for
+            from forgegraph.spec.documents import load_yaml, registry_for
 
             try:
                 data = data_path(
@@ -585,8 +582,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         evidence, ok = "no GraphSpec in the project", False
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.documents import load as load_yaml
-            from forgegraph.spec.documents import registry_for
+            from forgegraph.spec.documents import load_yaml, registry_for
 
             final = specs[-1]
             where = data_path(load_yaml(final), registry_for(final.parent), final.parent)
@@ -864,7 +860,7 @@ def main() -> None:
         for c, m, n in jobs:
             saved = _result_path(args.out, config, m, c["id"], n)
             if saved.is_file():
-                kept = _load(saved)
+                kept = load_layout(saved)
                 if not kept.error.startswith("runner:"):  # the runner's own failures run again
                     done[c["id"], m or "", n] = kept
     todo = [(c, m, n) for c, m, n in jobs if (c["id"], m or "", n) not in done]
@@ -894,7 +890,7 @@ def _regrade(case: dict[str, Any], config: str, number: int, out: Path, model: s
     """A finished run graded again from its folder and transcripts, with the current checks;
     one that ended in an error stays as it was."""
     saved = _result_path(out, config, model, case["id"], number)
-    run = _load(saved)
+    run = load_layout(saved)
     if run.error:
         return run
     ws = saved.with_name(f"run-{number}")

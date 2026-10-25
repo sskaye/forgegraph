@@ -94,3 +94,20 @@ def png(graph: fg.Graph, dpi: int = 50) -> bytes:
     with isolated(graph.style):
         graph.figure.savefig(buffer, format="png", dpi=dpi, metadata={KEY: None})  # no record
     return buffer.getvalue()
+
+
+def painted_draws(monkeypatch: Any) -> list[Any]:
+    """Every drawing of a ForgeGraph figure that paints pixels, as it happens. A draw made
+    only to measure has its painting switched off: matplotlib puts no-ops on the renderer."""
+    from forgegraph.drawing.figure import GraphFigure
+
+    painted: list[Any] = []
+    original = GraphFigure.draw
+
+    def counting_draw(self: Any, renderer: Any) -> None:
+        if "draw_path" not in vars(renderer):
+            painted.append(renderer)
+        original(self, renderer)
+
+    monkeypatch.setattr(GraphFigure, "draw", counting_draw)
+    return painted

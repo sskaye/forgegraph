@@ -20,7 +20,7 @@ from PIL import Image
 
 from forgegraph import __version__
 from forgegraph.catalog import forgemark
-from forgegraph.catalog.examples import NONSTANDARD, Change, draw
+from forgegraph.catalog.examples import NONSTANDARD, Change, draw, image
 from forgegraph.catalog.files import CatalogError, read
 from forgegraph.catalog.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.graph import Graph, SpecError
@@ -87,7 +87,7 @@ def current(path: Path, pack: Pack | None = None) -> bool:
 
 
 def _png(graph: Graph) -> bytes:
-    raw = Image.open(io.BytesIO(png(graph))).convert("RGB")
+    raw = image(graph, CSS_DPI * DENSITY).convert("RGB")
     small = raw.quantize(COLORS, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     buffer = io.BytesIO()
     small.save(buffer, "PNG", optimize=True)

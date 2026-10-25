@@ -103,3 +103,31 @@ def test_dropped_rows():
     g = render()  # the example data has one missing reading
     [issue] = [i for i in g.issues if i.check == "dropped-rows"]
     assert issue.message == "1 row left out: missing x or y"
+
+
+def test_a_key_over_markers_is_found_without_testing_points_one_by_one(monkeypatch):
+    """The key-over-data check tests a line's markers against the key all at once."""
+    from matplotlib.transforms import BboxBase
+
+    from forgegraph.drawing import lint
+
+    g = render({"legend.method": "key"}, data=_clean_data())
+    [key] = keys(g.axes)
+    box = key.bbox()
+    to_data = g.axes.transData.inverted()
+
+    def marker_at(x: float, y: float):
+        ((px, py),) = to_data.transform([(x, y)])
+        return g.axes.plot([px], [py], linestyle="none", marker="o")[0]
+
+    tested = []
+    contains = BboxBase.contains
+    monkeypatch.setattr(
+        BboxBase, "contains", lambda self, x, y: tested.append(1) or contains(self, x, y)
+    )
+    covered = marker_at((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)
+    assert [i.check for i in lint._key_over_data(g.axes)] == ["key-over-data"]
+    covered.remove()
+    marker_at(box.x1 + 3 * box.width, box.y1 + 3 * box.height)
+    assert lint._key_over_data(g.axes) == []
+    assert tested == []

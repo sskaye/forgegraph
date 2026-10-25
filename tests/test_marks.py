@@ -368,3 +368,28 @@ def test_side_by_side_bars_are_drawn_centred_on_their_tick_to_the_pixel(base, dp
     )
     offsets = _drawn_offsets(g, base, dpi)
     assert len(offsets) == 2 and all(abs(o) < 0.01 for o in offsets), offsets
+
+
+def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
+    """Each point moves by its place's offset, looked up once per distinct place."""
+    from forgegraph.drawing import marks
+
+    g = graph()
+    ax = g.axes
+    rng = np.random.default_rng(1)
+    places = np.array([0.0, 1.0, 2.0, 1.0 + 1e-12, np.nan])  # 1 + 1e-12 is place 1
+    xs = rng.choice(places, 5000)
+    points = np.c_[xs, rng.uniform(0, 100, 5000)]
+    shifts = {0.0: -6.0, 1.0: 4.5}
+    transform = marks.PlaceShift(ax, "x", shifts)
+    looked_up = []
+    key = marks.key
+    monkeypatch.setattr(marks, "key", lambda p: looked_up.append(p) or key(p))
+    moved = transform.transform(points)
+    monkeypatch.setattr(marks, "key", key)
+    px = g.figure.dpi / 72
+    plain = ax.transData.transform(points)
+    expected = plain.copy()
+    expected[:, 0] += [shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in xs]
+    assert np.array_equal(moved, expected, equal_nan=True)
+    assert len(looked_up) <= len(places)

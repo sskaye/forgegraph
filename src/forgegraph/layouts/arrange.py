@@ -29,6 +29,7 @@ from matplotlib.patches import Rectangle
 from forgegraph.drawing import spacing
 from forgegraph.drawing.figure import MARGIN_IN, PASSES, LayoutError, visible_extent
 from forgegraph.drawing.style import Style, isolated, unset
+from forgegraph.drawing.text import measure
 from forgegraph.spec.layout import BLANK, Area
 
 Room = tuple[float, float, float, float]  # left, right, bottom, top, in inches
@@ -89,7 +90,7 @@ def _measure(fig: Figure, placed: Sequence[Placed]) -> dict[str, Room]:
     for p in placed:
         with isolated(p.style):
             spacing.apply(p.ax, p.style)
-    fig.canvas.draw()
+    measure(fig)
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     dpi = fig.dpi
     rooms = {}

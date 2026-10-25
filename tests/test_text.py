@@ -138,3 +138,101 @@ def test_a_framed_key_has_the_same_padding_on_every_side():
     expected = key.style.pt("legend.key.padding") * PT
     for pad in pads:
         assert pad == pytest.approx(expected, abs=0.6 * PT)
+
+
+def _fresh_layout(string: str, key: tuple, align: str):
+    """text._layout's measurement on a figure of its own, as it was first written."""
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    from matplotlib.font_manager import FontProperties
+
+    family, size, weight, style = key
+    prop = FontProperties(family=list(family), size=size, weight=weight, style=style)
+    fig = Figure(figsize=(2, 2), dpi=72 * text._FINE)
+    FigureCanvasAgg(fig)
+    with matplotlib.rc_context({"text.hinting": "no_hinting"}):
+        artist = fig.text(
+            0, 0, string, fontproperties=prop, va="baseline", ha=align, transform=None
+        )
+        renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
+        extent = artist.get_window_extent(renderer)
+        _, lines, _ = artist._get_layout(renderer)  # type: ignore[attr-defined]
+    fine = text._FINE
+    placed = tuple((line, (x - extent.x0) / fine, y / fine) for line, _, (x, y) in lines)
+    return extent.y1 / fine, -extent.y0 / fine, extent.width / fine, placed
+
+
+@pytest.mark.parametrize("align", ["left", "center", "right"])
+@pytest.mark.parametrize(
+    ("family", "size", "weight"),
+    [("Source Sans 3", 12.0, "normal"), ("Roboto", 7.5, 700), ("IBM Plex Serif", 30.0, 300)],
+)
+def test_a_measurement_is_what_a_figure_of_its_own_gives(family, size, weight, align):
+    key = text._key(text.font(family, size, weight))
+    for string in ["Hg", "1.0", "", " ", "Wide line\nnarrow", "a\nbb\nccc", "$x^2$ mV", "45° ±1"]:
+        text._layout.cache_clear()
+        assert text._layout(string, key, align) == _fresh_layout(string, key, align), string
+
+
+def test_measuring_new_texts_makes_no_figure_each(monkeypatch):
+    made = []
+    figure = text.Figure
+
+    def counting(*args, **kwargs):
+        made.append(1)
+        return figure(*args, **kwargs)
+
+    monkeypatch.setattr(text, "Figure", counting)
+    text._layout.cache_clear()
+    prop = _font(11.0)
+    for i in range(5):
+        text.box(f"label {i}", prop)
+    assert len(made) <= 1
+
+
+def _probe(string: str, prop, dpi: float) -> tuple[float, float]:
+    """A tick label's extent as the axes measured it: a Text of its own on a figure."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+    from matplotlib.text import Text
+
+    fig = Figure(dpi=dpi)
+    FigureCanvasAgg(fig)
+    probe = Text(text=string, fontproperties=prop)
+    probe.set_figure(fig)
+    box = probe.get_window_extent()
+    return box.width, box.height
+
+
+@pytest.mark.parametrize("dpi", [100.0, 300.0, 600.0])
+def test_a_labels_extent_is_a_probes(dpi):
+    g = render()
+    prop = _font(9.5)
+    with isolated(g.style):
+        for string in [
+            "0.25",
+            "1,000",
+            "\u22123",  # a minus sign, as tick labels write it
+            "$10^{3}$",
+            "$\\mathregular{10^{-2}}$",
+            "Jan\n2026",
+            "",
+        ]:
+            assert text.extent(string, prop, dpi) == _probe(string, prop, dpi), string
+
+
+def test_measuring_a_label_again_lays_nothing_out(monkeypatch):
+    from matplotlib.text import Text
+
+    g = render()
+    made = []
+    init = Text.__init__
+    monkeypatch.setattr(
+        Text, "__init__", lambda self, *a, **k: made.append(1) or init(self, *a, **k)
+    )
+    with isolated(g.style):
+        text.extent("12.5", _font(8.25), 123.0)
+        made.clear()
+        text.extent("12.5", _font(8.25), 123.0)
+    assert made == []

@@ -13,7 +13,7 @@ import pytest
 from matplotlib.lines import Line2D
 from pack_helpers import allow, write_pack
 from PIL import Image
-from render_helpers import BASE, polarization
+from render_helpers import BASE, painted_draws, polarization
 from ruamel.yaml import YAML
 from typer.testing import CliRunner
 
@@ -119,6 +119,29 @@ def problems(path) -> list[str]:
     with pytest.raises(fg.SpecError) as e:
         fg.layout(path)
     return e.value.problems
+
+
+def test_only_the_last_draw_of_a_tab_paints(project, monkeypatch):
+    painted = painted_draws(monkeypatch)
+    fg.layout(
+        write_layout(
+            project, {"Figure": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+        )
+    )
+    assert len(painted) == 1
+
+
+def test_one_save_inspects_each_tab_once_whatever_it_writes(project, monkeypatch):
+    tabs = {"A": tab([["volt"]], volt="volt.yaml"), "B": tab([["power"]], power="power.yaml")}
+    layout = fg.layout(write_layout(project, tabs, fmt="forgegraph_base/base_layout_format"))
+    assert not layout.nonstandard  # standard tabs are the ones inspected
+    hashes = []
+    for t in layout.tabs:
+        pixels = t._pixels
+        monkeypatch.setattr(t, "_pixels", lambda p=pixels: hashes.append(1) or p())
+    for kind in ("html", "pdf", "png"):
+        layout.save(project / f"fig.{kind}")
+    assert len(hashes) == 3 * len(layout.tabs)  # once per tab, for each save
 
 
 # The grid

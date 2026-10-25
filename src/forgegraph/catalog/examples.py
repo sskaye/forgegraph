@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
 from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, data_path, render
@@ -105,6 +107,16 @@ def png(graph: Graph, dpi: float) -> bytes:
             buffer, format="png", dpi=dpi, metadata={"Software": None, export.KEY: None}
         )
     return buffer.getvalue()
+
+
+def image(graph: Graph, dpi: float) -> Image.Image:
+    """The graph drawn at dpi, as the pixels png() would encode: savefig's raw buffer, as
+    many pixels across and down as Agg's renderer has (the figure's size, truncated)."""
+    buffer = io.BytesIO()
+    with isolated(graph.style):
+        graph.figure.savefig(buffer, format="raw", dpi=dpi)
+    width, height = (int(v * dpi) for v in graph.figure.get_size_inches())
+    return Image.frombuffer("RGBA", (width, height), buffer.getvalue(), "raw", "RGBA", 0, 1)
 
 
 @dataclass(frozen=True)

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from matplotlib.axes import Axes
@@ -35,6 +36,7 @@ from forgegraph.drawing.marks import Bars
 from forgegraph.drawing.style import Style
 
 DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)]
+REACHES = (1.0, 1.6, 2.4, 3.4)  # a label's distance from its anchor, in offsets
 SERIES_LABEL = "forgegraph-series-label"
 
 
@@ -75,6 +77,65 @@ def _rect_dist(points: np.ndarray, box: tuple[float, float, float, float]) -> fl
     return float(np.min(np.hypot(dx, dy)))
 
 
+_CHUNK = 64  # candidate boxes measured together
+
+
+def _near(points: np.ndarray, boxes: np.ndarray, reach: float) -> np.ndarray:
+    """Each box's distance from its nearest point, where that's at most reach, else inf:
+    _rect_dist's exact value within reach. Only points that could be within reach of a
+    group of boxes are measured against it."""
+    out = np.full(len(boxes), np.inf)
+    if len(points) == 0 or len(boxes) == 0:
+        return out
+    pts = points[np.argsort(points[:, 0], kind="stable")]
+    margin = reach * (1 + 1e-9) + 1e-9  # a little more, for rounding at the window's edge
+    order = np.argsort(boxes[:, 0], kind="stable")
+    for start in range(0, len(boxes), _CHUNK):
+        chunk = order[start : start + _CHUNK]
+        b = boxes[chunk]
+        near = pts
+        if np.isfinite(margin):
+            lo = np.searchsorted(pts[:, 0], b[:, 0].min() - margin, side="left")
+            hi = np.searchsorted(pts[:, 0], b[:, 2].max() + margin, side="right")
+            near = pts[lo:hi]
+            near = near[
+                (near[:, 1] >= b[:, 1].min() - margin) & (near[:, 1] <= b[:, 3].max() + margin)
+            ]
+        if len(near) == 0:
+            continue
+        x0, y0, x1, y1 = (b[:, i : i + 1] for i in range(4))
+        dx = np.maximum(np.maximum(x0 - near[:, 0], 0), near[:, 0] - x1)
+        dy = np.maximum(np.maximum(y0 - near[:, 1], 0), near[:, 1] - y1)
+        d = np.min(np.hypot(dx, dy), axis=1)
+        out[chunk] = np.where(d <= reach, d, np.inf)
+    return out
+
+
+def _candidate_boxes(
+    anchors: np.ndarray, steps: np.ndarray, offset: float, w: float, h: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Every candidate box around each anchor point, in order (anchor, then step), and each
+    one's end preference: how far its anchor is from the nearer end of the series."""
+    dx, dy, reach = (steps[:, i][None, :] for i in range(3))
+    ax_, ay = anchors[:, 0][:, None], anchors[:, 1][:, None]
+    cx = np.where(dx != 0, ax_ + dx * (reach * offset + w / 2), ax_)
+    cy = np.where(dy != 0, ay + dy * (reach * offset + h / 2), ay)
+    boxes = np.stack([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2], axis=-1).reshape(-1, 4)
+    t = np.arange(len(anchors)) / max(1, len(anchors) - 1)
+    ends = np.repeat(np.minimum(t, 1 - t), len(steps))
+    return boxes, ends
+
+
+def _overlaps(boxes: np.ndarray, other: Any, pad: float) -> np.ndarray:
+    """_overlap for many boxes against one."""
+    return ~(
+        (boxes[:, 2] + pad <= other[0])
+        | (other[2] + pad <= boxes[:, 0])
+        | (boxes[:, 3] + pad <= other[1])
+        | (other[3] + pad <= boxes[:, 1])
+    )
+
+
 def _overlap(a: tuple, b: tuple, pad: float) -> bool:
     return not (
         a[2] + pad <= b[0] or b[2] + pad <= a[0] or a[3] + pad <= b[1] or b[3] + pad <= a[1]
@@ -110,9 +171,9 @@ def _bar_samples(box: Bbox) -> np.ndarray:
 
 def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = True) -> bool:
     """Place one label per group inside the plot (rules 1-4). True if every label fits; with
-    draw False, only find out."""
+    draw False, only find out. Everything it reads is worked out from the axes as they are
+    now, so it draws nothing."""
     fig = ax.figure
-    fig.canvas.draw()  # type: ignore[union-attr]
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     px = fig.dpi / 72.0
     size = style.pt("legend.label.size")
@@ -143,42 +204,42 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
         if t.get_visible() and t.get_text() and t.get_gid() not in (SERIES_LABEL, KEY)
     ]
 
+    steps = np.array(
+        [(dx, dy, reach) for (dx, dy), reach in itertools.product(DIRECTIONS, REACHES)]
+    )
     candidates: list[list[_Candidate]] = []
     for k, (pts, (w, h)) in enumerate(zip(own_dense, sizes, strict=True)):
-        found: list[_Candidate] = []
         pts = pts[np.isfinite(pts).all(axis=1)]
         if len(pts) == 0:
             return False
         idx = np.unique(np.linspace(0, len(pts) - 1, 60).round().astype(int))
-        for j, i in enumerate(idx):
-            p = pts[i]
-            t = j / max(1, len(idx) - 1)
-            for (dx, dy), reach in itertools.product(DIRECTIONS, (1.0, 1.6, 2.4, 3.4)):
-                cx = p[0] + dx * (reach * offset + w / 2) if dx else p[0]
-                cy = p[1] + dy * (reach * offset + h / 2) if dy else p[1]
-                cand = (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
-                if (
-                    cand[0] < inner[0]
-                    or cand[1] < inner[1]
-                    or cand[2] > inner[2]
-                    or cand[3] > inner[3]
-                ):
-                    continue  # rule 1
-                if _rect_dist(every_line, cand) < line_clear:
-                    continue  # rule 3: lines
-                if _rect_dist(every_marker, cand) < marker_clear:
-                    continue  # rule 3: markers
-                if any(_overlap(cand, tuple(o), clearance) for o in texts):
-                    continue  # rule 3: other text
-                d_own = _rect_dist(own_dense[k], cand)
-                others = [_rect_dist(d, cand) for m, d in enumerate(own_dense) if m != k]
-                if others and d_own > association * min(others):
-                    continue  # rule 2: its own series must be the nearest
-                if d_own > 1.5 * h:
-                    continue  # rule 2: close by
-                end_pref = min(t, 1 - t)
-                clarity = min(min(others), 3 * h) if others else 3 * h
-                found.append(_Candidate(cand, (d_own - 0.7 * clarity) / px + 4 * end_pref))
+        boxes, ends = _candidate_boxes(pts[idx], steps, offset, w, h)
+        keep = (  # rule 1
+            (boxes[:, 0] >= inner[0])
+            & (boxes[:, 1] >= inner[1])
+            & (boxes[:, 2] <= inner[2])
+            & (boxes[:, 3] <= inner[3])
+        )
+        boxes, ends = boxes[keep], ends[keep]
+        keep = (_near(every_line, boxes, line_clear) >= line_clear) & (  # rule 3: lines
+            _near(every_marker, boxes, marker_clear) >= marker_clear  # rule 3: markers
+        )
+        for o in texts:  # rule 3: other text
+            keep &= ~_overlaps(boxes, o, clearance)
+        boxes, ends = boxes[keep], ends[keep]
+        d_own = _near(own_dense[k], boxes, 1.5 * h)  # rule 2: close by (inf beyond)
+        others = [d for m, d in enumerate(own_dense) if m != k]
+        if others:
+            # beyond this, clarity is 3h and the association test passes either way
+            reach = max(3 * h, 1.5 * h / association) if association > 0 else np.inf
+            nearest = np.min([_near(d, boxes, reach) for d in others], axis=0)
+            keep = (d_own <= 1.5 * h) & ~(d_own > association * nearest)  # rule 2
+            clarity = np.minimum(nearest, 3 * h)
+        else:
+            keep = d_own <= 1.5 * h
+            clarity = np.full(len(boxes), 3 * h)
+        scores = (d_own - 0.7 * clarity) / px + 4 * ends
+        found = [_Candidate(tuple(b), sc) for b, sc in zip(boxes[keep], scores[keep], strict=True)]
         found.sort(key=lambda c: c.score)
         candidates.append(found[:40])
     if any(not c for c in candidates):
@@ -260,7 +321,7 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
 
 
 def _clear_of_data(ax: Axes, key: Key, lines_shown: bool) -> bool:
-    ax.figure.canvas.draw()  # type: ignore[union-attr]
+    text.measure(ax.figure)
     return box_clear(ax, key.bbox(), lines_shown)
 
 

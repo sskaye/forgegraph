@@ -20,7 +20,8 @@ from typer.testing import CliRunner
 
 import forgegraph as fg
 from forgegraph.cli import app
-from forgegraph.drawing.figure import WATERMARK, visible_extent
+from forgegraph.drawing.figure import WATERMARK
+from forgegraph.drawing.layout import visible_extent
 from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.layout import slug
 from forgegraph.spec.registry import builtin

@@ -38,8 +38,9 @@ from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import text
-from forgegraph.drawing.figure import WATERMARK, texts_of
+from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.layout import texts_of
 
 MIN_TEXT_PT = 6.0  # the smallest text journals accept in a printed figure
 OVERLAP_PX = 0.5  # letters closer than this count as touching, not overlapping

@@ -4,8 +4,8 @@ A layout file (spec/layout.py) names a format and a grid of GraphSpec files for 
 Each tile is drawn as its GraphSpec says, in its own theme, from its own data, into an Axes
 of the tab's figure; the layout's format replaces each tile's own, so every tile is drawn at
 the layout's base size, and the figure is the format's size. The tiles are then laid out
-together (layouts/arrange.py), so their plot boxes line up, with the layout's separators
-between them.
+together (drawing/layout.py), so their plot boxes line up, with the layout's separators
+between them (layouts/separators.py).
 
 A rendered tab's figure checks itself as a graph's does (drawing/figure.py): drawing or saving
 it first checks whether it's still as ForgeGraph left it, and watermarks every tile if not.
@@ -26,22 +26,21 @@ from matplotlib.figure import Figure
 
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing.errors import DrawError, LayoutError
-from forgegraph.drawing.figure import (
-    MARGIN_IN,
-    GraphCanvas,
-    GraphFigure,
-    TileAxes,
-    add_footnote,
-    footnote_room,
-    inches,
-    place_footnote,
-    watermark,
-)
+from forgegraph.drawing.figure import GraphFigure, TileAxes, canvas_figure, inches, watermark
 from forgegraph.drawing.key import keys
+from forgegraph.drawing.layout import (
+    MARGIN_IN,
+    Grid,
+    Placed,
+    add_footnote,
+    arrange,
+    footnote_room,
+    place_footnote,
+)
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.graph import PLACE_PASSES, Graph, Prepared, prepare, render
-from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
+from forgegraph.layouts.separators import apply_separators, backgrounds
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
@@ -481,8 +480,7 @@ def _draw_tab(
     first = next(iter(prepared.values()))
     places = tab.places()
     with isolated(first.style), lint.font_messages() as font_problems:
-        fig = GraphFigure(figsize=(width or 6.0, height or 4.0))
-        GraphCanvas(fig)
+        fig = canvas_figure(width or 6.0, height or 4.0)
         placed, drawn = [], {}
         for name, p in prepared.items():
             with isolated(p.style):

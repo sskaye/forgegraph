@@ -1,10 +1,4 @@
-"""Figures sized by the format, laid out by what's visible.
-
-Width and height are in mm. ForgeGraph lays the figure out itself rather than with
-matplotlib's layout engines, which space text by its box (see forgegraph.drawing.text): the
-plot box is placed so that everything drawn, measured to its letters and lines, sits MARGIN
-from each edge of the figure. With both sizes given, the plot box takes the space left; with
-one auto, the plot box keeps the theme's plot_area.aspect and the figure is fitted around it.
+"""ForgeGraph's figures: sized by the format, laid out by drawing.layout.
 
 The figure is a GraphFigure on a GraphCanvas, so that whatever draws or saves it, ForgeGraph
 or matplotlib directly (`figure.savefig`, a notebook), first checks whether it's still as
@@ -24,24 +18,17 @@ from matplotlib.figure import Figure
 from matplotlib.patches import PathPatch
 from matplotlib.text import Text
 from matplotlib.textpath import TextPath
-from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
+from matplotlib.transforms import Affine2D, ScaledTranslation
 
-from forgegraph.drawing import export, spacing, text
-from forgegraph.drawing.errors import LayoutError
-from forgegraph.drawing.key import keys
-from forgegraph.drawing.markup import literal
+from forgegraph.drawing import export
 from forgegraph.drawing.style import MM_PER_INCH, Style, isolated
 
-MARGIN_IN = 0.04  # space kept between what's drawn and the figure's edges
 WATERMARK = "forgegraph-watermark"
-FOOTNOTE = "forgegraph-footnote"
 
 
 def inches(value: object) -> float | None:
+    """A format's size, in mm or auto, in inches (None for auto)."""
     return None if value == "auto" else float(value) / MM_PER_INCH  # type: ignore[arg-type]
-
-
-PASSES = 6  # layout passes; if none settles, the last two passes' most room is used
 
 
 class GraphFigure(Figure):
@@ -116,184 +103,24 @@ class GraphCanvas(FigureCanvasAgg):
             return super().print_figure(filename, *args, **kwargs)
 
 
+def canvas_figure(width: float, height: float) -> GraphFigure:
+    """A GraphFigure on its GraphCanvas, this size in inches until it's laid out."""
+    fig = GraphFigure(figsize=(width, height))
+    GraphCanvas(fig)  # without pyplot there's no canvas, and text can't be measured
+    return fig
+
+
 def new_figure(style: Style) -> tuple[GraphFigure, Axes]:
-    """A figure with a drawing canvas and one Axes, sized provisionally until `layout()`."""
+    """A figure with a drawing canvas and one Axes, sized provisionally until it's laid out
+    (drawing.layout.layout)."""
     width = inches(style.format["figure.width"])
     height = inches(style.format["figure.height"])
     aspect = float(style.theme["plot_area.aspect"])
     w = width if width is not None else height * aspect  # type: ignore[operator]
     h = height if height is not None else w / aspect
-    fig = GraphFigure(figsize=(w, h))
-    GraphCanvas(fig)  # without pyplot there's no canvas, and text can't be measured
+    fig = canvas_figure(w, h)
     ax = fig.add_axes((0.2, 0.2, 0.6, 0.6))
     return fig, ax
-
-
-def tick_marks(ax: Axes, renderer: Any) -> list[Bbox]:
-    """The Axes' tick marks in view, in display pixels."""
-    out = []
-    for axis in (ax.xaxis, ax.yaxis):
-        lo, hi = sorted(axis.get_view_interval())
-        for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()]:
-            if not lo <= tick.get_loc() <= hi:
-                continue
-            for line in (tick.tick1line, tick.tick2line):
-                if line.get_visible():
-                    out.append(line.get_window_extent(renderer))
-    return out
-
-
-def texts_of(ax: Axes) -> list[Text]:
-    """The Axes' titles, its texts and its tick labels in view."""
-    out: list[Text] = [ax.title, ax.xaxis.label, ax.yaxis.label, *ax.texts]
-    out += [ax.xaxis.get_offset_text(), ax.yaxis.get_offset_text()]  # e.g. a date axis's year
-    for axis in (ax.xaxis, ax.yaxis):
-        lo, hi = sorted(axis.get_view_interval())
-        for tick in axis.get_major_ticks():
-            if lo <= tick.get_loc() <= hi:
-                out += [tick.label1, tick.label2]
-    return out
-
-
-def visible_extent(ax: Axes, renderer: Any) -> Bbox:
-    """Everything drawn for an Axes and any Axes inside it, measured to letters and lines, in
-    display pixels. The watermark, drawn over the plot box, isn't included."""
-    boxes = []
-    for each in spacing.axes_family(ax):
-        boxes.append(each.bbox)
-        for side, spine in each.spines.items():  # a box line is centred on the box's edge
-            if spine.get_visible():
-                half = spine.get_linewidth() / 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-                grow = {
-                    "left": (half, 0, 0, 0),
-                    "right": (0, 0, half, 0),
-                    "bottom": (0, half, 0, 0),
-                    "top": (0, 0, 0, half),
-                }.get(side, (half, half, half, half))  # a color bar's outline: every side
-                b = each.bbox
-                boxes.append(
-                    Bbox.from_extents(
-                        b.x0 - grow[0], b.y0 - grow[1], b.x1 + grow[2], b.y1 + grow[3]
-                    )
-                )
-        boxes += tick_marks(each, renderer)
-        for t in texts_of(each):
-            if t.get_visible() and t.get_text().strip() and t.get_gid() != WATERMARK:
-                boxes.append(text.footprint(t, renderer))
-        boxes += [k.bbox() for k in keys(each) if k.outside]  # its frame, drawn or not
-    return Bbox.union([b for b in boxes if b.width > 0 or b.height > 0])
-
-
-def layout(fig: Figure, ax: Axes, style: Style) -> None:
-    """Size the figure and place the plot box from what's drawn around it. Each pass measures
-    the room needed on each side and lays out again; it has settled when a pass changes the
-    figure's size by under 0.001 in and moves the box by under 0.0001 of the figure. Tick
-    labels can keep it from settling, alternating between two states (a taller box gets more,
-    wider labels, which shrink the box again), so after PASSES unsettled passes it lays out
-    once more with, on each side, the most room either of the last two passes needed: both
-    states' labels fit. Earlier passes, made while the figure was still far from its size,
-    don't count."""
-    width = inches(style.format["figure.width"])
-    height = inches(style.format["figure.height"])
-    aspect = float(style.theme["plot_area.aspect"])
-    last = both = (0.0, 0.0, 0.0, 0.0)
-    for _ in range(PASSES):
-        spacing.apply(ax, style)
-        text.measure(fig)
-        renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
-        dpi = fig.dpi
-        extent, box = visible_extent(ax, renderer), ax.bbox
-        room = (
-            (box.x0 - extent.x0) / dpi,
-            (extent.x1 - box.x1) / dpi,
-            (box.y0 - extent.y0) / dpi + footnote_room(fig),
-            (extent.y1 - box.y1) / dpi,
-        )
-        if _place(fig, ax, room, width, height, aspect):
-            break
-        both, last = tuple(max(a, b) for a, b in zip(last, room, strict=True)), room
-    else:
-        _place(fig, ax, both, width, height, aspect)
-    spacing.apply(ax, style)
-    place_footnote(fig, MARGIN_IN, MARGIN_IN)
-
-
-def add_footnote(fig: Figure, words: str, style: Style) -> Text:
-    """The figure's footnote, in the theme's footnote look; layout places it."""
-    prop = style.font("footnote.size", "font.weight")
-    note = fig.text(
-        0,
-        0,
-        literal(words),
-        fontproperties=prop,
-        color=style.color("footnote.color"),
-        ha="right",
-        va="baseline",
-        gid=FOOTNOTE,
-    )
-    note.gap = style.pt("footnote.gap")  # type: ignore[attr-defined]
-    fig.footnote = note  # type: ignore[attr-defined]
-    return note
-
-
-def footnote_room(fig: Figure) -> float:
-    """The room a figure's footnote needs below everything else, in inches: its gap and its
-    letters."""
-    note = getattr(fig, "footnote", None)
-    if note is None:
-        return 0.0
-    e = text.edges(note.get_text(), note.get_fontproperties())
-    return (float(note.gap) + e.top + e.bottom) / 72
-
-
-def place_footnote(fig: Figure, right: float, bottom: float) -> None:
-    """Put the footnote's letters `right` and `bottom` inches from the figure's bottom right."""
-    note = getattr(fig, "footnote", None)
-    if note is None:
-        return
-    w, h = fig.get_size_inches()
-    e = text.edges(note.get_text(), note.get_fontproperties())
-    cut = (e.advance - e.right) / 72  # its box reaches past its last letter by this much
-    note.set_position((1 - (right - cut) / w, (bottom + e.bottom / 72) / h))
-
-
-def _place(
-    fig: Figure,
-    ax: Axes,
-    room: tuple[float, ...],
-    width: float | None,
-    height: float | None,
-    aspect: float,
-) -> bool:
-    """Size the figure and place the plot box with this room (left, right, bottom, top, in
-    inches) around it. Returns whether nothing moved: the layout has settled."""
-    left, right, bottom, top = room
-    around_w, around_h = left + right + 2 * MARGIN_IN, bottom + top + 2 * MARGIN_IN
-    if width is not None:
-        box_w = width - around_w
-        box_h = height - around_h if height is not None else box_w / aspect
-    else:
-        assert height is not None
-        box_h = height - around_h
-        box_w = box_h * aspect
-    if box_w <= 0 or box_h <= 0:
-        raise LayoutError(
-            "size: too small for the titles, tick labels and keys around the plot box; "
-            "make the format larger or its base font smaller"
-        )
-    fig_w = width if width is not None else box_w + around_w
-    fig_h = height if height is not None else box_h + around_h
-    position = (
-        (left + MARGIN_IN) / fig_w,
-        (bottom + MARGIN_IN) / fig_h,
-        box_w / fig_w,
-        box_h / fig_h,
-    )
-    old_size, old_position = fig.get_size_inches(), ax.get_position().bounds
-    fig.set_size_inches(fig_w, fig_h)
-    ax.set_position(position)
-    moved = max(abs(a - b) for a, b in zip(old_position, position, strict=True))
-    return abs(old_size[0] - fig_w) < 1e-3 and abs(old_size[1] - fig_h) < 1e-3 and moved < 1e-4
 
 
 class Watermark(PathPatch):

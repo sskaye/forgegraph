@@ -16,13 +16,9 @@ from forgegraph.data import read_data
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.errors import LayoutError
-from forgegraph.drawing.figure import (
-    add_footnote,
-    layout,
-    new_figure,
-    watermark,
-)
+from forgegraph.drawing.figure import new_figure, watermark
 from forgegraph.drawing.key import keys
+from forgegraph.drawing.layout import add_footnote, layout
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts

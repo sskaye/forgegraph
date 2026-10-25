@@ -18,7 +18,7 @@ from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, needs_n
 from render_helpers import BASE
 
 import forgegraph as fg
-from forgegraph.drawing.figure import FOOTNOTE
+from forgegraph.drawing.layout import FOOTNOTE
 from forgegraph.drawing.page import STALE_ID
 from forgegraph.jobs import run as job_run
 from forgegraph.jobs import status as status_file

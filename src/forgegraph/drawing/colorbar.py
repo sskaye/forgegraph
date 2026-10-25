@@ -20,7 +20,8 @@ from matplotlib.colors import Colormap, Normalize
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
 from forgegraph.drawing import spacing, text
-from forgegraph.drawing.figure import WATERMARK, texts_of, tick_marks
+from forgegraph.drawing.figure import WATERMARK
+from forgegraph.drawing.layout import texts_of, tick_marks
 from forgegraph.drawing.style import Style
 from forgegraph.drawing.ticks import NiceTicks, minor_ticks
 

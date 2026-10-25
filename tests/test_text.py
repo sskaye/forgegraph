@@ -13,8 +13,8 @@ from PIL import Image
 from render_helpers import render
 
 from forgegraph.drawing import text
-from forgegraph.drawing.figure import MARGIN_IN
 from forgegraph.drawing.key import keys
+from forgegraph.drawing.layout import MARGIN_IN
 from forgegraph.drawing.style import isolated
 
 DPI = 600

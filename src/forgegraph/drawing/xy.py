@@ -23,9 +23,9 @@ from forgegraph.drawing import colorbar, layers, marks, text, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
-from forgegraph.drawing.figure import texts_of
 from forgegraph.drawing.key import KEY, Entry, keys
 from forgegraph.drawing.layers import Y_VALUE
+from forgegraph.drawing.layout import texts_of
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset

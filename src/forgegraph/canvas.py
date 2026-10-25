@@ -20,12 +20,8 @@ from matplotlib.figure import Figure
 
 from forgegraph.drawing import export
 from forgegraph.drawing.errors import LayoutError
-from forgegraph.drawing.figure import (
-    GraphFigure,
-    layout,
-    new_figure,
-    watermark,
-)
+from forgegraph.drawing.figure import GraphFigure, new_figure, watermark
+from forgegraph.drawing.layout import layout
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.drawn import Saved, SpecError
 from forgegraph.spec.access import name_problems, packs_used, use_fonts

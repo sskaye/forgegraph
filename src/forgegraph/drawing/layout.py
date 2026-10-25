@@ -1,18 +1,24 @@
-"""Placing a tab's tiles on its grid, so that their plot boxes line up.
+"""Laying a figure out by what's visible: one graph, or a layout's tab of tiles on its grid.
+
+Width and height are in mm. ForgeGraph lays the figure out itself rather than with
+matplotlib's layout engines, which space text by its box (see forgegraph.drawing.text). One
+graph is a grid of one tile (layout), MARGIN_IN from the figure's edges; a layout's tab is a
+grid of its tiles (arrange), so that their plot boxes line up.
 
 Each pass measures, for every tile, the room its titles, tick labels and keys need on each
-side of its plot box, to their letters (drawing.figure.visible_extent). A column's left margin
-is the most room any tile starting in it needs on its left; its right margin, the most any
-tile ending in it needs on its right; rows work the same way, top and bottom. Columns and rows
-are separated by the layout's gap. What's left of the format's width, after the margins and
-gaps, is shared among the columns' plot boxes by column_widths, and likewise for heights; a
-tile spanning several columns or rows runs across the margins and gaps inside it, so its plot
-box lines up with the ones beside it. With the format's height auto, each row is as tall as
-the tallest plot box its tiles' plot_area.aspect needs at their widths (a tile spanning rows
+side of its plot box, to their letters (visible_extent, room). A column's left margin is the
+most room any tile starting in it needs on its left; its right margin, the most any tile
+ending in it needs on its right; rows work the same way, top and bottom. Columns and rows are
+separated by the layout's gap. What's left of the format's width, after the margins and gaps,
+is shared among the columns' plot boxes by column_widths, and likewise for heights; a tile
+spanning several columns or rows runs across the margins and gaps inside it, so its plot box
+lines up with the ones beside it. With the format's height auto, each row is as tall as the
+tallest plot box its tiles' plot_area.aspect needs at their widths (a tile spanning rows
 shares what it lacks among them); width auto works the same way across columns. Tick labels
-change with the plot boxes' sizes, so the passes repeat until nothing moves, as for one graph
-(drawing.figure.layout). Tiles are never scaled: a figure too small for them is an error naming
-the tiles that don't fit.
+change with the plot boxes' sizes, so the passes repeat until nothing moves (arrange). Tiles
+are never scaled: a figure too small for them is an error naming the tiles that don't fit.
+
+A footnote is written small at the bottom right, below everything else.
 """
 
 from __future__ import annotations
@@ -25,15 +31,126 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
+from matplotlib.text import Text
+from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import spacing
+from forgegraph.drawing import spacing, text
 from forgegraph.drawing.errors import LayoutError
-from forgegraph.drawing.figure import MARGIN_IN, PASSES, visible_extent
-from forgegraph.drawing.style import Style, isolated, unset
-from forgegraph.drawing.text import measure
-from forgegraph.spec.layout import BLANK, Area
+from forgegraph.drawing.figure import WATERMARK, inches
+from forgegraph.drawing.key import keys
+from forgegraph.drawing.markup import literal
+from forgegraph.drawing.style import Style, isolated
+from forgegraph.spec.layout import Area
+
+MARGIN_IN = 0.04  # space kept between what's drawn and the figure's edges
+PASSES = 6  # layout passes; if none settles, the last two passes' most room is used
+FOOTNOTE = "forgegraph-footnote"
 
 Room = tuple[float, float, float, float]  # left, right, bottom, top, in inches
+
+
+def tick_marks(ax: Axes, renderer: Any) -> list[Bbox]:
+    """The Axes' tick marks in view, in display pixels."""
+    out = []
+    for axis in (ax.xaxis, ax.yaxis):
+        lo, hi = sorted(axis.get_view_interval())
+        for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()]:
+            if not lo <= tick.get_loc() <= hi:
+                continue
+            for line in (tick.tick1line, tick.tick2line):
+                if line.get_visible():
+                    out.append(line.get_window_extent(renderer))
+    return out
+
+
+def texts_of(ax: Axes) -> list[Text]:
+    """The Axes' titles, its texts and its tick labels in view."""
+    out: list[Text] = [ax.title, ax.xaxis.label, ax.yaxis.label, *ax.texts]
+    out += [ax.xaxis.get_offset_text(), ax.yaxis.get_offset_text()]  # e.g. a date axis's year
+    for axis in (ax.xaxis, ax.yaxis):
+        lo, hi = sorted(axis.get_view_interval())
+        for tick in axis.get_major_ticks():
+            if lo <= tick.get_loc() <= hi:
+                out += [tick.label1, tick.label2]
+    return out
+
+
+def visible_extent(ax: Axes, renderer: Any) -> Bbox:
+    """Everything drawn for an Axes and any Axes inside it, measured to letters and lines, in
+    display pixels. The watermark, drawn over the plot box, isn't included."""
+    boxes = []
+    for each in spacing.axes_family(ax):
+        boxes.append(each.bbox)
+        for side, spine in each.spines.items():  # a box line is centred on the box's edge
+            if spine.get_visible():
+                half = spine.get_linewidth() / 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
+                grow = {
+                    "left": (half, 0, 0, 0),
+                    "right": (0, 0, half, 0),
+                    "bottom": (0, half, 0, 0),
+                    "top": (0, 0, 0, half),
+                }.get(side, (half, half, half, half))  # a color bar's outline: every side
+                b = each.bbox
+                boxes.append(
+                    Bbox.from_extents(
+                        b.x0 - grow[0], b.y0 - grow[1], b.x1 + grow[2], b.y1 + grow[3]
+                    )
+                )
+        boxes += tick_marks(each, renderer)
+        for t in texts_of(each):
+            if t.get_visible() and t.get_text().strip() and t.get_gid() != WATERMARK:
+                boxes.append(text.footprint(t, renderer))
+        boxes += [k.bbox() for k in keys(each) if k.outside]  # its frame, drawn or not
+    return Bbox.union([b for b in boxes if b.width > 0 or b.height > 0])
+
+
+def room(ax: Axes, renderer: Any) -> Room:
+    """The room what's drawn around the Axes' plot box takes on each side, in inches."""
+    extent, box, dpi = visible_extent(ax, renderer), ax.bbox, ax.figure.dpi  # type: ignore[union-attr]
+    return (
+        (box.x0 - extent.x0) / dpi,
+        (extent.x1 - box.x1) / dpi,
+        (box.y0 - extent.y0) / dpi,
+        (extent.y1 - box.y1) / dpi,
+    )
+
+
+def add_footnote(fig: Figure, words: str, style: Style) -> Text:
+    """The figure's footnote, in the theme's footnote look; laying out places it."""
+    note = fig.text(
+        0,
+        0,
+        literal(words),
+        fontproperties=style.font("footnote.size", "font.weight"),
+        color=style.color("footnote.color"),
+        ha="right",
+        va="baseline",
+        gid=FOOTNOTE,
+    )
+    note.gap = style.pt("footnote.gap")  # type: ignore[attr-defined]
+    fig.footnote = note  # type: ignore[attr-defined]
+    return note
+
+
+def footnote_room(fig: Figure) -> float:
+    """The room a figure's footnote needs below everything else, in inches: its gap and its
+    letters."""
+    note = getattr(fig, "footnote", None)
+    if note is None:
+        return 0.0
+    e = text.edges(note.get_text(), note.get_fontproperties())
+    return (float(note.gap) + e.top + e.bottom) / 72
+
+
+def place_footnote(fig: Figure, right: float, bottom: float) -> None:
+    """Put the footnote's letters `right` and `bottom` inches from the figure's bottom right."""
+    note = getattr(fig, "footnote", None)
+    if note is None:
+        return
+    w, h = fig.get_size_inches()
+    e = text.edges(note.get_text(), note.get_fontproperties())
+    cut = (e.advance - e.right) / 72  # its box reaches past its last letter by this much
+    note.set_position((1 - (right - cut) / w, (bottom + e.bottom / 72) / h))
 
 
 @dataclass
@@ -54,8 +171,8 @@ class Placed:
 
 @dataclass
 class Grid:
-    """A tab's grid as laid out, in inches from the figure's top left: where each column's
-    and row's plot boxes start, and their sizes and margins."""
+    """A grid as laid out, in inches from the figure's top left: where each column's and
+    row's plot boxes start, and their sizes and margins."""
 
     areas: list[list[str]]
     left: list[float]
@@ -91,19 +208,9 @@ def _measure(fig: Figure, placed: Sequence[Placed]) -> dict[str, Room]:
     for p in placed:
         with isolated(p.style):
             spacing.apply(p.ax, p.style)
-    measure(fig)
+    text.measure(fig)
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
-    dpi = fig.dpi
-    rooms = {}
-    for p in placed:
-        extent, box = visible_extent(p.ax, renderer), p.ax.bbox
-        rooms[p.name] = (
-            (box.x0 - extent.x0) / dpi,
-            (extent.x1 - box.x1) / dpi,
-            (box.y0 - extent.y0) / dpi,
-            (extent.y1 - box.y1) / dpi,
-        )
-    return rooms
+    return {p.name: room(p.ax, renderer) for p in placed}
 
 
 def _margins(
@@ -259,9 +366,14 @@ def arrange(
 ) -> Grid:
     """Lay the tiles out on the grid until nothing moves (see the module's description).
     Sizes are in inches; width or height None is auto; edge is the space between the outer
-    tiles and the figure's edges. If no pass settles, it lays out once
-    more with, for each tile, the most room either of the last two passes needed, as
-    drawing.figure.layout does."""
+    tiles and the figure's edges, foot the room below the last row for the footnote.
+
+    It has settled when a pass changes the figure's size by under 0.001 in and moves every
+    plot box by under 0.0001 of the figure. Tick labels can keep it from settling,
+    alternating between two states (a taller box gets more, wider labels, which shrink the
+    box again), so after PASSES unsettled passes it lays out once more with, for each tile,
+    the most room either of the last two passes needed: both states' labels fit. Earlier
+    passes, made while the figure was still far from its size, don't count."""
     last: dict[str, Room] = {p.name: (0.0, 0.0, 0.0, 0.0) for p in placed}
     both = dict(last)
     sizes = (gap, width, height, column_widths, row_heights, edge, foot)
@@ -283,123 +395,20 @@ def arrange(
     return grid
 
 
-def backgrounds(fig: Figure, grid: Grid, placed: Sequence[Placed]) -> None:
-    """Put each tile's theme background behind its part of the grid: its plot box and the
-    margins around it."""
-    w, h = grid.size
-    for p in placed:
-        color = p.style.theme["background.color"]
-        if unset(color):
-            continue
-        x0, x1 = grid.column_span(p.area.column, p.area.last_column)
-        y0, y1 = grid.row_span(p.area.row, p.area.last_row)
-        bounds = (x0 / w, 1 - y1 / h, (x1 - x0) / w, (y1 - y0) / h)
-        if p.background is None:
-            p.background = Rectangle(
-                bounds[:2],
-                *bounds[2:],
-                transform=fig.transFigure,
-                facecolor=str(color),
-                edgecolor="none",
-                zorder=-10,
-            )
-            fig.add_artist(p.background)
-        else:
-            p.background.set_bounds(*bounds)
-
-
-def separator_lines(
-    fig: Figure, grid: Grid, color: str, width_pt: float, between: bool, border: bool
-) -> list[Line2D]:
-    """Lines through the middle of the gaps. With between, a line runs beside each pair of
-    neighbouring cells that aren't one tile (a blank cell counts as a tile of its own), joins
-    the line beside the next pair, and reaches across the gap to meet a crossing line or the
-    border. With border, a line runs around the outside, through the middle of the space
-    between the outer tiles and the figure's edges."""
-    areas, rows, columns = grid.areas, len(grid.areas), len(grid.areas[0])
-    w, h = grid.size
-
-    def apart(a: str, b: str) -> bool:
-        return a != b or a == BLANK
-
-    vertical: set[tuple[int, int]] = set()
-    horizontal: set[tuple[int, int]] = set()
-    if between:
-        vertical = {(r, c) for r in range(rows) for c in range(columns - 1)}
-        vertical = {(r, c) for r, c in vertical if apart(areas[r][c], areas[r][c + 1])}
-        horizontal = {(r, c) for r in range(rows - 1) for c in range(columns)}
-        horizontal = {(r, c) for r, c in horizontal if apart(areas[r][c], areas[r + 1][c])}
-    half, out = grid.gap / 2, grid.edge / 2
-    segments: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    for r, c in sorted(vertical):
-        x = grid.left[c] + grid.width[c] + grid.margin_r[c] + half
-        y0, y1 = grid.row_span(r, r)
-        above = (
-            half
-            if r > 0 and ((r - 1, c) in vertical or {(r - 1, c), (r - 1, c + 1)} & horizontal)
-            else (out if r == 0 and border else 0.0)
-        )
-        below = (
-            half
-            if r < rows - 1 and ((r + 1, c) in vertical or {(r, c), (r, c + 1)} & horizontal)
-            else (out + grid.foot if r == rows - 1 and border else 0.0)
-        )
-        segments.append(((x, x), (y0 - above, y1 + below)))
-    for r, c in sorted(horizontal):
-        y = grid.top[r] + grid.height[r] + grid.margin_b[r] + half
-        x0, x1 = grid.column_span(c, c)
-        left = (
-            half
-            if c > 0 and ((r, c - 1) in horizontal or {(r, c - 1), (r + 1, c - 1)} & vertical)
-            else (out if c == 0 and border else 0.0)
-        )
-        right = (
-            half
-            if c < columns - 1 and ((r, c + 1) in horizontal or {(r, c), (r + 1, c)} & vertical)
-            else (out if c == columns - 1 and border else 0.0)
-        )
-        segments.append(((x0 - left, x1 + right), (y, y)))
-    for line in grid.lines:
-        line.remove()
-    lines = []
-    for xs, ys in segments:
-        line = Line2D(
-            [x / w for x in xs],
-            [1 - y / h for y in ys],
-            transform=fig.transFigure,
-            color=color,
-            linewidth=width_pt,
-            solid_capstyle="butt",
-            zorder=-5,
-        )
-        fig.add_artist(line)
-        lines.append(line)
-    if border:
-        xs = [out, w - out, w - out, out, out]
-        ys = [out, out, h - out, h - out, out]
-        line = Line2D(
-            [x / w for x in xs],
-            [1 - y / h for y in ys],
-            transform=fig.transFigure,
-            color=color,
-            linewidth=width_pt,
-            solid_joinstyle="miter",
-            zorder=-5,
-        )
-        fig.add_artist(line)
-        lines.append(line)
-    grid.lines = lines
-    return lines
-
-
-def apply_separators(fig: Figure, grid: Grid, layout_values: dict[str, Any], base: float) -> None:
-    """The figure's color in the gaps, blank cells and edges, and the lines between tiles
-    and around them."""
-    color = layout_values["separators.color"]
-    fig.set_facecolor("none" if unset(color) else str(color))
-    between = bool(layout_values["separators.line.show"])
-    border = bool(layout_values["separators.line.border"])
-    if between or border:
-        width = float(layout_values["separators.line.width"]) * base
-        line_color = str(layout_values["separators.line.color"])
-        separator_lines(fig, grid, line_color, width, between, border)
+def layout(fig: Figure, ax: Axes, style: Style) -> Grid:
+    """Size the figure and place one graph's plot box from what's drawn around it, as a grid
+    of one tile MARGIN_IN from the figure's edges, with room for its footnote below: with
+    both of the format's sizes given, the plot box takes the space left; with one auto, it
+    keeps the theme's plot_area.aspect and the figure is fitted around it."""
+    width = inches(style.format["figure.width"])
+    height = inches(style.format["figure.height"])
+    placed = [Placed("graph", Area(0, 0), ax, style)]
+    try:
+        grid = arrange(fig, [["graph"]], placed, 0.0, width, height, foot=footnote_room(fig))
+    except LayoutError:  # a graph alone has no tiles to name
+        raise LayoutError(
+            "size: too small for the titles, tick labels and keys around the plot box; "
+            "make the format larger or its base font smaller"
+        ) from None
+    place_footnote(fig, MARGIN_IN, MARGIN_IN)
+    return grid

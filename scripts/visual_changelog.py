@@ -13,17 +13,16 @@ from __future__ import annotations
 import argparse
 import base64
 import html
-import re
 import subprocess
 from pathlib import Path
 
 import forgegraph
+from forgegraph.catalog_build.page import figures
 
 ROOT = Path(__file__).parents[1]
 BASELINES = "tests/baselines"
 CATALOG = "catalog/forgegraph_base.html"
 EARLIER_CATALOG = "catalog/catalog.html"  # forgegraph_base's page before phase 6
-FIGURE = re.compile(r'<figure id="([^"]+)"><img [^>]*src="data:image/png;base64,([^"]+)"')
 
 
 def _git(*args: str) -> bytes:
@@ -62,7 +61,7 @@ def _catalog(ref: str | None, page: str) -> dict[str, bytes]:
             continue
     if text is None:
         return {}
-    return {fid: base64.b64decode(data) for fid, data in FIGURE.findall(text)}
+    return figures(text)
 
 
 def _img(data: bytes | None, label: str) -> str:

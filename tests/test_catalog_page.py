@@ -12,7 +12,7 @@ import pytest
 
 import forgegraph
 from forgegraph import forgemark
-from forgegraph.catalog_build.page import open_commented
+from forgegraph.catalog_build.page import Card, Instance, Kind, Row, figures, open_commented, page
 
 CATALOG = Path(__file__).parents[1] / "catalog" / "forgegraph_base.html"
 
@@ -39,6 +39,13 @@ def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
     assert f'<p id="version" class="version">version {forgegraph.__version__}</p>' in text
+
+
+def test_figures_gives_each_cards_image_by_its_figures_id():
+    row = Row("grid.show", "false", "true | false", "variable", "Draw a grid.")
+    cards = (Card("t-baseline", "Baseline", b"one", 100), Card("t-card", "Card", b"two", 90))
+    text = page([Kind("theme", "Themes", (Instance("t", "t", "Theme > t", (row,), cards),))], "0")
+    assert figures(text) == {"t-baseline-figure": b"one", "t-card-figure": b"two"}
 
 
 def test_commented_categories_are_open():

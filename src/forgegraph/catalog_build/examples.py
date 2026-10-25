@@ -58,9 +58,10 @@ def draw(
     format: str | None = None,
     reg: Registry | None = None,
 ) -> Graph:
-    """A GraphSpec, in this theme and format if given, with these
-    changes. A parameter the GraphSpec lists is changed there; any other in a theme or format
-    extending the one it uses."""
+    """A GraphSpec, in this theme and format if given, with these changes. Given a theme or
+    format, it's drawn with that spec's own values of its variable parameters, not the
+    GraphSpec's. A parameter the GraphSpec lists is changed there; any other in a theme or
+    format extending the one it uses."""
     reg = (reg or builtin()).copy()
     doc = copy.deepcopy(reg.docs["graphspec"][spec])
     inherited = list(resolve_layers(doc, reg)) if doc.get("extends") not in (None, NONE) else []
@@ -70,8 +71,13 @@ def draw(
     if inherited:  # and those it inherits are removed by name
         listed["layers"] = {name: NONE for name in inherited}
     for kind, name in (("theme", theme), ("format", format)):
-        if name is not None:
-            listed["specifications"][kind] = name
+        if name is None:
+            continue
+        listed["specifications"][kind] = name
+        own = resolve(kind, reg.docs[kind][name], reg)
+        for path, p in definitions(kind).items():
+            if path in in_chain and not own.fixed(path, p.fixed):
+                tree_set(listed, path, own.value(path, p.default))
     others: dict[str, dict[str, Any]] = {"theme": {}, "format": {}}
     for c in _flat(changes):
         if c.path in SPECIAL:

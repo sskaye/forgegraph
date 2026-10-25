@@ -460,6 +460,10 @@ def test_a_graphspec_names_existing_files():
     assert validate("graphspec", spec({"specifications.theme": "loud"})) == [
         "variable_parameters.specifications.theme: must be the name of a theme"
     ]
+    theme = "forgegraph_base/base_theme"
+    assert validate("graphspec", spec({"specifications.theme": [theme]})) == [
+        "variable_parameters.specifications.theme: must be a single value: the name of a theme"
+    ]
 
 
 def test_a_graphspec_respects_fixed_values_of_the_graphspec_it_extends():

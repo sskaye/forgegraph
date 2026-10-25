@@ -11,11 +11,10 @@ from forgegraph.spec.parameters import definitions
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import (
     HEADINGS,
-    OTHER_KINDS,
     Resolved,
     Values,
-    choices,
     definitions_for,
+    named,
     resolve,
 )
 
@@ -48,7 +47,7 @@ def explain(
     variable values. With `format` (a layout's format's values), those are the format's."""
     reg = reg or builtin()
     spec = resolve("graphspec", doc, reg)
-    chosen = choices(doc, reg)
+    chosen = named("graphspec", doc, reg)
     own = definitions("graphspec")
     layers = Values(
         {
@@ -57,11 +56,11 @@ def explain(
         }
     )
     out: dict[str, Values] = {}
-    for kind in OTHER_KINDS:
+    for kind, name in chosen.items():
         if kind == "format" and format is not None:
             out[kind] = Values(format)
             continue
-        other = reg.docs[kind][chosen[kind]]
+        other = reg.docs[kind][name]
         defs = definitions_for(kind, other, reg)
         heading = chosen["graph_type"] if kind in HEADINGS else None
         values = resolve(kind, other, reg, heading)

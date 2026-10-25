@@ -33,11 +33,11 @@ from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.explain import Explained, explain
-from forgegraph.spec.parameters import NONE, tree_set
+from forgegraph.spec.parameters import NAMES, NONE, tree_set
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, created, plain
 from forgegraph.spec.registry import Registry, load_document
-from forgegraph.spec.resolve import Values, folder_of, resolve, setter
-from forgegraph.spec.validate import drawing_problems, validate
+from forgegraph.spec.resolve import Values, chain, folder_of, resolve, setter
+from forgegraph.spec.validate import drawing_problems, named_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
 PLACE_PASSES = 3  # place, then lay out again, while value labels widen the axis
@@ -266,7 +266,7 @@ def used(values: dict[str, dict[str, Any]], reg: Registry) -> dict[str, Any]:
     """Each spec a graph is drawn with, by kind, as its name and version (and its pack's)."""
     chosen = values["graphspec"]
     out: dict[str, Any] = {}
-    for kind in ("graph_type", "theme", "format"):
+    for kind in NAMES["graphspec"]:
         out[kind] = spec_record(kind, chosen[f"specifications.{kind}"], reg)
     layers = values.get("layers") or {}
     if layers:
@@ -349,7 +349,7 @@ def prepare(
     problems = validate("graphspec", doc, reg)
     if problems:
         raise SpecError(problems)
-    problems = _named_problems(doc, reg)
+    problems = named_problems("graphspec", doc, reg)
     if problems:
         raise SpecError(problems)
     problems = drawing_problems(doc, reg)
@@ -358,8 +358,8 @@ def prepare(
     explained = explain(doc, reg, format)
     values = explained.plain()
     frame, record = _data(doc, values, reg, data, folder)
-    gt_name = values["graphspec"]["specifications.graph_type"]
-    module = GRAPH_TYPES[_graph_type_root(gt_name, reg)]
+    gt = reg.docs["graph_type"][values["graphspec"]["specifications.graph_type"]]
+    module = GRAPH_TYPES[str(chain("graph_type", gt, reg)[-1]["name"])]
     fixed = frozenset(p for p, r in explained.theme.items() if r.fixed)
     style = Style(values["theme"], values["format"], fixed)
     nonstandard = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
@@ -426,27 +426,6 @@ def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | No
 
 def _limit(value: Any) -> float | None:
     return None if value is None or value == NONE else float(value)
-
-
-def _named_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
-    """Problems in the files a GraphSpec names, and the files they extend."""
-    problems = []
-    names = resolve("graphspec", doc, reg)
-    for kind in ("graph_type", "theme", "format"):
-        name = names[f"specifications.{kind}"].value
-        label = kind.replace("_", " ")
-        while name not in (None, NONE):
-            named = reg.docs[kind][name]
-            problems += [f"{label} '{name}': {p}" for p in validate(kind, named, reg)]
-            name = named.get("extends")
-    return problems
-
-
-def _graph_type_root(name: str, reg: Registry) -> str:
-    doc = reg.docs["graph_type"][name]
-    while doc.get("extends") not in (None, NONE):
-        doc = reg.docs["graph_type"][doc["extends"]]
-    return str(doc["name"])
 
 
 def data_path(doc: dict[str, Any], reg: Registry, folder: Path) -> Path | None:

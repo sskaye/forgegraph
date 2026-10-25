@@ -44,7 +44,6 @@ from forgegraph.drawing.figure import (
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.graph import (
-    NONE,
     PLACE_PASSES,
     Inspected,
     Prepared,
@@ -63,7 +62,7 @@ from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord, created, plain
 from forgegraph.spec.registry import Registry, load_document, load_yaml
 from forgegraph.spec.resolve import Resolved, Values, folder_of, resolve
-from forgegraph.spec.validate import validate
+from forgegraph.spec.validate import named_problems, validate
 
 SUFFIX = ".layout.yaml"
 
@@ -338,12 +337,7 @@ def _check(doc: Any, reg: Registry) -> None:
     problems = validate("layout", doc, reg)
     if problems:
         raise SpecError(problems)
-    chosen = resolve("layout", doc, reg)["specifications.format"].value
-    while chosen not in (None, NONE):
-        named = reg.docs["format"][chosen]
-        problems += [f"format '{chosen}': {p}" for p in validate("format", named, reg)]
-        chosen = named.get("extends")
-    problems += drawing_problems(doc, reg)
+    problems = named_problems("layout", doc, reg) + drawing_problems(doc, reg)
     if problems:
         raise SpecError(problems)
 

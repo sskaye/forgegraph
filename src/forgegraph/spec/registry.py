@@ -19,7 +19,7 @@ from ruamel.yaml import YAML
 
 from forgegraph.packs import FOLDERS as PACK_FOLDERS
 from forgegraph.packs import Config, Pack, pip_packs, read_pack, setup
-from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, base_folder
+from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, NAMES, SECTIONS, base_folder
 
 _yaml = YAML(typ="safe", pure=True)
 
@@ -72,7 +72,7 @@ class Registry:
                 doc = load_yaml(path)
                 if isinstance(doc, dict) and "name" in doc:
                     self.add(kind, {**doc, "name": f"{pack.name}/{doc['name']}"}, path)
-                    for named in _specs_named(doc):
+                    for named in _specs_named(kind, doc):
                         self.reach(named)
         return self
 
@@ -186,13 +186,13 @@ def load_document(
     return spec, reg, Path.cwd()
 
 
-def _specs_named(doc: dict[str, Any]) -> list[Any]:
-    """The specs a pack's spec builds on: what it extends, and the theme and format a
-    GraphSpec or layout names."""
+def _specs_named(kind: str, doc: dict[str, Any]) -> list[Any]:
+    """The specs a pack's spec builds on: what it extends, and the packs' specs a GraphSpec
+    or layout names (see NAMES)."""
     named = [doc.get("extends")]
-    for section in ("fixed_parameters", "variable_parameters"):
+    for section in SECTIONS:
         chosen = doc.get(section)
         chosen = chosen.get("specifications") if isinstance(chosen, dict) else None
         if isinstance(chosen, dict):
-            named += [chosen.get("theme"), chosen.get("format")]
+            named += [chosen.get(k) for k in NAMES.get(kind, ()) if k not in CORE_KINDS]
     return named

@@ -13,9 +13,9 @@ from typing import Any
 from forgegraph.fonts import register_pack_fonts
 from forgegraph.packs import fonts, user_config
 from forgegraph.spec.common import kind_label, suggest
-from forgegraph.spec.parameters import NONE
+from forgegraph.spec.parameters import CORE_KINDS, NAMES, NONE
 from forgegraph.spec.registry import Registry
-from forgegraph.spec.resolve import chain, entries, resolve
+from forgegraph.spec.resolve import chain, entries, named
 
 PACK_TYPES = frozenset({"theme", "format", "graphspec", "layout", "schedule"})
 
@@ -26,14 +26,15 @@ def permission_problems(kind: str, doc: dict[str, Any], reg: Registry) -> list[s
     a pack's spec may build on any spec that's loaded."""
     if reg.owner(kind, doc):
         return []
-    named = []
+    listed = []
     if doc.get("extends") not in (None, NONE):
-        named.append(("extends", str(doc["extends"])))
+        listed.append(("extends", str(doc["extends"])))
+    paths = {f"specifications.{k}" for k in NAMES.get(kind, ()) if k not in CORE_KINDS}
     for section, _, path, value in entries(kind, doc, reg):
-        if path in ("specifications.theme", "specifications.format") and isinstance(value, str):
-            named.append((f"{section}.{path}", value))
+        if path in paths and isinstance(value, str):
+            listed.append((f"{section}.{path}", value))
     problems = []
-    for where, name in named:
+    for where, name in listed:
         pack = name.split("/")[0] if "/" in name else None
         if pack is not None and pack not in reg.allowed:
             problems.append(f"{where}: '{name}' is in the pack '{pack}', which {reg.allows()}")
@@ -53,12 +54,8 @@ def packs_used(kind: str, doc: dict[str, Any], reg: Registry) -> set[str]:
                 out.add(pack)
 
     add(kind, doc)
-    if kind not in ("graphspec", "layout"):
-        return out
-    names = resolve(kind, doc, reg)
-    for k in ("theme", "format") if kind == "graphspec" else ("format",):
-        name = names[f"specifications.{k}"].value
-        if isinstance(name, str) and name in reg.docs[k]:
+    for k, name in named(kind, doc, reg).items():
+        if k not in CORE_KINDS and isinstance(name, str) and name in reg.docs[k]:
             add(k, reg.docs[k][name])
     return out
 

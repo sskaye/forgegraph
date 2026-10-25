@@ -15,6 +15,7 @@ from typing import Any
 from forgegraph.spec.common import kind_label, suggest
 from forgegraph.spec.parameters import (
     COLLECTIONS,
+    NAMES,
     NONE,
     SECTIONS,
     Parameter,
@@ -24,13 +25,7 @@ from forgegraph.spec.parameters import (
 )
 from forgegraph.spec.registry import Registry
 
-OTHER_KINDS = ("graph_type", "theme", "format")  # files a GraphSpec names
 HEADINGS = ("theme", "format")  # kinds that may use graph-type headings
-CHOICE = {
-    "graph_type": "specifications.graph_type",
-    "theme": "specifications.theme",
-    "format": "specifications.format",
-}
 
 
 def entries(
@@ -170,6 +165,10 @@ def folder_of(
     return known.parent if known is not None else folder
 
 
-def choices(doc: dict[str, Any], reg: Registry) -> dict[str, Any]:
-    spec = resolve("graphspec", doc, reg)
-    return {kind: spec.value(path) for kind, path in CHOICE.items()}
+def named(kind: str, doc: dict[str, Any], reg: Registry) -> dict[str, Any]:
+    """The specs a file names under specifications, by kind (see NAMES): a GraphSpec's graph
+    type, theme and format, and a layout's format; None where unset."""
+    if kind not in NAMES:
+        return {}
+    values = resolve(kind, doc, reg)
+    return {k: values.value(f"specifications.{k}") for k in NAMES[kind]}

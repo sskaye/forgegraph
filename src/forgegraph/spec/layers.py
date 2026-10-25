@@ -13,7 +13,7 @@ from typing import Any
 from forgegraph.spec.common import suggest
 from forgegraph.spec.parameters import NONE, SECTIONS, check_parameter, definitions, flatten
 from forgegraph.spec.registry import Registry
-from forgegraph.spec.resolve import Resolved, chain, choices, resolve
+from forgegraph.spec.resolve import Resolved, chain, named, resolve
 
 
 def _layers_in(d: dict[str, Any]) -> list[tuple[str, str, Any]]:
@@ -75,7 +75,7 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     """Problems with the layers a GraphSpec lists, and with the layers it ends up with."""
     errors = []
     try:
-        gt_name = choices(doc, reg)["graph_type"]
+        gt_name = named("graphspec", doc, reg)["graph_type"]
         gt = resolve("graph_type", reg.docs["graph_type"][gt_name], reg)
     except (ValueError, KeyError):
         return []

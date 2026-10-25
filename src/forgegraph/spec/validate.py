@@ -46,11 +46,10 @@ from forgegraph.spec.parameters import (
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import (
     HEADINGS,
-    OTHER_KINDS,
     chain,
-    choices,
     definitions_for,
     entries,
+    named,
     resolve,
 )
 from forgegraph.spec.schedule import Cadence, CadenceError
@@ -97,13 +96,7 @@ def _entry_problems(
     twice), and the paths listed without a graph-type heading."""
     errors: list[str] = []
     names = reg.names()
-    others = (
-        _settable(doc, reg)
-        if kind == "graphspec"
-        else _format_settable(doc, reg)
-        if kind == "layout"
-        else {}
-    )
+    others = _settable(kind, doc, reg)
     seen: dict[tuple[str | None, str], str] = {}
     for section, heading, path, value in entries(kind, doc, reg):
         where = f"{section}." + (f"{heading}." if heading else "")
@@ -190,44 +183,28 @@ def _format_size(doc: dict[str, Any], reg: Registry) -> list[str]:
     return []
 
 
-def _settable(doc: dict[str, Any], reg: Registry) -> dict[str, tuple[Parameter, str, bool]]:
-    """Parameters of the GraphSpec's graph type, theme and format, with whether each is
-    fixed there: {path: (definition, owner, fixed)}."""
+def _settable(
+    kind: str, doc: dict[str, Any], reg: Registry
+) -> dict[str, tuple[Parameter, str, bool]]:
+    """Parameters of the specs a GraphSpec or layout names (see NAMES), with whether each is
+    fixed there: {path: (definition, owner, fixed)}. It can set the variable ones."""
     try:
-        chosen = choices(doc, reg)
+        chosen = named(kind, doc, reg)
     except ValueError:
         return {}
     out = {}
-    for kind in OTHER_KINDS:
-        other = reg.docs[kind].get(chosen[kind])
+    for k, name in chosen.items():
+        other = reg.docs[k].get(name) if isinstance(name, str) else None
         if other is None:
             continue
         try:
-            defs = definitions_for(kind, other, reg)
-            resolved = resolve(kind, other, reg, chosen["graph_type"] if kind in HEADINGS else None)
+            defs = definitions_for(k, other, reg)
+            resolved = resolve(k, other, reg, chosen.get("graph_type") if k in HEADINGS else None)
         except ValueError:
             continue
         for path, p in defs.items():
-            fixed = resolved.fixed(path, p.fixed)
-            out[path] = (p, f"{kind_label(kind)} '{chosen[kind]}'", fixed)
+            out[path] = (p, f"{kind_label(k)} '{name}'", resolved.fixed(path, p.fixed))
     return out
-
-
-def _format_settable(doc: dict[str, Any], reg: Registry) -> dict[str, tuple[Parameter, str, bool]]:
-    """A layout's format's parameters, with whether each is fixed there: a layout can set the
-    variable ones, as a GraphSpec can."""
-    try:
-        name = str(resolve("layout", doc, reg).value("specifications.format"))
-        fmt = reg.docs["format"].get(name)
-        if fmt is None:
-            return {}
-        defs = definitions_for("format", fmt, reg)
-        resolved = resolve("format", fmt, reg)
-    except ValueError:
-        return {}
-    return {
-        path: (p, f"format '{name}'", resolved.fixed(path, p.fixed)) for path, p in defs.items()
-    }
 
 
 def _inherited_fixed(doc: dict[str, Any], reg: Registry) -> list[str]:
@@ -356,7 +333,7 @@ def drawing_problems(doc: dict[str, Any], reg: Registry | None = None) -> list[s
     graph type defines with no default."""
     reg = reg or builtin()
     values = explain(doc, reg).graph_type.plain()
-    gt = reg.docs["graph_type"][choices(doc, reg)["graph_type"]]
+    gt = reg.docs["graph_type"][named("graphspec", doc, reg)["graph_type"]]
     problems = [
         f"{path}: must be set before the graph can be drawn"
         for path, p in definitions_for("graph_type", gt, reg).items()
@@ -369,4 +346,16 @@ def drawing_problems(doc: dict[str, Any], reg: Registry | None = None) -> list[s
             for path, p in definitions("layer", layer["type"]).items()
             if p.required and layer.get(path) in (None, NONE)
         ]
+    return problems
+
+
+def named_problems(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
+    """Problems in the specs a GraphSpec or layout names (see NAMES), and the specs they
+    extend."""
+    problems = []
+    for k, name in named(kind, doc, reg).items():
+        while name not in (None, NONE):
+            spec = reg.docs[k][name]
+            problems += [f"{kind_label(k)} '{name}': {p}" for p in validate(k, spec, reg)]
+            name = spec.get("extends")
     return problems

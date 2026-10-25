@@ -58,6 +58,7 @@ BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_
 HEADER = ("name", "version", "description", "extends", "fixed_parameters", "variable_parameters")
 LAYER_HEADER = ("name", "version", "description", "parameters")
 COLLECTIONS = {"graphspec": ("layers",), "layout": ("tabs",)}  # categories keyed by chosen names
+NAMES = {"graphspec": ("graph_type", "theme", "format"), "layout": ("format",)}  # specs it names
 SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step

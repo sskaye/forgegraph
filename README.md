@@ -169,5 +169,5 @@ Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye
 - **examples/**: sample data; `packs/acme`, an example pack in a deliberately different style; and `layouts/`, a paper figure and a dashboard.
 - **evals/skill/**: the skill's eval cases, run by `scripts/run_skill_evals.py`.
 - **tests/**, **scripts/**: tests, and build and maintenance scripts.
-- **docs/**: the specifications, the design record and the visual changelogs.
+- **docs/**: the specifications, the design record and the visual changelogs. **review/**: each build phase's review pages.
 

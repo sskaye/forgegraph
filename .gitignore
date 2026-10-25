@@ -23,5 +23,5 @@ htmlcov/
 # Claude Code's local settings
 .claude/
 
-# Each build phase's review pages: kept outside this repository
-/review/
+# The skill evals' image sheets: kept locally, or attached to their PR
+review/*/skill-eval-graphs/

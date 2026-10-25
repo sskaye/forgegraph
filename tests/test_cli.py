@@ -362,3 +362,18 @@ def test_every_import_form_gives_the_module_and_the_api_its_functions():
         "assert all(callable(f) and not isinstance(f, types.ModuleType) for f in api)\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_every_commands_help_shows():
+    """--help works for every command and group, with the click that the allowed typer
+    versions resolve to (typer before 0.15.4 can't show help under click 8.2 and later)."""
+    import typer.main
+
+    def paths(command, path):
+        yield path
+        for name, sub in getattr(command, "commands", {}).items():
+            yield from paths(sub, [*path, name])
+
+    for path in paths(typer.main.get_command(app), []):
+        result = runner.invoke(app, [*path, "--help"])
+        assert result.exit_code == 0, (path, result.output)

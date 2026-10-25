@@ -7,7 +7,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 ### Changed
 
 - One name is one pack. A config can't give a built-in pack's name, or a name the main config already gives, to another folder. Before, a folder config's copy of a pack replaced the one the main config lists, and what it drew wasn't marked non-standard.
-- ForgeGraph needs matplotlib 3.11.2 and typer 0.13 or later; earlier versions installed but didn't work.
+- ForgeGraph needs matplotlib 3.11.2 and typer 0.15.4 or later; earlier versions installed but didn't work.
 - The package's description and classifiers say what it is now: released, in alpha.
 
 ### Fixed

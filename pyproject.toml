@@ -22,7 +22,7 @@ dependencies = [
     "pydantic>=2.7",
     "ruamel.yaml>=0.18",
     "pyarrow>=17",
-    "typer>=0.13",
+    "typer>=0.15.4",  # earlier versions allow a click whose help they can't show
     "packaging>=23",
 ]
 

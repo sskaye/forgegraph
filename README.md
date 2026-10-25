@@ -148,7 +148,6 @@ ForgeGraph is [MIT-licensed](https://github.com/sskaye/forgegraph/blob/main/LICE
 - [Contributing](https://github.com/sskaye/forgegraph/blob/main/CONTRIBUTING.md): working on ForgeGraph itself.
 - Design record, in [docs/design](https://github.com/sskaye/forgegraph/blob/main/docs/design):
   - [Architecture](https://github.com/sskaye/forgegraph/blob/main/docs/design/architecture.md): how ForgeGraph is designed, and why.
-  - [Decisions](https://github.com/sskaye/forgegraph/blob/main/docs/design/decisions.md): decisions that refine the architecture.
   - [To do](https://github.com/sskaye/forgegraph/blob/main/docs/design/todo.md): what's still planned.
 
 ## Contributing

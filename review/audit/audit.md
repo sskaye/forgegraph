@@ -147,6 +147,16 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T13:05:21.967Z"
       body: Agreed
+    - author: Claude
+      timestamp: 2026-10-25T16:04:21Z
+      body: |
+        Done, in the catalog-rule PR. Building it needed these refinements, all general rather than per parameter:
+        1. Each parameter gets an ordered list of candidate values from its range, and its card is the first candidate and baseline that draws and changes the drawing. Numbers try twice, then half (rounded down for whole numbers); words try those after the default; a font tries each bundled family; an auto figure size tries the other size's value; a list tries one-item lists, then itself reversed.
+        2. Generic baselines were added where none showed a parameter: horizontal bars, categories drawn with markers (with the categories on x, and on y), and dates. Baselines no card uses are dropped.
+        3. The benchmark's column and value, which a validation rule ties together, become None together. The tie is declared once, beside that rule. Both benchmark cards draw the same, since each sets both.
+        4. Exempt, since no value changes the drawing: the format's output and provenance parameters, and a graph type's layer.types. So the format panels show no cards.
+        5. Every parameter, fixed ones included, gets a card by the same rule. The page shows the variable ones; the perturbation test draws all of them (175 cases, one per parameter).
+        6. A17: a theme's or format's catalog draws every baseline with its own values, and so does a pack's whole page.
 - id: 3
   anchor_text: "3. decisions.md (G3)"
   context_before: "The forgegraph_base_2 page is drawn with the base theme's line and marker sizes."

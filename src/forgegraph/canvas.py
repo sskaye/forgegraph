@@ -19,9 +19,9 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from forgegraph.drawing import export
+from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import (
     GraphFigure,
-    LayoutError,
     layout,
     new_figure,
     watermark,

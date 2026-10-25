@@ -27,7 +27,8 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
 from forgegraph.drawing import spacing
-from forgegraph.drawing.figure import MARGIN_IN, PASSES, LayoutError, visible_extent
+from forgegraph.drawing.errors import LayoutError
+from forgegraph.drawing.figure import MARGIN_IN, PASSES, visible_extent
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawing.text import measure
 from forgegraph.spec.layout import BLANK, Area

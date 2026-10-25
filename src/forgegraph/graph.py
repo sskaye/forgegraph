@@ -15,8 +15,8 @@ from matplotlib.figure import Figure
 from forgegraph.data import read_data
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing import xy as xy_type
+from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import (
-    LayoutError,
     add_footnote,
     layout,
     new_figure,

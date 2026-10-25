@@ -35,7 +35,8 @@ from matplotlib.dates import date2num
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.drawing.axes import DrawError, number_text
+from forgegraph.drawing.axes import number_text
+from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
 

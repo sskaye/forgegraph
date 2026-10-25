@@ -27,6 +27,7 @@ from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
 from forgegraph.drawing import export, spacing, text
+from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import MM_PER_INCH, Style, isolated
@@ -34,10 +35,6 @@ from forgegraph.drawing.style import MM_PER_INCH, Style, isolated
 MARGIN_IN = 0.04  # space kept between what's drawn and the figure's edges
 WATERMARK = "forgegraph-watermark"
 FOOTNOTE = "forgegraph-footnote"
-
-
-class LayoutError(ValueError):
-    """The format is too small for what has to be drawn around the plot box."""
 
 
 def inches(value: object) -> float | None:

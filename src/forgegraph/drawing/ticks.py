@@ -15,7 +15,8 @@ fit at about one per three tick-label heights along x and two along y, from 2 to
 - matplotlib: matplotlib's default (MaxNLocator with steps 1, 2, 2.5, 5, 10).
 
 Log axes have their own algorithms, picked by the theme's axis.tick.log_algorithm (LogTicks):
-R's scales::breaks_log, ported with its MIT licence, or matplotlib's LogLocator.
+R's scales::breaks_log, ported with its MIT licence, or matplotlib's LogLocator. A manual
+step on a log axis is a factor (LogStep).
 
 On an axis of whole numbers (an int column, or a categorical axis's positions), every
 algorithm keeps to whole-number steps of 1 or more: extended_wilkinson and wilkinson skip
@@ -38,6 +39,7 @@ import numpy as np
 from matplotlib.ticker import Locator, LogLocator, MaxNLocator, NullLocator
 
 from forgegraph.drawing import text
+from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style
 
 EPS = 1e-10
@@ -506,6 +508,28 @@ class LogTicks(Locator):
         gap = self.gap * figure.dpi / 72
         spans.sort()
         return all(b[0] - a[1] >= gap for a, b in pairwise(spans))
+
+
+class LogStep(Locator):
+    """Ticks a factor apart on a log axis, counted from the first power of ten at or above
+    its low end: a step of 100 from 10 gives 10, 1000, 100000."""
+
+    def __init__(self, factor: float) -> None:
+        if factor <= 1:
+            raise DrawError(f"tick.step: {factor:g} on a log axis must be a factor above 1")
+        self.factor = factor
+
+    def __call__(self) -> Any:
+        lo, hi = sorted(cast(Any, self.axis).get_view_interval())
+        return self.tick_values(lo, hi)
+
+    def tick_values(self, vmin: float, vmax: float) -> Any:
+        lo, hi = sorted((vmin, vmax))
+        anchor = 10.0 ** math.ceil(math.log10(lo) - 1e-9)
+        first = math.floor(math.log(lo / anchor) / math.log(self.factor))
+        last = math.ceil(math.log(hi / anchor) / math.log(self.factor))
+        ticks = (anchor * self.factor**k for k in range(first, last + 1))
+        return [float(f"{t:.12g}") for t in ticks if lo * (1 - 1e-9) <= t <= hi * (1 + 1e-9)]
 
 
 def minor_ticks(axis: Any, style: Style) -> None:

@@ -25,12 +25,11 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from forgegraph.drawing import export, lint, page
-from forgegraph.drawing.axes import DrawError
+from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import (
     MARGIN_IN,
     GraphCanvas,
     GraphFigure,
-    LayoutError,
     TileAxes,
     add_footnote,
     footnote_room,

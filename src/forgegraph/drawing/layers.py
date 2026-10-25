@@ -34,7 +34,8 @@ from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import labels, marks
-from forgegraph.drawing.axes import DrawError, number_text
+from forgegraph.drawing.axes import number_text
+from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset

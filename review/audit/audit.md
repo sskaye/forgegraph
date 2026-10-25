@@ -104,6 +104,10 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T12:24:20.513Z"
       body: Agreed.
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#13. An old name gets the "did you mean" error. It suggests the new name for 28 of 31 old names; for three it suggests a sibling, because a sibling is the closest spelling (encoding.color suggests encoding.color.type).
 - id: 2
   anchor_text: "2. How catalog cards are chosen (F10, A17)"
   context_before: "\"\" for the same relation, for example grid.line_width beside series.line.width."
@@ -177,6 +181,10 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T12:26:28.979Z"
       body: "Agreed, but put it in an appendix at the bottom so that it doesn’t interfere with reading the main architecture details."
+    - author: Claude
+      timestamp: 2026-10-25T16:36:16Z
+      body: |
+        Done in sskaye/forgegraph#8: the reasons that still apply are an appendix at the bottom of architecture.md, and decisions.md is deleted.
 - id: 4
   anchor_text: "4. The public history (H1)"
   context_before: "t entries record designs that were later replaced, and some contradict the code."
@@ -196,6 +204,10 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T12:26:54.412Z"
       body: Agreed.
+    - author: Claude
+      timestamp: 2026-10-25T16:36:17Z
+      body: |
+        Done. main and the v0.1.0 and v0.2.0 tags are rewritten without review/, and a fresh clone is 17.7 MiB instead of 45.7. The review pages are back as one commit, without the skill evals' image sheets. forgegraph-dev is archived.
 - id: 5
   anchor_text: "5. Merged branches (C11)"
   context_before: ", but it's still 33 of the public history's 44 MiB, so every clone downloads it."
@@ -216,6 +228,10 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T12:27:02.495Z"
       body: Agreed.
+    - author: Claude
+      timestamp: 2026-10-25T16:36:17Z
+      body: |
+        Done: both are deleted, and GitHub now deletes merged branches automatically.
 - id: 6
   anchor_text: "6. Releasing 0.2.1"
   context_before: "es (C11) phase-10-release and post-release-fixes are merged but still on GitHub."
@@ -254,4 +270,8 @@ None of these has been seen in real use: no eval run, report or issue has hit th
     - author: Steven
       timestamp: "2026-10-25T12:28:54.961Z"
       body: Agreed.
+    - author: Claude
+      timestamp: 2026-10-25T16:36:17Z
+      body: |
+        Done: review/refactor/refactor.md, implemented in sskaye/forgegraph#9, #10 and #11.
 -->

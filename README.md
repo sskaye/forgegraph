@@ -164,7 +164,7 @@ Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye
   - **drawing/**: drawing, layout and lint. **layouts/**: `fg.layout` and layouts. **jobs/**: scheduled renders.
   - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
   - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog_build/**: the catalog builder. **catalogs/**: each definition's catalog file.
-  - **skill/forgegraph/**: the agent skill.
+  - **skill/forgegraph/**: the agent skill. `forgemark.py`: Forgemark's review-comment format, and its pinned tool.
 - **catalog/**: the generated catalog pages.
 - **examples/**: sample data; `packs/acme`, an example pack in a deliberately different style; and `layouts/`, a paper figure and a dashboard.
 - **evals/skill/**: the skill's eval cases, run by `scripts/run_skill_evals.py`.

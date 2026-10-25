@@ -2,7 +2,9 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
-## Unreleased
+## 0.3.0 (2026-10-25)
+
+Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).
 
 ### Added
 
@@ -24,6 +26,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
   11. `encoding.color` → `encoding.color.column`; `encoding.color_type` → `encoding.color.type`; `encoding.line_style` → `encoding.line.style.column`; `encoding.marker_shape` → `encoding.marker.shape.column`; `encoding.marker_fill` → `encoding.marker.fill.column`; `encoding.detail` → `encoding.detail.column` (`encoding.order` is unchanged)
   12. Layouts: `separators.line.border` → `separators.border.show`
   13. Schedules: `freshness.stamp` → `freshness.stamp.show`; `cadence.interval` → `cadence.interval.count`; `cadence.interval_unit` → `cadence.interval.unit`
+- **Breaking for packs' catalog files:** a catalog's cards are chosen by a rule, not by hand. Every parameter gets one card, its value taken from its range and the baseline's data, drawn on the first baseline where it changes the drawing; the page shows the variable parameters' cards. A catalog file lists only its baselines, and a layer's settings: `variations`, `no_card` and the `{value, from, with}` forms are gone. A pack's catalog page draws with the pack's own theme and format values.
 - Drawing and saving are about 3.7 times faster. Graphs and their files are the same as before.
 - A pack's fonts are registered when a file drawn uses one of its specs, not whenever a config lists the pack.
 - `forgegraph --help` gives each command a one-sentence summary, and `forgegraph catalog --help` names every kind it lists.
@@ -40,6 +43,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 - Value labels written with format auto use the value axis's tick label format when it's set, as reference lines do.
 - The catalog's record of what it was built from covers every module it draws with, so a change to the drawing code marks the catalog out of date.
 - The package's metadata lists the bundled fonts' licences.
+- A GraphSpec naming a list as its theme, format or graph type gets the error "must be a single value", not a crash.
 - A config naming a pack that can't be found, or another pack problem, stops `catalog`, `pack-notes`, `schema` and `explain` with its problems listed (`error:` lines, exit 1), not a traceback; with `--json`, one problem each, not one joined line.
 
 ## 0.2.0 (2026-10-24)

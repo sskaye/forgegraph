@@ -11,12 +11,13 @@ import io
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import pandas as pd
 from PIL import Image
 
 from forgegraph.data import data_path
 from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
-from forgegraph.graph import Graph, render
+from forgegraph.graph import Graph, SpecError, render
 from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.loaded import Loaded
 from forgegraph.spec.parameters import NONE, definitions, tree_has, tree_set
@@ -82,7 +83,10 @@ def draw(
     for c in _flat(changes):
         if c.path in SPECIAL:
             continue
-        if c.path in in_chain or tree_has(listed, c.path) or c.path.startswith("layers."):
+        layer = c.path.split(".")[1] if c.path.startswith("layers.") else None
+        if layer is not None and listed.get("layers", {}).get(layer) == NONE:
+            listed["layers"][layer] = {}  # a layer it inherits, removed above, drawn anew
+        if c.path in in_chain or tree_has(listed, c.path) or layer is not None:
             tree_set(listed, c.path, c.value)
         elif c.path in definitions("theme"):
             others["theme"][c.path] = c.value
@@ -94,9 +98,7 @@ def draw(
         if values:
             reg.add(kind, _child(kind, listed["specifications"][kind], values))
             listed["specifications"][kind] = "catalog"
-    home = reg.paths["graphspec"].get(spec)
-    folder = home.parent if home is not None else Path.cwd()
-    where = data_path(Loaded("graphspec", doc, reg, folder))
+    where = _data_file(spec, doc, reg)
     if where is not None:  # the copy is drawn from memory: its data found where the original's is
         tree_set(listed, "data.file", str(where))
     footnoted = any(c.path == FOOTNOTED for c in _flat(changes))
@@ -104,6 +106,21 @@ def draw(
     if any(c.path == NONSTANDARD for c in _flat(changes)):
         graph.axes.axvline(60, color="#000000", linewidth=1)  # any addition makes it non-standard
     return graph
+
+
+def _data_file(spec: str, doc: dict[str, Any], reg: Registry) -> Path | None:
+    """The data file of a GraphSpec named spec, or of doc, a copy of it."""
+    home = reg.paths["graphspec"].get(spec)
+    folder = home.parent if home is not None else Path.cwd()
+    return data_path(Loaded("graphspec", doc, reg, folder))
+
+
+def data(spec: str, reg: Registry) -> pd.DataFrame:
+    """The data a GraphSpec draws, from its data file."""
+    where = _data_file(spec, reg.docs["graphspec"][spec], reg)
+    if where is None:
+        raise SpecError([f"GraphSpec '{spec}': data.file: None, so it has no data to draw"])
+    return pd.read_parquet(where)
 
 
 def png(graph: Graph, dpi: float) -> bytes:

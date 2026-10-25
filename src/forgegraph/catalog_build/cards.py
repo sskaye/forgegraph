@@ -1,16 +1,45 @@
 """A catalog panel's cards: what each one changes, where it's placed, and its drawing.
 
-place() lays out a catalog's cards from its catalog file (forgegraph.catalog_build.files),
-without drawing; Drawings draws them, each once.
+Every variable parameter of the spec a catalog shows gets one card, chosen by a rule, not
+by hand; a format's output.* and provenance.* parameters (EXEMPT), which change the saved
+files and not the drawing, get none. candidates() lists the values the rule gives a
+parameter's card, in order, from the parameter's default d (the value the spec shown gives
+it: a theme's or format's own, a graph type's or layer type's definition's), its range and
+the baseline's data:
+
+1. true or false: not d.
+2. A column in the range: each column of the baseline's data, in the data's order, that the
+   GraphSpec drawn doesn't already use, and whose type the parameter takes: numbers for an
+   axis's column or a layer's, any other.
+3. A parameter whose name ends in format, with text in its range: FORMATS.
+4. Other text in its range: SAMPLE_TEXT.
+5. A hex color in its range: SAMPLE_COLOR.
+6. A number with a numeric default: 2d, then d/2 (for d = 0, just 1), each within the
+   range's interval.
+7. A number with a None default: for an axis's min or max, the median of the axis's column;
+   for its tick.step, a quarter of the column's range, to one significant figure; for a
+   layer's value, the median of the layer's axis's column.
+8. Then the range's words after d, in the range's order and wrapping round, without d; for
+   a list default, the one-item list of each word after d's first.
+9. Last, d itself, which changes the drawing where the GraphSpec sets another value (the
+   base pack's example sets a benchmark).
+
+A value outside the range isn't a candidate. A card setting one of the parameters TIES ties
+to None sets the others to None too.
+
+place() puts each card on its first candidate that draws, and differently from the baseline
+it's drawn on, on the first such baseline: the catalog's GraphSpec first, then its numbered
+baselines in the catalog files' order. Drawings draws the cards, each once.
 """
 
 from __future__ import annotations
 
 import io
-from collections.abc import Collection
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import pandas as pd
 from PIL import Image
 
 from forgegraph.catalog_build.examples import NONSTANDARD, draw, image
@@ -18,12 +47,18 @@ from forgegraph.catalog_build.page import CSS_DPI
 from forgegraph.graph import Graph, SpecError
 from forgegraph.spec.parameters import NONE, Parameter
 from forgegraph.spec.registry import Registry
+from forgegraph.spec.validate import TIES
 
 if TYPE_CHECKING:  # catalog_build.files imports this module, so only to check types
     from forgegraph.catalog_build.files import Catalog
 
 DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough to commit
 COLORS = 64  # palette size: plenty for a graph's few colors and their anti-aliasing
+EXEMPT = {"format": ("output.", "provenance.")}  # change the saved files, not the drawing
+FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
+SAMPLE_TEXT = "Sample text"
+SAMPLE_COLOR = "#D55E00"
+NUMBERS = ("int", "positive int", "float", "positive float")
 
 
 @dataclass(frozen=True)
@@ -35,7 +70,8 @@ class Change:
 
 @dataclass(frozen=True)
 class Variation:
-    """A parameter's change (with any it needs), from the baseline or a numbered baseline."""
+    """A parameter's card: its change (with its ties'), from the baseline or a numbered
+    baseline."""
 
     parameter: Parameter
     changes: tuple[Change, ...]  # the parameter's own first
@@ -51,8 +87,7 @@ class Planned:
     """A card on a panel: its id and heading, the changes it draws besides the catalog's
     `always`, and the changes it must draw differently from (`start`, the card named
     `start_name`). A numbered baseline that is no parameter's card has no start; a
-    parameter's card shown as a numbered baseline (`numbered`) keeps its start, though the
-    build doesn't check it."""
+    parameter's card shown as a numbered baseline (`numbered`) keeps its start."""
 
     id: str
     heading: str
@@ -60,6 +95,104 @@ class Planned:
     start: tuple[Change, ...] | None = None
     start_name: str = ""
     numbered: bool = False
+
+
+@dataclass(frozen=True)
+class Scene:
+    """What the rule reads of the GraphSpec a catalog draws: its data, its values with the
+    catalog's `always` (a layer catalog's layer, with its defaults), and the columns those
+    name."""
+
+    data: pd.DataFrame
+    values: Mapping[str, Any]
+    used: frozenset[str]
+
+
+def gets_card(kind: str, p: Parameter) -> bool:
+    """Whether a variable parameter of a spec of this kind gets a card."""
+    return not p.path.startswith(EXEMPT.get(kind, ()))
+
+
+def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]:
+    """The values the rule gives a parameter's card, in order (see the module's docstring),
+    before they're checked against its range. d: its default, the value the spec shown gives
+    it; layer: the layer type whose parameter it is."""
+    rng = p.range
+    if set(rng.literals) == {"true", "false"}:
+        return [not d, d]
+    out: list[Any] = []
+    if {"column", "columns"} & set(rng.types):
+        numbers = bool(layer) or p.path.startswith("axis.")
+        frame = scene.data
+        out += [
+            c
+            for c in frame.columns
+            if c not in scene.used and (not numbers or pd.api.types.is_numeric_dtype(frame[c]))
+        ]
+    if "text" in rng.types:
+        out += FORMATS if p.path.endswith("format") else (SAMPLE_TEXT,)
+    if "hex color" in rng.types:
+        out.append(SAMPLE_COLOR)
+    if rng.intervals or set(NUMBERS) & set(rng.types):
+        if isinstance(d, int | float) and not isinstance(d, bool):
+            out += _within(p, d, [1] if d == 0 else [2 * d, d / 2])
+        elif d in (None, NONE):
+            out += _from_data(p, scene, layer)
+    return [*out, *_words(p, d), NONE if d is None else d]
+
+
+def _within(p: Parameter, d: float, values: list[float]) -> list[float]:
+    """Each value, moved into the range's interval that holds d."""
+    for i in p.range.intervals:
+        if i.low <= d <= i.high:
+            return [min(max(v, i.low), i.high) for v in values]
+    return values
+
+
+def _column(scene: Scene, axis: Any) -> pd.Series | None:
+    """The numbers of an axis's column (its first, for several), if they are numbers."""
+    name = scene.values.get(f"axis.{axis}.data.column")
+    name = name[0] if isinstance(name, list) else name
+    if name not in scene.data.columns or not pd.api.types.is_numeric_dtype(scene.data[name]):
+        return None
+    return cast(pd.Series, scene.data[name]).dropna()
+
+
+def _from_data(p: Parameter, scene: Scene, layer: str) -> list[float]:
+    """A number for a parameter defaulting to None, from its axis's column."""
+    parts = p.path.split(".")
+    if layer and p.path == "value":
+        column = _column(scene, scene.values.get(f"layers.{layer}.axis"))
+        return [] if column is None else [float(column.median())]
+    column = _column(scene, parts[1]) if parts[0] == "axis" and not layer else None
+    if column is None:
+        return []
+    if parts[2:] in (["min"], ["max"]):
+        return [float(column.median())]
+    if parts[2:] == ["tick", "step"]:
+        return [float(f"{(column.max() - column.min()) / 4:.1g}")]
+    return []
+
+
+def _words(p: Parameter, d: Any) -> list[Any]:
+    """The range's words after d (for a list, its first), in the range's order and wrapping
+    round, without it; for a list, each as a one-item list."""
+    words = list(p.range.literals)
+    first = d[0] if isinstance(d, list) and d else d
+    first = NONE if first is None else first
+    i = words.index(first) if first in words else len(words) - 1
+    after = [w for w in words[i + 1 :] + words[: i + 1] if w != first]
+    return [[w] for w in after] if isinstance(d, list) else after
+
+
+def tied(path: str, value: Any, prefix: str = "") -> tuple[Change, ...]:
+    """A card's changes: its parameter's, and when that's None, None for each parameter TIES
+    ties it to. prefix: a layer catalog's layers.<layer>."""
+    own = Change(f"{prefix}{path}", value)
+    if value not in (None, NONE):
+        return (own,)
+    others = [q for tie in TIES if path in tie for q in tie if q != path]
+    return (own, *(Change(f"{prefix}{q}", NONE) for q in others))
 
 
 def show(value: Any) -> str:
@@ -85,32 +218,72 @@ def _id(change: Change) -> str:
     return change.path.replace(".", "-")
 
 
-def place(catalog: Catalog, shown: Collection[str]) -> list[Planned]:
-    """The cards of a catalog's panel, in order: the baseline, then the card of each
-    parameter in shown (by path), each numbered baseline before the first card starting
-    from it."""
+# differs(start, changes): whether start with changes draws, and differently from start
+Differs = Callable[[tuple[Change, ...], tuple[Change, ...]], bool]
+
+
+def _first(catalog: Catalog, options: tuple[tuple[Change, ...], ...], differs: Differs):
+    bases: list[Change | None] = [None, *catalog.baselines]
+    return next(
+        (
+            (changes, base)
+            for changes in options
+            for base in bases
+            if differs(() if base is None else (base,), changes)
+        ),
+        None,
+    )
+
+
+def placed(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Variation]:
+    """Each parameter's card: its first candidate that draws differently from a baseline, on
+    the first such baseline (the GraphSpec, then the numbered baselines in order). One with
+    none is placed by fallback if given (a pack's catalog: as ForgeGraph's places it), else
+    it's a CatalogError."""
+    from forgegraph.catalog_build.files import CatalogError
+
+    out, problems = [], []
+    for p, options in catalog.cards:
+        found = _first(catalog, options, differs)
+        if found is None and fallback is not None:
+            found = _first(catalog, options, fallback)
+        if found is None:
+            problems.append(
+                f"{catalog.kind.replace('_', ' ')} {catalog.name}: {p.path}: no candidate "
+                "changes the drawing on any baseline; add a baseline that shows it"
+            )
+        else:
+            out.append(Variation(p, *found))
+    if problems:
+        raise CatalogError(problems)
+    return out
+
+
+def place(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Planned]:
+    """The cards of a catalog's panel, in order: the baseline, then each parameter's card
+    (placed()), each numbered baseline before the first card starting from it."""
     first = "Baseline"
     if catalog.always:  # a layer's catalog: say what every card adds to the GraphSpec
         first = " + ".join([f"Baseline: {catalog.baseline}", *(_change(c) for c in catalog.always)])
     cards = [Planned("baseline", first, ())]
-    variations = [v for p, v in catalog.variations if v is not None and p.path in shown]
+    variations = placed(catalog, differs, fallback)
     numbers: dict[str, int] = {}  # each numbered baseline's number, by the change that makes it
-    placed: dict[str, int] = {}  # and its place in cards
+    at: dict[str, int] = {}  # and its place in cards
     for v in variations:
         single = len(v.changes) == 1
         base = () if v.base is None else (v.base,)
         if single and _change(v.change) in numbers:  # already shown, as a numbered baseline
-            i = placed[_change(v.change)]
+            i = at[_change(v.change)]
             cards[i] = replace(cards[i], start=base, numbered=True)
             continue
         if v.base is not None and _change(v.base) not in numbers:
             numbers[_change(v.base)] = len(numbers) + 2
-            placed[_change(v.base)] = len(cards)
+            at[_change(v.base)] = len(cards)
             heading = f"Baseline {numbers[_change(v.base)]}: Baseline + {_change(v.base)}"
             cards.append(Planned(f"baseline-{_id(v.base)}", heading, (v.base,)))
         if single and v.base is None and any(w.base == v.change for w in variations):
             numbers[_change(v.change)] = len(numbers) + 2
-            placed[_change(v.change)] = len(cards)
+            at[_change(v.change)] = len(cards)
             heading = f"Baseline {numbers[_change(v.change)]}: Baseline + {_change(v.change)}"
             cards.append(
                 Planned(f"baseline-{_id(v.change)}", heading, (v.change,), (), numbered=True)
@@ -145,8 +318,9 @@ def _message_png(text: str, width_in: float) -> bytes:
 
 class Drawings:
     """A catalog's cards drawn in a theme and format (None: the baseline's), each once, by
-    its changes. A lenient one draws a card that can't be drawn as its problem, in place of
-    its graph; otherwise that's a CatalogError. The baseline itself must draw."""
+    its changes: its image and its width in inches. A lenient one draws a card that can't be
+    drawn as its problem, in place of its graph; otherwise that's a CatalogError. The
+    baseline itself must draw."""
 
     def __init__(
         self,
@@ -161,44 +335,51 @@ class Drawings:
         self.theme = theme
         self.fmt = fmt
         self.lenient = lenient
-        self._drawn: dict[str, tuple[Graph | None, bytes]] = {}
-
-    def graph(self, *changes: Change) -> Graph | None:
-        """The card's graph; None if it can't be drawn."""
-        return self._draw(changes)[0]
+        self._drawn: dict[str, tuple[bytes | None, float, list[str]]] = {}
 
     def png(self, *changes: Change) -> bytes:
         """The card's image."""
-        return self._draw(changes)[1]
+        image_, _, problems = self._draw(changes)
+        if image_ is not None:
+            return image_
+        if self.lenient and changes:
+            problem = f"Can't be drawn in this theme and format: {problems[0]}"
+            return _message_png(problem, self.width())
+        from forgegraph.catalog_build.files import CatalogError
 
-    def _draw(self, changes: tuple[Change, ...]) -> tuple[Graph | None, bytes]:
-        key = " + ".join(_change(c) for c in changes)
-        if key in self._drawn:
-            return self._drawn[key]
         catalog = self.catalog
-        try:
-            graph = draw(
-                *catalog.always,
-                *changes,
-                spec=catalog.baseline,
-                theme=self.theme,
-                format=self.fmt,
-                reg=self.reg,
-            )
-        except SpecError as e:
-            from forgegraph.catalog_build.files import CatalogError
+        card = " + ".join(["Baseline", *(_change(c) for c in changes)])
+        kind = catalog.kind.replace("_", " ")
+        raise CatalogError([f"{kind} {catalog.name}: {card}: {p}" for p in problems])
 
-            card = " + ".join(["Baseline", *(_change(c) for c in changes)])
-            if self.lenient and changes:
-                baseline = self.graph()
-                assert baseline is not None  # the baseline itself must draw
-                width = baseline.figure.get_size_inches()[0]
-                problem = f"Can't be drawn in this theme and format: {e.problems[0]}"
-                self._drawn[key] = None, _message_png(problem, width)
-                return self._drawn[key]
-            kind = catalog.kind.replace("_", " ")
-            raise CatalogError(
-                [f"{kind} {catalog.name}: {card}: {p}" for p in e.problems]
-            ) from None
-        self._drawn[key] = graph, _png(graph)
+    def width(self, *changes: Change) -> float:
+        """The card's width, inches; for one that can't be drawn, the baseline's."""
+        image_, width, _ = self._draw(changes)
+        if image_ is None:
+            self.png()  # the baseline itself must draw
+            width = self._draw(())[1]
+        return width
+
+    def differs(self, start: tuple[Change, ...], changes: tuple[Change, ...]) -> bool:
+        """Whether start with changes draws, and differently from start."""
+        before = self._draw(start)[0]
+        after = self._draw((*start, *changes))[0]
+        return before is not None and after is not None and before != after
+
+    def _draw(self, changes: tuple[Change, ...]) -> tuple[bytes | None, float, list[str]]:
+        key = " + ".join(_change(c) for c in changes)
+        if key not in self._drawn:
+            try:
+                graph = draw(
+                    *self.catalog.always,
+                    *changes,
+                    spec=self.catalog.baseline,
+                    theme=self.theme,
+                    format=self.fmt,
+                    reg=self.reg,
+                )
+            except SpecError as e:
+                self._drawn[key] = None, 0.0, list(e.problems)
+            else:
+                self._drawn[key] = _png(graph), graph.figure.get_size_inches()[0], []
         return self._drawn[key]

@@ -16,9 +16,8 @@ from pathlib import Path
 
 from forgegraph import __version__, forgemark
 from forgegraph.catalog_build.cards import Drawings, place, show
-from forgegraph.catalog_build.files import Catalog, CatalogError, read
+from forgegraph.catalog_build.files import Catalog, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
-from forgegraph.graph import Graph
 from forgegraph.packs import Pack
 from forgegraph.spec.parameters import BASE, NONE, Parameter, graph_type_files
 from forgegraph.spec.registry import Registry, builtin
@@ -135,18 +134,17 @@ def instance(
     fmt: str | None = None,
 ) -> Instance:
     """One specification file's panel: its table, and its catalog's cards. A graph type's or
-    layer type's cards are drawn in theme and fmt when given (a pack's); one that can't be
-    drawn in them, or draws the same as the card it starts from, says so on the card instead
-    of stopping the page, since a pack can't change those cards."""
+    layer type's cards are drawn in theme and fmt when given (a pack's), and placed in them;
+    a card that can't be placed in them is placed as in ForgeGraph's catalog, and one that
+    then can't be drawn in them, or draws the same as the card it starts from, says so on
+    the card instead of stopping the page, since a pack can't change those cards."""
     kind, name = catalog.kind, catalog.name
     lenient = kind in ("graph_type", "layer") and (theme is not None or fmt is not None)
     theme = name if kind == "theme" else theme
     fmt = name if kind == "format" else fmt
     iid = f"{kind.replace('_', '')}-{name.replace('/', '-')}"
     drawings = Drawings(catalog, reg, theme, fmt, lenient)
-    first_drawn = drawings.graph()
-    assert first_drawn is not None  # the baseline itself must draw
-    baseline: Graph = first_drawn
+    drawings.png()  # the baseline itself must draw
     own = _own_values(kind, name, reg)
 
     rows = tuple(
@@ -157,30 +155,18 @@ def instance(
             _status(p, own.fixed(p.path, p.fixed)),
             p.description,
         )
-        for p, _ in catalog.variations
+        for p in catalog.parameters
     )
-    # Only a variable parameter's card is shown; every card is still drawn by the
-    # perturbation test.
-    shown = {p.path for p, _ in catalog.variations if not own.fixed(p.path, p.fixed)}
+    fallback = Drawings(catalog, reg).differs if lenient else None
     cards = []
-    problems = []
-    for planned in place(catalog, shown):
+    for planned in place(catalog, drawings.differs, fallback):
         png_ = drawings.png(*planned.changes)
         heading_ = planned.heading
-        if planned.start is not None and not planned.numbered:
-            same = png_ == drawings.png(*planned.start)
-            if same and lenient:
-                heading_ += f" (draws the same as {planned.start_name} in this theme and format)"
-            elif same:
-                problems.append(
-                    f"{kind.replace('_', ' ')} {name}: {heading_} draws the same as "
-                    f"{planned.start_name}"
-                )
-        graph = drawings.graph(*planned.changes) or baseline
-        size = round(graph.figure.get_size_inches()[0] * CSS_DPI)
+        checked = lenient and planned.start is not None and not planned.numbered
+        if checked and png_ == drawings.png(*(planned.start or ())):
+            heading_ += f" (draws the same as {planned.start_name} in this theme and format)"
+        size = round(drawings.width(*planned.changes) * CSS_DPI)
         cards.append(Card(f"{iid}-{planned.id}", heading_, png_, size))
-    if problems:
-        raise CatalogError(problems)
     return Instance(iid, name, heading, rows, tuple(cards))
 
 

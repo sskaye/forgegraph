@@ -1,17 +1,41 @@
-"""Catalog files: the rules a catalog file follows, and what reading one gives."""
+"""Catalog files: the rules a catalog file follows, what reading one gives, and the rule
+choosing each card's value and baseline."""
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 from pack_helpers import write_pack
 
-from forgegraph.catalog_build.files import CatalogError, read
+from forgegraph.catalog_build.cards import (
+    SAMPLE_COLOR,
+    SAMPLE_TEXT,
+    Change,
+    Scene,
+    candidates,
+    gets_card,
+    place,
+    placed,
+    tied,
+)
+from forgegraph.catalog_build.files import Catalog, CatalogError, read
 from forgegraph.packs import read_pack
+from forgegraph.spec.parameters import definitions
 from forgegraph.spec.registry import builtin
 
 HEADER = (
     "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"
     "baseline: forgegraph_base/polarization\n"
+)
+XY = definitions("graph_type", "xy")
+THEME = definitions("theme")
+# A GraphSpec's data and values: x and y use two of its four columns.
+SCENE = Scene(
+    pd.DataFrame(
+        {"Cell": ["A", "B", "A"], "x": [1.0, 2.0, 9.0], "y": [3.0, 5.0, 4.0], "t": [10, 20, 30]}
+    ),
+    {"axis.x.data.column": "x", "axis.y.data.column": ["y"], "layers.line.axis": "y"},
+    frozenset({"x", "y"}),
 )
 
 
@@ -42,13 +66,17 @@ def _problems(tmp_path, catalog: str, **kw) -> list[str]:
     return e.value.problems
 
 
-def test_a_catalog_extending_another_lists_only_what_differs(tmp_path):
-    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_format") + (
-        "baselines: None\nvariations:\n    figure:\n        width: 90\n"
+# --- reading a catalog file ---------------------------------------------------------------
+
+
+def test_a_catalog_extending_another_adds_its_baselines_after_the_ones_it_inherits(tmp_path):
+    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
+        "baselines:\n    wide: {figure.width: 200}\n"
     )
-    reg = catalog_project(tmp_path, catalog)
-    widths = {v.change.value for p, v in read("format", "house/plain", reg).variations if v}
-    assert 90 in widths and 100 not in widths
+    reg = catalog_project(tmp_path, catalog, kind_folder="themes")
+    names = [b.path for b in read("theme", "house/plain", reg).baselines]
+    inherited = [b.path for b in read("theme", "forgegraph_base/base_theme", builtin()).baselines]
+    assert names == [*inherited, "figure.width"]
 
 
 def test_every_file_needs_a_catalog(tmp_path):
@@ -62,18 +90,16 @@ def test_catalog_rules_are_errors(tmp_path):
     catalog = HEADER.format(name="plain", extends="None") + (
         "baselines:\n"
         "    two: [90, 80]\n"
-        "variations:\n"
-        "    figure:\n"
-        "        width: -5\n"
-        "        height: {value: auto, from: nowhere}\n"
-        "        depth: 3\n"
+        "    unknown: {figure.depth: 3}\n"
+        "    wrong: {figure.width: -5}\n"
+        "variations: None\n"
     )
-    problems = _problems(tmp_path, catalog)
+    problems = _problems(tmp_path / "1", catalog)
+    assert any("variations: unknown field" in p for p in problems)
+    problems = _problems(tmp_path / "2", catalog.replace("variations: None\n", ""))
     assert any("baselines.two: must be parameters and their values" in p for p in problems)
-    assert any("variations: missing figure.base_size" in p for p in problems)
-    assert any("variations.figure.depth: unknown parameter" in p for p in problems)
-    assert any("variations.figure.width: must be" in p for p in problems)
-    assert any("from: no numbered baseline 'nowhere'" in p for p in problems)
+    assert any("baselines.unknown: unknown parameter 'figure.depth'" in p for p in problems)
+    assert any("baselines.wrong.figure.width: must be" in p for p in problems)
 
 
 def test_builtin_catalogs_follow_the_rules():
@@ -87,9 +113,8 @@ def test_builtin_catalogs_follow_the_rules():
 
 def test_a_numbered_baseline_can_change_several_parameters():
     catalog = read("graph_type", "xy", builtin())
-    offset = next(v for p, v in catalog.variations if p.path == "series.offset")
-    assert offset is not None and offset.base is not None
-    parts = {c.path: c.value for c in offset.base.parts}
+    overlaid = next(b for b in catalog.baselines if b.path == "overlaid")
+    parts = {c.path: c.value for c in overlaid.parts}
     assert parts["encoding.color"] == "Run" and parts["mark.bar.show"] is True
 
 
@@ -98,7 +123,7 @@ def test_a_layer_catalog_draws_its_layer_on_every_card():
     always = {c.path: c.value for c in catalog.always}
     assert always["layers.note.type"] == "note"
     assert always["layers.note.position"] == "bottom_left"
-    paths = [v.change.path for _, v in catalog.variations if v]
+    paths = [options[0][0].path for _, options in catalog.cards]
     assert paths == ["layers.note.text", "layers.note.position", "layers.note.inside"]
 
 
@@ -106,3 +131,146 @@ def test_a_layer_catalogs_settings_are_on_every_card():
     always = {c.path: c.value for c in read("layer", "error_bar", builtin()).always}
     assert always["axis.y.data.aggregation"] == "mean"
     assert always["layers.error_bar.type"] == "error_bar"
+
+
+def test_only_variable_parameters_get_cards():
+    catalog = read("theme", "forgegraph_base/base_theme", builtin())
+    carded = {p.path for p, _ in catalog.cards}
+    assert "grid.show" in carded and "font.family" not in carded  # variable; fixed
+    assert len(catalog.parameters) > len(catalog.cards)
+
+
+def test_a_formats_output_and_provenance_get_no_card():
+    assert not gets_card("format", definitions("format")["output.file_types"])
+    assert not gets_card("format", definitions("format")["provenance.level"])
+    assert gets_card("theme", THEME["grid.show"])
+    assert read("format", "forgegraph_base/base_format", builtin()).cards == ()
+
+
+def test_candidates_outside_the_range_are_dropped():
+    catalog = read("graph_type", "xy", builtin())
+    options = next(o for p, o in catalog.cards if p.path == "axis.x.data.column")
+    assert all(changes[0].value != "None" for changes in options)  # d itself: not a column
+
+
+# --- the rule: each card's candidate values, by range ---------------------------------------
+
+
+def test_true_or_false_is_the_other():
+    assert candidates(XY["mark.line.show"], True, SCENE) == [False, True]
+
+
+def test_an_axis_column_is_each_unused_column_of_numbers():
+    assert candidates(XY["axis.x.data.column"], None, SCENE) == ["t", "None"]
+
+
+def test_an_encoding_column_is_each_unused_column_then_the_words():
+    p = XY["encoding.color"]
+    assert candidates(p, "column_name", SCENE) == ["Cell", "t", "None", "column_name"]
+
+
+def test_a_format_is_a_number_format_then_a_date_format():
+    assert candidates(XY["axis.x.tick.label.format"], "auto", SCENE) == [".3f", "%b %-d", "auto"]
+
+
+def test_other_text_is_the_sample_then_the_words():
+    p = XY["axis.x.title"]
+    assert candidates(p, "column_name", SCENE) == [SAMPLE_TEXT, "None", "column_name"]
+
+
+def test_a_hex_color_is_the_sample_color():
+    p = THEME["layer.error_bar.color"]
+    assert candidates(p, "#000000", SCENE) == [SAMPLE_COLOR, "series", "#000000"]
+
+
+def test_a_number_is_doubled_then_halved_within_its_interval():
+    assert candidates(THEME["series.bar.gap"], 0.15, SCENE) == [0.3, 0.075, 0.15]
+    p = THEME["legend.direct.max_relative_distance"]  # 0-1
+    assert candidates(p, 0.8, SCENE) == [1.0, 0.4, 0.8]
+    assert candidates(THEME["axis.tick.minor.num"], 0, SCENE) == [1, 0]
+
+
+def test_a_number_defaulting_to_none_comes_from_its_axis_column():
+    assert candidates(XY["axis.x.min"], None, SCENE) == [2.0, "None"]  # the median
+    assert candidates(XY["axis.y.max"], None, SCENE) == [4.0, "None"]
+    step = candidates(XY["axis.x.tick.step"], None, SCENE)
+    assert step == [SAMPLE_TEXT, 2.0, "None"]  # a quarter of 1-9, to one figure
+    value = definitions("layer", "reference_line")["value"]
+    assert candidates(value, None, SCENE, "line") == ["t", 4.0, "None"]  # the layer's axis
+
+
+def test_words_follow_the_default_round_the_range():
+    assert candidates(XY["legend.method"], "auto", SCENE) == ["direct", "key", "none", "auto"]
+    assert candidates(XY["series.base_axis"], "y", SCENE) == ["x", "y"]
+
+
+def test_a_list_takes_each_word_after_its_first_as_a_list():
+    p = XY["legend.key.positions"]
+    d = ["top_right", "top_left"]
+    found = candidates(p, d, SCENE)
+    assert found[:2] == [["bottom_left"], ["bottom_center"]]
+    assert found[-2:] == [["top_center"], d]
+    assert ["top_right"] not in found
+
+
+def test_a_mixed_range_takes_its_types_before_its_words():
+    p = THEME["legend.color_bar.colors"]
+    found = candidates(p, "viridis", SCENE)
+    assert found[:3] == [SAMPLE_COLOR, "cividis", "plasma"] and found[-1] == "viridis"
+
+
+def test_setting_one_of_a_tie_to_none_sets_the_other_too():
+    assert tied("benchmark.data_column", "None") == (
+        Change("benchmark.data_column", "None"),
+        Change("benchmark.value", "None"),
+    )
+    assert tied("benchmark.value", "None")[1] == Change("benchmark.data_column", "None")
+    assert tied("benchmark.data_column", "Cell") == (Change("benchmark.data_column", "Cell"),)
+    assert tied("mark.line.show", "None") == (Change("mark.line.show", "None"),)
+
+
+# --- placing the cards -----------------------------------------------------------------------
+
+B2, B3 = Change("legend.method", "key"), Change("grid.show", True)
+ONE, TWO = (Change("series.line.width", 1),), (Change("series.line.width", 2),)
+P = THEME["series.line.width"]
+
+
+def _catalog(*options: tuple[Change, ...]) -> Catalog:
+    return Catalog("theme", "t", "forgegraph_base/polarization", (P,), ((P, options),), (B2, B3))
+
+
+def test_a_card_is_its_first_candidate_on_the_first_baseline_it_changes():
+    tried = []
+
+    def differs(start, changes):
+        tried.append((start, changes))
+        return start == (B3,) or changes == TWO
+
+    [v] = placed(_catalog(ONE, TWO), differs)
+    assert v.changes == ONE and v.base == B3  # the first candidate, though TWO differs sooner
+    assert tried == [((), ONE), ((B2,), ONE), ((B3,), ONE)]
+
+
+def test_a_card_on_a_numbered_baseline_is_drawn_after_it():
+    cards = place(_catalog(ONE), lambda start, changes: start == (B2,))
+    assert [c.heading for c in cards] == [
+        "Baseline",
+        "Baseline 2: Baseline + legend.method = key",
+        "Baseline 2 + series.line.width = 1",
+    ]
+    assert cards[2].start == (B2,) and cards[2].changes == (B2, *ONE)
+
+
+def test_a_parameter_no_candidate_shows_is_an_error():
+    with pytest.raises(CatalogError) as e:
+        placed(_catalog(ONE, TWO), lambda start, changes: False)
+    assert e.value.problems == [
+        "theme t: series.line.width: no candidate changes the drawing on any baseline; "
+        "add a baseline that shows it"
+    ]
+
+
+def test_a_packs_card_its_looks_cant_show_is_placed_as_forgegraphs_is():
+    [v] = placed(_catalog(ONE, TWO), lambda s, c: False, lambda s, c: c == TWO and s == (B2,))
+    assert v.changes == TWO and v.base == B2

@@ -18,14 +18,13 @@ from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.figure import (
     LayoutError,
     add_footnote,
-    artists,
     layout,
     new_figure,
     watermark,
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
-from forgegraph.drawn import Inspected, Saved, SpecError, pixel_hash
+from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
@@ -60,6 +59,7 @@ class Graph(Inspected, Saved):
     _held: bool = False  # inspected already, during one save (see inspected_once)
     _drawing: list[lint.Issue] = field(default_factory=list)  # found while drawing
     _font_problems: list[str] = field(default_factory=list)
+    _prepared: Prepared = field(kw_only=True, repr=False, compare=False)  # what it was drawn from
 
     def mark(self) -> None:
         """Draw the watermark over the plot box, once: the figure has been found changed."""
@@ -68,19 +68,11 @@ class Graph(Inspected, Saved):
     def check(self) -> list[lint.Issue]:
         """Lint the figure as it is now, including anything drawn on it since, and return
         the issues (also kept in `issues`)."""
-        gt = self.values["graph_type"]
-        with isolated(self.style), lint.font_messages() as font_problems:
-            self.figure.canvas.draw()  # type: ignore[union-attr]
-        self._font_problems = sorted({*self._font_problems, *font_problems})
+        self._lint_draw()
         with isolated(self.style):
-            self.issues = lint.check(
-                self.figure,
-                self.axes,
-                fixed_limits=fixed_limits(gt),
-                rows_dropped=self.data.rows_dropped,
-                font_problems=self._font_problems,
-                drawing=self._drawing,
-            )
+            figure = lint.figure_issues(self.figure, self._font_problems)
+        plot = self._prepared.plot_issues(self.axes, self._drawing)
+        self.issues = lint.ordered(figure, plot)
         return self.issues
 
     @property
@@ -195,6 +187,16 @@ class Prepared:
         self.record.rows_plotted = drawn.rows_plotted
         self.record.rows_dropped = drawn.rows_dropped
 
+    def plot_issues(self, ax: Axes, drawing: list[lint.Issue]) -> list[lint.Issue]:
+        """Lint's issues with the graph as drawn into ax, with those drawing it found."""
+        with isolated(self.style):
+            return lint.plot_issues(
+                ax,
+                fixed_limits=fixed_limits(self.values["graph_type"]),
+                rows_dropped=self.record.rows_dropped,
+                drawing=drawing,
+            )
+
 
 def prepare(
     spec: dict[str, Any] | str | Path,
@@ -258,15 +260,11 @@ def render(
         except module.DrawError as e:
             raise SpecError([str(e)]) from None
     p.finish(drawn)
-    graph = Graph(p.doc, fig, ax, p.values, style, p.record, drawn.labelling, [], p.specs)
-    graph.nonstandard_packs = p.nonstandard_packs
-    graph.changed = bool(p.nonstandard_packs)  # drawn with a pack the main config doesn't list
+    graph = Graph(
+        p.doc, fig, ax, p.values, style, p.record, drawn.labelling, [], p.specs, _prepared=p
+    )
     graph._drawing = list(drawn.warnings)
-    graph._font_problems = font_problems
-    graph.check()  # the one draw after layout, which the record of its pixels shares
-    graph._snapshot = artists(fig)
-    graph._drawn = pixel_hash(fig, style, redraw=False)
-    fig.graph = graph  # from here on, drawing or saving the figure inspects it first
+    graph.seal(fig, font_problems, p.nonstandard_packs)
     return graph
 
 

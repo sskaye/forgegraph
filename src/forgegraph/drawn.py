@@ -12,7 +12,7 @@ from pathlib import Path
 from matplotlib.figure import Figure
 
 from forgegraph.drawing import lint
-from forgegraph.drawing.figure import artists
+from forgegraph.drawing.figure import GraphFigure, artists
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.spec.common import ProblemsError
 
@@ -28,13 +28,41 @@ class Inspected:
     figure, by any route, inspects it first."""
 
     changed: bool
+    nonstandard_packs: list[str]
     _snapshot: tuple[int, ...]
     _drawn: str
     _held: bool
+    _font_problems: list[str]
 
     def _shown(self) -> tuple[Figure, Style]:
         """The figure, and the style it's drawn in."""
         raise NotImplementedError
+
+    def check(self) -> list[lint.Issue]:
+        """Lint the figure as it is now, and return the issues."""
+        raise NotImplementedError
+
+    def seal(
+        self, figure: GraphFigure, font_problems: list[str], nonstandard_packs: list[str]
+    ) -> None:
+        """Finish rendering: keep the font problems drawing found and the packs used that the
+        main config doesn't list (which make it non-standard), lint it in the one draw after
+        layout, which the record of its pixels shares, then record its artists and pixels.
+        From here on, drawing or saving the figure inspects it first."""
+        self.nonstandard_packs = nonstandard_packs
+        self.changed = bool(nonstandard_packs)
+        self._font_problems = font_problems
+        self.check()
+        self._snapshot = artists(figure)
+        self._drawn = pixel_hash(figure, self._shown()[1], redraw=False)
+        figure.graph = self
+
+    def _lint_draw(self) -> None:
+        """Draw the figure for lint, adding any font problems drawing it finds."""
+        figure, style = self._shown()
+        with isolated(style), lint.font_messages() as font_problems:
+            figure.canvas.draw()  # type: ignore[union-attr]
+        self._font_problems = sorted({*self._font_problems, *font_problems})
 
     @property
     def nonstandard(self) -> bool:

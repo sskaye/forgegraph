@@ -16,7 +16,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass, field
-from functools import cached_property
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,7 +33,6 @@ from forgegraph.drawing.figure import (
     LayoutError,
     TileAxes,
     add_footnote,
-    artists,
     footnote_room,
     inches,
     place_footnote,
@@ -42,8 +40,8 @@ from forgegraph.drawing.figure import (
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
-from forgegraph.drawn import Inspected, Saved, SpecError, pixel_hash
-from forgegraph.graph import PLACE_PASSES, Prepared, fixed_limits, prepare
+from forgegraph.drawn import Inspected, Saved, SpecError
+from forgegraph.graph import PLACE_PASSES, Prepared, prepare
 from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
@@ -59,23 +57,45 @@ SUFFIX = ".layout.yaml"
 
 @dataclass
 class Tile:
-    """A tile as drawn: its GraphSpec, every value it was drawn with, and its data."""
+    """A tile as drawn: its GraphSpec prepared (every value it was drawn with, and its data),
+    the Axes it was drawn into, and what the graph type drew."""
 
     name: str
     file: str  # the GraphSpec file, as the layout names it
-    spec: dict[str, Any]
+    prepared: Prepared = field(compare=False)  # what it was drawn from
     axes: Axes
-    explained: Explained  # every value, by kind, with where each came from
-    style: Style
-    data: DataRecord
-    labelling: str
-    drawing: list[lint.Issue] = field(default_factory=list)
-    specs: dict[str, Any] = field(default_factory=dict)  # each spec used: name and version
+    drawn: Any  # what the graph type drew
 
-    @cached_property
+    @property
+    def spec(self) -> dict[str, Any]:
+        return self.prepared.doc
+
+    @property
     def values(self) -> dict[str, dict[str, Any]]:
-        """Every value, by kind, without where each came from."""
-        return self.explained.plain()
+        """Every value it was drawn with, by kind."""
+        return self.prepared.values
+
+    @property
+    def style(self) -> Style:
+        return self.prepared.style
+
+    @property
+    def data(self) -> DataRecord:
+        return self.prepared.record
+
+    @property
+    def specs(self) -> dict[str, Any]:
+        """Each spec used, by kind: its name and version."""
+        return self.prepared.specs
+
+    @property
+    def labelling(self) -> str:
+        return self.drawn.labelling
+
+    @property
+    def drawing(self) -> list[lint.Issue]:
+        """What lint found while drawing it."""
+        return list(self.drawn.warnings)
 
     def record(self, full: bool, layout_format: dict[str, Any]) -> TileRecord:
         """Its provenance record; it was drawn in the layout's format, not its own."""
@@ -123,20 +143,11 @@ class TabFigure(Inspected):
     def check(self) -> list[lint.Issue]:
         """Lint the tab's figure as it is now, and return the issues (also kept in `issues`).
         Issues of one plot name its tile."""
-        with isolated(self.style), lint.font_messages() as font_problems:
-            self.figure.canvas.draw()  # type: ignore[union-attr]
-        self._font_problems = sorted({*self._font_problems, *font_problems})
+        self._lint_draw()
         with isolated(self.style):
             issues = lint.figure_issues(self.figure, self._font_problems)
         for tile in self.tiles.values():
-            gt = tile.values["graph_type"]
-            with isolated(tile.style):
-                found = lint.plot_issues(
-                    tile.axes,
-                    fixed_limits=fixed_limits(gt),
-                    rows_dropped=tile.data.rows_dropped,
-                    drawing=tile.drawing,
-                )
+            found = tile.prepared.plot_issues(tile.axes, tile.drawing)
             issues += [lint.Issue(i.check, f"tile '{tile.name}': {i.message}") for i in found]
         self.issues = issues
         return issues
@@ -485,29 +496,11 @@ def _draw_tab(
         apply_separators(fig, grid, layout.values, float(fmt["figure.base_size"]))
     tiles = {}
     for p in placed:
-        prep = prepared[p.name]
-        prep.finish(drawn[p.name])
-        tiles[p.name] = Tile(
-            p.name,
-            str(tab.tiles[p.name]),
-            prep.doc,
-            p.ax,
-            prep.explained,
-            prep.style,
-            prep.record,
-            drawn[p.name].labelling,
-            list(drawn[p.name].warnings),
-            prep.specs,
-        )
+        prepared[p.name].finish(drawn[p.name])
+        tiles[p.name] = Tile(p.name, str(tab.tiles[p.name]), prepared[p.name], p.ax, drawn[p.name])
     result = TabFigure(layout, tab.name, tab.slug, fig, tiles, grid)
     used = {p for prep in prepared.values() for p in prep.nonstandard_packs}
-    result.nonstandard_packs = sorted({*layout._own_packs, *used})
-    result.changed = bool(result.nonstandard_packs)  # drawn with a pack not in the main config
-    result._font_problems = font_problems
-    result.check()  # the one draw after layout, which the record of its pixels shares
-    result._snapshot = artists(fig)
-    result._drawn = pixel_hash(fig, result.style, redraw=False)
-    fig.graph = result  # from here on, drawing or saving the figure inspects it first
+    result.seal(fig, font_problems, sorted({*layout._own_packs, *used}))
     return result
 
 

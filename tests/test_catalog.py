@@ -259,22 +259,18 @@ def test_catalog_rules_are_errors(tmp_path):
     assert any("from: no numbered baseline 'nowhere'" in p for p in problems)
 
 
-def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path, monkeypatch):
+def test_a_card_drawing_the_same_as_its_baseline_is_an_error(tmp_path):
     from forgegraph.catalog_build.build import instance
 
     catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
         "baselines: None\nvariations:\n    grid:\n        show: false\n"  # the baseline's
     )
     reg = _project(tmp_path, catalog, kind_folder="themes")
-
-    def only_grid_show(*args):  # leave out the inherited cards, which draw differently
-        found = read(*args)
-        kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
-        return dataclasses.replace(found, variations=kept)
-
-    monkeypatch.setattr(build, "read", only_grid_show)
+    found = read("theme", "house/plain", reg)
+    # only grid.show: leave out the inherited cards, which draw differently
+    kept = tuple((p, v) for p, v in found.variations if p.path == "grid.show")
     with pytest.raises(CatalogError, match=r"Baseline \+ grid.show = false draws the same"):
-        instance("theme", "house/plain", "Theme > plain", reg)
+        instance(dataclasses.replace(found, variations=kept), "Theme > plain", reg)
 
 
 def test_builtin_catalogs_follow_the_rules():

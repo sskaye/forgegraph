@@ -186,7 +186,7 @@ def _specs(ws: Path) -> list[tuple[Path, str, dict[str, Any]]]:
     """The spec files the agent wrote, each with its kind: layout or schedule by its suffix;
     theme or format by its pack folder; GraphSpec if it names a graph type or extends a
     GraphSpec; otherwise "style", a theme or format outside a pack."""
-    from forgegraph.spec.documents import registry_for
+    from forgegraph.spec.registry import registry_for
 
     yaml = YAML(typ="safe")
     given, out = _given(ws), []
@@ -228,7 +228,8 @@ def _graphspecs(ws: Path) -> list[Path]:
 
 
 def _resolved(spec: Path) -> dict[str, dict[str, Any]]:
-    from forgegraph.spec.documents import explain, load_yaml, registry_for
+    from forgegraph.spec.explain import explain
+    from forgegraph.spec.registry import load_yaml, registry_for
 
     doc = load_yaml(spec)
     reg = registry_for(spec.parent).copy()
@@ -269,7 +270,7 @@ def _drawn(final: Path) -> tuple[Any, pd.DataFrame | None, str]:
     """The final GraphSpec drawn, its Parquet data, and why either failed."""
     import forgegraph as fg
     from forgegraph.graph import data_path
-    from forgegraph.spec.documents import load_yaml, registry_for
+    from forgegraph.spec.registry import load_yaml, registry_for
 
     try:
         graph = fg.render(final)
@@ -426,7 +427,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         ok = bool(specs) and bool(images)
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.documents import load_yaml, registry_for
+            from forgegraph.spec.registry import load_yaml, registry_for
 
             try:
                 data = data_path(
@@ -582,7 +583,7 @@ def grade(case: dict[str, Any], ws: Path, transcripts: list[Path], before: dict)
         evidence, ok = "no GraphSpec in the project", False
         if specs:
             from forgegraph.graph import data_path
-            from forgegraph.spec.documents import load_yaml, registry_for
+            from forgegraph.spec.registry import load_yaml, registry_for
 
             final = specs[-1]
             where = data_path(load_yaml(final), registry_for(final.parent), final.parent)

@@ -30,17 +30,12 @@ from forgegraph import __version__
 from forgegraph.jobs import status as status_file
 from forgegraph.jobs.status import Attempt, DataFile, HookStatus, JobStatus, TargetStatus
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.documents import (
-    Registry,
-    explain,
-    folder_of,
-    load_document,
-    resolve,
-    setter,
-    validate,
-)
+from forgegraph.spec.explain import explain
 from forgegraph.spec.parameters import NONE
+from forgegraph.spec.registry import Registry, load_document
+from forgegraph.spec.resolve import folder_of, resolve, setter
 from forgegraph.spec.schedule import Cadence, CadenceError
+from forgegraph.spec.validate import validate
 
 LOG_LIMIT = 1_000_000  # bytes; a longer log is moved to <name>.log.1
 

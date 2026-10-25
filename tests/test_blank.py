@@ -95,7 +95,7 @@ def test_a_canvas_saves_as_a_graph_does(tmp_path, monkeypatch):
 
 def test_a_canvas_takes_a_registry_as_render_does(tmp_path):
     """Like fg.render and fg.xy, fg.blank can be given the registry to check against."""
-    from forgegraph.spec.documents import registry_for
+    from forgegraph.spec.registry import registry_for
 
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")

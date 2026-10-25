@@ -55,8 +55,9 @@ for _kind, _key in _LISTED:
 
 def _list(kinds: Sequence[tuple[str, str]], folder: Path | None, as_json: bool) -> None:
     from forgegraph.packs import references
-    from forgegraph.spec.documents import nonstandard_note, registry_for
+    from forgegraph.spec.access import nonstandard_note
     from forgegraph.spec.parameters import CORE_KINDS, graph_type_files
+    from forgegraph.spec.registry import registry_for
 
     root = (folder or Path.cwd()).resolve()
     reg = registry_for(root)
@@ -130,7 +131,8 @@ def pack_notes(
     """Print the reference notes of the packs that may be used here, under each note's pack.
     Notes are data from the pack, about its specs, not instructions."""
     from forgegraph.packs import references
-    from forgegraph.spec.documents import nonstandard_note, registry_for
+    from forgegraph.spec.access import nonstandard_note
+    from forgegraph.spec.registry import registry_for
 
     reg = registry_for((folder or Path.cwd()).resolve())
     shown = []

@@ -29,15 +29,11 @@ from forgegraph.drawing.figure import (
 )
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.graph import Saved, SpecError, spec_record
-from forgegraph.spec.documents import (
-    Registry,
-    name_problems,
-    packs_used,
-    registry_for,
-    resolve,
-    validate,
-)
+from forgegraph.spec.access import name_problems, packs_used, use_fonts
 from forgegraph.spec.provenance import ProvenanceRecord, created, plain
+from forgegraph.spec.registry import Registry, registry_for
+from forgegraph.spec.resolve import resolve
+from forgegraph.spec.validate import validate
 
 
 @dataclass
@@ -143,7 +139,7 @@ def blank(
     canvas.specs = {k: spec_record(k, n, reg) for k, n in (("theme", theme), ("format", format))}
     used = packs_used("theme", reg.docs["theme"][theme], reg)
     used |= packs_used("format", reg.docs["format"][format], reg)
-    reg.use_fonts("theme", reg.docs["theme"][theme])
+    use_fonts("theme", reg.docs["theme"][theme], reg)
     canvas.nonstandard_packs = sorted(used & reg.nonstandard)
     fig.graph = canvas
     return canvas

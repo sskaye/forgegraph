@@ -6,7 +6,7 @@ pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
 formats/base_format.yaml, layouts/base_layout.yaml, schedules/base_schedule.yaml) and its
 reference GraphSpec (graphspecs/polarization.yaml). A layer file has
 only a name, version and description, and its parameters. A GraphSpec's layers and a
-layout's tabs are collections keyed by name, checked by spec/documents.py and spec/layout.py,
+layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
 (tab_definitions). Every line of those files, header included, is
 `name: value          # [RANGE]; DESCRIPTION`.
@@ -271,7 +271,7 @@ def check_parameter(
 ) -> list[tuple[str, str]]:
     """Problems as (suffix, message); suffix is '' or '[i]' for a list item."""
     if p.required and value in (None, NONE):
-        return []  # unset; drawing needs it, see documents.drawing_problems
+        return []  # unset; drawing needs it, see validate.drawing_problems
     if p.takes_list:
         if value in (None, NONE) and NONE in p.range.literals:
             return []  # a list parameter whose range allows None, e.g. no tick sides

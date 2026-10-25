@@ -11,8 +11,8 @@ import pytest
 
 from forgegraph.catalog_build.examples import Change, draw, png
 from forgegraph.catalog_build.files import read
-from forgegraph.spec.documents import builtin
 from forgegraph.spec.parameters import graph_type_files
+from forgegraph.spec.registry import builtin
 
 pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 

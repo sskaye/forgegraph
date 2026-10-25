@@ -42,8 +42,8 @@ def schema(
     For layer, every layer type's parameters, as type.parameter: what a GraphSpec's layers
     set, under a name of its choosing. For layout, its parameters, its format's variable
     parameters, then a tab's, as tabs.<tab>.<parameter>, and a tile's, tabs.<tab>.tiles.<tile>."""
-    from forgegraph.spec.documents import builtin
     from forgegraph.spec.parameters import KINDS, definitions, tab_definitions
+    from forgegraph.spec.registry import builtin
 
     def builtin_layers() -> list[str]:
         return list(builtin().docs["layer"])
@@ -155,8 +155,10 @@ def _settable(
     """Every parameter a GraphSpec can set, with the value it has unless the GraphSpec sets
     it, and which file gives that value; and notes on any spec named whose pack is
     non-standard here, or may not be used here."""
-    from forgegraph.spec.documents import found_problems, nonstandard_note, registry_for, resolve
+    from forgegraph.spec.access import found_problems, nonstandard_note
     from forgegraph.spec.parameters import NONE, definitions
+    from forgegraph.spec.registry import registry_for
+    from forgegraph.spec.resolve import resolve
 
     reg = registry_for(root)
     chosen_names = (("graph_type", graph_type), ("theme", theme), ("format", format))

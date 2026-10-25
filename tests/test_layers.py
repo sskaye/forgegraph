@@ -13,7 +13,9 @@ import pytest
 
 import forgegraph as fg
 from forgegraph.drawing.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
-from forgegraph.spec.documents import builtin, drawing_problems, explain, validate
+from forgegraph.spec.explain import explain
+from forgegraph.spec.registry import builtin
+from forgegraph.spec.validate import drawing_problems, validate
 
 RATES = pd.DataFrame(
     {

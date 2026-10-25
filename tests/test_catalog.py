@@ -22,7 +22,7 @@ from forgegraph.catalog_build.files import CatalogError, read
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, page
 from forgegraph.cli import app
 from forgegraph.packs import built_in_folder, read_pack
-from forgegraph.spec.documents import builtin
+from forgegraph.spec.registry import builtin
 
 pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 

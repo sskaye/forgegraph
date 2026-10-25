@@ -30,7 +30,7 @@ def render(
     HTML page with every tab."""
     import forgegraph as fg
     from forgegraph.layouts import is_layout, stem
-    from forgegraph.spec.documents import nonstandard_note
+    from forgegraph.spec.access import nonstandard_note
 
     drawn: Any
     try:
@@ -82,13 +82,10 @@ def explain(
     a layout: its own values, then each tile's, under tabs.<tab>.tiles.<tile>."""
     import forgegraph as fg
     from forgegraph.layouts import explain_layout, is_layout, nonstandard_packs_of
-    from forgegraph.spec.documents import explain as explain_values
-    from forgegraph.spec.documents import (
-        load_document,
-        nonstandard_note,
-        packs_used,
-        validate,
-    )
+    from forgegraph.spec.access import nonstandard_note, packs_used
+    from forgegraph.spec.explain import explain as explain_values
+    from forgegraph.spec.registry import load_document
+    from forgegraph.spec.validate import validate
 
     if is_layout(graphspec):
         try:

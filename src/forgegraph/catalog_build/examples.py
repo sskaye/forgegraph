@@ -16,8 +16,10 @@ from PIL import Image
 from forgegraph.drawing import export
 from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, data_path, render
-from forgegraph.spec.documents import Registry, builtin, resolve, resolve_layers
+from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.parameters import NONE, Parameter, definitions, tree_has, tree_set
+from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.resolve import resolve
 
 NONSTANDARD = "non-standard"  # a change that draws on the graph after ForgeGraph finishes
 FOOTNOTED = "footnoted"  # a change that draws a footnote, as a scheduled run's stamp

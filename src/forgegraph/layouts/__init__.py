@@ -56,19 +56,13 @@ from forgegraph.graph import (
     spec_record,
 )
 from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
-from forgegraph.spec.documents import (
-    Registry,
-    Resolved,
-    explain,
-    folder_of,
-    load_document,
-    load_yaml,
-    packs_used,
-    resolve_detailed,
-    validate,
-)
+from forgegraph.spec.access import packs_used
+from forgegraph.spec.explain import explain
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord, created, plain
+from forgegraph.spec.registry import Registry, load_document, load_yaml
+from forgegraph.spec.resolve import Resolved, folder_of, resolve_detailed
+from forgegraph.spec.validate import validate
 
 SUFFIX = ".layout.yaml"
 
@@ -400,7 +394,7 @@ def explain_layout(
 ) -> dict[str, dict[str, Resolved]]:
     """Every value a layout is drawn with, without drawing it: {"layout": its own values},
     then each tile's values by kind, as {"tabs.<tab>.tiles.<tile>.<kind>": ...} (see
-    spec.documents.explain). Each tile's format values are the layout's format's."""
+    spec.explain.explain). Each tile's format values are the layout's format's."""
     doc, reg, folder = load_layout(spec, registry)
     _check(doc, reg)
     own = resolve_detailed("layout", doc, reg)

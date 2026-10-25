@@ -29,21 +29,14 @@ from forgegraph.drawing.figure import (
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
+from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.documents import (
-    Registry,
-    Resolved,
-    drawing_problems,
-    explain,
-    folder_of,
-    load_document,
-    packs_used,
-    resolve,
-    setter,
-    validate,
-)
+from forgegraph.spec.explain import explain
 from forgegraph.spec.parameters import NONE, tree_set
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, created, plain
+from forgegraph.spec.registry import Registry, load_document
+from forgegraph.spec.resolve import Resolved, folder_of, resolve, setter
+from forgegraph.spec.validate import drawing_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
 PLACE_PASSES = 3  # place, then lay out again, while value labels widen the axis
@@ -367,7 +360,7 @@ def prepare(
     fixed = frozenset(p for p, r in resolved["theme"].items() if r.fixed)
     style = Style(values["theme"], values["format"], fixed)
     nonstandard = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
-    reg.use_fonts("graphspec", doc)
+    use_fonts("graphspec", doc, reg)
     return Prepared(
         doc, resolved, values, frame, record, module, style, used(values, reg), nonstandard
     )

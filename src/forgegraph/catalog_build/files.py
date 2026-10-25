@@ -22,7 +22,6 @@ from typing import Any
 from forgegraph.catalog_build.examples import SPECIAL, Change, Variation
 from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.documents import Registry, load_yaml, resolve
 from forgegraph.spec.parameters import (
     KINDS,
     NONE,
@@ -31,6 +30,8 @@ from forgegraph.spec.parameters import (
     definitions,
     flatten,
 )
+from forgegraph.spec.registry import Registry, load_yaml
+from forgegraph.spec.resolve import resolve
 
 FOLDERS = {kind: KINDS[kind] for kind in ("theme", "format", "graph_type", "layer")}
 HEADER = ("name", "version", "description", "extends", "baseline", "baselines", "variations")

@@ -11,7 +11,6 @@ import re
 
 import pytest
 
-from forgegraph.spec.documents import Registry, builtin, drawing_problems, resolve, validate
 from forgegraph.spec.parameters import (
     BASE,
     CORE_KINDS,
@@ -27,6 +26,9 @@ from forgegraph.spec.parameters import (
     parse_range,
     tree_set,
 )
+from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.resolve import resolve
+from forgegraph.spec.validate import drawing_problems, validate
 
 
 def reference_name(kind: str) -> str:
@@ -553,42 +555,44 @@ def test_impossible_requests_are_errors():
 
 
 def test_an_unchanged_file_is_parsed_once(tmp_path, monkeypatch):
-    from forgegraph.spec import documents
+    from forgegraph.spec import registry
 
     path = tmp_path / "t.yaml"
     path.write_text("a: 1\nb: [x, y]\n")
     parsed = []
-    parse = documents._yaml.load
-    monkeypatch.setattr(documents._yaml, "load", lambda f: parsed.append(1) or parse(f))
-    first = documents.load_yaml(path)
+    parse = registry._yaml.load
+    monkeypatch.setattr(registry._yaml, "load", lambda f: parsed.append(1) or parse(f))
+    first = registry.load_yaml(path)
     first["a"] = 99  # a caller changing what it was given
     first["b"].append("z")
-    assert documents.load_yaml(path) == {"a": 1, "b": ["x", "y"]}
+    assert registry.load_yaml(path) == {"a": 1, "b": ["x", "y"]}
     assert len(parsed) == 1
 
 
 def test_an_edited_file_is_parsed_again(tmp_path):
     import os
 
-    from forgegraph.spec import documents
+    from forgegraph.spec import registry
 
     path = tmp_path / "t.yaml"
     path.write_text("a: 1\n")
-    assert documents.load_yaml(path) == {"a": 1}
+    assert registry.load_yaml(path) == {"a": 1}
     path.write_text("a: 2\n")  # the same size: only the time tells
     stat = path.stat()
     os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
-    assert documents.load_yaml(path) == {"a": 2}
+    assert registry.load_yaml(path) == {"a": 2}
 
 
 def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
-    from forgegraph.spec import documents
+    from forgegraph.spec import explain as explaining
+    from forgegraph.spec.registry import builtin
+    from forgegraph.spec.validate import validate
 
-    doc = documents.builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    doc = builtin().docs["graphspec"]["forgegraph_base/polarization"]
     calls = []
-    explain = documents.explain
-    monkeypatch.setattr(documents, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
-    assert documents.validate("graphspec", doc) == []
+    explain = explaining.explain
+    monkeypatch.setattr(explaining, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
+    assert validate("graphspec", doc) == []
     assert len(calls) == 1
 
 
@@ -609,7 +613,7 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     never changed."""
     from ruamel.yaml import YAML
 
-    from forgegraph.spec.documents import builtin, load_document
+    from forgegraph.spec.registry import builtin, load_document
 
     doc = {**builtin().docs["graphspec"]["forgegraph_base/polarization"], "name": "mine"}
     path = tmp_path / "mine.yaml"

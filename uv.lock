@@ -354,13 +354,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "matplotlib", specifier = ">=3.9" },
+    { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "packaging", specifier = ">=23" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pyarrow", specifier = ">=17" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "ruamel-yaml", specifier = ">=0.18" },
-    { name = "typer", specifier = ">=0.12" },
+    { name = "typer", specifier = ">=0.13" },
 ]
 
 [package.metadata.requires-dev]

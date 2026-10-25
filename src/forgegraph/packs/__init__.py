@@ -246,8 +246,28 @@ def setup(start: Path) -> Setup:
     configs = find_configs(start)
     main = _packs(configs[0])
     allowed = _packs(configs[-1]) if len(configs) == 2 else main
+    _one_pack_per_name(configs, main, allowed)
     nonstandard = frozenset(n for n in allowed if n not in main)
     return Setup(configs, allowed, {**main, **allowed}, nonstandard)
+
+
+def _one_pack_per_name(
+    configs: tuple[Config, ...], main: dict[str, Pack], allowed: dict[str, Pack]
+) -> None:
+    """One name is one pack: a config can't give a built-in pack's name, or a name the main
+    config gives, to another folder."""
+    known = {name: built_in_folder(name).resolve() for name in BUILT_IN}
+    problems = []
+    for config, listed in zip(configs, (main, allowed), strict=False):
+        for name, pack in listed.items():
+            folder = pack.folder.resolve()
+            if known.setdefault(name, folder) != folder:
+                problems.append(
+                    f"{config.path}: packs: '{name}' is the pack in {folder}, but '{name}' is "
+                    f"already the pack in {known[name]}; give it a name of its own"
+                )
+    if problems:
+        raise PackError(problems)
 
 
 def references(pack: Pack) -> dict[str, str]:

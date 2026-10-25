@@ -13,7 +13,11 @@ from ruamel.yaml import YAML
 
 from forgegraph import __version__
 
-app = typer.Typer(help="ForgeGraph: consistent, high-quality graphs.", no_args_is_help=True)
+app = typer.Typer(
+    help="ForgeGraph: fast, consistent, publication-quality graphs from pandas DataFrames, "
+    "usable by people and AI agents.",
+    no_args_is_help=True,
+)
 catalog_app = typer.Typer(
     help="What's available: graph types, layer types, themes, formats, layouts and GraphSpecs "
     "to extend. Also builds and checks the review catalog.",

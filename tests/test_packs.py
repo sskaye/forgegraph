@@ -17,7 +17,8 @@ from ruamel.yaml import YAML
 import forgegraph as fg
 from forgegraph import packs
 from forgegraph.drawing.figure import WATERMARK
-from forgegraph.packs import PackError, read_pack, setup
+from forgegraph.packs import PackError, read_pack
+from forgegraph.packs import setup as pack_setup  # pytest would run a module's setup()
 from forgegraph.spec import documents
 from forgegraph.spec.documents import name_problems, registry_for, validate
 
@@ -48,7 +49,7 @@ def user(tmp_path: Path, monkeypatch, *listed: str) -> Path:
 def test_a_missing_main_config_is_written_listing_the_built_in_packs(tmp_path, monkeypatch, capsys):
     main = tmp_path / "home" / "forgegraph" / "config.toml"
     monkeypatch.setenv(packs.MAIN_CONFIG_VARIABLE, str(main))
-    assert set(setup(tmp_path).packs) == {"forgegraph_base", "forgegraph_base_2"}
+    assert set(pack_setup(tmp_path).packs) == {"forgegraph_base", "forgegraph_base_2"}
     assert packs.read_config(main).packs == ("forgegraph_base", "forgegraph_base_2")
     assert f"ForgeGraph wrote its main config, {main}" in capsys.readouterr().err
     shutil.copytree(ACME, tmp_path / "acme")
@@ -72,7 +73,7 @@ def test_a_main_config_that_cant_be_written_is_an_error(tmp_path, monkeypatch):
     main = tmp_path / "home" / "config.toml"
     monkeypatch.setenv(packs.MAIN_CONFIG_VARIABLE, str(main))
     with pytest.raises(PackError) as e:
-        setup(tmp_path)
+        pack_setup(tmp_path)
     [problem] = e.value.problems
     assert problem.startswith(f"{main}: can't write the main config")
     assert "set FORGEGRAPH_CONFIG to a file that can be written" in problem
@@ -122,8 +123,8 @@ def test_a_folder_config_narrows_the_main_config(tmp_path, monkeypatch):
     project = tmp_path / "work"
     project.mkdir()
     allow(project, "../acme")
-    assert set(setup(project).packs) == {"acme"}  # narrowed
-    assert set(setup(tmp_path / "elsewhere").packs) == {"forgegraph_base", "acme"}
+    assert set(pack_setup(project).packs) == {"acme"}  # narrowed
+    assert set(pack_setup(tmp_path / "elsewhere").packs) == {"forgegraph_base", "acme"}
 
 
 def test_a_pack_only_a_folder_config_lists_is_nonstandard(tmp_path, monkeypatch):
@@ -134,7 +135,7 @@ def test_a_pack_only_a_folder_config_lists_is_nonstandard(tmp_path, monkeypatch)
     work = tmp_path / "work"
     _loud(work)  # house/loud extends acme/acme, which the main config lists
     allow(work, "forgegraph_base", "./house")
-    assert setup(work).nonstandard == {"house"}
+    assert pack_setup(work).nonstandard == {"house"}
     g = fg.render(graphspec(work, "house/loud"))
     assert g.nonstandard and g.nonstandard_packs == ["house"]
     [path] = g.save(work / "g.png")
@@ -151,7 +152,7 @@ def test_configs_are_found_from_the_drawn_file_up(tmp_path):
     allow(tmp_path, "./acme")
     deep = tmp_path / "a" / "b"
     deep.mkdir(parents=True)
-    assert [c.path for c in setup(deep).configs] == [
+    assert [c.path for c in pack_setup(deep).configs] == [
         Path(os.environ[packs.MAIN_CONFIG_VARIABLE]),
         tmp_path / "forgegraph.toml",
     ]
@@ -272,7 +273,7 @@ def test_a_pip_pack_is_found_by_its_entry_point_without_importing_it(tmp_path, m
     packs.pip_packs.cache_clear()
     try:
         allow(tmp_path, "acme")
-        found = setup(tmp_path).packs["acme"]
+        found = pack_setup(tmp_path).packs["acme"]
         assert found.source == "pip" and found.folder == package
         assert "acme_forgegraph" not in sys.modules
     finally:
@@ -282,7 +283,7 @@ def test_a_pip_pack_is_found_by_its_entry_point_without_importing_it(tmp_path, m
 def test_an_uninstalled_pip_pack_is_an_error(tmp_path):
     config = allow(tmp_path, "nonesuch")
     with pytest.raises(PackError, match=re.escape(f"{config}: packs: no pack 'nonesuch'")):
-        setup(tmp_path)
+        pack_setup(tmp_path)
 
 
 @pytest.mark.parametrize(
@@ -326,7 +327,7 @@ def test_a_bad_pack_yaml_is_an_error(tmp_path, text, message):
 def test_a_bad_config_is_an_error(tmp_path, text, message):
     (tmp_path / "forgegraph.toml").write_text(text)
     with pytest.raises(PackError, match=message):
-        setup(tmp_path)
+        pack_setup(tmp_path)
 
 
 def test_two_packs_with_one_name_are_an_error(tmp_path):
@@ -334,7 +335,47 @@ def test_two_packs_with_one_name_are_an_error(tmp_path):
     write_pack(tmp_path / "b")
     allow(tmp_path, "./a/house", "./b/house")
     with pytest.raises(PackError, match="two packs named 'house'"):
-        setup(tmp_path)
+        pack_setup(tmp_path)
+
+
+def test_a_folder_copy_of_a_main_config_pack_is_an_error(tmp_path, monkeypatch):
+    """A folder config can't swap in its own copy of a pack the main config lists: one name
+    is one pack, so an edited copy can't pass as the standard one."""
+    shutil.copytree(ACME, tmp_path / "acme")
+    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    work = tmp_path / "work"
+    shutil.copytree(ACME, work / "acme")
+    allow(work, "./acme")
+    with pytest.raises(PackError, match=r"'acme' .*work/acme.*already.*/acme"):
+        pack_setup(work)
+
+
+@pytest.mark.parametrize("name", ["forgegraph_base", "forgegraph_base_2"])
+def test_a_folder_pack_named_like_a_built_in_pack_is_an_error(tmp_path, monkeypatch, name):
+    user(tmp_path, monkeypatch, "forgegraph_base")
+    work = tmp_path / "work"
+    write_pack(work, name)
+    allow(work, f"./{name}")
+    with pytest.raises(PackError, match=f"'{name}' .*already"):
+        pack_setup(work)
+
+
+def test_a_main_config_pack_named_like_a_built_in_pack_is_an_error(tmp_path, monkeypatch):
+    write_pack(tmp_path, "forgegraph_base_2")
+    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "forgegraph_base_2"))
+    with pytest.raises(PackError, match=r"'forgegraph_base_2' .*already"):
+        pack_setup(tmp_path / "elsewhere")
+
+
+def test_both_configs_may_list_the_same_pack_folder(tmp_path, monkeypatch):
+    """Written differently, the same folder is the same pack: standard, not an error."""
+    shutil.copytree(ACME, tmp_path / "acme")
+    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    work = tmp_path / "work"
+    work.mkdir()
+    allow(work, "forgegraph_base", "../acme")
+    found = pack_setup(work)
+    assert set(found.packs) == {"forgegraph_base", "acme"} and not found.nonstandard
 
 
 def test_a_packs_fonts_are_registered_when_it_may_be_used(tmp_path):

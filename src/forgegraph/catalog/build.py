@@ -31,20 +31,10 @@ from forgegraph.spec.parameters import NONE, Parameter, graph_type_files
 COMMENTS = "<!-- forgemark-comments"
 DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough to commit
 COLORS = 64  # palette size: plenty for a graph's few colors and their anti-aliasing
-# The package folders and files whose contents decide what the catalog shows.
-INPUTS = (
-    "__init__.py",
-    "graph.py",
-    "catalog",
-    "catalogs",
-    "fonts",
-    "graph_types",
-    "layers",
-    "packs/__init__.py",
-    f"packs/{BASE}",
-    "render",
-    "spec",
-)
+# Package files that can't change what the catalog shows. Every other file counts, so a new
+# module counts without being listed; built-in packs other than the base pack count only
+# for their own catalog.
+UNUSED = ("__main__.py", "canvas.py", "cli", "jobs", "layouts", "skill")
 # Each kind of specification: its id, tab title and heading name.
 KINDS = (
     ("theme", "Themes", "Theme"),
@@ -56,31 +46,31 @@ _INPUTS_META = re.compile(r'<meta name="forgegraph-inputs" content="([0-9a-f]+)"
 
 
 def inputs_hash(pack: Pack | None = None) -> str:
-    """A hash of the library version, every package file the catalog depends on and, for a
+    """A hash of the library version, every package file the catalog can depend on and, for a
     pack's catalog, every file in the pack (its GraphSpecs' data included)."""
     digest = hashlib.sha256(__version__.encode())
-    sources: list[tuple[Path, tuple[str, ...], str]] = [
-        (Path(str(files("forgegraph"))), INPUTS, "")
-    ]
+    root = Path(str(files("forgegraph")))
+    sources = [(root, "", _depends_on)]
     if pack is not None:
-        sources.append((pack.folder, (".",), "pack/"))
-    for base, names, prefix in sources:
-        for name in names:
-            path = base / name
-            found = [path]
-            if path.is_dir():  # in the same order everywhere: Windows sorts paths ignoring case
-                found = sorted(path.rglob("*"), key=lambda f: f.relative_to(base).as_posix())
-            for f in found:
-                if not f.is_file() or "__pycache__" in f.parts:
-                    continue
-                data = f.read_bytes()
-                if f.suffix in (".py", ".yaml", ".md", ".txt", ".csv"):
-                    data = data.replace(b"\r\n", b"\n")  # the same on a Windows checkout
-                rel = prefix + f.relative_to(base).as_posix()
-                if prefix and ".git" in f.relative_to(base).parts:
-                    continue
-                digest.update(rel.encode() + b"\0" + data + b"\0")
+        sources.append((pack.folder, "pack/", lambda rel: ".git" not in rel.parts))
+    for base, prefix, counts in sources:
+        # in the same order everywhere: Windows sorts paths ignoring case
+        for f in sorted(base.rglob("*"), key=lambda f: f.relative_to(base).as_posix()):
+            rel = f.relative_to(base)
+            if not f.is_file() or "__pycache__" in rel.parts or not counts(rel):
+                continue
+            data = f.read_bytes()
+            if f.suffix in (".py", ".yaml", ".md", ".txt", ".csv"):
+                data = data.replace(b"\r\n", b"\n")  # the same on a Windows checkout
+            digest.update((prefix + rel.as_posix()).encode() + b"\0" + data + b"\0")
     return digest.hexdigest()
+
+
+def _depends_on(rel: Path) -> bool:
+    """Whether the catalog can depend on this package file."""
+    if rel.parts[0] in UNUSED:
+        return False
+    return not (rel.parts[0] == "packs" and len(rel.parts) > 2 and rel.parts[1] != BASE)
 
 
 def recorded_hash(page_text: str) -> str | None:

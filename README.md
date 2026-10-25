@@ -1,6 +1,6 @@
 # ForgeGraph
 
-Fast, consistent, publication-quality graphs from pandas DataFrames, useable by people and AI agents.
+Fast, consistent, publication-quality graphs from pandas DataFrames, usable by people and AI agents.
 
 You describe a graph in a **GraphSpec**. ForgeGraph draws it in a house style set by a **theme** and a **format**. It checks what it drew, and records how the graph was made inside the saved file. An agent skill lets agents make and revise graphs the same way.
 

@@ -9,6 +9,7 @@ import io
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -31,11 +32,11 @@ from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.explain import explain
+from forgegraph.spec.explain import Explained, explain
 from forgegraph.spec.parameters import NONE, tree_set
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, created, plain
 from forgegraph.spec.registry import Registry, load_document
-from forgegraph.spec.resolve import Resolved, folder_of, resolve, setter
+from forgegraph.spec.resolve import Values, folder_of, resolve, setter
 from forgegraph.spec.validate import drawing_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
@@ -296,14 +297,18 @@ class Prepared:
     """A GraphSpec checked and resolved, with its data, ready to draw into an Axes."""
 
     doc: dict[str, Any]
-    resolved: dict[str, Any]  # explain's values, by kind, with where each came from
-    values: dict[str, dict[str, Any]]
+    explained: Explained  # every value, by kind, with where each came from
     frame: pd.DataFrame
     record: DataRecord
     module: Any  # the graph type's drawing module
     style: Style
     specs: dict[str, Any]  # each spec used, by kind: its name and version
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
+
+    @cached_property
+    def values(self) -> dict[str, dict[str, Any]]:
+        """Every value, by kind, without where each came from."""
+        return self.explained.plain()
 
     @property
     def title(self) -> str | None:
@@ -334,7 +339,7 @@ def prepare(
     spec: dict[str, Any] | str | Path,
     data: pd.DataFrame | None = None,
     registry: Registry | None = None,
-    format: dict[str, Resolved] | None = None,
+    format: Values | None = None,
 ) -> Prepared:
     """Check and resolve a GraphSpec, given as a file path or a document, and read its data:
     `data` if given, otherwise the Parquet file its data.file names. With `format` (resolved
@@ -350,20 +355,16 @@ def prepare(
     problems = drawing_problems(doc, reg)
     if problems:
         raise SpecError(problems)
-    resolved = explain(doc, reg)
-    if format is not None:
-        resolved["format"] = dict(format)
-    values = {kind: {p: r.value for p, r in v.items()} for kind, v in resolved.items()}
+    explained = explain(doc, reg, format)
+    values = explained.plain()
     frame, record = _data(doc, values, reg, data, folder)
     gt_name = values["graphspec"]["specifications.graph_type"]
     module = GRAPH_TYPES[_graph_type_root(gt_name, reg)]
-    fixed = frozenset(p for p, r in resolved["theme"].items() if r.fixed)
+    fixed = frozenset(p for p, r in explained.theme.items() if r.fixed)
     style = Style(values["theme"], values["format"], fixed)
     nonstandard = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
     use_fonts("graphspec", doc, reg)
-    return Prepared(
-        doc, resolved, values, frame, record, module, style, used(values, reg), nonstandard
-    )
+    return Prepared(doc, explained, frame, record, module, style, used(values, reg), nonstandard)
 
 
 def render(
@@ -432,7 +433,7 @@ def _named_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     problems = []
     names = resolve("graphspec", doc, reg)
     for kind in ("graph_type", "theme", "format"):
-        name = names[f"specifications.{kind}"][0]
+        name = names[f"specifications.{kind}"].value
         label = kind.replace("_", " ")
         while name not in (None, NONE):
             named = reg.docs[kind][name]
@@ -452,7 +453,7 @@ def data_path(doc: dict[str, Any], reg: Registry, folder: Path) -> Path | None:
     """Where the Parquet file a GraphSpec's data.file names is, or None if it names none.
     `~` is the home folder; a relative path is found from the folder of the GraphSpec file
     that sets it: `folder` for doc itself, or the file of a GraphSpec it extends."""
-    file = resolve("graphspec", doc, reg).get("data.file", (None,))[0]
+    file = resolve("graphspec", doc, reg).value("data.file")
     if file in (None, NONE):
         return None
     where = Path(str(file)).expanduser()

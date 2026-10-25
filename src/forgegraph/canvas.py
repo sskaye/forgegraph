@@ -117,7 +117,7 @@ def _values(kind: str, name: str, reg: Registry) -> dict[str, Any]:
         problems = [f"{kind} '{name}': {p}" for p in validate(kind, reg.docs[kind][name], reg)]
     if problems:
         raise SpecError(problems)
-    return {p: v for p, (v, _) in resolve(kind, reg.docs[kind][name], reg).items()}
+    return resolve(kind, reg.docs[kind][name], reg).plain()
 
 
 def blank(

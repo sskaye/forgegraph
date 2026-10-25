@@ -28,7 +28,7 @@ from typing import Any
 from forgegraph.fonts import WEIGHTS, font_available, font_weights
 from forgegraph.spec.access import PACK_TYPES, permission_problems, use_fonts
 from forgegraph.spec.common import kind_label, suggest
-from forgegraph.spec.explain import resolve_graphspec
+from forgegraph.spec.explain import explain
 from forgegraph.spec.layers import layer_problems, resolve_layers, with_defaults
 from forgegraph.spec.layout import layout_problems
 from forgegraph.spec.parameters import (
@@ -171,12 +171,12 @@ def _graphspec_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     if errors:
         return errors
     errors = _inherited_fixed(doc, reg)
-    return errors or _graphspec_rules(resolve_graphspec(doc, reg))
+    return errors or _graphspec_rules(explain(doc, reg).plain())
 
 
 def _schedule_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     try:
-        Cadence.from_values({p: v for p, (v, _) in resolve("schedule", doc, reg).items()})
+        Cadence.from_values(resolve("schedule", doc, reg).plain())
     except CadenceError as e:
         return [str(e)]
     return []
@@ -185,10 +185,7 @@ def _schedule_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
 def _format_size(doc: dict[str, Any], reg: Registry) -> list[str]:
     for gt in [None, *reg.docs["graph_type"]]:
         r = resolve("format", doc, reg, gt)
-        if (
-            r.get("figure.width", (None,))[0] == "auto"
-            and r.get("figure.height", (None,))[0] == "auto"
-        ):
+        if r.value("figure.width") == "auto" and r.value("figure.height") == "auto":
             return ["size: width and height can't both be auto"]
     return []
 
@@ -211,7 +208,7 @@ def _settable(doc: dict[str, Any], reg: Registry) -> dict[str, tuple[Parameter, 
         except ValueError:
             continue
         for path, p in defs.items():
-            fixed = resolved.get(path, (None, p.fixed))[1]
+            fixed = resolved.fixed(path, p.fixed)
             out[path] = (p, f"{kind_label(kind)} '{chosen[kind]}'", fixed)
     return out
 
@@ -220,7 +217,7 @@ def _format_settable(doc: dict[str, Any], reg: Registry) -> dict[str, tuple[Para
     """A layout's format's parameters, with whether each is fixed there: a layout can set the
     variable ones, as a GraphSpec can."""
     try:
-        name = str(resolve("layout", doc, reg).get("specifications.format", (None,))[0])
+        name = str(resolve("layout", doc, reg).value("specifications.format"))
         fmt = reg.docs["format"].get(name)
         if fmt is None:
             return {}
@@ -229,8 +226,7 @@ def _format_settable(doc: dict[str, Any], reg: Registry) -> dict[str, tuple[Para
     except ValueError:
         return {}
     return {
-        path: (p, f"format '{name}'", resolved.get(path, (None, p.fixed))[1])
-        for path, p in defs.items()
+        path: (p, f"format '{name}'", resolved.fixed(path, p.fixed)) for path, p in defs.items()
     }
 
 
@@ -242,7 +238,7 @@ def _inherited_fixed(doc: dict[str, Any], reg: Registry) -> list[str]:
     return [
         f"{section}.{path}: fixed by GraphSpec '{parent}'"
         for section, _, path, _ in entries("graphspec", doc, reg)
-        if inherited.get(path, (None, False))[1]
+        if inherited.fixed(path)
     ]
 
 
@@ -326,13 +322,13 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
     for heading in sorted(headings, key=lambda h: h or ""):
         values = resolve("theme", doc, reg, heading)
         where = f" under {heading}" if heading else ""
-        family = str(values["font.family"][0])
+        family = str(values["font.family"].value)
         has = font_weights(family)
-        for path, (value, _) in values.items():
+        for path, value in values.plain().items():
             if path.endswith("weight") and WEIGHTS.get(value) not in has:
                 names = ", ".join(n for n, w in WEIGHTS.items() if w in has)
                 errors.append(f"{path}{where}: {family} has no {value} weight; it has {names}")
-        if "watermark.text" in values and not _visible(str(values["watermark.text"][0])):
+        if "watermark.text" in values and not _visible(str(values["watermark.text"].value)):
             errors.append(
                 f"watermark.text{where}: has no letters; the watermark is drawn from its "
                 "letters' outlines, so it needs at least one visible character"
@@ -359,7 +355,7 @@ def drawing_problems(doc: dict[str, Any], reg: Registry | None = None) -> list[s
     """What a valid GraphSpec still lacks before the graph can be drawn: parameters its
     graph type defines with no default."""
     reg = reg or builtin()
-    values = resolve_graphspec(doc, reg)["graph_type"]
+    values = explain(doc, reg).graph_type.plain()
     gt = reg.docs["graph_type"][choices(doc, reg)["graph_type"]]
     problems = [
         f"{path}: must be set before the graph can be drawn"

@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any, cast
 
@@ -57,11 +58,11 @@ from forgegraph.graph import (
 )
 from forgegraph.layouts.arrange import Grid, Placed, apply_separators, arrange, backgrounds
 from forgegraph.spec.access import packs_used
-from forgegraph.spec.explain import explain
+from forgegraph.spec.explain import Explained, explain
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
 from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord, created, plain
 from forgegraph.spec.registry import Registry, load_document, load_yaml
-from forgegraph.spec.resolve import Resolved, folder_of, resolve_detailed
+from forgegraph.spec.resolve import Resolved, Values, folder_of, resolve
 from forgegraph.spec.validate import validate
 
 SUFFIX = ".layout.yaml"
@@ -75,13 +76,17 @@ class Tile:
     file: str  # the GraphSpec file, as the layout names it
     spec: dict[str, Any]
     axes: Axes
-    values: dict[str, dict[str, Any]]
-    resolved: dict[str, dict[str, Resolved]]
+    explained: Explained  # every value, by kind, with where each came from
     style: Style
     data: DataRecord
     labelling: str
     drawing: list[lint.Issue] = field(default_factory=list)
     specs: dict[str, Any] = field(default_factory=dict)  # each spec used: name and version
+
+    @cached_property
+    def values(self) -> dict[str, dict[str, Any]]:
+        """Every value, by kind, without where each came from."""
+        return self.explained.plain()
 
     def record(self, full: bool, layout_format: dict[str, Any]) -> TileRecord:
         """Its provenance record; it was drawn in the layout's format, not its own."""
@@ -161,7 +166,7 @@ class Layout(Saved):
 
     spec: dict[str, Any]
     values: dict[str, Any]
-    resolved: dict[str, Resolved]
+    resolved: Values
     format: dict[str, Any]
     tabs: list[TabFigure] = field(default_factory=list)
     specs: dict[str, Any] = field(default_factory=dict)  # the layout and its format: name, version
@@ -314,17 +319,17 @@ def is_layout(path: Path) -> bool:
     return path.name.endswith(SUFFIX)
 
 
-def _format_values(
-    doc: dict[str, Any], reg: Registry, own: dict[str, Resolved]
-) -> dict[str, Resolved]:
+def _format_values(doc: dict[str, Any], reg: Registry, own: Values) -> Values:
     """The layout's format's values, each saying it came through the layout, with the format's
     variable parameters that the layout sets replaced by the layout's values."""
     name = own["specifications.format"].value
     origin = f"layout '{doc['name']}'"
-    values = {
-        p: Resolved(r.value, r.fixed, f"{r.origin}, from {origin}")
-        for p, r in resolve_detailed("format", reg.docs["format"][name], reg).items()
-    }
+    values = Values(
+        {
+            p: Resolved(r.value, r.fixed, f"{r.origin}, from {origin}")
+            for p, r in resolve("format", reg.docs["format"][name], reg).items()
+        }
+    )
     values.update({p: r for p, r in own.items() if p in values})
     return values
 
@@ -333,7 +338,7 @@ def _check(doc: Any, reg: Registry) -> None:
     problems = validate("layout", doc, reg)
     if problems:
         raise SpecError(problems)
-    chosen = resolve_detailed("layout", doc, reg)["specifications.format"].value
+    chosen = resolve("layout", doc, reg)["specifications.format"].value
     while chosen not in (None, NONE):
         named = reg.docs["format"][chosen]
         problems += [f"format '{chosen}': {p}" for p in validate("format", named, reg)]
@@ -391,16 +396,16 @@ def tile_documents(
 
 def explain_layout(
     spec: dict[str, Any] | str | Path, registry: Registry | None = None
-) -> dict[str, dict[str, Resolved]]:
-    """Every value a layout is drawn with, without drawing it: {"layout": its own values},
-    then each tile's values by kind, as {"tabs.<tab>.tiles.<tile>.<kind>": ...} (see
-    spec.explain.explain). Each tile's format values are the layout's format's."""
+) -> tuple[Values, dict[tuple[str, str], Explained]]:
+    """Every value a layout is drawn with, without drawing it: its own values, and each
+    tile's, by (tab, tile), in reading order (see spec.explain). Each tile's format values
+    are the layout's format's."""
     doc, reg, folder = load_layout(spec, registry)
     _check(doc, reg)
-    own = resolve_detailed("layout", doc, reg)
+    own = resolve("layout", doc, reg)
     fmt = _format_values(doc, reg, own)
     files, problems = tile_files(doc, reg, folder)
-    out: dict[str, dict[str, Resolved]] = {"layout": own}
+    out: dict[tuple[str, str], Explained] = {}
     for tab, tiles in files.items():
         for name, path in tiles.items():
             where = f"tabs.{tab}.tiles.{name}"
@@ -412,12 +417,10 @@ def explain_layout(
             if found:
                 problems += [f"{where} ({path.name}): {p}" for p in found]
                 continue
-            values = explain(gdoc, greg)
-            values["format"] = dict(fmt)
-            out.update({f"{where}.{kind}": v for kind, v in values.items()})
+            out[tab, name] = explain(gdoc, greg, fmt)
     if problems:
         raise SpecError(problems)
-    return out
+    return own, out
 
 
 def nonstandard_packs_of(
@@ -450,8 +453,8 @@ def render_layout(
     footnote is written small at the bottom right of each tab, below every tile."""
     doc, reg, folder = load_layout(spec, registry)
     _check(doc, reg)
-    own = resolve_detailed("layout", doc, reg)
-    values = {p: r.value for p, r in own.items()}
+    own = resolve("layout", doc, reg)
+    values = own.plain()
     fmt = _format_values(doc, reg, own)
     data = dict(data or {})
     listed = tabs(doc, reg)
@@ -464,7 +467,7 @@ def render_layout(
     files, problems = tile_files(doc, reg, folder)
     if problems:
         raise SpecError(problems)
-    layout = Layout(doc, values, own, {p: r.value for p, r in fmt.items()})
+    layout = Layout(doc, values, own, fmt.plain())
     layout.specs = {
         "layout": {"name": doc["name"], "version": doc["version"]},
         "format": spec_record("format", values["specifications.format"], reg),
@@ -533,8 +536,7 @@ def _draw_tab(
             str(tab.tiles[p.name]),
             prep.doc,
             p.ax,
-            prep.values,
-            prep.resolved,
+            prep.explained,
             prep.style,
             prep.record,
             drawn[p.name].labelling,

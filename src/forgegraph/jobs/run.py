@@ -92,7 +92,7 @@ def load(path: Path) -> Schedule:
     problems = validate("schedule", doc, reg)
     if problems:
         raise ScheduleError(problems)
-    values = {p: v for p, (v, _) in resolve("schedule", doc, reg).items()}
+    values = resolve("schedule", doc, reg).plain()
     files = values["targets.files"]
     if files in (None, NONE):
         raise ScheduleError(
@@ -229,7 +229,7 @@ def _date_order(target: Path) -> str:
         return "month_day"
     doc, reg, _ = found[0]
     try:
-        return str(explain(doc, reg)["theme"]["axis.tick.label.date_order"].value)
+        return str(explain(doc, reg).theme["axis.tick.label.date_order"].value)
     except Exception:  # the render reports what's wrong with the GraphSpec
         return "month_day"
 

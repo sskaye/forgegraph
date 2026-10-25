@@ -263,14 +263,14 @@ def _sizes_problems(
 ) -> list[str]:
     """With the format's height (or width) auto, rows (columns) take the size their tiles
     need, so row_heights (column_widths) can't also be set."""
-    chosen = resolve("layout", doc, reg).get("specifications.format", (None,))[0]
+    chosen = resolve("layout", doc, reg).value("specifications.format")
     fmt = reg.docs["format"].get(chosen) if chosen is not None else None
     if fmt is None:
         return []
     values = resolve("format", fmt, reg)
     errors = []
     for size, key in (("height", "row_heights"), ("width", "column_widths")):
-        if values.get(f"figure.{size}", (None,))[0] != "auto":
+        if values.value(f"figure.{size}") != "auto":
             continue
         for tab_name, entry in entries.items():
             if entry["grid"].get(key) not in (None, NONE):

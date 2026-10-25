@@ -470,7 +470,7 @@ def test_a_layout_sets_its_formats_variable_parameters(project):
     )
     saved = fg.layout(path).save_all(project / "out" / "fig")
     assert sorted(p.name for p in saved) == ["fig.html", "fig.png"]
-    tile = explain_layout(path)["tabs.Overview.tiles.volt.format"]["output.file_types"]
+    tile = explain_layout(path)[1]["Overview", "volt"].format["output.file_types"]
     assert tile.value == ["html", "png"] and tile.origin == "layout 'fig'"
 
 

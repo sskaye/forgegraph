@@ -111,13 +111,30 @@ class Resolved:
     origin: str  # e.g. "theme 'journal'", or "theme 'journal', under xy"
 
 
-def resolve_detailed(
-    kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | None = None
-) -> dict[str, Resolved]:
+class Values(dict[str, Resolved]):
+    """Resolved values by parameter path, each with whether it's fixed and which file set
+    it."""
+
+    def value(self, path: str, default: Any = None) -> Any:
+        """A parameter's value, or default if it isn't listed."""
+        r = self.get(path)
+        return default if r is None else r.value
+
+    def fixed(self, path: str, default: bool = False) -> bool:
+        """Whether a parameter is fixed, or default if it isn't listed."""
+        r = self.get(path)
+        return default if r is None else r.fixed
+
+    def plain(self) -> dict[str, Any]:
+        """The values alone, by path."""
+        return {p: r.value for p, r in self.items()}
+
+
+def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | None = None) -> Values:
     """Every listed parameter's value, whether it's fixed, and which file set it. The nearest
     file that lists a parameter decides it; within one file, an entry under the graph type's
     heading beats the general one."""
-    out: dict[str, Resolved] = {}
+    out = Values()
     for d in chain(kind, doc, reg):
         own: dict[str, tuple[int, Resolved]] = {}
         label = f"{kind_label(kind)} '{d.get('name')}'"
@@ -153,13 +170,6 @@ def folder_of(
     return known.parent if known is not None else folder
 
 
-def resolve(
-    kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | None = None
-) -> dict[str, tuple[Any, bool]]:
-    """Every listed parameter's value and whether it's fixed, as {path: (value, fixed)}."""
-    return {p: (r.value, r.fixed) for p, r in resolve_detailed(kind, doc, reg, graph_type).items()}
-
-
 def choices(doc: dict[str, Any], reg: Registry) -> dict[str, Any]:
     spec = resolve("graphspec", doc, reg)
-    return {kind: spec.get(path, (None,))[0] for kind, path in CHOICE.items()}
+    return {kind: spec.value(path) for kind, path in CHOICE.items()}

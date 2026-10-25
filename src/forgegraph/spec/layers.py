@@ -79,7 +79,7 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         gt = resolve("graph_type", reg.docs["graph_type"][gt_name], reg)
     except (ValueError, KeyError):
         return []
-    accepted = gt.get("layer.types", ([],))[0] or []
+    accepted = gt.value("layer.types", []) or []
     parent = doc.get("extends")
     inherited = (
         resolve_layers(reg.docs["graphspec"][parent], reg)

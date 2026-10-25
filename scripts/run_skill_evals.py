@@ -234,7 +234,7 @@ def _resolved(spec: Path) -> dict[str, dict[str, Any]]:
     doc = load_yaml(spec)
     reg = registry_for(spec.parent).copy()
     reg.add("graphspec", doc, spec)
-    return {kind: {p: r.value for p, r in v.items()} for kind, v in explain(doc, reg).items()}
+    return explain(doc, reg).plain()
 
 
 def _matches(actual: Any, expected: Any) -> bool:

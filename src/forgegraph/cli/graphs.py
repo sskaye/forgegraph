@@ -85,21 +85,27 @@ def explain(
     from forgegraph.spec.access import nonstandard_note, packs_used
     from forgegraph.spec.explain import explain as explain_values
     from forgegraph.spec.registry import load_document
+    from forgegraph.spec.resolve import Values
     from forgegraph.spec.validate import validate
 
+    values: dict[str, Values]  # by kind; a tile's as tabs.<tab>.tiles.<tile>.<kind>
     if is_layout(graphspec):
         try:
-            values = explain_layout(graphspec)
+            own, tiles = explain_layout(graphspec)
         except fg.SpecError as e:
             fail(e.problems, as_json)
             return
+        values = {"layout": own}
+        for (tab, tile), explained in tiles.items():
+            where = f"tabs.{tab}.tiles.{tile}"
+            values.update({f"{where}.{kind}": v for kind, v in explained.kinds().items()})
         packs = nonstandard_packs_of(graphspec)
     else:
         doc, reg, _ = load_document("graphspec", graphspec)
         problems = validate("graphspec", doc, reg)
         if problems:
             fail(problems, as_json)
-        values = explain_values(doc, reg)
+        values = explain_values(doc, reg).kinds()
         packs = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
     note = nonstandard_note(packs) if packs else None
     rows = [

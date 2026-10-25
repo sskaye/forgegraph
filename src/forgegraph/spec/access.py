@@ -57,7 +57,7 @@ def packs_used(kind: str, doc: dict[str, Any], reg: Registry) -> set[str]:
         return out
     names = resolve(kind, doc, reg)
     for k in ("theme", "format") if kind == "graphspec" else ("format",):
-        name = names[f"specifications.{k}"][0]
+        name = names[f"specifications.{k}"].value
         if isinstance(name, str) and name in reg.docs[k]:
             add(k, reg.docs[k][name])
     return out

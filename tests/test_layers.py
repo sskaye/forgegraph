@@ -105,7 +105,7 @@ def test_layers_merge_by_name_through_extends():
     child.update(name="child", extends="parent")
     reg.add("graphspec", child)
     assert validate("graphspec", child, reg) == []
-    layers = {name: r.value for name, r in explain(child, reg)["layers"].items()}
+    layers = {name: r.value for name, r in explain(child, reg).layers.items()}
     assert list(layers) == ["target", "conditions", "extra"]
     assert layers["target"]["value"] == 2.0 and layers["target"]["label.text"] == "Aim"
 

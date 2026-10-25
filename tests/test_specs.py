@@ -373,7 +373,7 @@ def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
     theme["variable_parameters"] = {"series": {"line": {"width": 0.12}}}
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
-    r = resolve("theme", theme, reg)
+    r = {p: (v.value, v.fixed) for p, v in resolve("theme", theme, reg).items()}
     assert r["axis.tick.direction"] == ("in", True)
     assert r["series.line.width"] == (0.12, False)  # fixed in default, variable here
     assert r["axis.tick.length"] == (0.3, True)  # inherited
@@ -386,8 +386,8 @@ def test_graph_type_heading_in_a_theme():
     theme["fixed_parameters"] = {"axis": left, "xy": {"axis": bottom}}
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
-    assert resolve("theme", theme, reg)["axis.tick.sides"][0] == ["left"]
-    assert resolve("theme", theme, reg, "xy")["axis.tick.sides"][0] == ["bottom"]
+    assert resolve("theme", theme, reg).value("axis.tick.sides") == ["left"]
+    assert resolve("theme", theme, reg, "xy").value("axis.tick.sides") == ["bottom"]
 
 
 def test_graph_type_heading_only_in_themes_and_formats():
@@ -584,15 +584,14 @@ def test_an_edited_file_is_parsed_again(tmp_path):
 
 
 def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
-    from forgegraph.spec import explain as explaining
+    from forgegraph.spec import validate as validation
     from forgegraph.spec.registry import builtin
-    from forgegraph.spec.validate import validate
 
     doc = builtin().docs["graphspec"]["forgegraph_base/polarization"]
     calls = []
-    explain = explaining.explain
-    monkeypatch.setattr(explaining, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
-    assert validate("graphspec", doc) == []
+    explain = validation.explain
+    monkeypatch.setattr(validation, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
+    assert validation.validate("graphspec", doc) == []
     assert len(calls) == 1
 
 

@@ -194,12 +194,12 @@ def _settable(
         }
         for p in definitions("graphspec").values()
     ]
-    methods = resolve("theme", reg.docs["theme"][theme], reg, graph_type)["legend.methods"][0]
+    methods = resolve("theme", reg.docs["theme"][theme], reg, graph_type)["legend.methods"].value
     for kind, name in chosen_names:
         params = definitions(kind, graph_type if kind == "graph_type" else None)
         values = resolve(kind, reg.docs[kind][name], reg, graph_type)
-        for path, (value, fixed) in values.items():
-            if fixed or path not in params:
+        for path, r in values.items():
+            if r.fixed or path not in params:
                 continue
             p = params[path]
             allowed = p.range.describe()
@@ -208,7 +208,7 @@ def _settable(
             rows.append(
                 {
                     "parameter": path,
-                    "value": value,
+                    "value": r.value,
                     "range": allowed,
                     "required": p.required,
                     "description": p.description,

@@ -27,7 +27,7 @@ from forgegraph.graph import Graph, SpecError
 from forgegraph.packs import Pack
 from forgegraph.spec.parameters import BASE, NONE, Parameter, graph_type_files
 from forgegraph.spec.registry import Registry, builtin
-from forgegraph.spec.resolve import resolve
+from forgegraph.spec.resolve import Values, resolve
 
 COMMENTS = "<!-- forgemark-comments"
 DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough to commit
@@ -161,11 +161,11 @@ def _status(p: Parameter, fixed: bool) -> str:
     return "fixed" if fixed else "variable"
 
 
-def _own_values(kind: str, name: str, reg: Registry) -> dict[str, tuple[Any, bool]]:
+def _own_values(kind: str, name: str, reg: Registry) -> Values:
     """The values a theme, format or graph type is drawn with, and whether each is fixed,
     by parameter: its own, not the definition's defaults (a pack's theme isn't the base's)."""
     if kind not in ("theme", "format", "graph_type"):
-        return {}
+        return Values()
     return resolve(kind, reg.docs[kind][name], reg)
 
 
@@ -223,15 +223,12 @@ def instance(
     baseline: Graph = first_drawn
     own = _own_values(kind, name, reg)
 
-    def value(p: Parameter) -> tuple[Any, bool]:
-        return own.get(p.path, (p.default, p.fixed))
-
     rows = tuple(
         Row(
             p.path,
-            show(value(p)[0]),
+            show(own.value(p.path, p.default)),
             allowed(p),
-            _status(p, value(p)[1]),
+            _status(p, own.fixed(p.path, p.fixed)),
             p.description,
         )
         for p, _ in catalog.variations
@@ -247,7 +244,9 @@ def instance(
     cards = [card("baseline", first, baseline, image)]
     # Only a variable parameter's card is shown; every card is still drawn by the
     # perturbation test.
-    variations = [v for p, v in catalog.variations if v is not None and not value(p)[1]]
+    variations = [
+        v for p, v in catalog.variations if v is not None and not own.fixed(p.path, p.fixed)
+    ]
     numbers: dict[str, int] = {}  # each numbered baseline's number, by the change that makes it
     problems = []
     for v in variations:

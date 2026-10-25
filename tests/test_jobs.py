@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pack_helpers import allow, write_pack
 from render_helpers import BASE, polarization
 from ruamel.yaml import YAML
 
@@ -75,6 +76,30 @@ def test_a_run_renders_its_targets_and_writes_its_status(project):
     modified = datetime.fromtimestamp((project / "p.parquet").stat().st_mtime).astimezone()
     assert target.data_as_of == modified.isoformat(timespec="seconds")
     assert (project / "out" / "lab.log").read_text().count("finished: success") == 1
+
+
+def test_paths_a_parent_schedule_sets_are_found_from_its_folder(project):
+    """A schedule extending a pack's schedule: the targets and output folder the pack's
+    schedule sets are relative to its file, not to the schedule that extends it."""
+    schedules = write_pack(project / "packs") / "schedules"
+    (schedules / "graphs").mkdir(parents=True)
+    polarization().to_parquet(schedules / "graphs" / "q.parquet")
+    _dump(
+        fg.graphspec("q", "xy", data_file="q.parquet", settings=BASE),
+        schedules / "graphs" / "q.yaml",
+    )
+    parent = schedule_doc("lab")
+    parent["variable_parameters"]["targets"] = {"files": ["graphs/q.yaml"], "output_folder": "made"}
+    _dump(parent, schedules / "lab.yaml")
+    work = project / "work"
+    work.mkdir()
+    allow(work, "forgegraph_base", "../packs/house")
+    child = schedule_doc("weekly")
+    child["extends"] = "house/lab"
+    del child["variable_parameters"]["targets"]
+    _dump(child, work / "weekly.schedule.yaml")
+    assert job_run.run(work / "weekly.schedule.yaml") == 0
+    assert (schedules / "made" / "q.png").is_file()
 
 
 def test_a_target_drawn_with_a_nonstandard_pack_says_so(project, monkeypatch):
@@ -212,6 +237,35 @@ def test_a_layout_target_takes_its_oldest_tiles_time(project):
     [target] = status(project).targets
     assert target.data_as_of is not None and target.data_as_of.startswith("2026-01-02T03:04")
     assert target.rows_read == 192
+
+
+def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
+    """A layout's tiles are drawn with the layout's configs, so its job finds their data
+    the same way, whatever configs the tiles' own folder has."""
+    tiles = project / "tiles"
+    tiles.mkdir()
+    shutil.copy(project / "p.yaml", tiles / "p.yaml")
+    shutil.copy(project / "p.parquet", tiles / "p.parquet")
+    (tiles / "forgegraph.toml").write_text("packs = ['forgegraph_base', 'not_installed']\n")
+    layout = {
+        "name": "tiled",
+        "version": 0,
+        "description": "",
+        "extends": "forgegraph_base/base_layout",
+        "fixed_parameters": "None",
+        "variable_parameters": {
+            "tabs": {"T": {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}}
+        },
+    }
+    _dump(layout, project / "tiled.layout.yaml")
+    _dump(
+        schedule_doc(targets={"files": ["tiled.layout.yaml"], "output_folder": "out"}),
+        project / "lab.schedule.yaml",
+    )
+    assert job_run.run(project / "lab.schedule.yaml") == 0
+    [target] = status(project).targets
+    assert [Path(d.path).name for d in target.data] == ["p.parquet"]
+    assert target.data_as_of is not None
 
 
 # --- the stale banner, under a simulated clock ------------------------------------------------

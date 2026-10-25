@@ -144,6 +144,50 @@ def test_one_save_inspects_each_tab_once_whatever_it_writes(project, monkeypatch
     assert len(hashes) == 3 * len(layout.tabs)  # once per tab, for each save
 
 
+def test_a_layouts_checks_records_and_saves(project, tmp_path, monkeypatch):
+    """What Graph offers, a layout offers too: lint by tab, non-standard by tab, a record
+    (none with provenance off), a save under its own name, and a PNG for notebooks."""
+    tabs = {"A": tab([["volt"]], volt="volt.yaml"), "B": tab([["power"]], power="power.yaml")}
+    layout = fg.layout(write_layout(project, tabs, fmt="forgegraph_base/base_layout_format"))
+    assert layout.check() == layout.issues
+    assert all(not t.nonstandard for t in layout.tabs)
+    assert layout.record() is not None
+    monkeypatch.setitem(layout.format, "provenance.level", "off")
+    assert layout.record() is None
+    monkeypatch.chdir(tmp_path)
+    saved = layout.save()
+    assert sorted(p.name for p in saved) == ["fig-a.png", "fig-b.png"]  # its name, a file a tab
+    assert all((tmp_path / p.name).is_file() for p in saved)
+    assert layout._repr_png_().startswith(b"\x89PNG")
+
+
+def test_tiles_a_parent_layout_lists_are_found_from_its_folder(project):
+    """A layout extending a pack's layout: the tile files the pack's layout lists are found
+    from its folder, not from the layout that extends it."""
+    layouts = project / "house" / "layouts"
+    (layouts / "graphs").mkdir(parents=True)
+    polarization().to_parquet(layouts / "graphs" / "p.parquet")
+    _dump(
+        fg.graphspec("v", "xy", data_file="p.parquet", settings=BASE), layouts / "graphs" / "v.yaml"
+    )
+    parent = write_layout(layouts, {"Figure": tab([["v"]], v="graphs/v.yaml")}, name="shared")
+    parent.rename(layouts / "shared.yaml")
+    work = project / "work"
+    work.mkdir()
+    allow(work, "forgegraph_base", "../house")
+    child = {
+        "name": "mine",
+        "version": 0,
+        "description": "test",
+        "extends": "house/shared",
+        "fixed_parameters": "None",
+        "variable_parameters": "None",
+    }
+    _dump(child, work / "mine.layout.yaml")
+    layout = fg.layout(work / "mine.layout.yaml")
+    assert list(layout.tabs[0].tiles) == ["v"]
+
+
 # The grid
 
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import forgegraph
-from forgegraph.catalog import build
+from forgegraph.catalog_build import build
 from forgegraph.packs import BASE
 
 PACKAGE = Path(forgegraph.__file__).parent
@@ -38,7 +38,7 @@ def _edit(path: Path) -> None:
         "graph_types/xy.yaml",
         "layers/error_bar.yaml",
         f"packs/{BASE}/themes/base_theme.yaml",
-        "catalog/page.py",
+        "catalog_build/page.py",
         "fonts/__init__.py",
     ],
 )
@@ -114,7 +114,7 @@ def test_a_cards_pixels_are_its_pngs(settings, dpi):
     from PIL import Image
     from render_helpers import render
 
-    from forgegraph.catalog.examples import image, png
+    from forgegraph.catalog_build.examples import image, png
 
     g = render(settings=settings, format={"figure.width": 83.3})
     decoded = Image.open(io.BytesIO(png(g, dpi))).convert("RGBA")

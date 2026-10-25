@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "tests"))
 from spec_mirror import MIRRORS, mirror_path, write
 
 sys.path.insert(0, str(Path(__file__).parent))
-from forgegraph.catalog import forgemark
+from forgegraph.catalog_build import forgemark
 
 for kind in MIRRORS:
     changed = write(kind)

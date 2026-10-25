@@ -22,32 +22,34 @@ from typing import Any, cast
 import matplotlib
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from forgegraph import __version__
 from forgegraph.drawing import export, lint, page
+from forgegraph.drawing.axes import DrawError
 from forgegraph.drawing.figure import (
     MARGIN_IN,
     GraphCanvas,
     GraphFigure,
     LayoutError,
     TileAxes,
-    Watermark,
-    _inches,
-    _watermarked,
     add_footnote,
+    artists,
     footnote_room,
+    inches,
     place_footnote,
+    watermark,
 )
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.graph import (
     NONE,
     PLACE_PASSES,
+    Inspected,
     Prepared,
+    Saved,
     SpecError,
-    _artists,
-    _created,
-    _plain,
+    fixed_limits,
     pixel_hash,
     prepare,
     recorded,
@@ -58,14 +60,15 @@ from forgegraph.spec.documents import (
     Registry,
     Resolved,
     explain,
+    folder_of,
+    load_document,
+    load_yaml,
     packs_used,
-    registry_for,
     resolve_detailed,
     validate,
 )
-from forgegraph.spec.documents import load as load_yaml
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
-from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord
+from forgegraph.spec.provenance import DataRecord, ProvenanceRecord, TileRecord, created, plain
 
 SUFFIX = ".layout.yaml"
 
@@ -92,14 +95,14 @@ class Tile:
             file=self.file,
             graphspec=recorded(self.spec, full),
             specs={**self.specs, "format": layout_format},
-            resolved=_plain(self.values) if full else None,
+            resolved=plain(self.values) if full else None,
             data=self.data.file if full else None,
             preprocessing=self.data.preprocessing if full else None,
         )
 
 
 @dataclass
-class TabFigure:
+class TabFigure(Inspected):
     """A layout's tab as drawn: one figure holding its tiles."""
 
     layout: Layout
@@ -124,34 +127,13 @@ class TabFigure:
     def saving(self) -> AbstractContextManager[None]:
         return _saving(self.style, self.layout.values)
 
+    def _shown(self) -> tuple[Figure, Style]:
+        return self.figure, self.style
+
     def mark(self) -> None:
         """Watermark every tile, once: the figure has been found changed."""
         for tile in self.tiles.values():
-            if not _watermarked(tile.axes):
-                tile.axes.add_artist(Watermark(tile.axes, tile.style))
-
-    @property
-    def nonstandard(self) -> bool:
-        return self.inspect()
-
-    def inspect(self) -> bool:
-        """Check whether the figure is still as ForgeGraph drew it (see Graph.inspect)."""
-        if not self.changed and not self._held:
-            self.changed = _artists(self.figure) != self._snapshot or self._pixels() != self._drawn
-        return self.changed
-
-    @contextmanager
-    def inspected_once(self) -> Iterator[None]:
-        """See Graph.inspected_once."""
-        self.inspect()
-        self._held = True
-        try:
-            yield
-        finally:
-            self._held = False
-
-    def _pixels(self) -> str:
-        return pixel_hash(self.figure, self.style)
+            watermark(tile.axes, tile.style)
 
     def check(self) -> list[lint.Issue]:
         """Lint the tab's figure as it is now, and return the issues (also kept in `issues`).
@@ -166,10 +148,7 @@ class TabFigure:
             with isolated(tile.style):
                 found = lint.plot_issues(
                     tile.axes,
-                    fixed_limits={
-                        a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max")))
-                        for a in ("x", "y")
-                    },
+                    fixed_limits=fixed_limits(gt),
                     rows_dropped=tile.data.rows_dropped,
                     drawing=tile.drawing,
                 )
@@ -183,7 +162,7 @@ class TabFigure:
 
 
 @dataclass
-class Layout:
+class Layout(Saved):
     """A drawn layout: its tabs, the layout file and the layout's own values."""
 
     spec: dict[str, Any]
@@ -218,12 +197,6 @@ class Layout:
     def nonstandard(self) -> bool:
         return any(t.inspect() for t in self.tabs)
 
-    def tab(self, name: str) -> TabFigure:
-        for t in self.tabs:
-            if t.name == name:
-                return t
-        raise KeyError(f"no tab '{name}'; tabs are {', '.join(t.name for t in self.tabs)}")
-
     def record(self, shown: list[TabFigure] | None = None) -> dict[str, Any] | None:
         """The provenance record of files showing these tabs (all by default), at the format's
         provenance.level; None with off."""
@@ -238,7 +211,7 @@ class Layout:
         record = ProvenanceRecord(
             provenance_level=level,
             forgegraph_version=__version__,
-            created=_created(),
+            created=created(),
             specs=self.specs,
             nonstandard=nonstandard,
             nonstandard_packs=packs or None,
@@ -248,16 +221,6 @@ class Layout:
             },
         )
         return record.model_dump(exclude_none=True)
-
-    def save(self, path: str | Path | None = None) -> list[Path]:
-        """Save the layout. A path with a suffix saves that one file type; a path without one
-        (or none: the layout's name, here) saves every file type the format lists."""
-        if path is None:
-            return self.save_all(Path(str(self.spec.get("name", "layout"))))
-        target = Path(path)
-        if not target.suffix:
-            return self.save_all(target)
-        return self._write(target.with_suffix(""), [target.suffix.lstrip(".")])
 
     def save_all(self, stem: str | Path) -> list[Path]:
         """Save every file type the format lists. html: one page with every tab; pdf: one file,
@@ -309,7 +272,7 @@ class Layout:
                     self.freshness,
                 )
             )
-        elif kind == "pdf":
+        elif kind == "pdf":  # in its settings: a PDF embeds its fonts as it closes
             with self.tabs[0].saving():
                 figures = [t.figure for t in self.tabs]
                 out.append(export.save_pages(figures, path, dpi, self.record()))
@@ -320,13 +283,11 @@ class Layout:
                     out.append(export.save(t.figure, target, dpi))
         return out
 
-    def _repr_png_(self) -> bytes:
-        import io
+    def _name(self) -> str:
+        return str(self.spec.get("name", "layout"))
 
-        buffer = io.BytesIO()
-        with self.tabs[0].saving():
-            self.tabs[0].figure.savefig(buffer, format="png", dpi=100)
-        return buffer.getvalue()
+    def _shown(self) -> tuple[Figure, Style]:
+        return self.tabs[0].figure, self.tabs[0].style
 
 
 def _framed(tab: TabFigure, svg: bytes, rule: float) -> bytes:
@@ -347,10 +308,6 @@ def _saving(style: Style, values: dict[str, Any]) -> Iterator[None]:
         matplotlib.rcParams["savefig.facecolor"] = background
         matplotlib.rcParams["savefig.transparent"] = background == "none"
         yield
-
-
-def _limit(value: Any) -> float | None:
-    return None if value is None or value == NONE else float(value)
 
 
 def stem(path: Path) -> str:
@@ -395,32 +352,18 @@ def _check(doc: Any, reg: Registry) -> None:
 def _tile_folder(doc: dict[str, Any], reg: Registry, folder: Path) -> Path:
     """Where a layout's tile files are found from: the folder of the file listing its tabs
     (`folder` for doc itself)."""
-    source = tabs_source(doc, reg)
-    if source is doc:
-        return folder
-    known = reg.paths["layout"].get(source["name"])
-    return known.parent if known is not None else folder
+    return folder_of("layout", tabs_source(doc, reg), doc, reg, folder)
 
 
-def _load(
+def load_layout(
     spec: dict[str, Any] | str | Path, registry: Registry | None
 ) -> tuple[Any, Registry, Path]:
     """The layout document, the registry it's checked against, and the folder its own
     relative paths are found from."""
-    if isinstance(spec, str | Path):
-        path = Path(spec)
-        doc = load_yaml(path)
-        reg = (registry or registry_for(path.parent)).copy()
-        if isinstance(doc, dict) and "name" in doc:
-            reg.add("layout", doc, path)
-        return doc, reg, path.parent
-    reg = (registry or registry_for(Path.cwd())).copy()
-    if isinstance(spec, dict) and "name" in spec and spec["name"] not in reg.docs["layout"]:
-        reg.add("layout", spec)
-    return spec, reg, Path.cwd()
+    return load_document("layout", spec, registry)
 
 
-def _tile_files(doc: dict[str, Any], reg: Registry, folder: Path) -> tuple[dict, list[str]]:
+def tile_files(doc: dict[str, Any], reg: Registry, folder: Path) -> tuple[dict, list[str]]:
     """Each tab's tiles' GraphSpec files, {tab: {tile: path}}, in reading order, and what's
     wrong with them."""
     files = _tile_folder(doc, reg, folder)
@@ -442,17 +385,27 @@ def _tile_files(doc: dict[str, Any], reg: Registry, folder: Path) -> tuple[dict,
     return out, problems
 
 
+def tile_documents(
+    spec: dict[str, Any] | str | Path, registry: Registry | None = None
+) -> list[tuple[Any, Registry, Path]]:
+    """Each tile's GraphSpec as the layout's render reads it, in reading order: its document,
+    the registry it's checked against (the layout's) and its folder."""
+    doc, reg, folder = load_layout(spec, registry)
+    files, _ = tile_files(doc, reg, folder)
+    return [load_document("graphspec", p, reg) for tab in files.values() for p in tab.values()]
+
+
 def explain_layout(
     spec: dict[str, Any] | str | Path, registry: Registry | None = None
 ) -> dict[str, dict[str, Resolved]]:
     """Every value a layout is drawn with, without drawing it: {"layout": its own values},
     then each tile's values by kind, as {"tabs.<tab>.tiles.<tile>.<kind>": ...} (see
     spec.documents.explain). Each tile's format values are the layout's format's."""
-    doc, reg, folder = _load(spec, registry)
+    doc, reg, folder = load_layout(spec, registry)
     _check(doc, reg)
     own = resolve_detailed("layout", doc, reg)
     fmt = _format_values(doc, reg, own)
-    files, problems = _tile_files(doc, reg, folder)
+    files, problems = tile_files(doc, reg, folder)
     out: dict[str, dict[str, Resolved]] = {"layout": own}
     for tab, tiles in files.items():
         for name, path in tiles.items():
@@ -478,9 +431,9 @@ def nonstandard_packs_of(
 ) -> list[str]:
     """The packs a layout is drawn with, its own specs' and its tiles', that the main config
     doesn't list, without drawing it."""
-    doc, reg, folder = _load(spec, registry)
+    doc, reg, folder = load_layout(spec, registry)
     used = packs_used("layout", doc, reg)
-    files, _ = _tile_files(doc, reg, folder)
+    files, _ = tile_files(doc, reg, folder)
     for tiles in files.values():
         for path in tiles.values():
             gdoc = load_yaml(path)
@@ -501,7 +454,7 @@ def render_layout(
     """Draw a layout, given as a file path or a document. `data` gives DataFrames by tile
     name, for tiles drawn from a DataFrame rather than their GraphSpec's data.file. A
     footnote is written small at the bottom right of each tab, below every tile."""
-    doc, reg, folder = _load(spec, registry)
+    doc, reg, folder = load_layout(spec, registry)
     _check(doc, reg)
     own = resolve_detailed("layout", doc, reg)
     values = {p: r.value for p, r in own.items()}
@@ -514,7 +467,7 @@ def render_layout(
         raise SpecError(
             [f"data: no tile '{n}'; tiles are {', '.join(sorted(names))}" for n in unknown]
         )
-    files, problems = _tile_files(doc, reg, folder)
+    files, problems = tile_files(doc, reg, folder)
     if problems:
         raise SpecError(problems)
     layout = Layout(doc, values, own, {p: r.value for p, r in fmt.items()})
@@ -543,7 +496,7 @@ def _draw_tab(
     layout: Layout, tab: Tab, prepared: dict[str, Prepared], footnote: str | None = None
 ) -> TabFigure:
     fmt = layout.format
-    width, height = _inches(fmt["figure.width"]), _inches(fmt["figure.height"])
+    width, height = inches(fmt["figure.width"]), inches(fmt["figure.height"])
     first = next(iter(prepared.values()))
     places = tab.places()
     with isolated(first.style), lint.font_messages() as font_problems:
@@ -573,8 +526,7 @@ def _draw_tab(
                     with isolated(p.style):
                         _tile_call(tab, p.name, prepared[p.name].module.check_outside, p.ax)
         except LayoutError as e:
-            where = f"tabs.{tab.name}: " if len(tab.tiles) else ""
-            raise SpecError([f"{where}{e}"]) from None
+            raise SpecError([f"tabs.{tab.name}: {e}"]) from None
         backgrounds(fig, grid, placed)
         place_footnote(fig, edge, edge)
         apply_separators(fig, grid, layout.values, float(fmt["figure.base_size"]))
@@ -601,7 +553,7 @@ def _draw_tab(
     result.changed = bool(result.nonstandard_packs)  # drawn with a pack not in the main config
     result._font_problems = font_problems
     result.check()  # the one draw after layout, which the record of its pixels shares
-    result._snapshot = _artists(fig)
+    result._snapshot = artists(fig)
     result._drawn = pixel_hash(fig, result.style, redraw=False)
     fig.graph = result  # from here on, drawing or saving the figure inspects it first
     return result
@@ -616,9 +568,7 @@ def _tile_call(tab: Tab, name: str, function: Any, *args: Any) -> Any:
     """Call a graph type's function on a tile, naming the tile in any error."""
     try:
         return function(*args)
-    except Exception as e:
-        if type(e).__name__ != "DrawError":
-            raise
+    except DrawError as e:
         raise SpecError([f"{_where(tab, name)}: {e}"]) from None
 
 

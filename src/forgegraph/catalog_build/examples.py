@@ -1,6 +1,6 @@
 """Drawing the catalog's cards: a baseline GraphSpec with changes.
 
-What each card changes comes from the catalog files (forgegraph.catalog.files).
+What each card changes comes from the catalog files (forgegraph.catalog_build.files).
 """
 
 from __future__ import annotations

@@ -68,11 +68,9 @@ def _tick_excess(axis: Axis, which: int, style: Style) -> float:
     box = text.box(labels[0], prop)
     if isinstance(axis, XAxis):
         return box.bottom - row.bottom if which == 1 else box.top - row.top
-    edges = [text.edges(label, prop) for label in labels]
+    widest = max((text.edges(label, prop) for label in labels), key=lambda e: e.advance)
     if which == 1:  # right-aligned: the widest label's box reaches furthest left
-        widest = max(edges, key=lambda e: e.advance)
         return widest.left
-    widest = max(edges, key=lambda e: e.advance)
     return widest.advance - widest.right
 
 

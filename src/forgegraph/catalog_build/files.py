@@ -19,10 +19,10 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from forgegraph.catalog.examples import SPECIAL, Change, Variation
+from forgegraph.catalog_build.examples import SPECIAL, Change, Variation
 from forgegraph.packs import Pack
-from forgegraph.spec.documents import Registry, resolve
-from forgegraph.spec.documents import load as load_yaml
+from forgegraph.spec.common import ProblemsError
+from forgegraph.spec.documents import Registry, load_yaml, resolve
 from forgegraph.spec.parameters import NONE, Parameter, check_parameter, definitions, flatten
 
 FOLDERS = {"theme": "themes", "format": "formats", "graph_type": "graph_types", "layer": "layers"}
@@ -32,12 +32,8 @@ NO_CARD = "no_card"
 FORMS = ("value", "from", "with")
 
 
-class CatalogError(ValueError):
+class CatalogError(ProblemsError):
     """Catalog files that can't be built; `problems` lists each one."""
-
-    def __init__(self, problems: list[str]) -> None:
-        self.problems = problems
-        super().__init__("\n".join(problems))
 
 
 @dataclass(frozen=True)

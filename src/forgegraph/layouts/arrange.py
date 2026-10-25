@@ -1,7 +1,7 @@
 """Placing a tab's tiles on its grid, so that their plot boxes line up.
 
 Each pass measures, for every tile, the room its titles, tick labels and keys need on each
-side of its plot box, to their letters (render.figure.visible_extent). A column's left margin
+side of its plot box, to their letters (drawing.figure.visible_extent). A column's left margin
 is the most room any tile starting in it needs on its left; its right margin, the most any
 tile ending in it needs on its right; rows work the same way, top and bottom. Columns and rows
 are separated by the layout's gap. What's left of the format's width, after the margins and
@@ -11,7 +11,7 @@ box lines up with the ones beside it. With the format's height auto, each row is
 the tallest plot box its tiles' plot_area.aspect needs at their widths (a tile spanning rows
 shares what it lacks among them); width auto works the same way across columns. Tick labels
 change with the plot boxes' sizes, so the passes repeat until nothing moves, as for one graph
-(render.figure.layout). Tiles are never scaled: a figure too small for them is an error naming
+(drawing.figure.layout). Tiles are never scaled: a figure too small for them is an error naming
 the tiles that don't fit.
 """
 
@@ -260,7 +260,7 @@ def arrange(
     Sizes are in inches; width or height None is auto; edge is the space between the outer
     tiles and the figure's edges. If no pass settles, it lays out once
     more with, for each tile, the most room either of the last two passes needed, as
-    render.figure.layout does."""
+    drawing.figure.layout does."""
     last: dict[str, Room] = {p.name: (0.0, 0.0, 0.0, 0.0) for p in placed}
     both = dict(last)
     sizes = (gap, width, height, column_widths, row_heights, edge, foot)

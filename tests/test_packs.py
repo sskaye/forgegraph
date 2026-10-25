@@ -378,18 +378,33 @@ def test_both_configs_may_list_the_same_pack_folder(tmp_path, monkeypatch):
     assert set(found.packs) == {"forgegraph_base", "acme"} and not found.nonstandard
 
 
-def test_a_packs_fonts_are_registered_when_it_may_be_used(tmp_path):
+def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
+    """Listing a pack doesn't register its fonts with matplotlib; drawing with one of its
+    specs does (fonts stay registered for the whole process)."""
     from matplotlib import font_manager
 
     house = write_pack(tmp_path)
     (house / "fonts").mkdir()
     bundled = ROOT / "src" / "forgegraph" / "fonts" / "SourceSans3-Regular.ttf"
     shutil.copy(bundled, house / "fonts" / "HouseSans.ttf")
-    allow(tmp_path, "./house")
+    (house / "themes").mkdir()
+    (house / "themes" / "t.yaml").write_text(
+        "name: t\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
+        "fixed_parameters: None\nvariable_parameters: None\n"
+    )
+    allow(tmp_path, "forgegraph_base", "./house")
+
+    def registered() -> bool:
+        return str(house / "fonts" / "HouseSans.ttf") in {
+            f.fname for f in font_manager.fontManager.ttflist
+        }
+
     registry_for(tmp_path)
-    assert str(house / "fonts" / "HouseSans.ttf") in {
-        f.fname for f in font_manager.fontManager.ttflist
-    }
+    assert not registered()
+    fg.render(graphspec(tmp_path, "forgegraph_base/base_theme"))
+    assert not registered()  # drawn without the pack
+    fg.render(graphspec(tmp_path, "house/t"))
+    assert registered()
 
 
 def test_the_reference_config_and_base_pack_are_valid():

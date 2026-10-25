@@ -13,7 +13,8 @@ variable_parameters:\
     separators:\
         line:\
             show: true\
-            border: true\
+        border:\
+            show: true\
     tabs:\
         Overview:\
             grid:\

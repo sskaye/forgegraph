@@ -11,7 +11,8 @@ fixed_parameters: None          *# List of fixed parameters for the sc
  \
 variable_parameters:          *# List of variable parameters for the schedule, None if none.*\
     cadence:\
-        interval_unit: week          *# \[minute, hour, day, week, month, year\]; The unit interval counts in.*\
+        interval:\
+            unit: week          *# \[minute, hour, day, week, month, year\]; The unit interval.count counts in.*\
         at: \[mon 06:00, tue 06:00, wed 06:00, thu 06:00, fri 06:00\]          *# \[None, text, texts\]; When in each unit it runs.*\
     on_failure:\
         command: \[acme-alert, --channel, lab-dashboards\]          *# \[None, texts\]; Program and arguments run, without a shell, when a run fails.*

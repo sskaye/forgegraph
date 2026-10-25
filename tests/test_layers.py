@@ -190,7 +190,7 @@ def test_a_line_per_named_series_takes_in_its_replicates():
             }
         },
         df,
-        **{"encoding.color": "state", "encoding.detail": "run"},
+        **{"encoding.color.column": "state", "encoding.detail.column": "run"},
     )
     assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [13.0, 30.0]
 
@@ -206,7 +206,7 @@ def test_a_line_per_series_in_its_color():
                 "per_series": True,
             }
         },
-        **{"encoding.color": "state"},
+        **{"encoding.color.column": "state"},
     )
     lines = layer_lines(g, REFERENCE)
     assert sorted(ln.get_ydata()[0] for ln in lines) == [13.0, 30.0]
@@ -269,7 +269,7 @@ def test_a_line_per_series_at_an_aggregate_counts_each_row_once():
         **{
             "axis.x.data.column": "x",
             "axis.y.data.column": ["b"],
-            "encoding.color": "g",
+            "encoding.color.column": "g",
             "legend.method": "key",
             "legend.key.inside": False,
             "legend.key.title.text": "None",
@@ -310,7 +310,7 @@ def test_error_bars_of_a_constant_and_of_a_column():
                 "value": {"lower": 1, "upper": 2, "aggregation": {"function": "None"}},
             }
         },
-        **{"axis.y.data.aggregation": "mean", "encoding.color": "state"},
+        **{"axis.y.data.aggregation": "mean", "encoding.color.column": "state"},
     )
     stems = [ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None"]
     y = np.asarray(stems[0].get_ydata(), dtype=float)
@@ -344,7 +344,7 @@ def test_error_bars_of_the_spread_of_aggregated_rows():
                     "value": {"lower": "rate", "upper": "rate", "aggregation": {"function": how}},
                 }
             },
-            **{"axis.y.data.aggregation": "mean", "encoding.color": "state"},
+            **{"axis.y.data.aggregation": "mean", "encoding.color.column": "state"},
         )
         stem = next(ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None")
         y = np.asarray(stem.get_ydata(), dtype=float)
@@ -448,7 +448,7 @@ def test_error_bars_on_stacked_series_are_an_error():
             {"e": {"type": "error_bar", "value": {"lower": 1, "upper": 1}}},
             **{
                 "axis.y.data.aggregation": "mean",
-                "encoding.color": "state",
+                "encoding.color.column": "state",
                 "series.aggregation": "sum",
             },
         )
@@ -460,7 +460,11 @@ def test_error_bars_on_stacked_series_are_an_error():
 def test_a_note_finds_a_clear_corner_and_keys_avoid_it():
     g = graph(
         {"n": {"type": "note", "text": "60 °C"}},
-        **{"encoding.color": "state", "legend.method": "key", "axis.y.data.aggregation": "mean"},
+        **{
+            "encoding.color.column": "state",
+            "legend.method": "key",
+            "axis.y.data.aggregation": "mean",
+        },
     )
     [note] = [t for t in g.axes.texts if t.get_gid() == NOTE]
     box = note.get_window_extent()
@@ -615,7 +619,7 @@ def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
             "axis.y.data.column": "value",
             "axis.y.data.aggregation": "mean",
             "axis.x.tick.algorithm": "all",
-            "encoding.color": "series",
+            "encoding.color.column": "series",
             "series.offset": "side_by_side",
             "layer.error_bar.color": "series",
             "legend.key.inside": False,

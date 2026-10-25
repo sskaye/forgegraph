@@ -1,4 +1,5 @@
-"""The color bar for a numeric encoding.color, laid out by the theme's legend.color_bar.layout:
+"""The color bar for a numeric encoding.color.column, laid out by the theme's
+legend.color_bar.layout:
 
 - title_above: a vertical bar right of the plot box, its title above it, left-aligned; the
   bar runs from the box's bottom to a title gap below the title;

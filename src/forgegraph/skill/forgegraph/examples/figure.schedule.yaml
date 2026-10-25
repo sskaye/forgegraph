@@ -7,5 +7,6 @@ variable_parameters:
     targets:
         files: [figure.layout.yaml]
     cadence:
-        interval_unit: week
+        interval:
+            unit: week
         at: [mon 06:00, tue 06:00, wed 06:00, thu 06:00, fri 06:00]

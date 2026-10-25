@@ -148,13 +148,13 @@ def test_a_numeric_color_draws_one_line_per_value():
     )  # fmt: skip
     scale = fg.xy(frame, x="t", y="v", color="d")  # on the color bar
     assert [len(np.asarray(line.get_xdata())) for line in scale.axes.lines] == [3, 3, 3]
-    named = fg.xy(frame, x="t", y="v", color="d", parameters={"encoding.color_type": "categorical"})
+    named = fg.xy(frame, x="t", y="v", color="d", parameters={"encoding.color.type": "categorical"})
     labels = [t.get_text() for t in named.axes.texts if t.get_gid() == "forgegraph-series-label"]
     assert sorted(labels) == ["1960", "1970", "1980"]
     text = frame.assign(d=frame["d"].astype(str) + "s")
-    message = re.escape("encoding.color_type: continuous, but d isn't numbers")
+    message = re.escape("encoding.color.type: continuous, but d isn't numbers")
     with pytest.raises(fg.SpecError, match=message):
-        fg.xy(text, x="t", y="v", color="d", parameters={"encoding.color_type": "continuous"})
+        fg.xy(text, x="t", y="v", color="d", parameters={"encoding.color.type": "continuous"})
 
 
 def test_legend_sits_in_a_corner_clear_of_data_with_its_title():
@@ -222,7 +222,7 @@ def test_layout_fits_tick_labels_that_change_with_the_box():
     parameters = {
         "axis.x.title": "Petal length (cm)",
         "axis.y.title": "Petal width (cm)",
-        "encoding.color_type": "categorical",
+        "encoding.color.type": "categorical",
         "mark.line.show": False,
     }
     g = fg.xy(iris, x="petal_length", y="petal_width", color="species",
@@ -245,7 +245,7 @@ def test_key_samples_have_their_own_marker_size():
         for a in legend.artists
         if isinstance(a, Line2D) and a.get_marker() not in ("none", "None")
     }
-    expected = Style(g.values["theme"], g.values["format"]).pt("legend.key.sample.marker_size")
+    expected = Style(g.values["theme"], g.values["format"]).pt("legend.key.sample.marker.size")
     assert sizes == {expected}
     series = {
         line.get_markersize()
@@ -256,7 +256,7 @@ def test_key_samples_have_their_own_marker_size():
 
 
 def test_a_style_key_explains_line_styles():
-    g = render({"encoding.line_style": "size", "legend.method": "direct"})
+    g = render({"encoding.line.style.column": "size", "legend.method": "direct"})
     assert any(k.title == "size" for k in keys(g.axes))
 
 
@@ -264,8 +264,8 @@ def test_column_name_groups_by_y_column():
     frame = polarization()
     settings = {
         "axis.y.data.column": ["cell_voltage", "temperature"],
-        "encoding.color": "column_name",
-        "encoding.detail": NONE,
+        "encoding.color.column": "column_name",
+        "encoding.detail.column": NONE,
         "benchmark.data_column": NONE,
         "benchmark.value": NONE,
         "legend.method": "key",
@@ -274,7 +274,7 @@ def test_column_name_groups_by_y_column():
     with pytest.raises(fg.SpecError, match="several y columns have no single name"):
         render(settings, data=frame)
     with pytest.raises(
-        fg.SpecError, match=re.escape("legend.key.title.text: encoding.color is column_name")
+        fg.SpecError, match=re.escape("legend.key.title.text: encoding.color.column is column_name")
     ):
         render(
             {**settings, "axis.y.title": NONE, "legend.key.title.text": "column_name"}, data=frame
@@ -291,7 +291,7 @@ def test_column_name_groups_by_y_column():
 def test_numeric_color_by_draws_a_color_bar():
     g = render(
         {
-            "encoding.color": "temperature",
+            "encoding.color.column": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -312,7 +312,7 @@ def test_numeric_color_by_draws_a_color_bar():
 def test_a_color_bar_title_can_read_down_its_side():
     g = render(
         {
-            "encoding.color": "temperature",
+            "encoding.color.column": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -328,7 +328,7 @@ def test_a_color_bar_title_can_read_down_its_side():
 def test_a_color_bar_can_go_below_the_plot():
     g = render(
         {
-            "encoding.color": "temperature",
+            "encoding.color.column": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -401,7 +401,10 @@ def test_too_many_groups_warns():
         }
     )
     g = fg.xy(frame, "x", "y", color="g")
-    assert "encoding.color: 12 groups but 7 colors in series.colors; colors repeat" in g.warnings
+    assert (
+        "encoding.color.column: 12 groups but 7 colors in series.colors; colors repeat"
+        in g.warnings
+    )
 
 
 # --- errors --------------------------------------------------------------------------------
@@ -416,8 +419,8 @@ def test_drawing_errors_name_the_parameter():
         fg.SpecError, match=re.escape("axis.x.data.type: decimal, but 'cell' isn't numbers")
     ):
         render({"axis.x.data.column": "cell", "axis.x.data.type": "decimal"})
-    with pytest.raises(fg.SpecError, match=re.escape("encoding.color: no column 'cel'")):
-        render({"encoding.color": "cel"})
+    with pytest.raises(fg.SpecError, match=re.escape("encoding.color.column: no column 'cel'")):
+        render({"encoding.color.column": "cel"})
 
 
 def test_no_data_file_needs_a_dataframe():
@@ -788,7 +791,7 @@ def test_impossible_drawings_are_errors_not_fallbacks():
         "mark.line.show": False,
         "benchmark.data_column": NONE,
         "benchmark.value": NONE,
-        "encoding.detail": NONE,
+        "encoding.detail.column": NONE,
     }
     with pytest.raises(
         fg.SpecError,
@@ -803,7 +806,7 @@ def test_impossible_drawings_are_errors_not_fallbacks():
 
 
 def test_each_styling_column_gets_its_own_key():
-    g = render({"encoding.line_style": "size", "encoding.marker_shape": "run"})
+    g = render({"encoding.line.style.column": "size", "encoding.marker.shape.column": "run"})
     assert {"size", "run"} <= {k.title for k in keys(g.axes)}
 
 

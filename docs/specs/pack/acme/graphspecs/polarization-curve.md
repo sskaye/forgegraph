@@ -29,7 +29,8 @@ variable_parameters:          *# List of variable parameters for the G
                 column: Cell voltage (V)          *# \[columns\]; Vertical axis column.*\
             title: column_name          *# \[None, column_name, text\]; Axis title.*\
     encoding:\
-        color: Cell          *# \[None, column_name, column\]; A color per value of this column.*\
+        color:\
+            column: Cell          *# \[None, column_name, column\]; A color per value of this column.*\
     mark:\
         marker:\
             show: true          *# \[true, false\]; Draw markers.*

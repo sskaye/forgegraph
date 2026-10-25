@@ -249,9 +249,9 @@ A graph type is defined by its own file in `src/forgegraph/graph_types/`, starti
 - `key`: a key at the first of the GraphSpec's legend.key.positions that covers no data, or outside the plot area (legend.key.inside: false);
 - `none`.
 
-A single series is named too, unless its name is the y-axis title's text, which already names it. A numeric `encoding.color` is drawn on a color scale with a color bar, or with palette colors and labels when `encoding.color_type` is `categorical`; with lines shown, a line joins only points of one color.
+A single series is named too, unless its name is the y-axis title's text, which already names it. A numeric `encoding.color.column` is drawn on a color scale with a color bar, or with palette colors and labels when `encoding.color.type` is `categorical`; with lines shown, a line joins only points of one color.
 
-Placement is deterministic. A direct label sits inside the plot, beside its own series, touching nothing; drawing/labels.py lists the rules. A key, and the style key that explains encoding.line_style, sits inside the plot area at the first position that covers no data, or outside it, with the figure laid out again around it; drawing/key.py places it. Existing labelling libraries (matplotlib-label-lines, adjustText) don't meet these rules.
+Placement is deterministic. A direct label sits inside the plot, beside its own series, touching nothing; drawing/labels.py lists the rules. A key, and the style key that explains encoding.line.style.column, sits inside the plot area at the first position that covers no data, or outside it, with the figure laid out again around it; drawing/key.py places it. Existing labelling libraries (matplotlib-label-lines, adjustText) don't meet these rules.
 
 ### D6. Review surface: tabbed HTML catalog, Forgemark comments
 
@@ -370,7 +370,7 @@ Paper figures and ops dashboards differ only in their format and defaults; examp
 
 A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/base_schedule.md): the GraphSpec and layout files to render, where to save them, and when. It extends the base schedule like any other spec, so it can be reviewed, kept in version control and checked like any parameter.
 
-- **Cadence.** `interval` counts `interval_unit` (minute, hour, day, week, month or year), and `at` says when in each unit, one time or a list: ":30", "06:00", "mon 06:00", "1 06:00", "Jan 1 06:00". `interval` divides 60, 24 and 12 for minutes, hours and months, and is 1 otherwise, so every form maps exactly onto every scheduler. Times are the machine's local time.
+- **Cadence.** `interval.count` counts `interval.unit` (minute, hour, day, week, month or year), and `at` says when in each unit, one time or a list: ":30", "06:00", "mon 06:00", "1 06:00", "Jan 1 06:00". `interval.count` divides 60, 24 and 12 for minutes, hours and months, and is 1 otherwise, so every form maps exactly onto every scheduler. Times are the machine's local time.
 - **`forgegraph job run lab.schedule.yaml`** runs a schedule once. Whatever the environment offers schedules that command: the machine's scheduler (launchd, systemd, cron, Task Scheduler), a GitHub Actions workflow, a Claude scheduled task. ForgeGraph writes no scheduler entries itself, so every user's path is the same.
 - **Each run** takes a lock, renders every target (a failing one is recorded and the others still render), writes the status file, and runs `on_failure` or `on_success` without a shell.
 - **Run status.** Every run writes `<name>.status.json` beside its outputs, whole: last attempt, last success, consecutive failures, and for each target its outputs, rows, data files and their times, lint count and errors. `job run` also writes a log, rotated so it can't grow without limit.
@@ -446,7 +446,7 @@ Every output embeds a provenance record, at its format's provenance.level (full,
 | --- | --- |
 | lines and markers, color by a column, direct labels, a benchmark series | built |
 | markers-only scatter with many points | built |
-| replicates: several lines per color group (encoding.detail) | built |
+| replicates: several lines per color group (encoding.detail.column) | built |
 | line style by a column, with a key for the styles | built |
 | log axes, unit markup | built |
 | color by a numeric column, with a color bar | built |
@@ -597,7 +597,7 @@ Decisions made while building whose reasons aren't given above.
 ### Schedules
 
 - **A scheduled job is a file,** so it can be reviewed, kept in version control and checked like any other spec.
-- **The cadence has one unit.** launchd's calendar intervals, cron and Task Scheduler's repetition count whole minutes, and can't run every 2 weeks or 3 days exactly, so `interval` divides 60, 24 or 12 for minutes, hours and months and is 1 otherwise. A list of times replaces separate weekday settings.
+- **The cadence has one unit.** launchd's calendar intervals, cron and Task Scheduler's repetition count whole minutes, and can't run every 2 weeks or 3 days exactly, so `interval.count` divides 60, 24 or 12 for minutes, hours and months and is 1 otherwise. A list of times replaces separate weekday settings.
 - **ForgeGraph writes no scheduler entries.** That would reach only the local machine, so one user's path would differ from everyone else's and couldn't be tested as theirs, and each operating system's rules made it the brittle part.
 - **on_success as well as on_failure.** on_success lets a check-in service notice a job that stopped running, which on_failure can't.
 - **Stale data isn't a failure.** A run that succeeds on old data isn't a failed run, so stale data shows in the banner, the footnote and the status file's data times, not through on_failure. "Data as of" is a target's oldest data file, so one stale tile makes a layout stale.

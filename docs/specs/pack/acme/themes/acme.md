@@ -21,7 +21,7 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
     grid:\
         color: "#DDDDDD"          *# \[hex color\]; Grid color.*\
     series:\
-        colors: tol_muted          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color groups, in order, then repeating: a named palette, or a list of colors.*\
+        colors: tol_muted          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.*\
  \
 variable_parameters:          *# List of variable parameters for the theme, None if none.*\
     grid:\

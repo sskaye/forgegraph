@@ -68,7 +68,7 @@ def test_bars_stand_on_zero():
     [bars] = bar_sets(g)
     assert segments(bars) == [(0, 0, 168), (1, 0, 124), (2, 0, 52)]
     assert g.axes.get_ylim()[0] == 0
-    assert bars.edge == "#000000" and bars.edge_width == g.style.pt("series.bar.edge_width")
+    assert bars.edge == "#000000" and bars.edge_width == g.style.pt("series.bar.edge.width")
 
 
 def test_a_bar_is_its_width_in_points_at_any_size():
@@ -92,7 +92,7 @@ def test_side_by_side_bars_are_centred_at_each_place():
 
 
 def test_stacked_bars():
-    g = graph(**{"series.aggregation": "sum", "series.value_label.total": True})
+    g = graph(**{"series.aggregation": "sum", "series.value_label.total.show": True})
     adelie, chinstrap, gentoo = bar_sets(g)
     assert segments(adelie)[0] == (0, 0, 44)
     assert segments(gentoo)[0] == (0, 44, 168)
@@ -123,7 +123,7 @@ def test_stacked_to_a_hundred():
             },
             "stacked segments are labelled inside",
         ),
-        ({"series.value_label.total": True}, "applies with series.aggregation sum"),
+        ({"series.value_label.total.show": True}, "applies with series.aggregation sum"),
         ({"axis.y.min": 10}, "bars start at 0, so the axis must include it"),
     ],
 )
@@ -287,9 +287,9 @@ def test_the_benchmarks_series_stack_among_themselves():
         color="run",
         parameters={
             **BARS,
-            "encoding.color_type": "categorical",
+            "encoding.color.type": "categorical",
             "series.aggregation": "sum",
-            "series.value_label.total": True,
+            "series.value_label.total.show": True,
             "benchmark.data_column": "who",
             "benchmark.value": "ref",
         },

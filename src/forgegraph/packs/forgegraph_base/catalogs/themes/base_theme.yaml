@@ -5,16 +5,16 @@ extends: None          # [None, catalog]; The catalog this one extends: its base
 baseline: forgegraph_base/polarization          # [graphspec]; The GraphSpec every card changes, drawn with the theme this catalog shows.
 
 baselines:          # Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.
-    styled_by_size: {encoding.line_style: Cell Size}          # [parameters and their values, or non-standard]; series.line.style acts only with encoding.line_style set.
-    colored_by_temperature: {encoding.color: "Temperature (°C)"}          # [parameters and their values, or non-standard]; A numeric encoding.color, so a color bar is drawn.
+    styled_by_size: {encoding.line.style.column: Cell Size}          # [parameters and their values, or non-standard]; series.line.style acts only with encoding.line.style.column set.
+    colored_by_temperature: {encoding.color.column: "Temperature (°C)"}          # [parameters and their values, or non-standard]; A numeric encoding.color.column, so a color bar is drawn.
     fanned: {data.file: fanned.parquet}          # [parameters and their values, or non-standard]; Curves ending at the same current: their labels fit only past the line ends.
     bars:          # [parameters and their values, or non-standard]; Each cell's peak power density as a bar, so the bar parameters act.
         axis.x.data.column: Cell
         axis.y.data.column: "Power Density (mW/cm²)"
         axis.y.data.aggregation: max
         axis.x.tick.algorithm: all
-        encoding.color: None
-        encoding.detail: None
+        encoding.color.column: None
+        encoding.detail.column: None
         mark.bar.show: true
         mark.line.show: false
         mark.marker.show: false
@@ -23,9 +23,9 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         axis.y.data.column: "Power Density (mW/cm²)"
         axis.y.data.aggregation: max
         axis.x.tick.algorithm: all
-        encoding.color: Run
-        encoding.color_type: categorical
-        encoding.detail: None
+        encoding.color.column: Run
+        encoding.color.type: categorical
+        encoding.detail.column: None
         legend.key.title.text: column_name
         mark.bar.show: true
         mark.line.show: false
@@ -38,10 +38,10 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         layers.spread.value.lower: 0.02
         layers.spread.value.upper: 0.02
     log_x: {axis.x.scale: log}          # [parameters and their values, or non-standard]; A log x axis, so the log tick algorithm acts.
-    minor_ticks: {axis.tick.minor.num: 4}          # [parameters and their values, or non-standard]; Minor tick sizes act only on minor ticks.
+    minor_ticks: {axis.tick.minor.count: 4}          # [parameters and their values, or non-standard]; Minor tick sizes act only on minor ticks.
     grid_shown: {grid.show: true}          # [parameters and their values, or non-standard]; The grid's parameters act only on a shown grid.
     thick_lines: {series.line.width: 1.2}          # [parameters and their values, or non-standard]; Thick lines, so their corners show.
-    key_framed: {legend.method: key, legend.key.frame: true}          # [parameters and their values, or non-standard]; The key, framed, so the frame's width acts.
+    key_framed: {legend.method: key, legend.key.frame.show: true}          # [parameters and their values, or non-standard]; The key, framed, so the frame's width acts.
     non_standard: non-standard          # [parameters and their values, or non-standard]; Drawn on after ForgeGraph finished, so the watermark shows.
     footnoted: footnoted          # [parameters and their values, non-standard, or footnoted]; With a footnote, as a scheduled run's stamp.
     dated: {data.file: dated.parquet, axis.x.data.column: Date, axis.x.title: Day}          # [parameters and their values, or non-standard]; Daily dates on x, so date labels show.
@@ -50,8 +50,8 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         axis.y.data.column: "Power Density (mW/cm²)"
         axis.y.data.aggregation: max
         axis.x.tick.algorithm: all
-        encoding.color: None
-        encoding.detail: None
+        encoding.color.column: None
+        encoding.detail.column: None
         mark.bar.show: true
         mark.line.show: false
         mark.marker.show: false
@@ -61,8 +61,8 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         axis.y.data.column: "Power Density (mW/cm²)"
         axis.y.data.aggregation: max
         axis.x.tick.algorithm: all
-        encoding.color: None
-        encoding.detail: None
+        encoding.color.column: None
+        encoding.detail.column: None
         mark.bar.show: true
         mark.line.show: false
         mark.marker.show: false

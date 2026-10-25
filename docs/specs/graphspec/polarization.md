@@ -55,12 +55,19 @@ variable_parameters:          *# List of variable parameters for the G
                 label:\
                     format: auto          *# \[auto, text\]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.*\
     encoding:\
-        color: Cell          *# \[None, column_name, column\]; A color per value of this column. column_name: per y column. None: one color.*\
-        color_type: auto          *# \[auto, categorical, continuous\]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.*\
-        line_style: None          *# \[None, column_name, column\]; A line style per value of this column. column_name: per y column. None: one style.*\
-        marker_shape: None          *# \[None, column_name, column\]; A marker shape per value of this column. column_name: per y column. None: one shape.*\
-        marker_fill: None          *# \[None, column_name, column\]; A marker fill per value of this column. column_name: per y column. None: one fill.*\
-        detail: \[Cell, Run\]          *# \[None, columns\]; Columns splitting rows into separate lines, e.g. replicates. Each y column is always its own line.*\
+        color:\
+            column: Cell          *# \[None, column_name, column\]; A color per value of this column. column_name: per y column. None: one color.*\
+            type: auto          *# \[auto, categorical, continuous\]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.*\
+        line:\
+            style:\
+                column: None          *# \[None, column_name, column\]; A line style per value of this column. column_name: per y column. None: one style.*\
+        marker:\
+            shape:\
+                column: None          *# \[None, column_name, column\]; A marker shape per value of this column. column_name: per y column. None: one shape.*\
+            fill:\
+                column: None          *# \[None, column_name, column\]; A marker fill per value of this column. column_name: per y column. None: one fill.*\
+        detail:\
+            column: \[Cell, Run\]          *# \[None, columns\]; Columns splitting rows into separate lines, e.g. replicates. Each y column is always its own line.*\
         order: sorted          *# \[sorted, data\]; Group order: sorted, or as first seen.*\
     benchmark:\
         data_column: Cell          *# \[None, column_name, column\]; Column marking the benchmark. column_name: a y column. None: no benchmark.*\
@@ -85,13 +92,14 @@ variable_parameters:          *# List of variable parameters for the G
             positions: \[top_right, top_left, bottom_right, bottom_left\]          *# \[top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom\]; Tried in order: the first clear one.*\
             inside: true          *# \[true, false\]; Inside the plot area, or outside it: top\_\* above it, bottom\_\* below the x-axis title, right\_\* to its right.*\
             sample:\
-                marker_size: 0.5          *# \[positive float\]; Marker size in key samples, × base size; series.marker.size sets the plot's.*\
+                marker:\
+                    size: 0.5          *# \[positive float\]; Marker size in key samples, × base size; series.marker.size sets the plot's.*\
             title:\
-                text: Cell          *# \[None, column_name, text\]; Key title. column_name: the encoding.color column's name. None: none.*\
+                text: Cell          *# \[None, column_name, text\]; Key title. column_name: the encoding.color.column column's name. None: none.*\
         color_bar:\
-            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color: a named scale, one hex color (light to it) or two (first to second).*\
+            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color.column: a named scale, one hex color (light to it) or two (first to second).*\
             title:\
-                text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color column's name. None: none.*\
+                text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color.column column's name. None: none.*\
     series:\
         base_axis: x          *# \[x, y\]; The axis series are drawn along: bars stand on it, and aggregation adds along the other.*\
         aggregation: none          *# \[none, sum, percent\]; Series at the same place: drawn as they are, stacked, or stacked to 100 %.*\
@@ -100,16 +108,19 @@ variable_parameters:          *# List of variable parameters for the G
             show: false          *# \[true, false\]; Write each value by its mark.*\
             position: auto          *# \[auto, inside, outside\]; Inside a bar's end, beyond the mark, or inside where it fits.*\
             format: auto          *# \[auto, text\]; Number format, e.g. ",.0f". auto: as the value axis's tick labels.*\
-            total: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
+            total:\
+                show: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
         line:\
             width: 0.15          *# \[positive float\]; Line width, × base size.*\
         marker:\
             size: 0.5          *# \[positive float\]; Marker size, × base size.*\
-            edge_width: 0.05          *# \[positive float\]; Marker outline width, × base size.*\
+            edge:\
+                width: 0.05          *# \[positive float\]; Marker outline width, × base size.*\
         bar:\
             width: 2.5          *# \[positive float\]; Bar width, × base size. Bars that would overlap are an error.*\
             gap: 0.15          *# \[0-2\]; Gap between side-by-side bars, × base size.*\
-            edge_width: 0.05          *# \[positive float\]; Bar outline width, × base size.*\
+            edge:\
+                width: 0.05          *# \[positive float\]; Bar outline width, × base size.*\
         benchmark:\
             line:\
                 style: solid          *# \[solid, dashed, dotted, dashdot\]; Benchmark line style.*\
@@ -117,10 +128,12 @@ variable_parameters:          *# List of variable parameters for the G
             marker:\
                 shape: circle          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; Benchmark marker shape.*\
                 size: 0.5          *# \[positive float\]; Benchmark marker size, × base size.*\
-                edge_width: 0.05          *# \[positive float\]; Benchmark marker outline width, × base size.*\
+                edge:\
+                    width: 0.05          *# \[positive float\]; Benchmark marker outline width, × base size.*\
             bar:\
                 width: 2.5          *# \[positive float\]; Benchmark bar width, × base size.*\
-                edge_width: 0.05          *# \[positive float\]; Benchmark bar outline width, × base size.*\
+                edge:\
+                    width: 0.05          *# \[positive float\]; Benchmark bar outline width, × base size.*\
     grid:\
         show: false          *# \[true, false\]; Draw a grid.*\
     output:\

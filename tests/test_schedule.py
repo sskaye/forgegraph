@@ -18,7 +18,7 @@ WEEKDAYS = ["mon 06:00", "tue 06:00", "wed 06:00", "thu 06:00", "fri 06:00"]
 
 def cadence(interval: int, unit: str, at: object) -> Cadence:
     return Cadence.from_values(
-        {"cadence.interval": interval, "cadence.interval_unit": unit, "cadence.at": at}
+        {"cadence.interval.count": interval, "cadence.interval.unit": unit, "cadence.at": at}
     )
 
 
@@ -76,8 +76,9 @@ def test_cadences_that_cant_run_exactly_are_errors(interval, unit, at, message):
 def test_a_schedules_cadence_is_checked_with_the_file():
     schedule = doc(
         "forgegraph_base/base_schedule",
-        variable={"cadence.interval": 2, "cadence.interval_unit": "day"},
+        variable={"cadence.interval.count": 2, "cadence.interval.unit": "day"},
     )
     assert validate("schedule", schedule, builtin()) == [
-        "cadence.interval: must be 1 for days; cron and launchd can't run every 2 days exactly"
+        "cadence.interval.count: must be 1 for days; cron and launchd can't run every 2 days "
+        "exactly"
     ]

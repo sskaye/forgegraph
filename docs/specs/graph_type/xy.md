@@ -48,12 +48,19 @@ variable_parameters:          *# List of variable parameters for the g
                 label:\
                     format: auto          *# \[auto, text\]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.*\
     encoding:\
-        color: column_name          *# \[None, column_name, column\]; A color per value of this column. column_name: per y column. None: one color.*\
-        color_type: auto          *# \[auto, categorical, continuous\]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.*\
-        line_style: None          *# \[None, column_name, column\]; A line style per value of this column. column_name: per y column. None: one style.*\
-        marker_shape: None          *# \[None, column_name, column\]; A marker shape per value of this column. column_name: per y column. None: one shape.*\
-        marker_fill: None          *# \[None, column_name, column\]; A marker fill per value of this column. column_name: per y column. None: one fill.*\
-        detail: None          *# \[None, columns\]; Columns splitting rows into separate lines, e.g. replicates. Each y column is always its own line.*\
+        color:\
+            column: column_name          *# \[None, column_name, column\]; A color per value of this column. column_name: per y column. None: one color.*\
+            type: auto          *# \[auto, categorical, continuous\]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.*\
+        line:\
+            style:\
+                column: None          *# \[None, column_name, column\]; A line style per value of this column. column_name: per y column. None: one style.*\
+        marker:\
+            shape:\
+                column: None          *# \[None, column_name, column\]; A marker shape per value of this column. column_name: per y column. None: one shape.*\
+            fill:\
+                column: None          *# \[None, column_name, column\]; A marker fill per value of this column. column_name: per y column. None: one fill.*\
+        detail:\
+            column: None          *# \[None, columns\]; Columns splitting rows into separate lines, e.g. replicates. Each y column is always its own line.*\
         order: sorted          *# \[sorted, data\]; Group order: sorted, or as first seen.*\
     series:\
         base_axis: x          *# \[x, y\]; The axis series are drawn along: bars stand on it, and aggregation adds along the other.*\
@@ -63,7 +70,8 @@ variable_parameters:          *# List of variable parameters for the g
             show: false          *# \[true, false\]; Write each value by its mark.*\
             position: auto          *# \[auto, inside, outside\]; Inside a bar's end, beyond the mark, or inside where it fits.*\
             format: auto          *# \[auto, text\]; Number format, e.g. ",.0f". auto: as the value axis's tick labels.*\
-            total: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
+            total:\
+                show: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
     benchmark:\
         data_column: None          *# \[None, column_name, column\]; Column marking the benchmark. column_name: a y column. None: no benchmark.*\
         value: None          *# \[None, text, float\]; The benchmark's value in data_column (for column_name, a y column's name), drawn in series.benchmark style. Set with data_column.*\
@@ -83,7 +91,7 @@ variable_parameters:          *# List of variable parameters for the g
             positions: \[top_right, top_left, bottom_right, bottom_left\]          *# \[top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom\]; Tried in order: the first clear one.*\
             inside: true          *# \[true, false\]; Inside the plot area, or outside it: top\_\* above it, bottom\_\* below the x-axis title, right\_\* to its right.*\
             title:\
-                text: column_name          *# \[None, column_name, text\]; Key title. column_name: the encoding.color column's name. None: none.*\
+                text: column_name          *# \[None, column_name, text\]; Key title. column_name: the encoding.color.column column's name. None: none.*\
         color_bar:\
             title:\
-                text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color column's name. None: none.*
+                text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color.column column's name. None: none.*

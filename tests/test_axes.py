@@ -370,8 +370,8 @@ def membranes(**theme) -> fg.Graph:
     settings = {
         "axis.x.data.column": "membrane",
         "axis.y.data.column": "value",
-        "encoding.color": None,
-        "encoding.detail": None,
+        "encoding.color.column": None,
+        "encoding.detail.column": None,
         "benchmark.data_column": None,
         "benchmark.value": None,
         "mark.line.show": False,
@@ -448,8 +448,8 @@ def test_the_benchmark_keeps_its_side_whatever_the_order(side, at):
                 "axis.y.data.aggregation": "max",
                 "axis.x.tick.algorithm": "all",
                 "axis.x.data.order.direction": direction,
-                "encoding.color": None,
-                "encoding.detail": None,
+                "encoding.color.column": None,
+                "encoding.detail.column": None,
                 "mark.line.show": False,
                 "benchmark.side": side,
             }

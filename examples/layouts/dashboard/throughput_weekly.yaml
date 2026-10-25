@@ -24,6 +24,7 @@ variable_parameters:
             title: Runs
             min: 0
     encoding:
-        color: Instrument
+        color:
+            column: Instrument
     grid:
         show: true

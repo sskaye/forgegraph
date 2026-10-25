@@ -132,7 +132,7 @@ def apply_separators(fig: Figure, grid: Grid, layout_values: dict[str, Any], bas
     color = layout_values["separators.color"]
     fig.set_facecolor("none" if unset(color) else str(color))
     between = bool(layout_values["separators.line.show"])
-    border = bool(layout_values["separators.line.border"])
+    border = bool(layout_values["separators.border.show"])
     if between or border:
         width = float(layout_values["separators.line.width"]) * base
         line_color = str(layout_values["separators.line.color"])

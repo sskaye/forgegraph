@@ -77,7 +77,7 @@ class Key:
             self.title_edges.height + style.pt("legend.key.title.gap") if self.title_edges else 0
         )
         self.height = 2 * self.pad + title_h + rows
-        self.frame = bool(t["legend.key.frame"])
+        self.frame = bool(t["legend.key.frame.show"])
         self.artists: list[Any] = []
         self.position: str | None = None
         self.outside = False
@@ -152,7 +152,7 @@ class Key:
                     transform=to_display,
                     facecolor=fill,
                     edgecolor=color if self.frame else "none",
-                    linewidth=self.style.pt("legend.key.frame_width") if self.frame else 0,
+                    linewidth=self.style.pt("legend.key.frame.width") if self.frame else 0,
                 ),
             )
         y = -self.pad  # the top of what comes next
@@ -236,7 +236,7 @@ class Key:
                     transform=to_display,
                     linestyle="none",
                     marker=h.get_marker(),
-                    markersize=self.style.pt("legend.key.sample.marker_size"),
+                    markersize=self.style.pt("legend.key.sample.marker.size"),
                     markerfacecolor=h.get_markerfacecolor(),
                     markeredgecolor=h.get_markeredgecolor(),
                     markeredgewidth=h.get_markeredgewidth(),

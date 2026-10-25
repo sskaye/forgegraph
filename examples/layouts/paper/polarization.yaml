@@ -23,4 +23,5 @@ variable_parameters:
                 column: voltage_v
             title: Cell voltage (V)
     encoding:
-        color: cell
+        color:
+            column: cell

@@ -116,7 +116,7 @@ def test_a_numbered_baseline_can_change_several_parameters():
     catalog = read("graph_type", "xy", builtin())
     overlaid = next(b for b in catalog.baselines if b.path == "overlaid")
     parts = {c.path: c.value for c in overlaid.parts}
-    assert parts["encoding.color"] == "Run" and parts["mark.bar.show"] is True
+    assert parts["encoding.color.column"] == "Run" and parts["mark.bar.show"] is True
 
 
 def test_a_layer_catalog_draws_its_layer_on_every_card():
@@ -173,7 +173,7 @@ def test_an_axis_column_is_each_unused_column_of_numbers():
 
 
 def test_an_encoding_column_is_each_unused_column_then_the_words():
-    p = XY["encoding.color"]
+    p = XY["encoding.color.column"]
     assert candidates(p, "column_name", SCENE) == ["Cell", "t", "None", "column_name"]
 
 
@@ -195,7 +195,7 @@ def test_a_number_is_doubled_then_halved_within_its_interval():
     assert candidates(THEME["series.bar.gap"], 0.15, SCENE) == [0.3, 0.075, 0.15]
     p = THEME["legend.direct.max_relative_distance"]  # 0-1
     assert candidates(p, 0.8, SCENE) == [1.0, 0.4, 0.8]
-    assert candidates(THEME["axis.tick.minor.num"], 0, SCENE) == [1, 0]
+    assert candidates(THEME["axis.tick.minor.count"], 0, SCENE) == [1, 0]
     assert candidates(THEME["axis.tick.label.max_wrap"], 1, SCENE) == [2, 0, 1]  # whole
 
 

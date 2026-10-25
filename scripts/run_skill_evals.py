@@ -632,15 +632,15 @@ def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
             ok, evidence = False, problem or "no data"
             if graph is not None:
                 values = graph.values["graph_type"]
-                color = values["encoding.color"]
-                kind = values["encoding.color_type"]
+                color = values["encoding.color.column"]
+                kind = values["encoding.color.type"]
                 text = (
                     frame is not None
                     and color in frame
                     and not pd.api.types.is_numeric_dtype(frame[color])
                 )
                 ok = kind == "categorical" or bool(text)
-                evidence = f"encoding.color {color!r}, color_type {kind}"
+                evidence = f"encoding.color.column {color!r}, encoding.color.type {kind}"
             checks.append(Check("color is categorical", ok, evidence))
     if "numeric_columns" in expect:
         evidence, ok = "no GraphSpec in the project", False

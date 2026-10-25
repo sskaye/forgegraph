@@ -249,7 +249,7 @@ class Layout(Saved):
             rule = float(self.values["separators.line.width"]) * float(
                 self.format["figure.base_size"]
             )
-            framed = not one and bool(self.values["separators.line.border"])
+            framed = not one and bool(self.values["separators.border.show"])
             with self.tabs[0].saving():
                 shown = [
                     page.Shown(
@@ -494,7 +494,7 @@ def _draw_tab(
                     raise SpecError([f"{_where(tab, name)}: {m}" for m in e.problems]) from None
             placed.append(Placed(name, places[name], ax, p.style))
         gap = float(layout.values["separators.gap"]) * float(fmt["figure.base_size"]) / 72
-        edge = gap if layout.values["separators.line.border"] else MARGIN_IN  # room for it
+        edge = gap if layout.values["separators.border.show"] else MARGIN_IN  # room for it
         if footnote:
             add_footnote(fig, footnote, first.style)
         foot = footnote_room(fig)

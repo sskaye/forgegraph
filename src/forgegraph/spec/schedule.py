@@ -1,9 +1,9 @@
 """A schedule's cadence: when a scheduled job runs (docs/specs/schedule/base_schedule.md).
 
-cadence.interval counts cadence.interval_unit (minute, hour, day, week, month or year), and
+cadence.interval.count counts cadence.interval.unit (minute, hour, day, week, month or year), and
 cadence.at says when in each unit the job runs, as one time or a list:
 
-| interval_unit | at | e.g. | None means |
+| interval.unit | at | e.g. | None means |
 | --- | --- | --- | --- |
 | minute | None | | each minute's start |
 | hour | :MM | ":30" | :00 |
@@ -12,7 +12,7 @@ cadence.at says when in each unit the job runs, as one time or a list:
 | month | day of month (1-28), HH:MM | "1 06:00" | the 1st, 00:00 |
 | year | month and day, HH:MM | "Jan 1 06:00" | 1 January, 00:00 |
 
-The time is optional for week, month and year. interval divides the next unit up (60 for
+The time is optional for week, month and year. interval.count divides the next unit up (60 for
 minutes, 24 for hours, 12 for months), and is 1 for days, weeks and years, so that every run
 lands on the same clock positions, as cron and launchd need. Times are the machine's local
 time. Everything here is checked: a cadence that can't be run exactly is an error.
@@ -69,18 +69,18 @@ class Cadence:
     @classmethod
     def from_values(cls, values: dict[str, Any]) -> Cadence:
         """The cadence a schedule's resolved values describe, checked."""
-        interval = values["cadence.interval"]
-        unit = values["cadence.interval_unit"]
+        interval = values["cadence.interval.count"]
+        unit = values["cadence.interval.unit"]
         at = values["cadence.at"]
         if unit in DIVIDES:
             if DIVIDES[unit] % interval:
                 raise CadenceError(
-                    f"cadence.interval: {interval} doesn't divide {DIVIDES[unit]}, so runs "
+                    f"cadence.interval.count: {interval} doesn't divide {DIVIDES[unit]}, so runs "
                     f"wouldn't land on the same clock positions every {_next_up(unit)}"
                 )
         elif interval != 1:
             raise CadenceError(
-                f"cadence.interval: must be 1 for {unit}s; cron and launchd can't run every "
+                f"cadence.interval.count: must be 1 for {unit}s; cron and launchd can't run every "
                 f"{interval} {unit}s exactly"
             )
         listed = at if isinstance(at, list) else [at]

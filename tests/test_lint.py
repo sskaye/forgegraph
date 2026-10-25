@@ -60,8 +60,8 @@ def test_too_many_groups():
         {
             "axis.x.data.column": "x",
             "axis.y.data.column": "y",
-            "encoding.color": "g",
-            "encoding.detail": "None",
+            "encoding.color.column": "g",
+            "encoding.detail.column": "None",
             "benchmark.data_column": "None",
             "benchmark.value": "None",
             "legend.method": "none",

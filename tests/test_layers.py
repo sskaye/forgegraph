@@ -512,7 +512,7 @@ def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
     _, box = _label_box(g)
     plot = g.axes.get_window_extent()
     assert plot.y0 <= box.y0 and box.y1 <= plot.y1  # the line is at the top: label below
-    assert box_clear(g.axes, box, lines_shown=False)
+    assert box_clear(g.axes, box, lines=False)
 
 
 def test_a_chosen_label_position_that_covers_the_data_is_an_error():

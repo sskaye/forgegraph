@@ -15,12 +15,16 @@ fit at about one per three tick-label heights along x and two along y, from 2 to
 - matplotlib: matplotlib's default (MaxNLocator with steps 1, 2, 2.5, 5, 10).
 
 Log axes have their own algorithms, picked by the theme's axis.tick.log_algorithm (LogTicks):
-R's scales::breaks_log, ported with its MIT licence, or matplotlib's LogLocator.
+R's scales::breaks_log, ported with its MIT licence, or matplotlib's LogLocator. A manual
+step on a log axis is a factor (LogStep).
 
 On an axis of whole numbers (an int column, or a categorical axis's positions), every
 algorithm keeps to whole-number steps of 1 or more: extended_wilkinson and wilkinson skip
 other candidates, heckbert, nelder and r_pretty move to their next whole step, matplotlib's
 MaxNLocator takes integer=True, and log axes drop breaks below 1.
+
+Minor ticks (minor_ticks) are the theme's axis.tick.minor.num between each pair of major
+ticks, evenly in log terms on a log axis.
 """
 
 from __future__ import annotations
@@ -32,9 +36,11 @@ from itertools import pairwise
 from typing import Any, cast
 
 import numpy as np
-from matplotlib.ticker import Locator, LogLocator, MaxNLocator
+from matplotlib.ticker import Locator, LogLocator, MaxNLocator, NullLocator
 
 from forgegraph.drawing import text
+from forgegraph.drawing.errors import DrawError
+from forgegraph.drawing.style import Style
 
 EPS = 1e-10
 
@@ -502,3 +508,62 @@ class LogTicks(Locator):
         gap = self.gap * figure.dpi / 72
         spans.sort()
         return all(b[0] - a[1] >= gap for a, b in pairwise(spans))
+
+
+class LogStep(Locator):
+    """Ticks a factor apart on a log axis, counted from the first power of ten at or above
+    its low end: a step of 100 from 10 gives 10, 1000, 100000."""
+
+    def __init__(self, factor: float) -> None:
+        if factor <= 1:
+            raise DrawError(f"tick.step: {factor:g} on a log axis must be a factor above 1")
+        self.factor = factor
+
+    def __call__(self) -> Any:
+        lo, hi = sorted(cast(Any, self.axis).get_view_interval())
+        return self.tick_values(lo, hi)
+
+    def tick_values(self, vmin: float, vmax: float) -> Any:
+        lo, hi = sorted((vmin, vmax))
+        anchor = 10.0 ** math.ceil(math.log10(lo) - 1e-9)
+        first = math.floor(math.log(lo / anchor) / math.log(self.factor))
+        last = math.ceil(math.log(hi / anchor) / math.log(self.factor))
+        ticks = (anchor * self.factor**k for k in range(first, last + 1))
+        return [float(f"{t:.12g}") for t in ticks if lo * (1 - 1e-9) <= t <= hi * (1 + 1e-9)]
+
+
+def minor_ticks(axis: Any, style: Style) -> None:
+    """axis.tick.minor.num minor ticks between each pair of major ticks, or none."""
+    n = int(style.theme["axis.tick.minor.num"])
+    axis.set_minor_locator(_Between(n) if n > 0 else NullLocator())
+
+
+class _Between(Locator):
+    """n ticks evenly between each pair of major ticks (evenly in log terms on a log axis),
+    and in the part-intervals beyond the first and last major tick."""
+
+    def __init__(self, n: int) -> None:
+        self.n = n
+
+    def __call__(self) -> Any:
+        axis = cast(Any, self.axis)
+        assert axis is not None
+        lo, hi = sorted(axis.get_view_interval())
+        majors = np.asarray(axis.get_major_locator()())
+        log = axis.get_scale() == "log"
+        if len(majors) < 2:
+            return []
+        f = np.log10 if log else (lambda v: v)
+        g = (lambda v: 10.0**v) if log else (lambda v: v)
+        m = f(majors)
+        step = np.diff(m)
+        edges = np.concatenate(([m[0] - step[0]], m, [m[-1] + step[-1]]))
+        out = [
+            g(a + (b - a) * k / (self.n + 1))
+            for a, b in pairwise(edges)
+            for k in range(1, self.n + 1)
+        ]
+        return [v for v in out if lo <= v <= hi]
+
+    def tick_values(self, vmin: float, vmax: float) -> Any:
+        return self()

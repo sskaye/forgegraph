@@ -54,10 +54,9 @@ class Key:
 
     def __init__(self, entries: list[Entry], title: str | None, style: Style) -> None:
         self.entries, self.title, self.style = entries, title, style
-        family, t = str(style.theme["font.family"]), style.theme
-        size = style.pt("legend.label.size")
-        self.font = text.font(family, size, style.weight("font.weight"))
-        self.title_font = text.font(family, size, style.weight("legend.key.title.weight"))
+        t = style.theme
+        self.font = style.font("legend.label.size", "font.weight")
+        self.title_font = style.font("legend.label.size", "legend.key.title.weight")
         self.pad = style.pt("legend.key.padding")
         self.sample = style.pt("legend.key.sample.length")
         self.sample_gap = style.pt("legend.key.sample.gap")

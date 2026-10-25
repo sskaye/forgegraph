@@ -219,7 +219,7 @@ def _date_order(target: Path) -> str:
 def stamp(as_of: datetime, cadence: Cadence, order: str) -> str:
     """The "data as of" footnote: e.g. "Data as of Oct 21, 2026, 05:12 · rendered daily
     at 06:00"."""
-    from forgegraph.drawing.axes import MONTHS
+    from forgegraph.drawing.dates import MONTHS
 
     month = MONTHS[as_of.month - 1][:3]
     day = (

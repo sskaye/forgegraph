@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from pack_helpers import allow, dump, needs_node, write_pack
-from render_helpers import BASE, polarization
+from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, needs_node, write_pack
+from render_helpers import BASE
 
 import forgegraph as fg
 from forgegraph.drawing.figure import FOOTNOTE
@@ -25,25 +25,13 @@ from forgegraph.jobs import status as status_file
 
 
 def schedule_doc(name: str = "lab", **variable: Any) -> dict[str, Any]:
-    return {
-        "name": name,
-        "version": 0,
-        "description": "test",
-        "extends": "forgegraph_base/base_schedule",
-        "fixed_parameters": "None",
-        "variable_parameters": {
-            "targets": {"files": ["p.yaml"], "output_folder": "out"},
-            **variable,
-        },
-    }
+    targets = {"files": ["p.yaml"], "output_folder": "out"}
+    return doc("forgegraph_base/base_schedule", name, variable={"targets": targets, **variable})
 
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
-    polarization().to_parquet(tmp_path / "p.parquet")
-    doc = fg.graphspec("p", "xy", data_file="p.parquet", settings=BASE)
-    doc["variable_parameters"]["output"] = {"file_types": ["png", "html"]}
-    dump(doc, tmp_path / "p.yaml")
+    graphspec_file(tmp_path, settings={**BASE, "output.file_types": ["png", "html"]})
     dump(schedule_doc(), tmp_path / "lab.schedule.yaml")
     monkeypatch.chdir(tmp_path)
     return tmp_path
@@ -75,12 +63,7 @@ def test_paths_a_parent_schedule_sets_are_found_from_its_folder(project):
     """A schedule extending a pack's schedule: the targets and output folder the pack's
     schedule sets are relative to its file, not to the schedule that extends it."""
     schedules = write_pack(project / "packs") / "schedules"
-    (schedules / "graphs").mkdir(parents=True)
-    polarization().to_parquet(schedules / "graphs" / "q.parquet")
-    dump(
-        fg.graphspec("q", "xy", data_file="q.parquet", settings=BASE),
-        schedules / "graphs" / "q.yaml",
-    )
+    graphspec_file(schedules / "graphs", "q", "q.parquet")
     parent = schedule_doc("lab")
     parent["variable_parameters"]["targets"] = {"files": ["graphs/q.yaml"], "output_folder": "made"}
     dump(parent, schedules / "lab.yaml")
@@ -180,9 +163,7 @@ def test_job_run_says_what_it_saved_and_exits_1_when_a_target_fails(project):
     out = json.loads(result.output)
     assert not out["ok"] and [t["ok"] for t in out["status"]["targets"]] == [True, False]
     dump(schedule_doc(interval=7), project / "lab.schedule.yaml")  # 7 days: not allowed
-    result = runner.invoke(app, ["job", "run", "lab.schedule.yaml", "--json"])
-    assert result.exit_code == 1
-    [problem] = json.loads(result.output)["problems"]
+    [problem] = cli_problems("job", "run", "lab.schedule.yaml")
     assert problem.startswith("variable_parameters.interval: ")
 
 
@@ -239,18 +220,8 @@ def test_a_layout_target_takes_its_oldest_tiles_time(project):
     )
     old = datetime(2026, 1, 2, 3, 4).timestamp()
     os.utime(project / "q.parquet", (old, old))
-    layout = {
-        "name": "both",
-        "version": 0,
-        "description": "",
-        "extends": "forgegraph_base/base_layout",
-        "fixed_parameters": "None",
-        "variable_parameters": {
-            "tabs": {
-                "T": {"grid": {"areas": [["p"], ["q"]]}, "tiles": {"p": "p.yaml", "q": "q.yaml"}}
-            }
-        },
-    }
+    tab = {"grid": {"areas": [["p"], ["q"]]}, "tiles": {"p": "p.yaml", "q": "q.yaml"}}
+    layout = doc("forgegraph_base/base_layout", "both", variable={"tabs": {"T": tab}})
     dump(layout, project / "both.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["both.layout.yaml"], "output_folder": "out"}),
@@ -270,16 +241,8 @@ def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
     shutil.copy(project / "p.yaml", tiles / "p.yaml")
     shutil.copy(project / "p.parquet", tiles / "p.parquet")
     (tiles / "forgegraph.toml").write_text("packs = ['forgegraph_base', 'not_installed']\n")
-    layout = {
-        "name": "tiled",
-        "version": 0,
-        "description": "",
-        "extends": "forgegraph_base/base_layout",
-        "fixed_parameters": "None",
-        "variable_parameters": {
-            "tabs": {"T": {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}}
-        },
-    }
+    tab = {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}
+    layout = doc("forgegraph_base/base_layout", "tiled", variable={"tabs": {"T": tab}})
     dump(layout, project / "tiled.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["tiled.layout.yaml"], "output_folder": "out"}),

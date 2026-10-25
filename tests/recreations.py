@@ -15,6 +15,7 @@ from unittest import mock
 
 import numpy as np
 import pandas as pd
+from pack_helpers import doc
 from ruamel.yaml import YAML
 
 import forgegraph as fg
@@ -40,21 +41,8 @@ class Recreation:
     def registry(self) -> Registry:
         reg = builtin().copy()
         if self.format:
-            sections: dict[str, Any] = {"size": {}, "output": {}}
-            for path, value in self.format.items():
-                category, param = path.split(".")
-                sections.setdefault(category, {})[param] = value
-            reg.add(
-                "format",
-                {
-                    "name": "changed",
-                    "version": 0,
-                    "description": "",
-                    "extends": "forgegraph_base/base_format",
-                    "fixed_parameters": {k: v for k, v in sections.items() if v},
-                    "variable_parameters": NONE,
-                },
-            )
+            fmt = doc("forgegraph_base/base_format", "changed", fixed=self.format, description="")
+            reg.add("format", fmt)
         return reg
 
     def render(self) -> fg.Graph:
@@ -362,38 +350,27 @@ class LayoutRecreation:
         )
         (folder / "forgegraph.toml").write_text('packs = ["forgegraph_base", "./house"]\n')
         (folder / "main.toml").write_text('packs = ["forgegraph_base", "./house"]\n')
-        fmt = {
-            "name": "slide",
-            "version": 0,
-            "description": "",
-            "extends": "forgegraph_base/base_format",
-            "fixed_parameters": {"figure": self.format},
-            "variable_parameters": NONE,
-        }
+        fmt = doc(
+            "forgegraph_base/base_format", "slide", fixed={"figure": self.format}, description=""
+        )
         with (folder / "house" / "formats" / "slide.yaml").open("w", encoding="utf-8") as f:
             yaml.dump(fmt, f)
         for name, r in self.tiles.items():
             with (folder / f"{name}.yaml").open("w", encoding="utf-8") as f:
                 yaml.dump(r.graphspec(), f)
-        doc = {
-            "name": self.name,
-            "version": 0,
-            "description": self.caption,
-            "extends": "forgegraph_base/base_layout",
-            "fixed_parameters": NONE,
-            "variable_parameters": {
-                "specifications": {"format": "house/slide"},
-                "tabs": {
-                    "Slide": {
-                        "grid": {"areas": self.areas},
-                        "tiles": {name: f"{name}.yaml" for name in self.tiles},
-                    }
-                },
+        tiles = {name: f"{name}.yaml" for name in self.tiles}
+        layout = doc(
+            "forgegraph_base/base_layout",
+            self.name,
+            variable={
+                "specifications.format": "house/slide",
+                "tabs": {"Slide": {"grid": {"areas": self.areas}, "tiles": tiles}},
             },
-        }
+            description=self.caption,
+        )
         path = folder / f"{self.name}.layout.yaml"
         with path.open("w", encoding="utf-8") as f:
-            yaml.dump(doc, f)
+            yaml.dump(layout, f)
         with mock.patch.dict(os.environ, {MAIN_CONFIG_VARIABLE: str(folder / "main.toml")}):
             return fg.layout(path, data={name: r.data for name, r in self.tiles.items()})
 

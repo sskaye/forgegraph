@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from pack_helpers import needs_node, write_pack
+from pack_helpers import cli_problems, needs_node, write_pack
 from typer.testing import CliRunner
 
 import forgegraph
@@ -146,9 +146,7 @@ def test_cli_build(tmp_path, monkeypatch):
 
 def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
     def problems(*args):
-        result = CliRunner().invoke(app, ["catalog", "build", *args, "--json"])
-        assert result.exit_code == 1, result.output
-        return json.loads(result.output)["problems"]
+        return cli_problems("catalog", "build", *args)
 
     (tmp_path / "empty").mkdir()
     [problem] = problems("--pack", str(tmp_path / "empty"))

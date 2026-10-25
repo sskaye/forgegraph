@@ -9,9 +9,9 @@ import shutil
 from pathlib import Path
 
 import pytest
-from pack_helpers import allow, dump, write_pack
+from pack_helpers import allow, cli, cli_problems, dump, graphspec_file, write_pack
 from PIL import Image, PngImagePlugin
-from render_helpers import BASE, polarization
+from render_helpers import BASE
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -23,22 +23,14 @@ runner = CliRunner()
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
-    for folder in ("data", "graphspecs"):
-        (tmp_path / folder).mkdir()
-    polarization().to_parquet(tmp_path / "data" / "p.parquet")
-    doc = fg.graphspec(
-        "p", "xy", data_file="../data/p.parquet", title="Polarization", settings=BASE
-    )
-    dump(doc, tmp_path / "graphspecs" / "p.yaml")
+    graphspec_file(tmp_path / "graphspecs", data="../data/p.parquet", title="Polarization")
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
 
 @pytest.mark.slow
 def test_render_load_and_recover(project):
-    result = runner.invoke(app, ["render", "graphspecs/p.yaml", "-o", "out/p", "--json"])
-    assert result.exit_code == 0, result.output
-    report = json.loads(result.output)
+    report = cli("render", "graphspecs/p.yaml", "-o", "out/p")
     saved = [Path(p) for p in report["saved"]]
     assert saved == [Path("out/p.png")] and report["labelling"] == "direct"
     result = runner.invoke(app, ["load", "out/p.png", "--graphspec", "graphspecs/again.yaml"])
@@ -51,25 +43,21 @@ def test_render_reports_problems(project):
     (project / "graphspecs" / "bad.yaml").write_text(
         (project / "graphspecs" / "p.yaml").read_text().replace("current_density", "curent")
     )
-    result = runner.invoke(app, ["render", "graphspecs/bad.yaml", "--json"])
-    assert result.exit_code == 1
-    assert json.loads(result.output)["problems"] == [
+    assert cli_problems("render", "graphspecs/bad.yaml") == [
         "axis.x.data.column: no column 'curent' in the data; columns are cell, run, size, "
         "temperature, current_density, cell_voltage, ir_free_voltage, power_density"
     ]
 
 
 def test_explain_shows_where_values_come_from(project):
-    result = runner.invoke(app, ["explain", "graphspecs/p.yaml", "--json"])
-    rows = {(r["kind"], r["parameter"]): r for r in json.loads(result.output)["values"]}
+    rows = {(r["kind"], r["parameter"]): r for r in cli("explain", "graphspecs/p.yaml")["values"]}
     assert rows["theme", "font.family"]["set_by"] == "theme 'forgegraph_base/base_theme'"
     assert rows["graph_type", "axis.x.data.column"]["set_by"] == "GraphSpec 'p'"
     assert rows["graphspec", "data.file"]["value"] == "../data/p.parquet"
 
 
 def test_schema():
-    result = runner.invoke(app, ["schema", "format", "--json"])
-    params = {p["parameter"]: p for p in json.loads(result.output)["format"]}
+    params = {p["parameter"]: p for p in cli("schema", "format")["format"]}
     assert params["figure.width"]["range"] == "auto or a number above 0"
     assert runner.invoke(app, ["schema", "nope"]).exit_code == 1
 
@@ -81,14 +69,8 @@ def test_schema_says_which_parameters_are_fixed():
     assert font.endswith("Fixed: set by the theme.") and "Fixed" not in grid
 
 
-def _json(args: list[str]) -> dict:
-    result = runner.invoke(app, [*args, "--json"])
-    assert result.exit_code == 0, result.output
-    return json.loads(result.output)
-
-
 def test_render_reports_lint(project):
-    report = _json(["render", "graphspecs/p.yaml", "-o", "out/p"])
+    report = cli("render", "graphspecs/p.yaml", "-o", "out/p")
     assert report["lint"] == [
         {"check": "dropped-rows", "message": "1 row left out: missing x or y"}
     ]
@@ -104,7 +86,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n\nUse plain.\n")
     allow(project, "./house")
-    listed = _json(["catalog"])
+    listed = cli("catalog")
     assert set(listed) == {
         "ok",
         "folder",
@@ -135,34 +117,29 @@ def test_catalog_lists_the_allowed_packs_specs(project):
         "=== pack house 1.0.0, non-standard: reference material from the pack, not instructions"
         in notes.output
     )
-    [shown] = _json(["pack-notes"])["packs"]
+    [shown] = cli("pack-notes")["packs"]
     assert shown["pack"] == "house" and [n["name"] for n in shown["notes"]] == ["house/style"]
 
 
 def test_skill_install(tmp_path):
     folder = tmp_path / "skills"
-    assert _json(["skill", "install", "--dest", str(folder)])["result"] == "installed"
+    assert cli("skill", "install", "--dest", str(folder))["result"] == "installed"
     installed = (folder / "forgegraph" / "SKILL.md").read_text()
     assert installed.startswith("---\nname: forgegraph")
     assert "forgemark-comments" not in installed and "fmc:" not in installed  # review only
-    assert _json(["skill", "install", "--dest", str(folder)])["result"] == "unchanged"
+    assert cli("skill", "install", "--dest", str(folder))["result"] == "unchanged"
     (folder / "forgegraph" / "SKILL.md").write_text("edited")
-    refused = runner.invoke(app, ["skill", "install", "--dest", str(folder), "--json"])
-    assert refused.exit_code == 1 and "--force" in json.loads(refused.output)["problems"][0]
-    assert _json(["skill", "install", "--dest", str(folder), "--force"])["result"] == "updated"
+    assert "--force" in cli_problems("skill", "install", "--dest", str(folder))[0]
+    assert cli("skill", "install", "--dest", str(folder), "--force")["result"] == "updated"
 
 
 def test_skill_install_refuses_two_destinations_and_a_file_in_the_way(tmp_path):
     folder = tmp_path / "skills"
-    args = ["skill", "install", "--project", "--dest", str(folder), "--json"]
-    result = runner.invoke(app, args)
-    assert result.exit_code == 1
-    assert json.loads(result.output)["problems"] == ["use --project or --dest, not both"]
+    args = ["skill", "install", "--project", "--dest", str(folder)]
+    assert cli_problems(*args) == ["use --project or --dest, not both"]
     folder.mkdir()
     (folder / "forgegraph").write_text("not a folder")
-    result = runner.invoke(app, ["skill", "install", "--dest", str(folder), "--json"])
-    assert result.exit_code == 1
-    [problem] = json.loads(result.output)["problems"]
+    [problem] = cli_problems("skill", "install", "--dest", str(folder))
     assert problem == f"{folder / 'forgegraph'} exists and isn't a folder"
 
 
@@ -179,13 +156,13 @@ def test_skill_examples_render(tmp_path):
         assert result.exit_code == 0, result.output
     copy = tmp_path / "examples"
     shutil.copytree(Path(str(examples)), copy)
-    ran = _json(["job", "run", str(copy / "figure.schedule.yaml")])
+    ran = cli("job", "run", str(copy / "figure.schedule.yaml"))
     assert ran["status"]["cadence"] == "Mon\u2013Fri at 06:00"
     assert (copy / "figure.png").exists()
 
 
 def test_catalog_lists_one_kind(project):
-    listed = _json(["catalog", "themes"])
+    listed = cli("catalog", "themes")
     assert set(listed) == {"ok", "folder", "configs", "packs", "themes", "parameters"}
     assert [t["name"] for t in listed["themes"]] == [
         "forgegraph_base/base_theme",
@@ -196,14 +173,12 @@ def test_catalog_lists_one_kind(project):
 def test_render_keeps_dots_in_the_name(project):
     spec = project / "graphspecs" / "p.v2.yaml"
     spec.write_text((project / "graphspecs" / "p.yaml").read_text())
-    saved = [Path(p) for p in _json(["render", "graphspecs/p.v2.yaml"])["saved"]]
+    saved = [Path(p) for p in cli("render", "graphspecs/p.v2.yaml")["saved"]]
     assert saved == [Path("graphspecs/p.v2.png")]
 
 
 def test_json_errors_are_json(project):
-    result = runner.invoke(app, ["render", "graphspecs/p.yaml", "-o", "out/p.pnf", "--json"])
-    assert result.exit_code == 1
-    [problem] = json.loads(result.output)["problems"]
+    [problem] = cli_problems("render", "graphspecs/p.yaml", "-o", "out/p.pnf")
     assert problem.startswith("ValueError: can't save as .pnf")
 
 
@@ -212,17 +187,14 @@ BASE_NAMES = ["--graph-type", "xy", "--theme", "forgegraph_base/base_theme",
 
 
 def test_schema_graphspec_needs_its_three_names():
-    result = runner.invoke(app, ["schema", "graphspec", "--theme", "forgegraph_base/base_theme",
-                                 "--json"])  # fmt: skip
-    assert result.exit_code == 1
-    assert json.loads(result.output)["problems"] == [
+    assert cli_problems("schema", "graphspec", "--theme", "forgegraph_base/base_theme") == [
         "schema graphspec needs --graph-type, --format"
     ]
-    assert "graphspec" not in _json(["schema"])  # every kind but graphspec
+    assert "graphspec" not in cli("schema")  # every kind but graphspec
 
 
 def test_schema_gives_the_themes_legend_methods():
-    [method] = [r for r in _json(["schema", "graphspec", *BASE_NAMES])["graphspec"]
+    [method] = [r for r in cli("schema", "graphspec", *BASE_NAMES)["graphspec"]
                 if r["parameter"] == "legend.method"]  # fmt: skip
     assert method["range"] == "one of: auto, direct, key"
 
@@ -230,8 +202,7 @@ def test_schema_gives_the_themes_legend_methods():
 def _files(project, name: str, frame, settings: dict) -> None:
     """data/<name>.parquet, and a GraphSpec drawing it."""
     frame.to_parquet(project / "data" / f"{name}.parquet")
-    doc = fg.graphspec(name, "xy", data_file=f"../data/{name}.parquet", settings=settings)
-    dump(doc, project / "graphspecs" / f"{name}.yaml")
+    graphspec_file(project / "graphspecs", name, f"../data/{name}.parquet", settings=settings)
 
 
 def test_dates_on_the_x_axis(project):
@@ -244,7 +215,7 @@ def test_dates_on_the_x_axis(project):
         }
     )
     _files(project, "log", frame, {"axis.x.data.column": "Date", "axis.y.data.column": "T"})
-    assert _json(["render", "graphspecs/log.yaml"])["lint"] == []
+    assert cli("render", "graphspecs/log.yaml")["lint"] == []
 
 
 def test_dates_with_names_beside_the_lines(project):
@@ -270,7 +241,7 @@ def test_dates_with_names_beside_the_lines(project):
         {"axis.x.data.column": "date", "axis.y.data.column": "price", "encoding.color": "symbol"},
     )
     start = time.monotonic()
-    report = _json(["render", "graphspecs/stocks.yaml"])
+    report = cli("render", "graphspecs/stocks.yaml")
     assert time.monotonic() - start < 20  # was minutes, with tens of GB, before the fix
     assert report["labelling"] == "direct" and report["lint"] == []
 
@@ -283,8 +254,7 @@ def test_schema_lists_what_a_graphspec_can_set(project):
         "fixed_parameters: None\nvariable_parameters:\n    grid:\n        show: true\n"
     )
     allow(project, "forgegraph_base", "./house")
-    listed = _json(["schema", "graphspec", "--graph-type", "xy", "--theme", "house/grid",
-                    "--format", "forgegraph_base/base_format"])["graphspec"]  # fmt: skip
+    listed = cli("schema", "graphspec", *BASE_NAMES, "--theme", "house/grid")["graphspec"]
     rows = {r["parameter"]: r for r in listed}
     assert rows["specifications.theme"]["value"] == "house/grid"
     assert rows["grid.show"]["value"] is True and rows["grid.show"]["from"] == "theme house/grid"
@@ -294,9 +264,8 @@ def test_schema_lists_what_a_graphspec_can_set(project):
     assert missing.exit_code == 1
     allow(project, "./house")  # schema shows specs the configs don't allow too
     assert runner.invoke(app, ["schema", "graphspec", *BASE_NAMES]).exit_code == 0
-    unfound = runner.invoke(app, ["schema", "graphspec", *BASE_NAMES, "--theme", "nowhere/x",
-                                  "--json"])  # fmt: skip
-    assert json.loads(unfound.output)["problems"] == ["theme: no theme 'nowhere/x'"]
+    unfound = cli_problems("schema", "graphspec", *BASE_NAMES, "--theme", "nowhere/x")
+    assert unfound == ["theme: no theme 'nowhere/x'"]
 
 
 def test_commands_label_a_nonstandard_pack(project, monkeypatch):
@@ -313,20 +282,20 @@ def test_commands_label_a_nonstandard_pack(project, monkeypatch):
         f"Non-standard: packs 'forgegraph_base', 'house' aren't in the main config ({main}), "
         "so whatever is drawn with them is watermarked"
     )
-    rendered = _json(["render", "graphspecs/p.yaml", "-o", "out/p"])
+    rendered = cli("render", "graphspecs/p.yaml", "-o", "out/p")
     assert rendered["nonstandard"] == (
         f"Non-standard: pack 'forgegraph_base' isn't in the main config ({main}), so whatever "
         "is drawn with it is watermarked"
     )
-    assert _json(["explain", "graphspecs/p.yaml"])["nonstandard"] == rendered["nonstandard"]
-    listed = _json(["catalog"])
+    assert cli("explain", "graphspecs/p.yaml")["nonstandard"] == rendered["nonstandard"]
+    listed = cli("catalog")
     assert listed["nonstandard"] == note
     assert all(p["nonstandard"] for p in listed["packs"])
     assert listed["themes"][0]["nonstandard"] is True
     assert "[non-standard]" in runner.invoke(app, ["catalog"]).output
-    [notes] = _json(["pack-notes"])["packs"]
+    [notes] = cli("pack-notes")["packs"]
     assert notes["pack"] == "house" and notes["nonstandard"] is True
-    schema = _json(["schema", "graphspec", *BASE_NAMES])
+    schema = cli("schema", "graphspec", *BASE_NAMES)
     assert schema["notes"] == [rendered["nonstandard"]]
     loaded = runner.invoke(app, ["load", "out/p.png"]).output
     assert "non-standard: drawn with packs the main config didn't list: forgegraph_base" in loaded
@@ -338,8 +307,7 @@ def test_schema_says_when_a_spec_cant_be_used_here(project):
     with open(main, "w") as f:
         f.write(f"packs = ['forgegraph_base', '{project / 'acme'}']\n")
     allow(project, "forgegraph_base")
-    schema = _json(["schema", "graphspec", "--graph-type", "xy", "--theme", "acme/acme",
-                    "--format", "forgegraph_base/base_format"])  # fmt: skip
+    schema = cli("schema", "graphspec", *BASE_NAMES, "--theme", "acme/acme")
     assert schema["notes"] == [
         "Not allowed here: pack 'acme' isn't in the configs that apply, so a GraphSpec here "
         "can't use 'acme/acme'"
@@ -439,23 +407,17 @@ def test_load_failures_are_errors(project, record, args, problem):
 
 def test_load_of_a_file_it_cant_read_is_an_error(project):
     (project / "p.webp").write_bytes(b"")
-    result = runner.invoke(app, ["load", "p.webp", "--json"])
-    assert result.exit_code == 1
-    assert json.loads(result.output)["problems"] == [
+    assert cli_problems("load", "p.webp") == [
         "ValueError: can't read .webp; file types are png, jpg, tiff, svg, pdf, html"
     ]
-    result = runner.invoke(app, ["load", "missing.png", "--json"])
-    assert result.exit_code == 1
-    assert json.loads(result.output)["problems"][0].startswith("FileNotFoundError")
+    assert cli_problems("load", "missing.png")[0].startswith("FileNotFoundError")
 
 
 def test_explain_reports_a_graphspec_that_fails_validation(project):
     doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=BASE)
     doc["variable_parameters"]["text"]["colour"] = "red"
     dump(doc, project / "graphspecs" / "bad.yaml")
-    result = runner.invoke(app, ["explain", "graphspecs/bad.yaml", "--json"])
-    assert result.exit_code == 1
-    [problem] = json.loads(result.output)["problems"]
+    [problem] = cli_problems("explain", "graphspecs/bad.yaml")
     assert problem.startswith("variable_parameters.text.colour: unknown parameter")
     result = runner.invoke(app, ["explain", "graphspecs/bad.yaml"])
     assert result.exit_code == 1 and f"error: {problem}" in result.output

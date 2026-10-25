@@ -7,12 +7,12 @@ from importlib.resources import files
 from typing import Any
 
 import pandas as pd
+from pack_helpers import child
 
 import forgegraph as fg
 from forgegraph.drawing.export import KEY
 from forgegraph.drawing.style import isolated
 from forgegraph.spec.documents import Registry, builtin
-from forgegraph.spec.parameters import NONE, definitions, tree_set
 
 
 def polarization() -> pd.DataFrame:
@@ -49,19 +49,8 @@ BASE = {
 }
 
 
-def _child(kind: str, name: str, changes: dict[str, Any]) -> dict[str, Any]:
-    defs = definitions(kind)
-    sections: dict[str, dict] = {"fixed_parameters": {}, "variable_parameters": {}}
-    for path, value in changes.items():
-        section = "fixed_parameters" if defs[path].fixed else "variable_parameters"
-        tree_set(sections[section], path, value)
-    return {
-        "name": name,
-        "version": 1,
-        "description": "test",
-        "extends": f"forgegraph_base/base_{kind}",
-        **{k: (v or NONE) for k, v in sections.items()},
-    }
+def _child(kind: str, changes: dict[str, Any]) -> dict[str, Any]:
+    return child(kind, f"forgegraph_base/base_{kind}", changes, name="changed", version=1)
 
 
 def render(
@@ -74,9 +63,9 @@ def render(
     reg: Registry = builtin().copy()
     theme_name = "forgegraph_base/base_theme"
     if theme:
-        reg.add("theme", _child("theme", "changed", theme))
+        reg.add("theme", _child("theme", theme))
         theme_name = "changed"
-    reg.add("format", _child("format", "changed", {**TEST_FORMAT, **(format or {})}))
+    reg.add("format", _child("format", {**TEST_FORMAT, **(format or {})}))
     format_name = "changed"
     doc = fg.graphspec(
         "test",

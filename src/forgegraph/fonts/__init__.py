@@ -40,6 +40,13 @@ def _bundled() -> tuple[Path, ...]:
     return tuple(sorted(font_dir().glob("*.ttf")))
 
 
+def bundled_families() -> list[str]:
+    """The bundled fonts' family names, in order."""
+    from matplotlib import font_manager
+
+    return sorted({font_manager.FontProperties(fname=str(p)).get_name() for p in _bundled()})
+
+
 def register_pack_fonts(paths: list[Path]) -> None:
     """Register a pack's font files with matplotlib, each once."""
     from matplotlib import font_manager

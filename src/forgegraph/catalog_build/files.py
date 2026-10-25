@@ -10,9 +10,10 @@ parameters every card sets so the layer can be drawn (`settings`) and the layer 
 draws (`layer`), named after its type. A file that extends another inherits its baselines
 and adds its own.
 
-No card is chosen here: every variable parameter of the file shown gets one card, its value
-and baseline chosen by the rule in forgegraph.catalog_build.cards. A parameter that changes
-no baseline's drawing is a build error, fixed by adding a baseline that shows it.
+No card is chosen here: every parameter of the file shown gets one card, its value and
+baseline chosen by the rule in forgegraph.catalog_build.cards. The page shows the variable
+parameters' cards; the perturbation test draws them all. A parameter that changes no
+baseline's drawing is an error, fixed by adding a baseline that shows it.
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ class Catalog:
     parameters: tuple[Parameter, ...]  # every parameter of the file it shows, as defined
     # each card's parameter, and the changes of each of its candidates, in order
     cards: tuple[tuple[Parameter, tuple[tuple[Change, ...], ...]], ...]
+    variable: frozenset[str] = frozenset()  # the cards the page shows: variable parameters'
     baselines: tuple[Change, ...] = ()  # the numbered baselines, in the catalog files' order
     always: tuple[Change, ...] = ()  # a layer type's catalog: its settings and layer, on every card
 
@@ -203,13 +205,13 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
         raise CatalogError(problems)
 
     scene = _scene(str(baseline), values, always, params, reg)
-    if kind == "layer":  # the layer's parameters it doesn't set, at their defaults
-        defaults = {f"{prefix}{p}": q.default for p, q in own.items()}
-        scene = Scene(scene.data, {**defaults, **scene.values}, scene.used)
     shown = resolve(kind, reg.docs[kind][name], reg) if kind != "layer" else Values()
+    # the shown spec's values beneath the GraphSpec's; a layer's defaults beneath its own
+    beneath = {f"{prefix}{p}": q.default for p, q in own.items()} if prefix else shown.plain()
+    scene = Scene(scene.data, {**beneath, **scene.values}, scene.used)
     cards = []
     for p in own.values():
-        if shown.fixed(p.path, p.fixed) or not gets_card(kind, p):
+        if not gets_card(kind, p):
             continue
         options: list[tuple[Change, ...]] = []
         d = shown.value(p.path, p.default)
@@ -225,6 +227,7 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
         str(baseline),
         tuple(own.values()),
         tuple(cards),
+        frozenset(p.path for p, _ in cards if not shown.fixed(p.path, p.fixed)),
         tuple(bases.values()),
         always,
     )

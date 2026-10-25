@@ -8,7 +8,7 @@ description: Cards for the base theme.          *# \[text\]; The descr
 extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
 baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, drawn with the theme this catalog shows.*\
  \
-baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every variable parameter gets one card, by rule: its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
+baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
     styled_by_size: {encoding.line_style: Cell Size}          *# \[parameters and their values, or non-standard\]; series.line.style acts only with encoding.line_style set.*\
     colored_by_temperature: {encoding.color: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric encoding.color, so a color bar is drawn.*\
     fanned: {data.file: fanned.parquet}          *# \[parameters and their values, or non-standard\]; Curves ending at the same current: their labels fit only past the line ends.*\
@@ -40,4 +40,42 @@ baselines:          *# Numbered baselines: generic scenarios, each the
     error_bars:          *# \[parameters and their values, or non-standard\]; An error bar on every point, so the error bar parameters act.*\
         layers.spread.type: error_bar\
         layers.spread.value.lower: 0.02\
-        layers.spread.value.upper: 0.02
+        layers.spread.value.upper: 0.02\
+    log_x: {axis.x.scale: log}          *# \[parameters and their values, or non-standard\]; A log x axis, so the log tick algorithm acts.*\
+    minor_ticks: {axis.tick.minor.num: 4}          *# \[parameters and their values, or non-standard\]; Minor tick sizes act only on minor ticks.*\
+    grid_shown: {grid.show: true}          *# \[parameters and their values, or non-standard\]; The grid's parameters act only on a shown grid.*\
+    thick_lines: {series.line.width: 1.2}          *# \[parameters and their values, or non-standard\]; Thick lines, so their corners show.*\
+    key_framed: {legend.method: key, legend.key.frame: true}          *# \[parameters and their values, or non-standard\]; The key, framed, so the frame's width acts.*\
+    non_standard: non-standard          *# \[parameters and their values, or non-standard\]; Drawn on after ForgeGraph finished, so the watermark shows.*\
+    footnoted: footnoted          *# \[parameters and their values, non-standard, or footnoted\]; With a footnote, as a scheduled run's stamp.*\
+    dated: {data.file: dated.parquet, axis.x.data.column: Date, axis.x.title: Day}          *# \[parameters and their values, or non-standard\]; Daily dates on x, so date labels show.*\
+    labelled:          *# \[parameters and their values, or non-standard\]; The bars, each with its value, so the value label parameters act.*\
+        axis.x.data.column: Cell\
+        axis.y.data.column: "Power Density (mW/cm²)"\
+        axis.y.data.aggregation: max\
+        axis.x.tick.algorithm: all\
+        encoding.color: None\
+        encoding.detail: None\
+        mark.bar.show: true\
+        mark.line.show: false\
+        mark.marker.show: false\
+        series.value_label.show: true\
+    wrapped:          *# \[parameters and their values, or non-standard\]; The bars, with a cell name wider than the space between ticks, so it wraps.*\
+        axis.x.data.column: Cell\
+        axis.y.data.column: "Power Density (mW/cm²)"\
+        axis.y.data.aggregation: max\
+        axis.x.tick.algorithm: all\
+        encoding.color: None\
+        encoding.detail: None\
+        mark.bar.show: true\
+        mark.line.show: false\
+        mark.marker.show: false\
+        data.file: reinforced.parquet\
+    target:          *# \[parameters and their values, or non-standard\]; A labelled reference line, so its parameters act.*\
+        layers.target.type: reference_line\
+        layers.target.axis: y\
+        layers.target.value: 1.2\
+        layers.target.label.text: Target\
+    noted:          *# \[parameters and their values, or non-standard\]; A note, so its parameters act.*\
+        layers.conditions.type: note\
+        layers.conditions.text: "60 °C, 1 atm, H\_{2}/air"

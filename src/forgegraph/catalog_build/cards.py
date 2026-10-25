@@ -1,26 +1,29 @@
 """A catalog panel's cards: what each one changes, where it's placed, and its drawing.
 
-Every variable parameter of the spec a catalog shows gets one card, chosen by a rule, not
-by hand; a format's output.* and provenance.* parameters (EXEMPT), which change the saved
-files and not the drawing, get none. candidates() lists the values the rule gives a
-parameter's card, in order, from the parameter's default d (the value the spec shown gives
-it: a theme's or format's own, a graph type's or layer type's definition's), its range and
-the baseline's data:
+Every parameter of the spec a catalog shows gets one card, chosen by a rule, not by hand;
+a format's output.* and provenance.* parameters, which change the saved files, and a graph
+type's layer.types, which only permits layers, get none (EXEMPT): they never change a
+drawing. A catalog page shows the variable parameters' cards; the perturbation test draws
+them all. candidates() lists the values the rule gives a parameter's card, in order, from
+the parameter's default d (the value the spec shown gives it: a theme's or format's own, a
+graph type's or layer type's definition's), its range and the baseline's data:
 
 1. true or false: not d.
 2. A column in the range: each column of the baseline's data, in the data's order, that the
    GraphSpec drawn doesn't already use, and whose type the parameter takes: numbers for an
    axis's column or a layer's, any other.
-3. A parameter whose name ends in format, with text in its range: FORMATS.
+3. A font family: each bundled family but d. A parameter whose name ends in format, with
+   text in its range: FORMATS.
 4. Other text in its range: SAMPLE_TEXT.
 5. A hex color in its range: SAMPLE_COLOR.
-6. A number with a numeric default: 2d, then d/2 (for d = 0, just 1), each within the
-   range's interval.
+6. A number with a numeric default: 2d, then d/2 (rounded down for a whole number; for
+   d = 0, just 1), each within the range's interval. A figure size defaulting to auto: the
+   other size.
 7. A number with a None default: for an axis's min or max, the median of the axis's column;
    for its tick.step, a quarter of the column's range, to one significant figure; for a
    layer's value, the median of the layer's axis's column.
 8. Then the range's words after d, in the range's order and wrapping round, without d; for
-   a list default, the one-item list of each word after d's first.
+   a list default, the one-item list of each word after d's first, then d reversed.
 9. Last, d itself, which changes the drawing where the GraphSpec sets another value (the
    base pack's example sets a benchmark).
 
@@ -44,6 +47,7 @@ from PIL import Image
 
 from forgegraph.catalog_build.examples import NONSTANDARD, draw, image
 from forgegraph.catalog_build.page import CSS_DPI
+from forgegraph.fonts import bundled_families
 from forgegraph.graph import Graph, SpecError
 from forgegraph.spec.parameters import NONE, Parameter
 from forgegraph.spec.registry import Registry
@@ -54,7 +58,10 @@ if TYPE_CHECKING:  # catalog_build.files imports this module, so only to check t
 
 DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough to commit
 COLORS = 64  # palette size: plenty for a graph's few colors and their anti-aliasing
-EXEMPT = {"format": ("output.", "provenance.")}  # change the saved files, not the drawing
+# Parameters that can't change a drawing: a format's saved files, and the layer types a
+# GraphSpec may list
+EXEMPT = {"format": ("output.", "provenance."), "graph_type": ("layer.types",)}
+SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # each from the other
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
 SAMPLE_TEXT = "Sample text"
 SAMPLE_COLOR = "#D55E00"
@@ -109,7 +116,7 @@ class Scene:
 
 
 def gets_card(kind: str, p: Parameter) -> bool:
-    """Whether a variable parameter of a spec of this kind gets a card."""
+    """Whether a parameter of a spec of this kind gets a card."""
     return not p.path.startswith(EXEMPT.get(kind, ()))
 
 
@@ -129,16 +136,22 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
             for c in frame.columns
             if c not in scene.used and (not numbers or pd.api.types.is_numeric_dtype(frame[c]))
         ]
+    if "text" in rng.types and p.path.endswith("family"):  # a font
+        out += [f for f in bundled_families() if f != d]
     if "text" in rng.types:
         out += FORMATS if p.path.endswith("format") else (SAMPLE_TEXT,)
     if "hex color" in rng.types:
         out.append(SAMPLE_COLOR)
     if rng.intervals or set(NUMBERS) & set(rng.types):
+        whole = not rng.intervals and not {"float", "positive float"} & set(rng.types)
         if isinstance(d, int | float) and not isinstance(d, bool):
-            out += _within(p, d, [1] if d == 0 else [2 * d, d / 2])
+            out += _within(p, d, [1] if d == 0 else [2 * d, d // 2 if whole else d / 2])
         elif d in (None, NONE):
             out += _from_data(p, scene, layer)
-    return [*out, *_words(p, d), NONE if d is None else d]
+        elif p.path in SIZES:  # auto: from the other size
+            out.append(scene.values.get(SIZES[p.path]))
+    reverse = [list(reversed(d))] if isinstance(d, list) and len(d) > 1 else []
+    return [*out, *_words(p, d), *reverse, NONE if d is None else d]
 
 
 def _within(p: Parameter, d: float, values: list[float]) -> list[float]:
@@ -235,15 +248,19 @@ def _first(catalog: Catalog, options: tuple[tuple[Change, ...], ...], differs: D
     )
 
 
-def placed(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Variation]:
-    """Each parameter's card: its first candidate that draws differently from a baseline, on
-    the first such baseline (the GraphSpec, then the numbered baselines in order). One with
-    none is placed by fallback if given (a pack's catalog: as ForgeGraph's places it), else
-    it's a CatalogError."""
+def placed(
+    catalog: Catalog, differs: Differs, fallback: Differs | None = None, every: bool = False
+) -> list[Variation]:
+    """Each variable parameter's card (with every, every parameter's): its first candidate
+    that draws differently from a baseline, on the first such baseline (the GraphSpec, then
+    the numbered baselines in order). One with none is placed by fallback if given (a pack's
+    catalog: as ForgeGraph's places it), else it's a CatalogError."""
     from forgegraph.catalog_build.files import CatalogError
 
     out, problems = [], []
     for p, options in catalog.cards:
+        if not every and p.path not in catalog.variable:
+            continue
         found = _first(catalog, options, differs)
         if found is None and fallback is not None:
             found = _first(catalog, options, fallback)
@@ -259,14 +276,17 @@ def placed(catalog: Catalog, differs: Differs, fallback: Differs | None = None) 
     return out
 
 
-def place(catalog: Catalog, differs: Differs, fallback: Differs | None = None) -> list[Planned]:
-    """The cards of a catalog's panel, in order: the baseline, then each parameter's card
-    (placed()), each numbered baseline before the first card starting from it."""
+def place(
+    catalog: Catalog, differs: Differs, fallback: Differs | None = None, every: bool = False
+) -> list[Planned]:
+    """The cards of a catalog's panel, in order: the baseline, then each variable parameter's
+    card (with every, every parameter's; see placed()), each numbered baseline before the
+    first card starting from it."""
     first = "Baseline"
     if catalog.always:  # a layer's catalog: say what every card adds to the GraphSpec
         first = " + ".join([f"Baseline: {catalog.baseline}", *(_change(c) for c in catalog.always)])
     cards = [Planned("baseline", first, ())]
-    variations = placed(catalog, differs, fallback)
+    variations = placed(catalog, differs, fallback, every)
     numbers: dict[str, int] = {}  # each numbered baseline's number, by the change that makes it
     at: dict[str, int] = {}  # and its place in cards
     for v in variations:

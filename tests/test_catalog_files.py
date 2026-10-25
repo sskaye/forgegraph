@@ -133,18 +133,25 @@ def test_a_layer_catalogs_settings_are_on_every_card():
     assert always["layers.error_bar.type"] == "error_bar"
 
 
-def test_only_variable_parameters_get_cards():
+def test_every_parameter_gets_a_card_and_the_page_shows_the_variable_ones():
     catalog = read("theme", "forgegraph_base/base_theme", builtin())
     carded = {p.path for p, _ in catalog.cards}
-    assert "grid.show" in carded and "font.family" not in carded  # variable; fixed
-    assert len(catalog.parameters) > len(catalog.cards)
+    assert carded == {p.path for p in catalog.parameters}
+    assert "grid.show" in catalog.variable and "font.family" not in catalog.variable
+    shown = [c.changes[-1].path for c in place(catalog, lambda s, c: True)[1:]]
+    assert set(shown) == catalog.variable
+    every = place(catalog, lambda s, c: True, every=True)[1:]
+    assert len(every) == len(catalog.cards)
 
 
 def test_a_formats_output_and_provenance_get_no_card():
     assert not gets_card("format", definitions("format")["output.file_types"])
     assert not gets_card("format", definitions("format")["provenance.level"])
+    assert not gets_card("graph_type", XY["layer.types"])  # it permits; it never draws
     assert gets_card("theme", THEME["grid.show"])
-    assert read("format", "forgegraph_base/base_format", builtin()).cards == ()
+    assert gets_card("format", definitions("format")["figure.width"])
+    paths = [p.path for p, _ in read("format", "forgegraph_base/base_format", builtin()).cards]
+    assert paths == ["figure.width", "figure.height", "figure.base_size"]
 
 
 def test_candidates_outside_the_range_are_dropped():
@@ -188,6 +195,17 @@ def test_a_number_is_doubled_then_halved_within_its_interval():
     p = THEME["legend.direct.max_relative_distance"]  # 0-1
     assert candidates(p, 0.8, SCENE) == [1.0, 0.4, 0.8]
     assert candidates(THEME["axis.tick.minor.num"], 0, SCENE) == [1, 0]
+    assert candidates(THEME["axis.tick.label.max_wrap"], 1, SCENE) == [2, 0, 1]  # whole
+
+
+def test_a_figure_size_defaulting_to_auto_is_the_other_size():
+    scene = Scene(SCENE.data, {"figure.width": 150}, SCENE.used)
+    assert candidates(definitions("format")["figure.height"], "auto", scene) == [150, "auto"]
+
+
+def test_a_font_is_each_bundled_family_but_its_own():
+    found = candidates(THEME["font.family"], "Roboto", SCENE)
+    assert found == ["IBM Plex Serif", "Source Sans 3", SAMPLE_TEXT, "Roboto"]
 
 
 def test_a_number_defaulting_to_none_comes_from_its_axis_column():
@@ -209,7 +227,7 @@ def test_a_list_takes_each_word_after_its_first_as_a_list():
     d = ["top_right", "top_left"]
     found = candidates(p, d, SCENE)
     assert found[:2] == [["bottom_left"], ["bottom_center"]]
-    assert found[-2:] == [["top_center"], d]
+    assert found[-3:] == [["top_center"], ["top_left", "top_right"], d]  # then d reversed
     assert ["top_right"] not in found
 
 
@@ -237,7 +255,8 @@ P = THEME["series.line.width"]
 
 
 def _catalog(*options: tuple[Change, ...]) -> Catalog:
-    return Catalog("theme", "t", "forgegraph_base/polarization", (P,), ((P, options),), (B2, B3))
+    cards, variable = ((P, options),), frozenset({P.path})
+    return Catalog("theme", "t", "forgegraph_base/polarization", (P,), cards, variable, (B2, B3))
 
 
 def test_a_card_is_its_first_candidate_on_the_first_baseline_it_changes():

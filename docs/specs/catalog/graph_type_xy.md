@@ -8,7 +8,7 @@ description: Cards for the xy graph type.          *# \[text\]; The de
 extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
 baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, drawn with the graph type this catalog shows.*\
  \
-baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every variable parameter gets one card, by rule: its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
+baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
     key_shown: {legend.method: key}          *# \[parameters and their values, or non-standard\]; Series named in a key, so the key's parameters act.*\
     colored_by_temperature: {encoding.color: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric encoding.color, so a color bar is drawn.*\
     colored_by_run: {encoding.color: Run}          *# \[parameters and their values, or non-standard\]; Colored by run, a column of numbers, so auto draws a color scale.*\

@@ -10,7 +10,7 @@ baseline: forgegraph_base/polarization          *# \[graphspec\]; The 
 settings: {axis.y.data.aggregation: mean, encoding.detail: None}          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
 layer: None          *# The layer every card draws, named after its type: its parameters. None: its defaults.*\
  \
-baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every variable parameter gets one card, by rule: its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
+baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
     power:          *# \[parameters and their values, or non-standard\]; Power density, whose values suit distances along either axis.*\
         axis.y.data.column: "Power Density (mW/cm²)"\
         layers.error_bar.value.lower: 4\

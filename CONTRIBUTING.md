@@ -19,7 +19,7 @@ Mark a new test `@pytest.mark.slow` if it takes over a second (`uv run pytest --
 
 ## After changing a definition or how graphs are drawn
 
-Every variable parameter gets one catalog card, its value and baseline chosen by a rule (`src/forgegraph/catalog_build/cards.py`), so a new parameter needs no card of its own. It needs a baseline that shows it only if none does: the build names a parameter that changes no baseline's drawing, and the fix is a generic scenario added to the baselines in the matching catalog file under `src/forgegraph/catalogs/` (or a pack's `catalogs/`).
+Every parameter gets one catalog card, its value and baseline chosen by a rule (`src/forgegraph/catalog_build/cards.py`), so a new parameter needs no card of its own; the page shows the variable parameters' cards, and the perturbation test draws them all. It needs a baseline that shows it only if none does: the build (for a variable parameter) or the perturbation test (for any) names a parameter that changes no baseline's drawing, and the fix is a generic scenario added to the baselines in the matching catalog file under `src/forgegraph/catalogs/` (or a pack's `catalogs/`).
 
 Rebuild the catalogs (it keeps its review comments; Node 18+ is needed once it has some), and the image baselines if graphs look different on purpose:
 

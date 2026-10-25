@@ -255,7 +255,7 @@ Placement is deterministic. A direct label sits inside the plot, beside its own 
 
 ### D6. Review surface: tabbed HTML catalog, Forgemark comments
 
-- `forgegraph catalog build` generates one **HTML catalog** per pack, with a tab per kind (themes, formats, graph types, layers). Each spec shows its generated table, its baseline, and one image per variable parameter, with that parameter changed. A rule chooses each image's value and the baseline it's drawn on, not a hand-picked list, so the catalog files hold only generic baselines; a format's output and provenance parameters, which change only the saved files, get none. Forgemark supports per-tab comments in HTML.
+- `forgegraph catalog build` generates one **HTML catalog** per pack, with a tab per kind (themes, formats, graph types, layers). Each spec shows its generated table, its baseline, and one image per variable parameter, with that parameter changed. A rule chooses each image's value and the baseline it's drawn on, not a hand-picked list, so the catalog files hold only generic baselines. Every parameter gets such a card, fixed ones included, and the perturbation tests draw them all; a format's output and provenance parameters, which change only the saved files, and a graph type's layer.types, which only permits layers, get none. Forgemark supports per-tab comments in HTML.
 - **Comments survive rebuilds.**
   - The build gives every section, table row and figure a stable `id` (`#xy-param-labels`, `#xy-example-labels-direct`), and carries the trailing `forgemark-comments` block across verbatim.
   - It then re-attaches each comment by its recorded anchor text, using Forgemark's own `reattach`. Only comments whose text actually changed stay orphaned.

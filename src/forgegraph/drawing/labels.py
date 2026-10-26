@@ -31,7 +31,7 @@ from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import text
+from forgegraph.drawing import limits, text
 from forgegraph.drawing.key import KEY, Entry, Key
 from forgegraph.drawing.key import keys as keys_of
 from forgegraph.drawing.marks import Bars
@@ -344,8 +344,8 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
         return False
     # The extra room is for labels: keep the ticks the layout made room for.
     locator = ax.xaxis.get_major_locator()
-    ticks = [t for t in ax.get_xticks() if min(x0, x1) <= t <= max(x0, x1)]
-    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ticks = np.asarray(ax.get_xticks(), dtype=float)  # a date axis's are a list
+    ax.xaxis.set_major_locator(FixedLocator(list(ticks[limits.in_view(ax.xaxis, ticks)])))
 
     def extend(fraction: float) -> None:
         if ax.get_xscale() == "log":

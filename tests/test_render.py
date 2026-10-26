@@ -843,6 +843,38 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     assert max(ticks) <= 100  # the data ends at 100; the room beyond holds labels only
 
 
+def test_direct_labels_can_widen_a_date_axis(monkeypatch):
+    """A date axis's locator gives its ticks as a list; the room beyond keeps them too."""
+    from forgegraph.drawing import labels
+
+    place = labels.place_interior
+    tries: list[bool] = []
+
+    def no_room_at_first(ax, groups, style, draw=True):  # as if the labels need more room
+        tries.append(draw)
+        return len(tries) > 1 and place(ax, groups, style, draw=draw)
+
+    monkeypatch.setattr(labels, "place_interior", no_room_at_first)
+    days = pd.DataFrame(
+        {
+            "day": list(pd.date_range("2025-08-25", periods=6, freq="D")) * 2,
+            "y": [1.0, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1],
+            "run": ["up"] * 6 + ["down"] * 6,
+        }
+    )
+    settings = {
+        "axis.x.data.column": "day",
+        "axis.y.data.column": "y",
+        "encoding.color.column": "run",
+        "encoding.detail.column": NONE,
+        "benchmark.data_column": NONE,
+        "benchmark.value": NONE,
+        "legend.method": "direct",
+    }
+    g = render(settings, data=days)
+    assert g.labelling == "direct" and tries[:2] == [True, False]  # widened, then placed
+
+
 # --- matplotlib's settings while drawing ------------------------------------------------------
 
 

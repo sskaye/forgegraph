@@ -11,12 +11,20 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.axes import Axes
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.dates import num2date
+from matplotlib.figure import Figure
+from matplotlib.ticker import FixedLocator, NullLocator
 from pack_helpers import child
 from render_helpers import render
 
 import forgegraph as fg
-from forgegraph.drawing.ticks import ALGORITHMS
+from forgegraph.drawing import spacing
+from forgegraph.drawing.axes import LogLabels
+from forgegraph.drawing.layout import texts_of, tick_marks
+from forgegraph.drawing.limits import inside, outside
+from forgegraph.drawing.ticks import ALGORITHMS, _Between
 from forgegraph.spec.registry import builtin
 
 
@@ -483,3 +491,64 @@ def test_a_tick_algorithm_remembers_what_it_found(name):
         assert np.array_equal(algorithm(lo, hi, m, integer=integer), expected)
     assert algorithm.cache_info().hits >= algorithm.cache_info().currsize > 0
     assert np.array_equal(algorithm(np.float64(0.0), np.float64(1.0), 5), algorithm(0.0, 1.0, 5))
+
+
+# --- values at an axis's limits, and float noise ------------------------------------------
+
+
+def test_a_value_is_past_a_limit_only_by_more_than_float_noise():
+    below, above = outside([0, -1e-12, -1e-6, 100.00000000000001, 100.001], 0, 100)
+    assert below.tolist() == [False, False, True, False, False]
+    assert above.tolist() == [False, False, False, False, True]
+    assert inside([0, -1e-12, -1e-6, 100.00000000000001, 100.001], 100, 0).tolist() == [
+        True,
+        True,
+        False,
+        True,
+        False,
+    ]
+    # on a log axis, measured in powers of ten; 0 and below are below any limit
+    below, above = outside(
+        [1e-3 * (1 - 1e-15), 0.9e-3, 0, -1, 1e5 * (1 + 1e-15)], 1e-3, 1e5, log=True
+    )
+    assert below.tolist() == [False, True, True, True, False]
+    assert not above.any()
+
+
+def _bare() -> tuple[Figure, Axes]:
+    fig = Figure()
+    ax = fig.add_subplot()
+    ax.xaxis.set_major_locator(NullLocator())
+    return fig, ax
+
+
+def test_a_tick_at_an_end_but_for_float_noise_is_in_view():
+    """matplotlib draws a tick a hair past the end of the view, so layout measures it."""
+    fig, ax = _bare()
+    ax.set_ylim(0, 0.3)
+    ax.yaxis.set_major_locator(FixedLocator([0, 0.1, 0.2, 0.1 + 0.2]))  # 0.30000000000000004
+    fig.draw_without_rendering()
+    last = ax.yaxis.get_major_ticks()[3]
+    assert last.get_loc() > 0.3
+    assert len(spacing._in_view(ax.yaxis)) == 4
+    assert last.label1 in texts_of(ax)
+    assert len(tick_marks(ax, FigureCanvasAgg(fig).get_renderer())) == 4
+
+
+def test_log_labels_count_a_tick_at_an_end_but_for_float_noise():
+    _, ax = _bare()
+    ax.set_yscale("log")
+    ax.set_ylim(0.1, 1e5 * (1 - 1e-15))
+    formatter = LogLabels()
+    ax.yaxis.set_major_formatter(formatter)
+    formatter.set_locs([0.1, 1, 10, 100, 1e3, 1e4, 1e5])
+    assert formatter(10) == "$10^{1}$"  # 1e5 is drawn too, so every label is a power of ten
+
+
+def test_a_minor_tick_at_an_end_but_for_float_noise_is_kept():
+    _, ax = _bare()
+    ax.set_ylim(0, 0.15)
+    ax.yaxis.set_major_locator(FixedLocator([0, 0.1]))
+    between = _Between(1)
+    ax.yaxis.set_minor_locator(between)
+    assert between() == pytest.approx([0.05, 0.15])  # 0.15000000000000002

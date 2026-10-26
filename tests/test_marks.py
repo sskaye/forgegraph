@@ -71,6 +71,13 @@ def test_bars_stand_on_zero():
     assert bars.edge == "#000000" and bars.edge_width == g.style.pt("series.bar.edge.width")
 
 
+def test_bars_of_a_sum_that_is_0_but_for_float_noise_stand_on_zero():
+    noise = pd.DataFrame({"island": ["Biscoe"] * 3 + ["Dream"], "penguins": [0.3, -0.1, -0.2, 5]})
+    g = graph(noise, color=None, **{"axis.y.data.aggregation": "sum"})
+    assert min(top for _, _, top in segments(bar_sets(g)[0])) < 0  # -2.8e-17
+    assert g.axes.get_ylim()[0] == 0
+
+
 def test_a_bar_is_its_width_in_points_at_any_size():
     g = graph(color=None, **{"axis.y.data.aggregation": "sum"})
     [bars] = bar_sets(g)

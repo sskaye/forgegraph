@@ -34,6 +34,7 @@ from matplotlib.axes import Axes
 from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator
 
+from forgegraph.drawing import limits
 from forgegraph.drawing import text as text_module
 from forgegraph.drawing.dates import (
     CalendarLabels,
@@ -154,8 +155,8 @@ class LogLabels(Formatter):
 
     def __call__(self, x: float, pos: int | None = None) -> str:
         assert self.axis is not None
-        lo, hi = sorted(self.axis.get_view_interval())
-        shown = [v for v in self.ticks if lo <= v <= hi] or [x]
+        drawn = limits.in_view(self.axis, self.ticks)
+        shown = [v for v, d in zip(self.ticks, drawn, strict=True) if d] or [x]
         if all(1e-3 <= v < 1e5 for v in shown):
             return f"{x:g}"
         exponent = math.floor(math.log10(x) + 1e-9)

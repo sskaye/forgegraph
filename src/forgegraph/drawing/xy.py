@@ -21,7 +21,7 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, marks, ticks
+from forgegraph.drawing import colorbar, layers, limits, marks, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
@@ -676,12 +676,14 @@ def _axes(
             ticks.minor_ticks(axis, style)
     _limits(ax, gt)
     if bool(gt["mark.bar.show"]) and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
-        floor = 1.0 if gt[f"axis.{r.value}.scale"] == "log" else 0.0
+        log = gt[f"axis.{r.value}.scale"] == "log"
+        floor = 1.0 if log else 0.0
         get = ax.get_ylim if r.value == "y" else ax.get_xlim
         put = ax.set_ylim if r.value == "y" else ax.set_xlim
         stacks = [np.r_[s.stack.bottom, s.stack.top] for s in series if s.stack is not None]
         ends = np.asarray(np.concatenate(stacks) if stacks else [], dtype=float)
-        if len(ends) and np.nanmin(ends) >= floor:
+        ends = ends[~np.isnan(ends)]
+        if len(ends) and not limits.outside(ends, floor, max(ends.max(), floor), log)[0].any():
             put(floor, get()[1])
     layers.include(ax, lines, gt)
 

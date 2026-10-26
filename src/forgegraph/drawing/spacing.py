@@ -16,7 +16,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.text import Text
 from matplotlib.transforms import ScaledTranslation, Transform
 
-from forgegraph.drawing import text
+from forgegraph.drawing import limits, text
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.style import Style
 
@@ -34,8 +34,7 @@ def title_font(style: Style) -> FontProperties:
 
 
 def _in_view(axis: Axis) -> list:
-    lo, hi = sorted(axis.get_view_interval())
-    return [t for t in axis.get_major_ticks() if lo <= t.get_loc() <= hi]
+    return limits.ticks_in_view(axis, axis.get_major_ticks())
 
 
 def _labels(axis: Axis, which: int) -> list[str]:

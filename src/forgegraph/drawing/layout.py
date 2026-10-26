@@ -37,7 +37,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import spacing, text
+from forgegraph.drawing import limits, spacing, text
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import WATERMARK, inches
 from forgegraph.drawing.key import KEY, keys
@@ -58,10 +58,7 @@ def tick_marks(ax: Axes, renderer: Any) -> list[Bbox]:
     """The Axes' tick marks in view, in display pixels."""
     out = []
     for axis in (ax.xaxis, ax.yaxis):
-        lo, hi = sorted(axis.get_view_interval())
-        for tick in [*axis.get_major_ticks(), *axis.get_minor_ticks()]:
-            if not lo <= tick.get_loc() <= hi:
-                continue
+        for tick in limits.ticks_in_view(axis, [*axis.get_major_ticks(), *axis.get_minor_ticks()]):
             for line in (tick.tick1line, tick.tick2line):
                 if line.get_visible():
                     out.append(line.get_window_extent(renderer))
@@ -73,10 +70,8 @@ def texts_of(ax: Axes) -> list[Text]:
     out: list[Text] = [ax.title, ax.xaxis.label, ax.yaxis.label, *ax.texts]
     out += [ax.xaxis.get_offset_text(), ax.yaxis.get_offset_text()]  # e.g. a date axis's year
     for axis in (ax.xaxis, ax.yaxis):
-        lo, hi = sorted(axis.get_view_interval())
-        for tick in axis.get_major_ticks():
-            if lo <= tick.get_loc() <= hi:
-                out += [tick.label1, tick.label2]
+        for tick in limits.ticks_in_view(axis, axis.get_major_ticks()):
+            out += [tick.label1, tick.label2]
     return out
 
 

@@ -9,7 +9,8 @@ drawing. Each issue names its check:
 - too-many-groups: more groups than the theme has colors, line styles or marker shapes, so
   they repeat;
 - log-axis-values: values of 0 or below on a log axis, which can't be drawn;
-- outside-limits: points outside an axis's fixed minimum or maximum, so not drawn;
+- outside-limits: points outside an axis's fixed minimum or maximum, so not drawn (past it
+  by more than float noise: drawing.limits);
 - small-text: text smaller than MIN_TEXT_PT, too small to read at the figure's size;
 - font-fallback: a font or a letter the theme's font doesn't have, drawn with another or not
   at all;
@@ -37,7 +38,7 @@ from matplotlib.lines import Line2D
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import text
+from forgegraph.drawing import limits, text
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.layers import GIDS as LAYERS
@@ -203,9 +204,16 @@ def _inside(box: Any, points: np.ndarray) -> np.ndarray:
 def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
     issues = []
     for axis, (lo, hi) in fixed.items():
-        values = _points(ax, axis)
-        below = int((values < lo).sum()) if lo is not None else 0
-        above = int((values > hi).sum()) if hi is not None else 0
+        view = ax.xaxis if axis == "x" else ax.yaxis
+        start, end = sorted(view.get_view_interval())  # an automatic end: where it is
+        low, high = limits.outside(
+            _points(ax, axis),
+            start if lo is None else lo,
+            end if hi is None else hi,
+            view.get_scale() == "log",
+        )
+        below = int(low.sum()) if lo is not None else 0
+        above = int(high.sum()) if hi is not None else 0
         if below or above:
             parts = [
                 f"{below} below axis.{axis}.min" if below else "",

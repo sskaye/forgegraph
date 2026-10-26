@@ -177,3 +177,36 @@ def test_an_error_bar_past_a_limit_isnt_points():
 
 def test_a_reference_lines_ends_arent_values_on_a_log_axis():
     assert "log-axis-values" not in checks(_layered(ACROSS, **{"axis.x.scale": "log"}))
+
+
+def test_a_stack_that_totals_a_limit_but_for_float_noise_isnt_past_it():
+    counts, n = [3, 30, 156, 8, 4], 201
+    shares = [100 * c / n for c in counts]
+    assert np.cumsum(shares)[-1] > 100  # 100.00000000000001
+    frame = pd.DataFrame({"week": ["a"] * 5, "band": list("ABCDE"), "pct": shares})
+    settings = {
+        "axis.x.data.column": "week",
+        "axis.y.data.column": "pct",
+        "axis.y.min": 0,
+        "axis.y.max": 100,
+        "encoding.color.column": "band",
+        "encoding.order": "data",
+        "series.aggregation": "sum",
+        "series.bar.width": 1.5,
+        "legend.method": "key",
+        "legend.key.inside": False,
+        "legend.key.positions": ["right_top"],
+        "mark.bar.show": True,
+        "mark.line.show": False,
+        "mark.marker.show": False,
+    }
+    assert _outside(fg.render(fg.graphspec("t", "xy", settings=settings), frame)) == []
+
+
+def test_a_point_just_past_a_limit_is_outside_it():
+    assert _outside(_layered({}, **{"axis.y.max": 3.999})) == [
+        "1 above axis.y.max: those points aren't drawn"
+    ]
+    assert _outside(_layered({}, **{"axis.y.scale": "log", "axis.y.min": 1.001})) == [
+        "1 below axis.y.min: those points aren't drawn"
+    ]

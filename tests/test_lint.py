@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 from render_helpers import polarization, render
 
+import forgegraph as fg
 from forgegraph.drawing.key import keys
 from forgegraph.drawing.lint import MIN_TEXT_PT
 
@@ -131,3 +135,45 @@ def test_a_key_over_markers_is_found_without_testing_points_one_by_one(monkeypat
     marker_at(box.x1 + 3 * box.width, box.y1 + 3 * box.height)
     assert lint._key_over_data(g.axes) == []
     assert tested == []
+
+
+# --- outside-limits: what counts as a point --------------------------------------------------
+
+POINTS = pd.DataFrame({"x": [10, 20, 30, 40], "y": [1, 3, 2, 4]})
+ACROSS = {"t": {"type": "reference_line", "axis": "y", "value": 3.5}}
+
+
+def _layered(listed: dict[str, Any], data: pd.DataFrame = POINTS, /, **settings: Any) -> fg.Graph:
+    doc = fg.graphspec(
+        "t", "xy", settings={"axis.x.data.column": "x", "axis.y.data.column": "y", **settings}
+    )
+    doc["variable_parameters"]["layers"] = listed
+    return fg.render(doc, data)
+
+
+def _outside(g: fg.Graph) -> list[str]:
+    return [i.message for i in g.issues if i.check == "outside-limits"]
+
+
+def test_a_reference_lines_ends_arent_points():
+    assert _outside(_layered(ACROSS, **{"axis.x.min": 5, "axis.x.max": 45})) == []
+    down = {"t": {"type": "reference_line", "axis": "x", "value": 25}}
+    assert _outside(_layered(down, **{"axis.y.min": 1.5, "axis.y.max": 5})) == [
+        "1 below axis.y.min: those points aren't drawn"
+    ]
+
+
+def test_a_reference_line_on_a_date_axis_isnt_points():
+    days = POINTS.assign(x=pd.date_range("2025-08-25", periods=4, freq="D"))
+    start, end = (float(mdates.date2num(pd.Timestamp(d))) for d in ("2025-08-24", "2025-08-29"))
+    assert _outside(_layered(ACROSS, days, **{"axis.x.min": start, "axis.x.max": end})) == []
+
+
+def test_an_error_bar_past_a_limit_isnt_points():
+    one = {"lower": 1, "upper": 1, "aggregation": {"function": "None"}}
+    bars = {"e": {"type": "error_bar", "value": one}}
+    assert _outside(_layered(bars, **{"axis.y.min": 0.5, "axis.y.max": 4.5})) == []
+
+
+def test_a_reference_lines_ends_arent_values_on_a_log_axis():
+    assert "log-axis-values" not in checks(_layered(ACROSS, **{"axis.x.scale": "log"}))

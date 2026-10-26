@@ -43,6 +43,7 @@ from forgegraph.drawing.text import measure
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
 ERROR_BAR = "forgegraph-error-bar"
+GIDS = (REFERENCE, ERROR_BAR, NOTE)  # every artist a layer draws has one of these
 NAMES = {
     "mean": "Mean",
     "median": "Median",

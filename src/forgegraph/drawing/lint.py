@@ -40,6 +40,7 @@ from matplotlib.transforms import Bbox
 from forgegraph.drawing import text
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.layers import GIDS as LAYERS
 from forgegraph.drawing.layout import texts_of
 
 MIN_TEXT_PT = 6.0  # the smallest text journals accept in a printed figure
@@ -177,6 +178,20 @@ def _key_over_data(ax: Axes) -> list[Issue]:
     return issues
 
 
+def _points(ax: Axes, axis: str) -> np.ndarray:
+    """Every data point's finite value along an axis. A layer's lines aren't points: a
+    reference line's ends are the plot's edges, and an error bar's are distances from a point."""
+    values = np.concatenate(
+        [
+            np.asarray(ln.get_xydata(), dtype=float)[:, 0 if axis == "x" else 1]
+            for ln in _data_lines(ax)
+            if ln.get_gid() not in LAYERS
+        ]
+        or [np.array([])]
+    )
+    return values[np.isfinite(values)]
+
+
 def _inside(box: Any, points: np.ndarray) -> np.ndarray:
     """Which points a box holds, edges included: matplotlib's Bbox.contains, for many."""
     x, y = points[:, 0], points[:, 1]
@@ -188,14 +203,7 @@ def _inside(box: Any, points: np.ndarray) -> np.ndarray:
 def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
     issues = []
     for axis, (lo, hi) in fixed.items():
-        values = np.concatenate(
-            [
-                np.asarray(ln.get_xydata(), dtype=float)[:, 0 if axis == "x" else 1]
-                for ln in _data_lines(ax)
-            ]
-            or [np.array([])]
-        )
-        values = values[np.isfinite(values)]
+        values = _points(ax, axis)
         below = int((values < lo).sum()) if lo is not None else 0
         above = int((values > hi).sum()) if hi is not None else 0
         if below or above:
@@ -214,15 +222,11 @@ def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
 
 def _log_values(ax: Axes) -> list[Issue]:
     issues = []
-    for axis, column in (("x", 0), ("y", 1)):
+    for axis in ("x", "y"):
         scale = ax.get_xscale() if axis == "x" else ax.get_yscale()
         if scale != "log":
             continue
-        values = np.concatenate(
-            [np.asarray(ln.get_xydata(), dtype=float)[:, column] for ln in _data_lines(ax)]
-            or [np.array([])]
-        )
-        bad = int((values[np.isfinite(values)] <= 0).sum())
+        bad = int((_points(ax, axis) <= 0).sum())
         if bad:
             issues.append(
                 Issue(

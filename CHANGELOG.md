@@ -2,6 +2,12 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
+## Unreleased
+
+### Fixed
+
+- The `outside-limits` and `log-axis-values` lint checks count only data points. A reference line's ends and an error bar's ends no longer count as points outside a set axis limit, or as values of 0 or below on a log axis.
+
 ## 0.3.0 (2026-10-25)
 
 Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).

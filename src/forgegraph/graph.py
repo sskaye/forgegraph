@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from forgegraph.data import read_data
 from forgegraph.drawing import export, lint, page
 from forgegraph.drawing import xy as xy_type
+from forgegraph.drawing.axes import value_number
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
 from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
@@ -262,12 +263,13 @@ def _call(function: Any, *args: Any) -> Any:
 
 
 def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | None]]:
-    """Each axis's set min and max (None where automatic), for lint."""
+    """Each axis's set min and max (None where automatic), for lint: as drawn, a date as its
+    day number (axes.value_number)."""
     return {a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max"))) for a in "xy"}
 
 
 def _limit(value: Any) -> float | None:
-    return None if value is None or value == NONE else float(value)
+    return None if value is None or value == NONE else value_number(value)
 
 
 def xy(

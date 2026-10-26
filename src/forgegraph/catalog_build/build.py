@@ -85,6 +85,7 @@ TYPES = {
     "positive int": "int > 0",
     "float": "float",
     "positive float": "float > 0",
+    "date": "date",
     "hex color": "hex color code",
     "hex colors": "[hex color codes]",
     "two hex colors": "[two hex color codes]",

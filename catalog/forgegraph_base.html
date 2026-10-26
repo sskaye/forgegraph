@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="forgegraph-inputs" content="7f9f7b4be4fb64e47cbd06f425417bb978de868099003d1205b4f9d1a253460a">
+<meta name="forgegraph-inputs" content="c8d3cb1788e4139e3f5d67308d32576f560e7c9edf0909dfd181975fd606caa2">
 <title>forgegraph_base Catalog</title>
 <style>
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
@@ -580,8 +580,8 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-axis-x-title"><td class="path" style="padding-left:2.85rem" title="axis.x.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>Axis title. column_name: the column&#x27;s name. None: none.</td></tr>
 <tr id="graphtype-xy-param-axis-x-scale"><td class="path" style="padding-left:2.85rem" title="axis.x.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>Axis scale.</td></tr>
-<tr id="graphtype-xy-param-axis-x-min"><td class="path" style="padding-left:2.85rem" title="axis.x.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
-<tr id="graphtype-xy-param-axis-x-max"><td class="path" style="padding-left:2.85rem" title="axis.x.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-x-min"><td class="path" style="padding-left:2.85rem" title="axis.x.min">min</td><td>None</td><td>float | date | None</td><td>variable</td><td>Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-x-max"><td class="path" style="padding-left:2.85rem" title="axis.x.max">max</td><td>None</td><td>float | date | None</td><td>variable</td><td>Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
 </table>
 <details class="category" id="graphtype-xy-category-axis-x-tick"><summary style="padding-left:3rem" title="axis.x.tick">tick</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -612,8 +612,8 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-axis-y-title"><td class="path" style="padding-left:2.85rem" title="axis.y.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>Axis title. column_name: the column&#x27;s name; with several columns, use text or None. None: none.</td></tr>
 <tr id="graphtype-xy-param-axis-y-scale"><td class="path" style="padding-left:2.85rem" title="axis.y.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>Axis scale.</td></tr>
-<tr id="graphtype-xy-param-axis-y-min"><td class="path" style="padding-left:2.85rem" title="axis.y.min">min</td><td>None</td><td>float | None</td><td>variable</td><td>Axis minimum. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
-<tr id="graphtype-xy-param-axis-y-max"><td class="path" style="padding-left:2.85rem" title="axis.y.max">max</td><td>None</td><td>float | None</td><td>variable</td><td>Axis maximum. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-y-min"><td class="path" style="padding-left:2.85rem" title="axis.y.min">min</td><td>None</td><td>float | date | None</td><td>variable</td><td>Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. None: the lowest value, less plot_area.margin × the data&#x27;s range.</td></tr>
+<tr id="graphtype-xy-param-axis-y-max"><td class="path" style="padding-left:2.85rem" title="axis.y.max">max</td><td>None</td><td>float | date | None</td><td>variable</td><td>Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. None: the highest value, plus plot_area.margin × the data&#x27;s range.</td></tr>
 </table>
 <details class="category" id="graphtype-xy-category-axis-y-tick"><summary style="padding-left:3rem" title="axis.y.tick">tick</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -673,7 +673,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-series-value_label-show"><td class="path" style="padding-left:2.85rem" title="series.value_label.show">show</td><td>false</td><td>true | false</td><td>variable</td><td>Write each value by its mark.</td></tr>
 <tr id="graphtype-xy-param-series-value_label-position"><td class="path" style="padding-left:2.85rem" title="series.value_label.position">position</td><td>auto</td><td>auto | inside | outside</td><td>variable</td><td>Inside a bar&#x27;s end, beyond the mark, or inside where it fits.</td></tr>
-<tr id="graphtype-xy-param-series-value_label-format"><td class="path" style="padding-left:2.85rem" title="series.value_label.format">format</td><td>auto</td><td>text | auto</td><td>variable</td><td>Number format, e.g. &quot;,.0f&quot;. auto: as the value axis&#x27;s tick labels.</td></tr>
+<tr id="graphtype-xy-param-series-value_label-format"><td class="path" style="padding-left:2.85rem" title="series.value_label.format">format</td><td>auto</td><td>text | auto</td><td>variable</td><td>Number format, e.g. &quot;,.0f&quot;; on a date axis, a date format, e.g. &quot;%H:%M&quot;. auto: as the value axis&#x27;s tick labels.</td></tr>
 </table>
 <details class="category" id="graphtype-xy-category-series-value_label-total"><summary style="padding-left:3rem" title="series.value_label.total">total</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -685,7 +685,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <details class="category" id="graphtype-xy-category-benchmark"><summary style="padding-left:0.5rem" title="benchmark">benchmark</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="graphtype-xy-param-benchmark-data_column"><td class="path" style="padding-left:1.6rem" title="benchmark.data_column">data_column</td><td>None</td><td>column | column_name | None</td><td>variable</td><td>Column marking the benchmark. column_name: a y column. None: no benchmark.</td></tr>
-<tr id="graphtype-xy-param-benchmark-value"><td class="path" style="padding-left:1.6rem" title="benchmark.value">value</td><td>None</td><td>text | float | None</td><td>variable</td><td>The benchmark&#x27;s value in data_column (for column_name, a y column&#x27;s name), drawn in series.benchmark style. Set with data_column.</td></tr>
+<tr id="graphtype-xy-param-benchmark-value"><td class="path" style="padding-left:1.6rem" title="benchmark.value">value</td><td>None</td><td>text | float | date | None</td><td>variable</td><td>The benchmark&#x27;s value in data_column (for column_name, a y column&#x27;s name; for a date column, a date), drawn in series.benchmark style. Set with data_column.</td></tr>
 <tr id="graphtype-xy-param-benchmark-side"><td class="path" style="padding-left:1.6rem" title="benchmark.side">side</td><td>start</td><td>start | end</td><td>variable</td><td>Where the benchmark goes on a categorical axis it&#x27;s a value of: before the other categories or after them.</td></tr>
 </table>
 </details>
@@ -1092,7 +1092,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="layer-reference_line-param-axis"><td class="path" style="padding-left:0.5rem" title="axis">axis</td><td>None</td><td>x | y</td><td>required</td><td>Axis the value is on: y draws a horizontal line. A GraphSpec must set it.</td></tr>
-<tr id="layer-reference_line-param-value"><td class="path" style="padding-left:0.5rem" title="value">value</td><td>None</td><td>float | column</td><td>required</td><td>The line&#x27;s value, or a column to aggregate. A GraphSpec must set it.</td></tr>
+<tr id="layer-reference_line-param-value"><td class="path" style="padding-left:0.5rem" title="value">value</td><td>None</td><td>float | date | column</td><td>required</td><td>The line&#x27;s value, or a column to aggregate. On a datetime axis, a date, e.g. 2025-08-25. A GraphSpec must set it.</td></tr>
 </table>
 <details class="category" id="layer-reference_line-category-aggregation"><summary style="padding-left:0.5rem" title="aggregation">aggregation</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -1107,7 +1107,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="layer-reference_line-param-label-text"><td class="path" style="padding-left:1.6rem" title="label.text">text</td><td>None</td><td>text | aggregation | value | aggregation_value | None</td><td>variable</td><td>aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.</td></tr>
 <tr id="layer-reference_line-param-label-position"><td class="path" style="padding-left:1.6rem" title="label.position">position</td><td>auto</td><td>auto | start_above | start_below | center_above | center_below | end_above | end_below</td><td>variable</td><td>auto: the first clear one.</td></tr>
-<tr id="layer-reference_line-param-label-format"><td class="path" style="padding-left:1.6rem" title="label.format">format</td><td>auto</td><td>text | auto</td><td>variable</td><td>Number format of the value, e.g. &quot;.2f&quot;. auto: one decimal more than the axis&#x27;s tick labels.</td></tr>
+<tr id="layer-reference_line-param-label-format"><td class="path" style="padding-left:1.6rem" title="label.format">format</td><td>auto</td><td>text | auto</td><td>variable</td><td>Number format of the value, e.g. &quot;.2f&quot;; on a date axis, a date format, e.g. &quot;%b %-d&quot;. auto: one decimal more than the axis&#x27;s tick labels; on a date axis, its tick label format.</td></tr>
 </table>
 </details>
 </div>

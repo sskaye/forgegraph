@@ -237,8 +237,13 @@ class CalendarLabels(Formatter):
 
 
 def date_format(fmt: str, path: str) -> str:
-    """A strftime format, checked: only directives that behave the same on every platform, and
-    %-d, %-m and %-H, which ForgeGraph writes itself."""
+    """A strftime format, checked: at least one directive, only directives that behave the same
+    on every platform, and %-d, %-m and %-H, which ForgeGraph writes itself."""
+    if not re.search(r"%-?[^%]", fmt.replace("%%", "")):
+        raise DrawError(
+            f"{path}: '{fmt}' isn't a date format, which has date directives, e.g. \"%b %-d\" "
+            'or "%H:%M"'
+        )
     for m in re.finditer(r"%(-?.)", fmt):
         if m[1] not in DATE_DIRECTIVES and not (m[1][0] == "-" and m[1][1:] in UNPADDED):
             raise DrawError(

@@ -49,7 +49,7 @@ from forgegraph.catalog_build.examples import NONSTANDARD, draw, image
 from forgegraph.catalog_build.page import CSS_DPI
 from forgegraph.fonts import bundled_families
 from forgegraph.graph import Graph, SpecError
-from forgegraph.spec.parameters import NONE, Parameter
+from forgegraph.spec.parameters import NONE, Parameter, is_none
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.validate import TIES
 
@@ -146,7 +146,7 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
         whole = not rng.intervals and not {"float", "positive float"} & set(rng.types)
         if isinstance(d, int | float) and not isinstance(d, bool):
             out += _within(p, d, [1] if d == 0 else [2 * d, d // 2 if whole else d / 2])
-        elif d in (None, NONE):
+        elif is_none(d):
             out += _from_data(p, scene, layer)
         elif p.path in SIZES:  # auto: from the other size
             out.append(scene.values.get(SIZES[p.path]))
@@ -202,7 +202,7 @@ def tied(path: str, value: Any, prefix: str = "") -> tuple[Change, ...]:
     """A card's changes: its parameter's, and when that's None, None for each parameter TIES
     ties it to. prefix: a layer catalog's layers.<layer>."""
     own = Change(f"{prefix}{path}", value)
-    if value not in (None, NONE):
+    if not is_none(value):
         return (own,)
     others = [q for tie in TIES if path in tie for q in tie if q != path]
     return (own, *(Change(f"{prefix}{q}", NONE) for q in others))

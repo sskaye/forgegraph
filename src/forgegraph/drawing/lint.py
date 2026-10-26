@@ -9,7 +9,8 @@ drawing. Each issue names its check:
 - too-many-groups: more groups than the theme has colors, line styles or marker shapes, so
   they repeat;
 - log-axis-values: values of 0 or below on a log axis, which can't be drawn;
-- outside-limits: points outside an axis's fixed minimum or maximum, so not drawn;
+- outside-limits: points outside an axis's fixed minimum or maximum, so not drawn (past it
+  by more than float noise: drawing.limits);
 - small-text: text smaller than MIN_TEXT_PT, too small to read at the figure's size;
 - font-fallback: a font or a letter the theme's font doesn't have, drawn with another or not
   at all;
@@ -37,9 +38,10 @@ from matplotlib.lines import Line2D
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import text
+from forgegraph.drawing import limits, text
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.layers import GIDS as LAYERS
 from forgegraph.drawing.layout import texts_of
 
 MIN_TEXT_PT = 6.0  # the smallest text journals accept in a printed figure
@@ -177,6 +179,20 @@ def _key_over_data(ax: Axes) -> list[Issue]:
     return issues
 
 
+def _points(ax: Axes, axis: str) -> np.ndarray:
+    """Every data point's finite value along an axis. A layer's lines aren't points: a
+    reference line's ends are the plot's edges, and an error bar's are distances from a point."""
+    values = np.concatenate(
+        [
+            np.asarray(ln.get_xydata(), dtype=float)[:, 0 if axis == "x" else 1]
+            for ln in _data_lines(ax)
+            if ln.get_gid() not in LAYERS
+        ]
+        or [np.array([])]
+    )
+    return values[np.isfinite(values)]
+
+
 def _inside(box: Any, points: np.ndarray) -> np.ndarray:
     """Which points a box holds, edges included: matplotlib's Bbox.contains, for many."""
     x, y = points[:, 0], points[:, 1]
@@ -188,16 +204,16 @@ def _inside(box: Any, points: np.ndarray) -> np.ndarray:
 def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
     issues = []
     for axis, (lo, hi) in fixed.items():
-        values = np.concatenate(
-            [
-                np.asarray(ln.get_xydata(), dtype=float)[:, 0 if axis == "x" else 1]
-                for ln in _data_lines(ax)
-            ]
-            or [np.array([])]
+        view = ax.xaxis if axis == "x" else ax.yaxis
+        start, end = sorted(view.get_view_interval())  # an automatic end: where it is
+        low, high = limits.outside(
+            _points(ax, axis),
+            start if lo is None else lo,
+            end if hi is None else hi,
+            view.get_scale() == "log",
         )
-        values = values[np.isfinite(values)]
-        below = int((values < lo).sum()) if lo is not None else 0
-        above = int((values > hi).sum()) if hi is not None else 0
+        below = int(low.sum()) if lo is not None else 0
+        above = int(high.sum()) if hi is not None else 0
         if below or above:
             parts = [
                 f"{below} below axis.{axis}.min" if below else "",
@@ -214,15 +230,11 @@ def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
 
 def _log_values(ax: Axes) -> list[Issue]:
     issues = []
-    for axis, column in (("x", 0), ("y", 1)):
+    for axis in ("x", "y"):
         scale = ax.get_xscale() if axis == "x" else ax.get_yscale()
         if scale != "log":
             continue
-        values = np.concatenate(
-            [np.asarray(ln.get_xydata(), dtype=float)[:, column] for ln in _data_lines(ax)]
-            or [np.array([])]
-        )
-        bad = int((values[np.isfinite(values)] <= 0).sum())
+        bad = int((_points(ax, axis) <= 0).sum())
         if bad:
             issues.append(
                 Issue(

@@ -39,6 +39,7 @@ def render(
         "ok": True,
         "saved": [str(p) for p in saved],
         "labelling": drawn.labelling_by_name,
+        "style_keys": drawn.style_keys_by_name,
         "lint": [i.as_dict() for i in drawn.issues],
     }
     if drawn.nonstandard_packs:

@@ -24,7 +24,7 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
-from forgegraph.spec.parameters import NONE, tree_set
+from forgegraph.spec.parameters import NONE, is_none, tree_set
 from forgegraph.spec.provenance import DataRecord, graph_fields, record, used
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
@@ -49,6 +49,7 @@ class Graph(Inspected, Saved):
     freshness: page.Freshness | None = None  # a scheduled run's, for its HTML page
     changed: bool = False  # found changed since rendering (see inspect); never reset
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
+    style_keys: list[str] = field(default_factory=list)  # the column each style key explains
     _snapshot: tuple[int, ...] = ()  # the figure's artists when rendering finished
     _drawn: str = ""  # a hash of the pixels the figure drew when rendering finished
     _held: bool = False  # inspected already, during one save (see inspected_once)
@@ -84,6 +85,11 @@ class Graph(Inspected, Saved):
     def labelling_by_name(self) -> str:
         """How its series are named: its one labelling, where a layout's are by tile."""
         return self.labelling
+
+    @property
+    def style_keys_by_name(self) -> list[str]:
+        """Its style keys' columns, where a layout's are by tile."""
+        return self.style_keys
 
     def record(self) -> dict[str, Any] | None:
         """The provenance record saved files carry, at the format's provenance.level; None
@@ -156,7 +162,7 @@ class Prepared:
     @property
     def title(self) -> str | None:
         title = self.values["graphspec"]["text.title"]
-        return None if title in (None, NONE) else str(title)
+        return None if is_none(title) else str(title)
 
     def draw(self, ax: Axes) -> Any:
         """Draw the graph into ax; returns what the graph type drew."""
@@ -251,6 +257,7 @@ def render(
     graph = Graph(
         p.doc, fig, ax, p.values, style, p.record, drawn.labelling, [], p.specs, _prepared=p
     )
+    graph.style_keys = [k.column for k in drawn.style_keys]
     graph._drawing = list(drawn.warnings)
     graph.seal(fig, font_problems, p.nonstandard_packs)
     return graph
@@ -269,7 +276,7 @@ def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | No
 
 
 def _limit(value: Any) -> float | None:
-    return None if value is None or value == NONE else value_number(value)
+    return None if is_none(value) else value_number(value)
 
 
 def xy(

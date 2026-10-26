@@ -17,7 +17,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
-from forgegraph.spec.parameters import NONE, SECTIONS, check_parameter, tab_definitions
+from forgegraph.spec.parameters import SECTIONS, check_parameter, is_none, tab_definitions
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import chain, resolve
 
@@ -114,8 +114,8 @@ def tabs(doc: dict[str, Any], reg: Registry) -> list[Tab]:
                 str(name),
                 [[str(c) for c in row] for row in g["areas"]],
                 {str(k): v for k, v in entry["tiles"].items()},
-                None if widths in (None, NONE) else [float(w) for w in widths],
-                None if heights in (None, NONE) else [float(h) for h in heights],
+                None if is_none(widths) else [float(w) for w in widths],
+                None if is_none(heights) else [float(h) for h in heights],
             )
         )
     return out
@@ -254,7 +254,7 @@ def drawing_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         f"tabs.{name}.tiles.{tile}: must be set before the layout can be drawn: a GraphSpec file"
         for name, entry in entries.items()
         for tile, file in entry["tiles"].items()
-        if file in (None, NONE)
+        if is_none(file)
     ]
 
 
@@ -273,7 +273,7 @@ def _sizes_problems(
         if values.value(f"figure.{size}") != "auto":
             continue
         for tab_name, entry in entries.items():
-            if entry["grid"].get(key) not in (None, NONE):
+            if not is_none(entry["grid"].get(key)):
                 errors.append(
                     f"{where}.{tab_name}.grid.{key}: format '{chosen}' has figure.{size} auto, "
                     f"so the tiles set each {'row' if key == 'row_heights' else 'column'}'s "

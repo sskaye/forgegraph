@@ -38,7 +38,7 @@ from typing import Any, cast
 import numpy as np
 from matplotlib.ticker import Locator, LogLocator, MaxNLocator, NullLocator
 
-from forgegraph.drawing import text
+from forgegraph.drawing import limits, text
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style
 
@@ -339,8 +339,7 @@ class NiceTicks(Locator):
         if len(ticks) > 1:  # no 0.30000000000000004; ticks needn't be multiples of the step
             step = abs(ticks[1] - ticks[0])
             ticks = np.round(ticks, max(0, 3 - int(np.floor(np.log10(step)))))
-        pad = (hi - lo) * 1e-9
-        return ticks[(ticks >= lo - pad) & (ticks <= hi + pad)]
+        return ticks[limits.inside(ticks, lo, hi)]
 
 
 # breaks_log and _log_sub_breaks are a Python port of breaks_log() and log_sub_breaks() in R's
@@ -480,13 +479,12 @@ class LogTicks(Locator):
             ticks = np.asarray(found if found is not None else self._linear().tick_values(lo, hi))
         else:
             ticks = np.asarray(LogLocator(base=10, numticks=n).tick_values(lo, hi))
-            if np.sum((ticks >= lo) & (ticks <= hi)) < 2:
+            if np.sum(limits.inside(ticks, lo, hi, log=True)) < 2:
                 ticks = self._linear().tick_values(lo, hi)
         ticks = np.asarray(_clean(list(np.asarray(ticks, dtype=float))))  # LogLocator: 9.99e-06
         if self.integer:
             ticks = ticks[ticks >= 1]
-        pad = (hi - lo) * 1e-9
-        return ticks[(ticks > 0) & (ticks >= lo - pad) & (ticks <= hi + pad)]
+        return ticks[(ticks > 0) & limits.inside(ticks, lo, hi, log=True)]
 
     def _fits(self, ticks: np.ndarray) -> bool:
         """Whether these ticks' labels, as the axis formats and draws them, keep gap apart."""
@@ -529,7 +527,7 @@ class LogStep(Locator):
         first = math.floor(math.log(lo / anchor) / math.log(self.factor))
         last = math.ceil(math.log(hi / anchor) / math.log(self.factor))
         ticks = (anchor * self.factor**k for k in range(first, last + 1))
-        return [float(f"{t:.12g}") for t in ticks if lo * (1 - 1e-9) <= t <= hi * (1 + 1e-9)]
+        return [float(f"{t:.12g}") for t in ticks if limits.inside(t, lo, hi, log=True)]
 
 
 def minor_ticks(axis: Any, style: Style) -> None:
@@ -548,7 +546,6 @@ class _Between(Locator):
     def __call__(self) -> Any:
         axis = cast(Any, self.axis)
         assert axis is not None
-        lo, hi = sorted(axis.get_view_interval())
         majors = np.asarray(axis.get_major_locator()())
         log = axis.get_scale() == "log"
         if len(majors) < 2:
@@ -563,7 +560,7 @@ class _Between(Locator):
             for a, b in pairwise(edges)
             for k in range(1, self.n + 1)
         ]
-        return [v for v in out if lo <= v <= hi]
+        return [v for v, d in zip(out, limits.in_view(axis, out), strict=True) if d]
 
     def tick_values(self, vmin: float, vmax: float) -> Any:
         return self()

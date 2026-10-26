@@ -19,7 +19,7 @@ from matplotlib.font_manager import FontProperties
 
 from forgegraph.drawing import text
 from forgegraph.fonts import WEIGHTS, register_fonts
-from forgegraph.spec.parameters import NONE
+from forgegraph.spec.parameters import is_none
 
 MM_PER_INCH = 25.4
 MARKERS = {
@@ -67,8 +67,7 @@ TICK_DIRECTIONS = {"out": "out", "in": "in", "both": "inout"}
 LAYOUT_DPI = 100  # figures are laid out at this resolution and saved at the format's dpi
 
 
-def unset(value: Any) -> bool:
-    return value is None or value == NONE
+unset = is_none  # the drawing code's name for it
 
 
 @dataclass(frozen=True)

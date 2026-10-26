@@ -27,6 +27,8 @@ from datetime import datetime, timedelta
 from itertools import pairwise
 from typing import Any
 
+from forgegraph.spec.parameters import is_none
+
 UNITS = ("minute", "hour", "day", "week", "month", "year")
 DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -84,7 +86,7 @@ class Cadence:
                 f"{interval} {unit}s exactly"
             )
         listed = at if isinstance(at, list) else [at]
-        if unit == "minute" and listed != [None] and listed != ["None"]:
+        if unit == "minute" and not (len(listed) == 1 and is_none(listed[0])):
             raise CadenceError("cadence.at: must be None for minute, the finest unit")
         times = tuple(_parse(item, unit) for item in listed)
         if len(set(times)) != len(times):
@@ -167,7 +169,7 @@ def _order(t: When) -> tuple[int, ...]:
 
 def _parse(item: Any, unit: str) -> When:
     """One of cadence.at's times, for the unit."""
-    if item in (None, "None"):
+    if is_none(item):
         return When()
     if not isinstance(item, str):
         raise CadenceError(f"cadence.at: {item!r} isn't text; write it in quotes: {FORMS[unit]}")

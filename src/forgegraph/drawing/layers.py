@@ -35,7 +35,7 @@ from matplotlib.axes import Axes
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import labels, marks
+from forgegraph.drawing import labels, limits, marks
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import markup
@@ -46,6 +46,7 @@ from forgegraph.spec.parameters import as_date
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
 ERROR_BAR = "forgegraph-error-bar"
+GIDS = (REFERENCE, ERROR_BAR, NOTE)  # every artist a layer draws has one of these
 NAMES = {
     "mean": "Mean",
     "median": "Median",
@@ -349,9 +350,12 @@ def include(ax: Axes, lines: list[RefLine], gt: dict[str, Any]) -> None:
         get = ax.get_ylim if axis == "y" else ax.get_xlim
         put = ax.set_ylim if axis == "y" else ax.set_xlim
         lo, hi = get()
-        if lo <= at <= hi:
+        below, above = limits.outside(
+            at, lo, hi, (ax.get_yscale() if axis == "y" else ax.get_xscale()) == "log"
+        )
+        if not (below or above):
             continue
-        end = "min" if at < lo else "max"
+        end = "min" if below else "max"
         if not unset(gt[f"axis.{axis}.{end}"]):
             raise DrawError(
                 f"layers.{name}: the line at {at:g} is outside axis.{axis}.{end}; move the line "

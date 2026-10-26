@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import re
 from pathlib import Path
+from typing import cast
 
 import matplotlib
 import numpy as np
@@ -23,8 +24,8 @@ import forgegraph as fg
 from forgegraph.drawing import xy
 from forgegraph.drawing.export import FILE_TYPES, IMAGES
 from forgegraph.drawing.figure import WATERMARK
-from forgegraph.drawing.key import keys
-from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.key import KEY, keys
+from forgegraph.drawing.style import LINE_STYLES, Style, isolated
 from forgegraph.drawing.text import footprint
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
 from forgegraph.spec.parameters import NONE
@@ -795,7 +796,10 @@ def test_impossible_drawings_are_errors_not_fallbacks():
     }
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("legend.method: key doesn't fit this graph; use auto, or direct"),
+        match=re.escape(
+            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
+            "is taken or covers data; use auto, or direct"
+        ),
     ):
         render({**scatter, "legend.method": "key"}, theme=no_margin, data=board)
     with pytest.raises(
@@ -808,6 +812,131 @@ def test_impossible_drawings_are_errors_not_fallbacks():
 def test_each_styling_column_gets_its_own_key():
     g = render({"encoding.line.style.column": "size", "encoding.marker.shape.column": "run"})
     assert {"size", "run"} <= {k.title for k in keys(g.axes)}
+
+
+def _banded() -> pd.DataFrame:
+    """A median line and an IQR's two edges, the line style set by band (issue 22)."""
+    rows = []
+    for x in range(5):
+        rows += [
+            {"x": x, "band": "median", "edge": "line", "y": 10 + x},
+            {"x": x, "band": "IQR", "edge": "lo", "y": 8 + x},
+            {"x": x, "band": "IQR", "edge": "hi", "y": 12 + x},
+        ]
+    return pd.DataFrame(rows)
+
+
+BANDED = {
+    "axis.x.data.column": "x",
+    "axis.y.data.column": "y",
+    "encoding.color.column": NONE,
+    "encoding.line.style.column": "band",
+    "encoding.detail.column": "edge",
+    "encoding.order": "data",
+    "benchmark.data_column": NONE,
+    "benchmark.value": NONE,
+    "mark.marker.show": False,
+    "legend.method": "key",
+}
+
+
+def test_the_key_title_is_every_keys():
+    def titles(**settings) -> list[str | None]:
+        g = render({**BANDED, **settings}, data=_banded())
+        return [k.title for k in keys(g.axes)]
+
+    assert titles() == ["band"]  # column_name: its own column's
+    assert titles(**{"legend.key.title.text": NONE}) == [None]
+    assert titles(**{"legend.key.title.text": "Percentiles"}) == ["Percentiles"]
+    colored = {"encoding.color.column": "edge", "encoding.detail.column": NONE}
+    assert sorted(map(str, titles(**colored))) == ["band", "edge"]
+    assert titles(**colored, **{"legend.key.title.text": NONE}) == [None, None]
+    with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
+        titles(**colored, **{"legend.key.title.text": "Percentiles"})
+    two = {"encoding.marker.shape.column": "edge", "mark.marker.show": True}
+    with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
+        titles(**two, **{"legend.key.title.text": "Percentiles"})
+
+
+def test_style_samples_take_the_series_color_with_no_color_encoding():
+    def samples(**settings) -> tuple[set[str], fg.Graph]:
+        g = render({**BANDED, **settings}, data=_banded())
+        [key] = [k for k in keys(g.axes) if k.title == "band"]
+        return {to_hex(cast(Line2D, e.handle).get_color()) for e in key.entries}, g
+
+    colors, g = samples()
+    drawn = {to_hex(ln.get_color()) for ln in g.axes.get_lines() if ln.get_gid() != KEY}
+    assert colors == drawn == {to_hex(g.style.series_colors()[0])}
+    colors, g = samples(**{"encoding.color.column": "edge", "encoding.detail.column": NONE})
+    assert colors == {to_hex(g.style.color("font.color"))}  # neutral among the colors
+
+
+def test_the_style_keys_drawn_are_reported():
+    g = render(BANDED, data=_banded())
+    assert g.labelling == "none" and g.style_keys == ["band"]
+    assert render({**BANDED, "encoding.line.style.column": NONE}, data=_banded()).style_keys == []
+
+
+# A delivered median, two percentile bands' edges, and the programmed schedule as the
+# benchmark, the line style set by the same column (issue 23); each at its own height.
+BASAL_Y = {"Delivered": 5.0, "Programmed": 5.5, "25-75%": (4.0, 6.0), "10-90%": (3.0, 7.0)}
+BASAL = {
+    "axis.x.data.column": "x",
+    "axis.y.data.column": "y",
+    "encoding.color.column": NONE,
+    "encoding.line.style.column": "basal",
+    "encoding.detail.column": "edge",
+    "encoding.order": "data",
+    "benchmark.data_column": "basal",
+    "benchmark.value": "Programmed",
+    "mark.marker.show": False,
+}
+
+
+def _basal() -> pd.DataFrame:
+    rows = []
+    for x in range(4):
+        for basal, y in BASAL_Y.items():
+            edges = {"lo": y[0], "hi": y[1]} if isinstance(y, tuple) else {"mid": y}
+            rows += [{"x": x, "basal": basal, "edge": e, "y": v} for e, v in edges.items()]
+    return pd.DataFrame(rows)
+
+
+def test_a_style_key_matches_the_drawing_and_leaves_the_benchmark_to_the_labelling():
+    outside = {"legend.key.positions": ["right_top"], "legend.key.inside": False}
+    g = render({**BASAL, **outside, "legend.method": "direct"}, data=_basal())
+    [key] = [k for k in keys(g.axes) if k.title == "basal"]
+    sampled = {e.name: cast(Line2D, e.handle).get_linestyle() for e in key.entries}
+    assert list(sampled) == ["Delivered", "25-75%", "10-90%"]  # no sample for the benchmark
+    at = {v: name for name, y in BASAL_Y.items() for v in np.atleast_1d(y)}
+    drawn = {
+        at[float(np.asarray(ln.get_ydata(), dtype=float)[0])]: ln.get_linestyle()
+        for ln in g.axes.get_lines()
+        if ln.get_gid() != KEY and np.size(ln.get_xdata()) > 1
+    }
+    assert {name: drawn[name] for name in sampled} == sampled
+    assert drawn["Programmed"] == LINE_STYLES[g.style.theme["series.benchmark.line.style"]]
+    assert g.labelling == "direct"  # names the benchmark, once
+    assert [t.get_text() for t in g.axes.texts if t.get_text() == "Programmed"] == ["Programmed"]
+
+
+def test_a_key_that_doesnt_fit_says_why():
+    with pytest.raises(
+        fg.SpecError,
+        match=re.escape(
+            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
+            "is taken or covers data (the style key for basal took right_top)"
+        ),
+    ):
+        render(
+            {
+                **BASAL,
+                "legend.method": "key",
+                "legend.key.positions": ["right_top"],
+                "legend.key.inside": False,
+            },
+            data=_basal(),
+        )
 
 
 def test_each_y_column_is_its_own_line():
@@ -841,6 +970,38 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     assert g.labelling == "direct"
     ticks = [t for t in g.axes.get_xticks() if t <= g.axes.get_xlim()[1]]
     assert max(ticks) <= 100  # the data ends at 100; the room beyond holds labels only
+
+
+def test_direct_labels_can_widen_a_date_axis(monkeypatch):
+    """A date axis's locator gives its ticks as a list; the room beyond keeps them too."""
+    from forgegraph.drawing import labels
+
+    place = labels.place_interior
+    tries: list[bool] = []
+
+    def no_room_at_first(ax, groups, style, draw=True):  # as if the labels need more room
+        tries.append(draw)
+        return len(tries) > 1 and place(ax, groups, style, draw=draw)
+
+    monkeypatch.setattr(labels, "place_interior", no_room_at_first)
+    days = pd.DataFrame(
+        {
+            "day": list(pd.date_range("2025-08-25", periods=6, freq="D")) * 2,
+            "y": [1.0, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1],
+            "run": ["up"] * 6 + ["down"] * 6,
+        }
+    )
+    settings = {
+        "axis.x.data.column": "day",
+        "axis.y.data.column": "y",
+        "encoding.color.column": "run",
+        "encoding.detail.column": NONE,
+        "benchmark.data_column": NONE,
+        "benchmark.value": NONE,
+        "legend.method": "direct",
+    }
+    g = render(settings, data=days)
+    assert g.labelling == "direct" and tries[:2] == [True, False]  # widened, then placed
 
 
 # --- matplotlib's settings while drawing ------------------------------------------------------

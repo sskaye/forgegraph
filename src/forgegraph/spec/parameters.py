@@ -33,9 +33,12 @@ from datetime import date, datetime
 from functools import cache
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from ruamel.yaml import YAML
+
+if TYPE_CHECKING:  # typing.TypeIs is Python 3.13's
+    from typing_extensions import TypeIs
 
 KINDS = {
     "theme": "themes",
@@ -164,6 +167,11 @@ class Parameter:
         return self.default is None and NONE not in self.range.literals
 
 
+def is_none(value: Any) -> TypeIs[Literal["None"] | None]:
+    """Whether a spec's value is None: the word None, or YAML's null (null, ~ or nothing)."""
+    return value is None or value == NONE
+
+
 def _num(x: float) -> str:
     return str(int(x)) if float(x).is_integer() else str(x)
 
@@ -236,7 +244,7 @@ def check_value(value: Any, rng: Range, names: dict[str, set[str]] | None = None
 def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
     match t:
         case "text":
-            return isinstance(value, str) and value != NONE
+            return isinstance(value, str) and not is_none(value)
         case "int":
             return _is_int(value) and value >= 0
         case "positive int":
@@ -262,7 +270,7 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
                 and all(_type_ok("hex color", v, names) for v in value)
             )
         case "column":
-            return isinstance(value, str) and value.strip() != "" and value != NONE
+            return isinstance(value, str) and value.strip() != "" and not is_none(value)
         case "columns":
             items = value if isinstance(value, list) else [value]
             return bool(items) and all(_type_ok("column", v, names) for v in items)
@@ -296,10 +304,10 @@ def check_parameter(
     p: Parameter, value: Any, names: dict[str, set[str]] | None = None
 ) -> list[tuple[str, str]]:
     """Problems as (suffix, message); suffix is '' or '[i]' for a list item."""
-    if p.required and value in (None, NONE):
+    if p.required and is_none(value):
         return []  # unset; drawing needs it, see validate.drawing_problems
     if p.takes_list:
-        if value in (None, NONE) and NONE in p.range.literals:
+        if is_none(value) and NONE in p.range.literals:
             return []  # a list parameter whose range allows None, e.g. no tick sides
         if not isinstance(value, list):
             return [("", f"must be a list of one or more items, each {p.range.describe()}")]
@@ -307,7 +315,7 @@ def check_parameter(
             return [("", "must have at least one item")]
         problems = []
         for i, item in enumerate(value):
-            if item in (None, NONE):
+            if is_none(item):
                 problems.append((f"[{i}]", "None can't be a list item"))
             elif err := check_value(item, p.range, names):
                 problems.append((f"[{i}]", err))
@@ -419,7 +427,7 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
     params: dict[str, Parameter] = {}
     for section in SECTIONS:
         tree = data.get(section)
-        if tree in (None, NONE):
+        if is_none(tree):
             continue
         for category, entries in tree.items():
             if category in COLLECTIONS.get(kind, ()):
@@ -486,7 +494,7 @@ def graph_type_files() -> tuple[str, ...]:
     out = []
     for path in sorted(folder.glob("*.yaml")):
         data = YAML(typ="safe", pure=True).load(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict) and data.get("extends") == NONE:
+        if isinstance(data, dict) and is_none(data.get("extends")):
             out.append(path.stem)
     return tuple(out)
 
@@ -502,4 +510,4 @@ def _plain(value: Any) -> Any:
     if isinstance(value, float):
         return float(value)
     s = str(value)
-    return None if s == NONE else s
+    return None if is_none(s) else s

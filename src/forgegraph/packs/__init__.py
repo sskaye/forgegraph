@@ -39,7 +39,7 @@ from ruamel.yaml import YAML
 
 from forgegraph import __version__
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS
+from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, is_none
 
 FOLDER_CONFIG = "forgegraph.toml"
 MAIN_CONFIG_VARIABLE = "FORGEGRAPH_CONFIG"
@@ -138,7 +138,7 @@ def read_pack(folder: Path, source: str, expected: str | None = None) -> Pack:
     name = str(data["name"])
     if expected is not None and name != expected:
         raise PackError([f"{where}: name: '{name}', but the pack is listed as '{expected}'"])
-    requires = None if data["requires"] in (None, "None") else str(data["requires"])
+    requires = None if is_none(data["requires"]) else str(data["requires"])
     if requires is not None:
         try:
             versions = SpecifierSet(requires)

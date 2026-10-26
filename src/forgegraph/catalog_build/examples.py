@@ -20,7 +20,7 @@ from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, SpecError, render
 from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.loaded import Loaded
-from forgegraph.spec.parameters import NONE, definitions, tree_has, tree_set
+from forgegraph.spec.parameters import NONE, definitions, is_none, tree_has, tree_set
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
 
@@ -65,7 +65,7 @@ def draw(
     format extending the one it uses."""
     reg = (reg or builtin()).copy()
     doc = copy.deepcopy(reg.docs["graphspec"][spec])
-    inherited = list(resolve_layers(doc, reg)) if doc.get("extends") not in (None, NONE) else []
+    inherited = list(resolve_layers(doc, reg)) if not is_none(doc.get("extends")) else []
     in_chain = set(resolve("graphspec", doc, reg))  # set by the GraphSpec or one it extends
     listed = doc["variable_parameters"]
     listed.pop("layers", None)  # a card shows one change; layers are shown on their own cards

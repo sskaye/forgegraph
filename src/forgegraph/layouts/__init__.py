@@ -93,6 +93,11 @@ class Tile:
         return self.drawn.labelling
 
     @property
+    def style_keys(self) -> list[str]:
+        """The column each of its style keys explains (see Graph.style_keys)."""
+        return [k.column for k in self.drawn.style_keys]
+
+    @property
     def drawing(self) -> list[lint.Issue]:
         """What lint found while drawing it."""
         return list(self.drawn.warnings)
@@ -193,6 +198,11 @@ class Layout(Saved):
     def labelling_by_name(self) -> dict[str, str]:
         """How each tile's series are named (see Graph.labelling), by "<tab>.<tile>"."""
         return {f"{t.name}.{n}": tile.labelling for t in self.tabs for n, tile in t.tiles.items()}
+
+    @property
+    def style_keys_by_name(self) -> dict[str, list[str]]:
+        """Each tile's style keys' columns (see Graph.style_keys), by "<tab>.<tile>"."""
+        return {f"{t.name}.{n}": tile.style_keys for t in self.tabs for n, tile in t.tiles.items()}
 
     def check(self) -> list[lint.Issue]:
         for t in self.tabs:

@@ -87,7 +87,7 @@ variable_parameters:          # List of variable parameters for the graph type, 
             positions: [top_right, top_left, bottom_right, bottom_left]          # [top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom]; Tried in order: the first clear one.
             inside: true          # [true, false]; Inside the plot area, or outside it: top_* above it, bottom_* below the x-axis title, right_* to its right.
             title:
-                text: column_name          # [None, column_name, text]; Key title. column_name: the encoding.color.column column's name. None: none.
+                text: column_name          # [None, column_name, text]; Every key's title. column_name: each key's own column's name. None: none. A text: one key only.
         color_bar:
             title:
                 text: column_name          # [None, column_name, text]; Color bar title. column_name: the encoding.color.column column's name. None: none.

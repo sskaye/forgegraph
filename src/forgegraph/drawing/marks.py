@@ -5,11 +5,13 @@ mark.bar; themes series.bar, series.value_label).
   at each place in series order, positive values up from 0 and negative values down; percent
   stacks each series' share of the place's total, to 100. The benchmark's series stack among
   themselves, apart from the others. A series with several rows at one
-  place is an error that names axis.*.data.aggregation.
+  place is an error that names axis.*.data.aggregation. Dates on the value axis can't be
+  added, so stacking them is an error.
 - **Bars** (mark.bar.show) run from 0 (1 on a log axis), or from the stack below, to each
-  value. Each series' bars are one collection of rectangles (Bars), outlined in the theme's
-  series.bar.edge.color and edge.width (the benchmark's, series.benchmark.bar), whose width
-  is the theme's series.bar.width in points at any size: they're laid out again at every draw.
+  value; on a date value axis, where 0 is 1970, they're an error. Each series' bars are one
+  collection of rectangles (Bars), outlined in the theme's series.bar.edge.color and
+  edge.width (the benchmark's, series.benchmark.bar), whose width is the theme's
+  series.bar.width in points at any size: they're laid out again at every draw.
 - **Side by side** (series.offset) centres the marks at each place on it, in series order:
   bars series.bar.gap apart, markers touching. A place with fewer series has fewer marks,
   still centred. Bars, or side-by-side marks, wider than the space between places are an
@@ -17,7 +19,8 @@ mark.bar; themes series.bar, series.value_label).
 - **Value labels** (series.value_label) write each value by its mark: beyond it, or inside a
   bar's end (auto: inside where it fits); a stacked segment's at its centre; with total, each
   stack's total beyond its end. Labels beyond the plot area grow an automatic value axis;
-  against a set limit, or running into each other, they're an error.
+  against a set limit, or running into each other, they're an error. On a date value axis
+  they're dates, so they need a date format.
 """
 
 from __future__ import annotations
@@ -31,11 +34,10 @@ from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import RendererAgg
 from matplotlib.collections import PolyCollection
 from matplotlib.colors import to_rgb
-from matplotlib.dates import date2num
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.drawing.axes import number_text
+from forgegraph.drawing.axes import number_text, numbers
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
@@ -54,9 +56,30 @@ class Stacked:
     value: np.ndarray
 
 
-def check(gt: dict[str, Any], value_axis: str) -> None:
-    """Combinations of series settings that can't be drawn, before any data is read."""
+def check(gt: dict[str, Any], value_axis: str, kind: str) -> None:
+    """Combinations of series settings that can't be drawn, once the value axis's type (kind)
+    is known."""
     how = gt["series.aggregation"]
+    if kind == "date":
+        dates = f"axis.{value_axis} is dates"
+        if how != "none":
+            raise DrawError(
+                f"series.aggregation: {how} adds the values, but {dates}, which can't be "
+                "added; use none"
+            )
+        if gt["mark.bar.show"]:
+            raise DrawError(
+                f"mark.bar.show: bars start at 0, which on axis.{value_axis}'s dates is 1970; "
+                "draw markers or lines instead"
+            )
+        if gt["series.value_label.show"] and all(
+            gt[p] == "auto"
+            for p in ("series.value_label.format", f"axis.{value_axis}.tick.label.format")
+        ):
+            raise DrawError(
+                f"series.value_label.show: {dates}, so the labels need a date format; set "
+                f'series.value_label.format or axis.{value_axis}.tick.label.format, e.g. "%H:%M"'
+            )
     if how != "none" and gt["series.offset"] == "side_by_side":
         raise DrawError(
             f"series.offset: side_by_side, but series.aggregation {how} stacks series at each "
@@ -104,7 +127,7 @@ def stack(series: list[Any], how: str, log: bool) -> list[Stacked]:
                     "rows at one place; combine them with the value axis's data.aggregation"
                 )
             if how == "percent":
-                values = np.asarray(s.y, dtype=float)
+                values = numbers(s.y)
                 if bool((values < 0).any()):
                     raise DrawError(
                         "series.aggregation: percent, but some values are below 0; a share of a "
@@ -114,7 +137,7 @@ def stack(series: list[Any], how: str, log: bool) -> list[Stacked]:
                     if np.isfinite(v):
                         totals[s.benchmark, p] = totals.get((s.benchmark, p), 0.0) + float(v)
     for s in series:
-        values = np.asarray(s.y, dtype=float)
+        values = numbers(s.y)
         if how == "none":
             out.append(Stacked(np.full(len(values), floor), values, values))
             continue
@@ -144,13 +167,6 @@ def key(place: float) -> float:
     return round(float(place), 9)
 
 
-def numbers(values: Any) -> np.ndarray:
-    """Values as the numbers matplotlib plots them at: dates as its day numbers."""
-    if np.issubdtype(np.asarray(values).dtype, np.datetime64):
-        return np.asarray(date2num(values), dtype=float)
-    return np.asarray(values, dtype=float)
-
-
 def widths(s: Any, gt: dict[str, Any]) -> float:
     """A series' mark width along the base axis, in points: its bars, or its markers."""
     return s.look.bar_width if gt["mark.bar.show"] else s.look.marker_size
@@ -160,7 +176,7 @@ def _present(series: list[Any]) -> dict[float, list[int]]:
     """The series with a mark at each place (by key), by their positions in series."""
     at: dict[float, list[int]] = {}
     for i, s in enumerate(series):
-        for p, v in zip(numbers(s.x), np.asarray(s.y, dtype=float), strict=True):
+        for p, v in zip(numbers(s.x), numbers(s.y), strict=True):
             if np.isfinite(p) and np.isfinite(v):
                 at.setdefault(key(p), []).append(i)
     return at
@@ -400,20 +416,20 @@ def _contrast(a: str, b: str) -> float:
 
 
 def value_labels(
-    ax: Axes, series: list[Any], gt: dict[str, Any], style: Style, base_axis: str
+    ax: Axes, series: list[Any], gt: dict[str, Any], style: Style, base_axis: str, kind: str
 ) -> bool:
     """Write the values (series.value_label) after layout, in series.value_label.format (see
-    axes.number_text). Returns True if the value axis was widened to fit them, so the figure
-    must be laid out again."""
+    axes.number_text; kind: the value axis's type). Returns True if the value axis was
+    widened to fit them, so the figure must be laid out again."""
     value_axis = "y" if base_axis == "x" else "x"
-    fmt = gt["series.value_label.format"]
-    axis = ax.yaxis if value_axis == "y" else ax.xaxis
-    text_of = number_text(gt, value_axis, axis, fmt, "series.value_label.format")
     for a in [a for a in ax.texts if a.get_gid() == VALUE_LABEL]:
         a.remove()
     show, total = bool(gt["series.value_label.show"]), bool(gt["series.value_label.total.show"])
     if not (show or total):
-        return False
+        return False  # nothing is written, so no format is checked
+    fmt = gt["series.value_label.format"]
+    axis = ax.yaxis if value_axis == "y" else ax.xaxis
+    text_of = number_text(gt, value_axis, axis, fmt, "series.value_label.format", kind=kind)
     fig = ax.figure
     size = style.pt("series.value_label.size")
     gap = style.pt("series.value_label.gap")

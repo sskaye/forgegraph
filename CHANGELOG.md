@@ -2,6 +2,16 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
 
+## Unreleased
+
+### Changed
+
+- On a date value axis, what would draw nonsense is an error that says what to do: stacking (`series.aggregation` sum or percent), adding up rows (`axis.*.data.aggregation` sum), bars (`mark.bar.show`, which would start at 1970), and value labels without a date format. A reference line at a date column's aggregate is on a date axis only, at its mean, median, min or max, with multiplier 1. A date axis's `tick.label.format` must have a date directive.
+
+### Fixed
+
+- Dates and times draw the same on y as on x: every value placed on an axis (the data, its aggregates, stacks, reference lines, error bars and limits) becomes a number the same way, so a date y axis has date ticks, a reference line at a date column's aggregate lands on it, and error bars from a date column's spread are in days. With value labels off, a date `tick.label.format` such as `"%H:%M"` on y is no longer refused as a number format; value labels and a reference line's value on a date axis are written in a date format.
+
 ## 0.3.0 (2026-10-25)
 
 Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).

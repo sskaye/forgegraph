@@ -2,7 +2,8 @@
 
 - **reference_line**: a line across the plot at a value, or at multiplier times an aggregate of a
   column's drawn values (with per_series, one per named series, all its replicates
-  together, in its color). A line outside the data widens an automatic axis; outside a set
+  together, in its color). A date column's aggregate is a date, on a date axis only: its
+  mean, median, min or max. A line outside the data widens an automatic axis; outside a set
   limit, it's an error. Its label, placed after layout, sits at one end or the middle,
   beside the line: auto takes the first position (LABEL_ORDER) inside the plot and clear
   of the data and other text. A chosen position that covers something is an error; one
@@ -34,7 +35,7 @@ from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import labels, marks
-from forgegraph.drawing.axes import number_text
+from forgegraph.drawing.axes import number_text, numbers
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset
@@ -74,6 +75,7 @@ class RefLine:
     color: Any
     with_value: bool = False  # the value follows, in label.format (after layout)
     fmt: str = "auto"
+    kind: str = "decimal"  # its axis's type
 
 
 def t_quantile(p: float, df: int) -> float:
@@ -123,10 +125,36 @@ Y_VALUE = "__forgegraph_y__"  # the long-form frame's column of values along the
 
 
 def _each_row_once(frame: pd.DataFrame, column: str) -> np.ndarray:
-    """A column's values, one per data row: the long form repeats each row once per value
-    column it draws."""
+    """A column's values, one per data row, as they're drawn (axes.numbers): the long form
+    repeats each row once per value column it draws."""
     rows = frame.drop_duplicates(ROW)
-    return np.asarray(pd.to_numeric(rows[column], errors="coerce"), dtype=float)
+    return numbers(rows[column])
+
+
+DATE_AGGREGATES = ("mean", "median", "min", "max")  # those of dates that are dates
+
+
+def _check_column(where: str, layer: dict[str, Any], column: pd.Series, kind: str) -> None:
+    """A date column's aggregate marks a date: on a date axis, as mean, median, min or max, at
+    multiplier 1."""
+    if not pd.api.types.is_datetime64_any_dtype(column):
+        return
+    axis, how = layer["axis"], layer["aggregation.function"]
+    if kind != "date":
+        raise DrawError(
+            f"{where}.value: '{column.name}' is dates, but axis.{axis} is {kind}; use a column "
+            "of numbers"
+        )
+    if how not in DATE_AGGREGATES:
+        raise DrawError(
+            f"{where}.aggregation.function: {how} of dates isn't a date; use "
+            f"{', '.join(DATE_AGGREGATES)}"
+        )
+    multiplier = float(layer["aggregation.multiplier"])
+    if multiplier != 1:
+        raise DrawError(
+            f"{where}.aggregation.multiplier: {multiplier:g} times a date isn't a date; use 1"
+        )
 
 
 def reference_lines(
@@ -158,6 +186,7 @@ def reference_lines(
                 )
             if value not in frame.columns:
                 raise DrawError(f"{where}.value: no column '{value}' in the data")
+            _check_column(where, layer, cast(pd.Series, frame[value]), kinds[axis])
             if layer["per_series"]:  # each named series, with all its replicates
                 named: dict[tuple[bool, Any], list[Any]] = {}
                 for s in series:
@@ -198,6 +227,7 @@ def reference_lines(
                     line_color,
                     with_value,
                     str(layer["label.format"]),
+                    kinds[axis],
                 )
             )
     return drawn
@@ -259,7 +289,7 @@ def _line_text(ax: Axes, gt: dict[str, Any], line: RefLine) -> str:
     value is read more closely than the scale)."""
     axis = ax.xaxis if line.axis == "x" else ax.yaxis
     path = f"layers.{line.name}.label.format"
-    return number_text(gt, line.axis, axis, line.fmt, path, extra=1)(line.at)
+    return number_text(gt, line.axis, axis, line.fmt, path, extra=1, kind=line.kind)(line.at)
 
 
 def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style) -> bool:
@@ -361,7 +391,7 @@ def error_bars(
             )
         log = gt[f"axis.{axis}.scale"] == "log"
         for s in series:
-            centres = marks.numbers(s.y if along_value else s.x)
+            centres = numbers(s.y if along_value else s.x)
             distances = {}
             for end in ("lower", "upper"):
                 given = layer[f"value.{end}"]
@@ -387,7 +417,7 @@ def error_bars(
                 raise DrawError(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
                 )
-            places = marks.numbers(s.x if along_value else s.y)
+            places = numbers(s.x if along_value else s.y)
             shifted = marks.shifted(ax, roles.base, s.shifts)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
 
@@ -408,7 +438,7 @@ def _distances(
         return np.full(n, float(given))
     if given not in frame.columns:
         raise DrawError(f"{path}: no column '{given}' in the data")
-    column = cast(pd.Series, pd.to_numeric(frame[given], errors="coerce"))
+    column = pd.Series(numbers(frame[given]), index=frame.index)
     if aggregated:
         if unset(how):
             raise DrawError(
@@ -416,14 +446,9 @@ def _distances(
                 "value.aggregation.function"
             )
         rows = frame.loc[s.rows]
-        groups = rows.groupby(marks.numbers(rows[s.place_column]), sort=False)[given]
-        spreads = {
-            marks.key(k): spread(
-                np.asarray(pd.to_numeric(g, errors="coerce"), dtype=float), str(how)
-            )
-            for k, g in groups
-        }
-        out = np.array([multiplier * spreads.get(marks.key(p), np.nan) for p in marks.numbers(s.x)])
+        groups = rows.groupby(numbers(rows[s.place_column]), sort=False)[given]
+        spreads = {marks.key(k): spread(numbers(g), str(how)) for k, g in groups}
+        out = np.array([multiplier * spreads.get(marks.key(p), np.nan) for p in numbers(s.x)])
     else:
         out = np.asarray(column.loc[s.rows], dtype=float)
     if bool((out[np.isfinite(out)] < 0).any()):

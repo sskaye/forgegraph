@@ -12,4 +12,4 @@ parameters:          # The layer's parameters, which a GraphSpec's layers entry 
     label:
         text: None          # [None, aggregation, value, aggregation_value, text]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.
         position: auto          # [auto, start_above, start_below, center_above, center_below, end_above, end_below]; auto: the first clear one.
-        format: auto          # [auto, text]; Number format of the value, e.g. ".2f". auto: one decimal more than the axis's tick labels.
+        format: auto          # [auto, text]; Number format of the value, e.g. ".2f"; on a date axis, a date format, e.g. "%b %-d". auto: one decimal more than the axis's tick labels; on a date axis, its tick label format.

@@ -314,6 +314,11 @@ def _drawable_rows(
         raise DrawError(
             f"axis.{r.value}.data.aggregation: {aggregation}, but the axis is categorical"
         )
+    if aggregation == "sum" and kind[r.value] == "date":
+        raise DrawError(
+            f"axis.{r.value}.data.aggregation: sum adds the values, but axis.{r.value} is dates, "
+            "which can't be added; use mean, median, min or max"
+        )
     no_x = _col(frame, x).isna()
     no_y = _col(frame, Y_VALUE).isna()
     if bool(no_x.any()) or bool(no_y.any()):
@@ -327,7 +332,7 @@ def _drawable_rows(
         (f"axis.{r.value}", Y_VALUE, ", ".join(ys)),
     ):
         if gt[f"{axis}.scale"] == "log" and kind[axis[-1]] != "categorical":
-            values = np.asarray(pd.to_numeric(_col(frame, column), errors="coerce"), dtype=float)
+            values = axis_data.numbers(_col(frame, column))
             bad = values[values <= 0]  # missing values compare False and are left alone
             if len(bad):
                 raise DrawError(
@@ -472,9 +477,9 @@ def _series(
             rows = rows.sort_values(by=x, kind="stable")
         if aggregation != "none":  # one point per place: the aggregate of its rows
             points = rows.groupby(x, sort=False, dropna=False)[Y_VALUE].agg(aggregation)
-            xs, ys_ = np.asarray(points.index), np.asarray(points.to_numpy())
+            xs, ys_ = axis_data.numbers(points.index), axis_data.numbers(points)
         else:
-            xs, ys_ = np.asarray(_col(rows, x)), np.asarray(_col(rows, Y_VALUE))
+            xs, ys_ = axis_data.numbers(_col(rows, x)), axis_data.numbers(_col(rows, Y_VALUE))
         index = {
             path: (
                 orders[path].index(values[col])
@@ -559,7 +564,7 @@ def draw(
     drawn = Drawn()
     listed = listed or {}
     series, frame, r = build_series(df, gt, style, drawn)
-    marks.check(gt, r.value)
+    marks.check(gt, r.value, drawn.kinds[r.value])
     log_values = gt[f"axis.{r.value}.scale"] == "log"
     stacked = marks.stack(series, gt["series.aggregation"], log_values)
     for s, st in zip(series, stacked, strict=True):
@@ -641,7 +646,9 @@ def _draw_marks(
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)
-            paths.setdefault(s.label, []).append(np.c_[marks.numbers(px), marks.numbers(py)])
+            paths.setdefault(s.label, []).append(
+                np.c_[axis_data.numbers(px), axis_data.numbers(py)]
+            )
     groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
     return groups, norm
 
@@ -661,7 +668,7 @@ def _axes(
     ax.set_yscale(gt["axis.y.scale"])
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
         along = [np.asarray(_as_xy(r, s.x, s.y)[0 if name == "x" else 1]) for s in series]
-        values = marks.numbers(np.concatenate(along)) if along else np.array([])
+        values = axis_data.numbers(np.concatenate(along)) if along else np.array([])
         kind = drawn.kinds[name]
         axis_data.ticks_and_labels(ax, name, kind, gt, style, drawn.categories.get(name), values)
         if kind == "categorical":
@@ -723,7 +730,7 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     labels. True if an axis was widened, so the figure must be laid out again."""
     r = cast(Roles, drawn.roles)  # draw() set it
     marks.check_room(ax, drawn.series, gt, style, r.base)
-    widened = marks.value_labels(ax, drawn.series, gt, style, r.base)
+    widened = marks.value_labels(ax, drawn.series, gt, style, r.base, drawn.kinds[r.value])
     return layers.label_lines(ax, drawn.ref_lines, gt, style) or widened
 
 

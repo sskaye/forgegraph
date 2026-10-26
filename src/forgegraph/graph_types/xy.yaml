@@ -65,7 +65,7 @@ variable_parameters:          # List of variable parameters for the graph type, 
         value_label:
             show: false          # [true, false]; Write each value by its mark.
             position: auto          # [auto, inside, outside]; Inside a bar's end, beyond the mark, or inside where it fits.
-            format: auto          # [auto, text]; Number format, e.g. ",.0f". auto: as the value axis's tick labels.
+            format: auto          # [auto, text]; Number format, e.g. ",.0f"; on a date axis, a date format, e.g. "%H:%M". auto: as the value axis's tick labels.
             total:
                 show: false          # [true, false]; With aggregation sum, also write each stack's total.
     benchmark:

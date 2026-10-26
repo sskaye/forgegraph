@@ -37,7 +37,7 @@ from matplotlib.colors import to_rgb
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.drawing.axes import number_text, numbers
+from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
@@ -103,7 +103,7 @@ def check(gt: dict[str, Any], value_axis: str, kind: str) -> None:
     if gt["mark.bar.show"]:
         low = gt[f"axis.{value_axis}.min"]
         base = 1.0 if gt[f"axis.{value_axis}.scale"] == "log" else 0.0
-        if not unset(low) and float(low) > base:
+        if not unset(low) and on_axis(low, value_axis, kind, f"axis.{value_axis}.min") > base:
             raise DrawError(
                 f"axis.{value_axis}.min: bars start at {base:g}, so the axis must include it; "
                 "for a narrower range, draw markers instead"

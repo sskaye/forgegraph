@@ -1,13 +1,14 @@
 """The layers a GraphSpec lists (layers/*.yaml), drawn on a graph type's series.
 
-- **reference_line**: a line across the plot at a value, or at multiplier times an aggregate of a
-  column's drawn values (with per_series, one per named series, all its replicates
-  together, in its color). A date column's aggregate is a date, on a date axis only: its
-  mean, median, min or max. A line outside the data widens an automatic axis; outside a set
-  limit, it's an error. Its label, placed after layout, sits at one end or the middle,
-  beside the line: auto takes the first position (LABEL_ORDER) inside the plot and clear
-  of the data and other text. A chosen position that covers something is an error; one
-  past the plot's edge widens an automatic axis.
+- **reference_line**: a line across the plot at a value (on a date axis, a date or a day
+  number; text that reads as a date is a column only if one has that name), or at
+  multiplier times an aggregate of a column's drawn values (with per_series, one per named
+  series, all its replicates together, in its color). A date column's aggregate is a date,
+  on a date axis only: its mean, median, min or max. A line outside the data widens an
+  automatic axis; outside a set limit, it's an error. Its label, placed after layout, sits
+  at one end or the middle, beside the line: auto takes the first position (LABEL_ORDER)
+  inside the plot and clear of the data and other text. A chosen position that covers
+  something is an error; one past the plot's edge widens an automatic axis.
 - **error_bar**: a bar on each mark along an axis, a number or a column's distance below and
   above it. With the value axis aggregated (data.aggregation), the distances can be
   multiplier times the spread of the rows each mark stands for: their standard deviation, its
@@ -35,11 +36,12 @@ from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import labels, marks
-from forgegraph.drawing.axes import number_text, numbers
+from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import LINE_STYLES, Style, unset
 from forgegraph.drawing.text import measure
+from forgegraph.spec.parameters import as_date
 
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
@@ -178,7 +180,8 @@ def reference_lines(
         value, how = layer["value"], layer["aggregation.function"]
         multiplier = float(layer["aggregation.multiplier"])
         groups: list[tuple[float, str]] = []
-        if isinstance(value, str):
+        # text is a column, unless it reads as a date and no column has that name
+        if isinstance(value, str) and (value in frame.columns or as_date(value) is None):
             if unset(how):
                 raise DrawError(
                     f"{where}.value: a column, so set aggregation.function to say which of its "
@@ -203,7 +206,7 @@ def reference_lines(
                 raise DrawError(
                     f"{where}.aggregation.function: applies only when value is a column"
                 )
-            groups.append((float(value), ""))
+            groups.append((on_axis(value, axis, kinds[axis], f"{where}.value"), ""))
         ink = style.color("layer.reference_line.color")
         for at, color in groups:
             line_color = color or ink

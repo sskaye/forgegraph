@@ -14,8 +14,9 @@ RANGE lists the alternatives a value may take, separated by commas:
 
 - a number range `min-max`, inclusive;
 - a type word: text, int (a whole number, 0 or more), positive int, float, positive float,
-  hex color, hex colors (a list of one or more), two hex colors, column, columns, graph type,
-  theme, format, graphspec, layer type, layer types, layout, schedule, texts (a list of text),
+  date (a date, or a date and time: YAML's own, or ISO 8601 text; see as_date), hex color,
+  hex colors (a list of one or more), two hex colors, column, columns, graph type, theme,
+  format, graphspec, layer type, layer types, layout, schedule, texts (a list of text),
   positive floats (a list of them), text grid (a list of rows, each a list of text);
 - any other word is a literal value (None, true, auto, linear, ...).
 
@@ -28,6 +29,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date, datetime
 from functools import cache
 from importlib.resources import files
 from pathlib import Path
@@ -63,8 +65,8 @@ SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
 TYPE_WORDS = (
-    "text", "int", "positive int", "float", "positive float", "hex color", "hex colors",
-    "two hex colors",
+    "text", "int", "positive int", "float", "positive float", "date", "hex color",
+    "hex colors", "two hex colors",
     "column", "columns", "graph type", "theme", "format", "graphspec", "layer type",
     "layer types", "layout", "schedule", "texts", "positive floats", "text grid",
 )  # fmt: skip
@@ -90,6 +92,9 @@ WHOLE_LISTS = ("text grid",)  # a list checked as a whole, even where the defini
 
 _INTERVAL = re.compile(r"^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$")
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
+_ISO_DATE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$"
+)
 _COMMENT = re.compile(r"^#\s*\[(?P<range>[^\]]*)\];\s*(?P<description>.*)$")
 _TYPE_TEXT = {
     "text": "text",
@@ -97,6 +102,7 @@ _TYPE_TEXT = {
     "positive int": "a whole number above 0",
     "float": "a number",
     "positive float": "a number above 0",
+    "date": 'a date, e.g. 2025-08-25 or "2025-08-25T06:00"',
     "hex color": "a hex color code such as #4C78A8",
     "hex colors": "a list of hex color codes",
     "two hex colors": "a list of two hex color codes",
@@ -197,6 +203,23 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def as_date(value: Any) -> datetime | None:
+    """A value of the date type as the date and time it stands for: a date, or a date and time
+    (as YAML reads 2025-08-25 or 2025-08-25 06:00:00), or ISO 8601 text of one ("2025-08-25",
+    "2025-08-25T06:00"); None for anything else. A time with a zone is at the time its clock
+    shows, as the data's are."""
+    if isinstance(value, str) and _ISO_DATE.match(value.strip()):
+        try:
+            value = datetime.fromisoformat(value.strip())
+        except ValueError:  # e.g. 2025-02-30
+            return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day)
+    return None
+
+
 def check_value(value: Any, rng: Range, names: dict[str, set[str]] | None = None) -> str | None:
     """Return why `value` is outside `rng`, or None if it's inside."""
     names = names or {}
@@ -222,6 +245,8 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
             return _is_number(value)
         case "positive float":
             return _is_number(value) and value > 0
+        case "date":
+            return as_date(value) is not None
         case "hex color":
             return isinstance(value, str) and bool(_HEX.match(value))
         case "hex colors":

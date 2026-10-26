@@ -13,7 +13,8 @@
   ("2 week"). Ticks from all and manual are never thinned. Labels that run together
   are an error with any algorithm (check_fit).
 - **Dates** on either axis are drawn at matplotlib's day numbers (numbers): the data, its
-  aggregates, layers' values and limits all become numbers the same way, on x as on y.
+  aggregates, layers' values and limits all become numbers the same way, on x as on y. A
+  spec's limit or line value may be a date on a date axis (on_axis), or a day number.
 - **Date ticks and labels** are on one calendar unit's boundaries and written at that unit
   (forgegraph.drawing.dates).
 - **Labels** (tick.label.format): auto, or a Python format spec for numbers (",.0f") or a
@@ -50,7 +51,7 @@ from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style
 from forgegraph.drawing.ticks import LogStep, LogTicks, NiceTicks
-from forgegraph.spec.parameters import STEP
+from forgegraph.spec.parameters import STEP, as_date
 
 
 def natural(value: Any) -> tuple:
@@ -111,6 +112,22 @@ def numbers(values: Any) -> np.ndarray:
     if pd.api.types.is_datetime64_any_dtype(column):
         return np.asarray(date2num(column.to_numpy()), dtype=float)
     return np.asarray(pd.to_numeric(column, errors="coerce"), dtype=float)
+
+
+def value_number(value: Any) -> float:
+    """A number or a date (the date type: spec.parameters.as_date) a spec gives, as the number
+    it's drawn at: a date by numbers, as the data's are; a number as it is, which on a date
+    axis is a day number."""
+    when = as_date(value)
+    return float(value) if when is None else float(numbers([when])[0])
+
+
+def on_axis(value: Any, name: str, kind: str, path: str) -> float:
+    """value_number of a value a spec gives on axis name, of type kind: a date is for a date
+    axis only."""
+    if kind != "date" and as_date(value) is not None:
+        raise DrawError(f"{path}: {value} is a date, but axis.{name} is {kind}; give a number")
+    return value_number(value)
 
 
 def reads_as_dates(values: pd.Series) -> bool:

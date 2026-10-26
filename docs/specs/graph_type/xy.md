@@ -23,8 +23,8 @@ variable_parameters:          *# List of variable parameters for the g
                     direction: ascending          *# \[ascending, descending\]; The category order's direction.*\
             title: column_name          *# \[None, column_name, text\]; Axis title. column_name: the column's name. None: none.*\
             scale: linear          *# \[linear, log\]; Axis scale.*\
-            min: None          *# \[None, float\]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.*\
-            max: None          *# \[None, float\]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.*\
+            min: None          *# \[None, float, date\]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.margin × the data's range.*\
+            max: None          *# \[None, float, date\]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
                 step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
@@ -40,8 +40,8 @@ variable_parameters:          *# List of variable parameters for the g
                     direction: ascending          *# \[ascending, descending\]; The category order's direction.*\
             title: column_name          *# \[None, column_name, text\]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.*\
             scale: linear          *# \[linear, log\]; Axis scale.*\
-            min: None          *# \[None, float\]; Axis minimum. None: the lowest value, less plot_area.margin × the data's range.*\
-            max: None          *# \[None, float\]; Axis maximum. None: the highest value, plus plot_area.margin × the data's range.*\
+            min: None          *# \[None, float, date\]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.margin × the data's range.*\
+            max: None          *# \[None, float, date\]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
                 step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
@@ -74,7 +74,7 @@ variable_parameters:          *# List of variable parameters for the g
                 show: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
     benchmark:\
         data_column: None          *# \[None, column_name, column\]; Column marking the benchmark. column_name: a y column. None: no benchmark.*\
-        value: None          *# \[None, text, float\]; The benchmark's value in data_column (for column_name, a y column's name), drawn in series.benchmark style. Set with data_column.*\
+        value: None          *# \[None, text, float, date\]; The benchmark's value in data_column (for column_name, a y column's name; for a date column, a date), drawn in series.benchmark style. Set with data_column.*\
         side: start          *# \[start, end\]; Where the benchmark goes on a categorical axis it's a value of: before the other categories or after them.*\
     mark:\
         line:\

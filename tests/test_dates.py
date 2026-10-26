@@ -5,8 +5,8 @@ on y; and what can't be drawn on a date axis is an error."""
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import date, datetime, timedelta
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -14,9 +14,12 @@ import pytest
 from matplotlib.dates import date2num
 
 import forgegraph as fg
+from forgegraph.drawing import export
 from forgegraph.drawing.axes import numbers
 from forgegraph.drawing.layers import ERROR_BAR, REFERENCE
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
+from forgegraph.spec.parameters import as_date
+from forgegraph.spec.validate import validate
 
 TIMES = [datetime(2000, 1, 1, 21) + timedelta(minutes=20 * i) for i in range(4)]
 DATA = pd.DataFrame({"n": [1.0, 2.0, 3.0, 4.0], "t": TIMES, "g": ["a", "a", "b", "b"]})
@@ -310,3 +313,152 @@ def test_lint_counts_dates_outside_a_limit_on_either_axis(on):
     g = graph(on, **{f"axis.{on}.max": float(DAYS[1]) + 0.001})
     [issue] = [i for i in g.issues if i.check == "outside-limits"]
     assert issue.message.startswith(f"2 above axis.{on}.max")
+
+
+# --- dates a spec gives (the date type) -------------------------------------------------------
+
+DATE_FORMS = [
+    pytest.param(date(2000, 1, 1), id="YAML date"),
+    pytest.param(datetime(2000, 1, 1, 20, 30), id="YAML date and time"),
+    pytest.param("2000-01-01", id="text date"),
+    pytest.param("2000-01-01T20:30", id="text date and time"),
+    pytest.param("2000-01-01T20:30+05:00", id="text with a zone, at its clock time"),
+]
+
+
+def _day(value: Any) -> float:
+    return float(date2num(as_date(value)))
+
+
+def _pixels(g: fg.Graph) -> bytes:
+    canvas = g.figure.canvas
+    canvas.draw()
+    return bytes(canvas.buffer_rgba())  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ("on", "value"),
+    [pytest.param("x", *f.values, id=f"x-{f.id}") for f in DATE_FORMS]
+    + [pytest.param("y", *f.values, id=f"y-{f.id}") for f in DATE_FORMS[1::2]],  # y: from 20:30
+)
+def test_a_date_limit_draws_exactly_as_its_day_number_does(on, value):
+    high = float(DAYS[-1]) + 0.05
+    dated = graph(on, **{f"axis.{on}.min": value, f"axis.{on}.max": high})
+    numbered = graph(on, **{f"axis.{on}.min": _day(value), f"axis.{on}.max": high})
+    limits = dated.axes.get_xlim() if on == "x" else dated.axes.get_ylim()
+    assert limits[0] == _day(value)
+    assert _pixels(dated) == _pixels(numbered)
+
+
+@pytest.mark.parametrize("value", DATE_FORMS)
+def test_a_date_on_a_number_axis_is_an_error(value):
+    with pytest.raises(
+        fg.SpecError, match=re.escape(f"axis.y.min: {value} is a date, but axis.y is decimal")
+    ):
+        graph("x", **{"axis.y.min": value})
+
+
+def test_number_limits_on_a_number_axis_still_work():
+    g = graph("x", **{"axis.y.min": 0, "axis.y.max": 10})
+    assert g.axes.get_ylim() == (0, 10)
+
+
+def test_lint_counts_points_outside_a_date_limit():
+    g = graph("x", **{"axis.x.max": "2000-01-01T21:30"})
+    [issue] = [i for i in g.issues if i.check == "outside-limits"]
+    assert issue.message.startswith("2 above axis.x.max")
+
+
+@pytest.mark.parametrize(
+    ("low", "high"),
+    [("2000-01-02", "2000-01-01"), (date(2000, 1, 2), date(2000, 1, 2)), ("2000-01-02", 10956.0)],
+)
+def test_a_date_min_must_be_below_the_max(low, high):
+    settings = {"axis.x.data.column": "t", "axis.y.data.column": "n"}
+    doc = fg.graphspec("t", "xy", settings={**settings, "axis.x.min": low, "axis.x.max": high})
+    message = f"axis.x.min: must be below axis.x.max ({low} is not below {high})"
+    assert any(message in p for p in validate("graphspec", doc))
+
+
+@pytest.mark.parametrize("on", AXES)
+@pytest.mark.parametrize("value", DATE_FORMS)
+def test_a_reference_line_at_a_date(on, value):
+    g = graph(on, {"r": {"type": "reference_line", "axis": on, "value": value}})
+    assert _line_at(g, on) == pytest.approx(_day(value))
+
+
+def test_text_that_names_a_column_is_the_column_even_if_it_reads_as_a_date():
+    df = DATA.assign(**{"2000-01-01": DATA["t"]})
+    layer = {
+        "type": "reference_line",
+        "axis": "y",
+        "value": "2000-01-01",
+        "aggregation": {"function": "max"},
+    }
+    g = graph("y", {"r": layer}, df)
+    assert _line_at(g, "y") == pytest.approx(DAYS[-1])
+
+
+def test_a_reference_line_at_a_date_on_a_number_axis_is_an_error():
+    layer = {"type": "reference_line", "axis": "y", "value": "2000-01-01"}
+    with pytest.raises(
+        fg.SpecError, match=re.escape("layers.r.value: 2000-01-01 is a date, but axis.y is decimal")
+    ):
+        graph("x", {"r": layer})
+
+
+@pytest.mark.parametrize("value", [TIMES[2], "2000-01-01T21:40", float(DAYS[2])])
+def test_a_benchmark_in_a_date_column(value):
+    g = graph("x", **{"benchmark.data_column": "t", "benchmark.value": value})
+    ink = g.style.color("series.benchmark.color")
+    [mark] = [ln for ln in lines(g) if ln.get_color() == ink]
+    assert along("x", mark.get_xydata()) == pytest.approx([DAYS[2]])
+
+
+def test_a_benchmark_date_that_isnt_in_the_column_is_an_error():
+    with pytest.raises(fg.SpecError, match=re.escape("benchmark.value: no rows where t is")):
+        graph("x", **{"benchmark.data_column": "t", "benchmark.value": "1999-01-01"})
+
+
+def test_a_benchmark_date_for_a_text_column_is_an_error():
+    with pytest.raises(
+        fg.SpecError,
+        match=re.escape("benchmark.value: 2000-01-01 is a date, but benchmark.data_column g isn't"),
+    ):
+        graph("x", **{"benchmark.data_column": "g", "benchmark.value": date(2000, 1, 1)})
+
+
+def test_a_benchmark_keeps_its_side_on_a_categorical_date_axis():
+    settings = {
+        "axis.x.data.type": "categorical",
+        "axis.x.tick.algorithm": "all",
+        "axis.x.tick.label.format": "%H:%M",
+        "benchmark.data_column": "t",
+        "benchmark.value": "2000-01-01T21:20",
+        "benchmark.side": "end",
+    }
+    assert labels(graph("x", **settings), "x") == ["21:00", "21:40", "22:00", "21:20"]
+
+
+def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
+    (tmp_path / "dated.yaml").write_text(
+        "name: dated\nversion: 0\ndescription: d\nextends: None\nfixed_parameters: None\n"
+        "variable_parameters:\n"
+        "    specifications: {graph_type: xy, theme: forgegraph_base/base_theme, "
+        "format: forgegraph_base/base_format}\n"
+        "    text: {title: None}\n"
+        "    data: {file: None, preprocessing: None}\n"
+        "    axis:\n"
+        "        x: {data: {column: t}, min: 2000-01-01 20:30:00, max: '2000-01-01T22:30'}\n"
+        "        y: {data: {column: n}}\n"
+        "    layers:\n"
+        "        r: {type: reference_line, axis: x, value: 2000-01-01 21:10:00}\n",
+        encoding="utf-8",
+    )
+    g = fg.render(tmp_path / "dated.yaml", DATA)
+    assert g.axes.get_xlim() == (_day("2000-01-01T20:30"), _day("2000-01-01T22:30"))
+    assert _line_at(g, "x") == pytest.approx(_day("2000-01-01T21:10"))
+    [saved] = g.save(tmp_path / "dated.png")
+    written = cast(dict[str, Any], export.read(saved))  # its full provenance record
+    assert written["graphspec"]["variable_parameters"]["axis"]["x"]["min"] == "2000-01-01T20:30:00"
+    assert written["resolved"]["graph_type"]["axis.x.max"] == "2000-01-01T22:30"

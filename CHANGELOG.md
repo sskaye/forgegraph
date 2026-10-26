@@ -6,6 +6,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ### Changed
 
+- A range type `date`: a date, or a date and time, as YAML's bare date (`2025-08-25`, `2025-08-25 06:00:00`) or ISO 8601 text (`"2025-08-25T06:00"`); a time with a zone is at its clock time, as the data's are. `axis.x.min`, `axis.x.max`, `axis.y.min` and `axis.y.max`, a reference line's `value` and `benchmark.value` take it: on a datetime axis or column, a date is drawn exactly where its day number is, and numbers keep working as day numbers. A date on an axis that isn't dates is an error naming the axis's type. Text that reads as a date is a reference line's column only if the data has a column of that name. Provenance records write dates as ISO 8601 text.
 - On a date value axis, what would draw nonsense is an error that says what to do: stacking (`series.aggregation` sum or percent), adding up rows (`axis.*.data.aggregation` sum), bars (`mark.bar.show`, which would start at 1970), and value labels without a date format. A reference line at a date column's aggregate is on a date axis only, at its mean, median, min or max, with multiplier 1. A date axis's `tick.label.format` must have a date directive.
 
 ### Fixed

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, cast
 
 import numpy as np
@@ -30,6 +31,7 @@ from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
+from forgegraph.spec.parameters import as_date
 
 Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
 COLUMN_NAME = "column_name"
@@ -374,8 +376,7 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     how = gt["encoding.order"]
     is_bench = pd.Series(False, index=frame.index)
     if bench_col is not None:
-        column = _col(frame, bench_col)
-        is_bench = (column.astype(str) == str(bench_value)) | (column == bench_value)
+        is_bench = _is_benchmark(_col(frame, bench_col), bench_value)
     if bench_col is not None and not bool(is_bench.any()):
         where = "no y column is named" if bench_col == Y_COLUMN else f"no rows where {bench_col} is"
         raise DrawError(f"benchmark.value: {where} '{bench_value}'")
@@ -407,6 +408,24 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
         grouping,
         choices,
     )
+
+
+def _is_benchmark(values: pd.Series, value: Any) -> pd.Series:
+    """Which of a column's values are benchmark.value: in a date column, a date or day number
+    drawn at the same place (axes.numbers); otherwise the value as written, or as text. A
+    date for a column that isn't dates is an error."""
+    if pd.api.types.is_datetime64_any_dtype(values):
+        if isinstance(value, str) and as_date(value) is None:
+            return pd.Series(False, index=values.index)
+        at = axis_data.value_number(value)
+        return pd.Series(axis_data.numbers(values) == at, index=values.index)
+    if isinstance(value, date):  # YAML's date, not text
+        name = "column_name (the y columns' names)" if values.name == Y_COLUMN else values.name
+        raise DrawError(
+            f"benchmark.value: {value} is a date, but benchmark.data_column {name} isn't dates; "
+            "quote it to match text"
+        )
+    return (values.astype(str) == str(value)) | (values == value)
 
 
 def _category_positions(
@@ -446,7 +465,8 @@ def _category_positions(
                 _col(frame, column), method, gt[f"axis.{name}.data.order.direction"]
             )
         if bench_col is not None and bench_col == column:  # the benchmark: its own side
-            bench = [c for c in cats if str(c) == str(bench_value) or c == bench_value]
+            marked = _is_benchmark(pd.Series(cats), bench_value).tolist()
+            bench = [c for c, b in zip(cats, marked, strict=True) if b]
             rest = [c for c in cats if c not in bench]
             cats = bench + rest if gt["benchmark.side"] == "start" else rest + bench
         drawn.categories[name] = cats
@@ -681,7 +701,7 @@ def _axes(
             (ax.set_xlim if name == "x" else ax.set_ylim)(-0.5, n - 0.5)
         else:
             ticks.minor_ticks(axis, style)
-    _limits(ax, gt)
+    _limits(ax, gt, drawn.kinds)
     if bool(gt["mark.bar.show"]) and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
         floor = 1.0 if gt[f"axis.{r.value}.scale"] == "log" else 0.0
         get = ax.get_ylim if r.value == "y" else ax.get_xlim
@@ -858,15 +878,19 @@ def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[S
     return found
 
 
-def _limits(ax: Axes, gt: dict[str, Any]) -> None:
+def _limits(ax: Axes, gt: dict[str, Any], kinds: dict[str, str]) -> None:
+    """Each axis's set min and max: numbers, or dates on a date axis (axes.on_axis)."""
     for axis in ("x", "y"):
         lo, hi = gt[f"axis.{axis}.min"], gt[f"axis.{axis}.max"]
         if unset(lo) and unset(hi):
             continue
         get = ax.get_xlim if axis == "x" else ax.get_ylim
         put = ax.set_xlim if axis == "x" else ax.set_ylim
-        cur_lo, cur_hi = get()
-        put(cur_lo if unset(lo) else float(lo), cur_hi if unset(hi) else float(hi))
+        at = [
+            now if unset(v) else axis_data.on_axis(v, axis, kinds[axis], f"axis.{axis}.{end}")
+            for end, v, now in zip(("min", "max"), (lo, hi), get(), strict=True)
+        ]
+        put(*at)
 
 
 def _box_and_ticks(ax: Axes, style: Style) -> None:

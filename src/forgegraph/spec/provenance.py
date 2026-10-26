@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import copy
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from pydantic import Field
@@ -69,14 +69,14 @@ def created() -> str:
 
 def record(level: Literal["full", "minimal"], **fields: Any) -> dict[str, Any]:
     """The provenance record saved files carry, at a level: ForgeGraph's version, when it
-    was made, and the fields given."""
+    was made, and the fields given, as plain values."""
     made = ProvenanceRecord(
         provenance_level=level,
         forgegraph_version=__version__,
         created=created(),
         **fields,
     )
-    return made.model_dump(exclude_none=True)
+    return plain(made.model_dump(exclude_none=True))
 
 
 def graph_fields(
@@ -93,14 +93,15 @@ def graph_fields(
 
 
 def plain(value: Any) -> Any:
-    """Values as plain Python: NumPy scalars as Python numbers, inside dicts and lists too."""
+    """Values as plain Python, as JSON writes them: NumPy scalars as Python numbers, and dates
+    (YAML's, in a spec) as ISO 8601 text, inside dicts and lists too."""
     if isinstance(value, dict):
         return {k: plain(v) for k, v in value.items()}
     if isinstance(value, list):
         return [plain(v) for v in value]
     if hasattr(value, "item"):
-        return value.item()
-    return value
+        value = value.item()
+    return value.isoformat() if isinstance(value, date) else value
 
 
 def recorded(spec: dict[str, Any], full: bool) -> dict[str, Any]:

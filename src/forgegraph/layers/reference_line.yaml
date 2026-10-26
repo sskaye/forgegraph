@@ -4,7 +4,7 @@ description: A horizontal or vertical line at a value or a column's aggregate, w
 
 parameters:          # The layer's parameters, which a GraphSpec's layers entry sets after its type.
     axis: None          # [x, y]; Axis the value is on: y draws a horizontal line. A GraphSpec must set it.
-    value: None          # [float, column]; The line's value, or a column to aggregate. A GraphSpec must set it.
+    value: None          # [float, date, column]; The line's value, or a column to aggregate. On a datetime axis, a date, e.g. 2025-08-25. A GraphSpec must set it.
     aggregation:          # With a column: the line is at multiplier × the column's aggregate.
         function: None          # [None, mean, median, sum, min, max, stddev]; The aggregate. None: value is a number.
         multiplier: 1          # [float]; What the aggregate is multiplied by, e.g. 2 for twice the stddev.

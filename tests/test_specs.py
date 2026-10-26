@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import re
+from datetime import date, datetime
 
 import pytest
 from pack_helpers import doc
@@ -211,6 +212,10 @@ SAMPLES = {
     "positive int": ([1, 300], [0, -2, 2.5]),
     "float": ([-3.5, 0], ["3"]),
     "positive float": ([0.001, 1.15, 40], [0, -0.1, "1"]),
+    "date": (
+        [date(2025, 8, 25), datetime(2025, 8, 25, 6), "2025-08-25", "2025-08-25T06:00"],
+        ["25/08/2025", "2025-02-30", "2025-08-25T6:00", 20325, True],
+    ),
     "hex color": (["#4C78A8", "#4C78A880"], ["blue", "#4C78A"]),
     "hex colors": ([["#4C78A8"], ["#4C78A8", "#000000"]], ["#4C78A8", [], ["#4C78A8", "blue"]]),
     "two hex colors": ([["#FFFFFF", "#000000"]], [["#FFFFFF"], ["#FFFFFF", "#000000", "#111111"]]),

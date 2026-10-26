@@ -25,7 +25,7 @@ from forgegraph.drawing import xy
 from forgegraph.drawing.export import FILE_TYPES, IMAGES
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.key import KEY, keys
-from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.style import LINE_STYLES, Style, isolated
 from forgegraph.drawing.text import footprint
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
 from forgegraph.spec.parameters import NONE
@@ -796,7 +796,10 @@ def test_impossible_drawings_are_errors_not_fallbacks():
     }
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("legend.method: key doesn't fit this graph; use auto, or direct"),
+        match=re.escape(
+            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
+            "is taken or covers data; use auto, or direct"
+        ),
     ):
         render({**scatter, "legend.method": "key"}, theme=no_margin, data=board)
     with pytest.raises(
@@ -872,6 +875,68 @@ def test_the_style_keys_drawn_are_reported():
     g = render(BANDED, data=_banded())
     assert g.labelling == "none" and g.style_keys == ["band"]
     assert render({**BANDED, "encoding.line.style.column": NONE}, data=_banded()).style_keys == []
+
+
+# A delivered median, two percentile bands' edges, and the programmed schedule as the
+# benchmark, the line style set by the same column (issue 23); each at its own height.
+BASAL_Y = {"Delivered": 5.0, "Programmed": 5.5, "25-75%": (4.0, 6.0), "10-90%": (3.0, 7.0)}
+BASAL = {
+    "axis.x.data.column": "x",
+    "axis.y.data.column": "y",
+    "encoding.color.column": NONE,
+    "encoding.line.style.column": "basal",
+    "encoding.detail.column": "edge",
+    "encoding.order": "data",
+    "benchmark.data_column": "basal",
+    "benchmark.value": "Programmed",
+    "mark.marker.show": False,
+}
+
+
+def _basal() -> pd.DataFrame:
+    rows = []
+    for x in range(4):
+        for basal, y in BASAL_Y.items():
+            edges = {"lo": y[0], "hi": y[1]} if isinstance(y, tuple) else {"mid": y}
+            rows += [{"x": x, "basal": basal, "edge": e, "y": v} for e, v in edges.items()]
+    return pd.DataFrame(rows)
+
+
+def test_a_style_key_matches_the_drawing_and_leaves_the_benchmark_to_the_labelling():
+    outside = {"legend.key.positions": ["right_top"], "legend.key.inside": False}
+    g = render({**BASAL, **outside, "legend.method": "direct"}, data=_basal())
+    [key] = [k for k in keys(g.axes) if k.title == "basal"]
+    sampled = {e.name: cast(Line2D, e.handle).get_linestyle() for e in key.entries}
+    assert list(sampled) == ["Delivered", "25-75%", "10-90%"]  # no sample for the benchmark
+    at = {v: name for name, y in BASAL_Y.items() for v in np.atleast_1d(y)}
+    drawn = {
+        at[float(np.asarray(ln.get_ydata(), dtype=float)[0])]: ln.get_linestyle()
+        for ln in g.axes.get_lines()
+        if ln.get_gid() != KEY and np.size(ln.get_xdata()) > 1
+    }
+    assert {name: drawn[name] for name in sampled} == sampled
+    assert drawn["Programmed"] == LINE_STYLES[g.style.theme["series.benchmark.line.style"]]
+    assert g.labelling == "direct"  # names the benchmark, once
+    assert [t.get_text() for t in g.axes.texts if t.get_text() == "Programmed"] == ["Programmed"]
+
+
+def test_a_key_that_doesnt_fit_says_why():
+    with pytest.raises(
+        fg.SpecError,
+        match=re.escape(
+            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
+            "is taken or covers data (the style key for basal took right_top)"
+        ),
+    ):
+        render(
+            {
+                **BASAL,
+                "legend.method": "key",
+                "legend.key.positions": ["right_top"],
+                "legend.key.inside": False,
+            },
+            data=_basal(),
+        )
 
 
 def test_each_y_column_is_its_own_line():

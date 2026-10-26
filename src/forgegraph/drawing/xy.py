@@ -247,9 +247,11 @@ def _cycle(items: list[Any], i: int) -> Any:
 
 def build_series(
     df: pd.DataFrame, gt: dict[str, Any], style: Style, drawn: Drawn
-) -> tuple[list[Series], pd.DataFrame, Roles]:
+) -> tuple[list[Series], pd.DataFrame, Roles, _Encodings]:
     """The series to draw, in base and value terms: each Series' x is along the base axis and
-    its y along the value axis (series.base_axis); categories are at their positions."""
+    its y along the value axis (series.base_axis); categories are at their positions. With
+    them, the frame they're drawn from, the axes' roles, and how the rows were grouped and
+    styled."""
     frame, r = long_form(df, gt)
     kind = _kinds(frame, r, gt, drawn)
     frame = _drawable_rows(frame, r, gt, kind, drawn)
@@ -257,7 +259,7 @@ def build_series(
     frame = _category_positions(frame, r, gt, kind, enc, drawn)
     series = _series(frame, r, gt, style, enc)
     _group_warnings(enc, drawn)
-    return series, frame, r
+    return series, frame, r, enc
 
 
 @dataclass
@@ -563,7 +565,7 @@ def draw(
     GraphSpec's layers (`listed`, by name)."""
     drawn = Drawn()
     listed = listed or {}
-    series, frame, r = build_series(df, gt, style, drawn)
+    series, frame, r, enc = build_series(df, gt, style, drawn)
     marks.check(gt, r.value)
     log_values = gt[f"axis.{r.value}.scale"] == "log"
     stacked = marks.stack(series, gt["series.aggregation"], log_values)
@@ -577,7 +579,7 @@ def draw(
     _axes(ax, series, lines, gt, style, drawn, r)
     drawn.y_title = _decorate(ax, gt, style, r, title, norm)
     drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = series, r, lines, listed
-    drawn.style_keys = _style_keys(gt, frame, style)
+    drawn.style_keys = _style_keys(gt, enc, style)
     layers.notes_outside(ax, listed, style)
     return drawn
 
@@ -830,14 +832,24 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             "series, or set axis.x.min/max or axis.y.min/max to leave room for it"
         )
     )
-    raise DrawError(f"legend.method: {method} doesn't fit this graph; {hint}")
+    why = ""
+    if method == "key":  # the style keys placed first may have taken the free positions
+        took = ", ".join(
+            f"the style key for {k.named} took {key.position}"
+            for k, key in zip(drawn.style_keys, taken, strict=True)
+        )
+        why = ": every position in legend.key.positions is taken or covers data" + (
+            f" ({took})" if took else ""
+        )
+    raise DrawError(f"legend.method: {method} doesn't fit this graph{why}; {hint}")
 
 
-def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[StyleKey]:
+def _style_keys(gt: dict[str, Any], enc: _Encodings, style: Style) -> list[StyleKey]:
     """Keys explaining line styles, marker shapes and fills set by an encoding other than
     encoding.color.column: one per styling column, titled by legend.key.title.text. Their
-    samples are in the one series color, or with a color encoding in font.color, neutral
-    among the colors."""
+    entries are the groups the series were styled by (enc.orders), so not the benchmark,
+    which has its own style and is named by legend.method. Their samples are in the one
+    series color, or with a color encoding in font.color, neutral among the colors."""
     styled = {
         d.by: gt[d.encoding_path]
         for d in DIMENSIONS
@@ -851,10 +863,8 @@ def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[S
     found = []
     for column in dict.fromkeys(styled.values()):
         bys = [b for b, c in styled.items() if c == column]
-        source = Y_COLUMN if column == COLUMN_NAME else column
-        values = _order(_col(frame, source), gt["encoding.order"])
         entries = []
-        for i, value in enumerate(values):
+        for i, value in enumerate(enc.orders[bys[0]]):
             ls, mk, fill = (_cycle(choices[b], i if b in bys else 0) for b in choices)
             handle = Line2D(
                 [],
@@ -868,7 +878,8 @@ def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[S
             )
             entries.append(Entry(literal(str(value)), handle))
         title = _title(gt["legend.key.title.text"], None if column == COLUMN_NAME else str(column))
-        found.append(StyleKey(entries, title, str(column)))
+        if entries:  # none when every row is the benchmark's
+            found.append(StyleKey(entries, title, str(column)))
     return found
 
 

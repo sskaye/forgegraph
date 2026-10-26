@@ -36,6 +36,7 @@ from forgegraph.spec.parameters import (
     SECTIONS,
     STEP,
     Parameter,
+    as_date,
     categories,
     check_parameter,
     check_value,
@@ -281,8 +282,12 @@ def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
             )
         lo, hi = v.get(f"{axis}.min"), v.get(f"{axis}.max")
         numbers = [x for x in (lo, hi) if isinstance(x, int | float) and not isinstance(x, bool)]
-        if len(numbers) == 2 and numbers[0] >= numbers[1]:
-            errors.append(f"{axis}.min: must be below {axis}.max ({lo} is not below {hi})")
+        ends = [x for x in (lo, hi) if x in numbers or as_date(x) is not None]
+        if len(ends) == 2:
+            from forgegraph.drawing.axes import value_number  # as drawn: dates as day numbers
+
+            if value_number(lo) >= value_number(hi):
+                errors.append(f"{axis}.min: must be below {axis}.max ({lo} is not below {hi})")
         if v.get(f"{axis}.scale") == "log":
             for end, value in (("min", lo), ("max", hi)):
                 if value in numbers and value <= 0:

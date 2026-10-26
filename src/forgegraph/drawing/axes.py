@@ -12,10 +12,14 @@
   factor on a log axis (10: 10, 100, 1000), or a count and a unit on a date axis
   ("2 week"). Ticks from all and manual are never thinned. Labels that run together
   are an error with any algorithm (check_fit).
+- **Dates** on either axis are drawn at matplotlib's day numbers (numbers): the data, its
+  aggregates, layers' values and limits all become numbers the same way, on x as on y. A
+  spec's limit or line value may be a date on a date axis (on_axis), or a day number.
 - **Date ticks and labels** are on one calendar unit's boundaries and written at that unit
   (forgegraph.drawing.dates).
 - **Labels** (tick.label.format): auto, or a Python format spec for numbers (",.0f") or a
-  strftime format for dates ("%b %Y"; see forgegraph.drawing.dates).
+  strftime format for dates ("%b %Y"; see forgegraph.drawing.dates). A value written beside a
+  mark or a line (number_text) is in the same kind of format: a date on a date axis.
 - **The theme** rotates x-axis tick labels (axis.tick.label.x_rotation) and lets a label that's
   wider than the space between its neighbours wrap onto up to max_wrap more lines.
 """
@@ -24,13 +28,14 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime
+from datetime import date, datetime
 from itertools import pairwise
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.dates import date2num, num2date
 from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator
 
@@ -47,7 +52,7 @@ from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style
 from forgegraph.drawing.ticks import LogStep, LogTicks, NiceTicks
-from forgegraph.spec.parameters import STEP
+from forgegraph.spec.parameters import STEP, as_date
 
 
 def natural(value: Any) -> tuple:
@@ -91,6 +96,41 @@ def data_type(values: pd.Series, setting: str, path: str, column: str) -> str:
     return setting
 
 
+def numbers(values: Any) -> np.ndarray:
+    """Values as the numbers they're drawn at, on either axis: dates and times as matplotlib's
+    day numbers, at the time their clocks show (a time zone is dropped, as the data's is);
+    anything else as a number, or missing if it isn't one. Every value placed on an axis comes
+    through here: the data, aggregates, layers' values and limits."""
+    column = values if isinstance(values, pd.Series) else pd.Series(np.asarray(values).ravel())
+    if (
+        column.dtype == object
+        and len(column.dropna())
+        and all(isinstance(v, datetime | date) for v in column.dropna())
+    ):
+        column = pd.Series(pd.to_datetime(column.to_numpy()))
+    if isinstance(column.dtype, pd.DatetimeTZDtype):
+        column = column.dt.tz_localize(None)
+    if pd.api.types.is_datetime64_any_dtype(column):
+        return np.asarray(date2num(column.to_numpy()), dtype=float)
+    return np.asarray(pd.to_numeric(column, errors="coerce"), dtype=float)
+
+
+def value_number(value: Any) -> float:
+    """A number or a date (the date type: spec.parameters.as_date) a spec gives, as the number
+    it's drawn at: a date by numbers, as the data's are; a number as it is, which on a date
+    axis is a day number."""
+    when = as_date(value)
+    return float(value) if when is None else float(numbers([when])[0])
+
+
+def on_axis(value: Any, name: str, kind: str, path: str) -> float:
+    """value_number of a value a spec gives on axis name, of type kind: a date is for a date
+    axis only."""
+    if kind != "date" and as_date(value) is not None:
+        raise DrawError(f"{path}: {value} is a date, but axis.{name} is {kind}; give a number")
+    return value_number(value)
+
+
 def reads_as_dates(values: pd.Series) -> bool:
     """Whether a column is text whose every value reads as an ISO 8601 date or time."""
     text = values.dropna()
@@ -117,8 +157,8 @@ def categories(
         out = sorted(present, key=natural)
     else:
         assert by is not None
-        numbers = pd.Series(np.asarray(pd.to_numeric(by, errors="coerce"), dtype=float))
-        sums = cast(pd.Series, numbers.groupby(values.reset_index(drop=True)).sum()).to_dict()
+        drawn_at = pd.Series(numbers(by))
+        sums = cast(pd.Series, drawn_at.groupby(values.reset_index(drop=True)).sum()).to_dict()
         out = sorted(present, key=lambda c: float(sums.get(c, 0.0)))
     return out[::-1] if direction == "descending" else out
 
@@ -186,13 +226,29 @@ def format_number(value: float, fmt: str) -> str:
 
 
 def number_text(
-    gt: dict[str, Any], name: str, axis: Any, given: Any, path: str, extra: int = 0
+    gt: dict[str, Any],
+    name: str,
+    axis: Any,
+    given: Any,
+    path: str,
+    extra: int = 0,
+    kind: str = "decimal",
 ) -> Any:
     """How a label writes a value on axis name: in its own format; auto, in the axis's tick
     label format if that's set, otherwise with as many decimals as the tick labels show,
-    plus extra."""
+    plus extra. On a date axis (kind), a date, in a date format: its own or the tick label
+    format; with neither, an error."""
+    own = path
     if given == "auto":
         given, path = gt[f"axis.{name}.tick.label.format"], f"axis.{name}.tick.label.format"
+    if kind == "date":
+        if given == "auto":
+            raise DrawError(
+                f"{own}: auto, but axis.{name} is dates and its tick.label.format is auto too; "
+                'set a date format in either, e.g. "%b %-d" or "%H:%M"'
+            )
+        when = date_format(str(given), path)
+        return lambda v: format_date(num2date(float(v)).replace(tzinfo=None), when)
     if given != "auto":
         checked = number_format(str(given), path)
         return lambda v: format_number(float(v), checked)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, cast
 
 import numpy as np
@@ -30,6 +31,7 @@ from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
+from forgegraph.spec.parameters import as_date
 
 Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
 COLUMN_NAME = "column_name"
@@ -321,6 +323,11 @@ def _drawable_rows(
         raise DrawError(
             f"axis.{r.value}.data.aggregation: {aggregation}, but the axis is categorical"
         )
+    if aggregation == "sum" and kind[r.value] == "date":
+        raise DrawError(
+            f"axis.{r.value}.data.aggregation: sum adds the values, but axis.{r.value} is dates, "
+            "which can't be added; use mean, median, min or max"
+        )
     no_x = _col(frame, x).isna()
     no_y = _col(frame, Y_VALUE).isna()
     if bool(no_x.any()) or bool(no_y.any()):
@@ -334,7 +341,7 @@ def _drawable_rows(
         (f"axis.{r.value}", Y_VALUE, ", ".join(ys)),
     ):
         if gt[f"{axis}.scale"] == "log" and kind[axis[-1]] != "categorical":
-            values = np.asarray(pd.to_numeric(_col(frame, column), errors="coerce"), dtype=float)
+            values = axis_data.numbers(_col(frame, column))
             bad = values[values <= 0]  # missing values compare False and are left alone
             if len(bad):
                 raise DrawError(
@@ -376,8 +383,7 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
     how = gt["encoding.order"]
     is_bench = pd.Series(False, index=frame.index)
     if bench_col is not None:
-        column = _col(frame, bench_col)
-        is_bench = (column.astype(str) == str(bench_value)) | (column == bench_value)
+        is_bench = _is_benchmark(_col(frame, bench_col), bench_value)
     if bench_col is not None and not bool(is_bench.any()):
         where = "no y column is named" if bench_col == Y_COLUMN else f"no rows where {bench_col} is"
         raise DrawError(f"benchmark.value: {where} '{bench_value}'")
@@ -409,6 +415,24 @@ def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodi
         grouping,
         choices,
     )
+
+
+def _is_benchmark(values: pd.Series, value: Any) -> pd.Series:
+    """Which of a column's values are benchmark.value: in a date column, a date or day number
+    drawn at the same place (axes.numbers); otherwise the value as written, or as text. A
+    date for a column that isn't dates is an error."""
+    if pd.api.types.is_datetime64_any_dtype(values):
+        if isinstance(value, str) and as_date(value) is None:
+            return pd.Series(False, index=values.index)
+        at = axis_data.value_number(value)
+        return pd.Series(axis_data.numbers(values) == at, index=values.index)
+    if isinstance(value, date):  # YAML's date, not text
+        name = "column_name (the y columns' names)" if values.name == Y_COLUMN else values.name
+        raise DrawError(
+            f"benchmark.value: {value} is a date, but benchmark.data_column {name} isn't dates; "
+            "quote it to match text"
+        )
+    return (values.astype(str) == str(value)) | (values == value)
 
 
 def _category_positions(
@@ -448,7 +472,8 @@ def _category_positions(
                 _col(frame, column), method, gt[f"axis.{name}.data.order.direction"]
             )
         if bench_col is not None and bench_col == column:  # the benchmark: its own side
-            bench = [c for c in cats if str(c) == str(bench_value) or c == bench_value]
+            marked = _is_benchmark(pd.Series(cats), bench_value).tolist()
+            bench = [c for c, b in zip(cats, marked, strict=True) if b]
             rest = [c for c in cats if c not in bench]
             cats = bench + rest if gt["benchmark.side"] == "start" else rest + bench
         drawn.categories[name] = cats
@@ -479,9 +504,9 @@ def _series(
             rows = rows.sort_values(by=x, kind="stable")
         if aggregation != "none":  # one point per place: the aggregate of its rows
             points = rows.groupby(x, sort=False, dropna=False)[Y_VALUE].agg(aggregation)
-            xs, ys_ = np.asarray(points.index), np.asarray(points.to_numpy())
+            xs, ys_ = axis_data.numbers(points.index), axis_data.numbers(points)
         else:
-            xs, ys_ = np.asarray(_col(rows, x)), np.asarray(_col(rows, Y_VALUE))
+            xs, ys_ = axis_data.numbers(_col(rows, x)), axis_data.numbers(_col(rows, Y_VALUE))
         index = {
             path: (
                 orders[path].index(values[col])
@@ -566,7 +591,7 @@ def draw(
     drawn = Drawn()
     listed = listed or {}
     series, frame, r, enc = build_series(df, gt, style, drawn)
-    marks.check(gt, r.value)
+    marks.check(gt, r.value, drawn.kinds[r.value])
     log_values = gt[f"axis.{r.value}.scale"] == "log"
     stacked = marks.stack(series, gt["series.aggregation"], log_values)
     for s, st in zip(series, stacked, strict=True):
@@ -648,7 +673,9 @@ def _draw_marks(
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)
-            paths.setdefault(s.label, []).append(np.c_[marks.numbers(px), marks.numbers(py)])
+            paths.setdefault(s.label, []).append(
+                np.c_[axis_data.numbers(px), axis_data.numbers(py)]
+            )
     groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
     return groups, norm
 
@@ -668,7 +695,7 @@ def _axes(
     ax.set_yscale(gt["axis.y.scale"])
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
         along = [np.asarray(_as_xy(r, s.x, s.y)[0 if name == "x" else 1]) for s in series]
-        values = marks.numbers(np.concatenate(along)) if along else np.array([])
+        values = axis_data.numbers(np.concatenate(along)) if along else np.array([])
         kind = drawn.kinds[name]
         axis_data.ticks_and_labels(ax, name, kind, gt, style, drawn.categories.get(name), values)
         if kind == "categorical":
@@ -681,7 +708,7 @@ def _axes(
             (ax.set_xlim if name == "x" else ax.set_ylim)(-0.5, n - 0.5)
         else:
             ticks.minor_ticks(axis, style)
-    _limits(ax, gt)
+    _limits(ax, gt, drawn.kinds)
     if bool(gt["mark.bar.show"]) and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
         log = gt[f"axis.{r.value}.scale"] == "log"
         floor = 1.0 if log else 0.0
@@ -732,7 +759,7 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     labels. True if an axis was widened, so the figure must be laid out again."""
     r = cast(Roles, drawn.roles)  # draw() set it
     marks.check_room(ax, drawn.series, gt, style, r.base)
-    widened = marks.value_labels(ax, drawn.series, gt, style, r.base)
+    widened = marks.value_labels(ax, drawn.series, gt, style, r.base, drawn.kinds[r.value])
     return layers.label_lines(ax, drawn.ref_lines, gt, style) or widened
 
 
@@ -883,15 +910,19 @@ def _style_keys(gt: dict[str, Any], enc: _Encodings, style: Style) -> list[Style
     return found
 
 
-def _limits(ax: Axes, gt: dict[str, Any]) -> None:
+def _limits(ax: Axes, gt: dict[str, Any], kinds: dict[str, str]) -> None:
+    """Each axis's set min and max: numbers, or dates on a date axis (axes.on_axis)."""
     for axis in ("x", "y"):
         lo, hi = gt[f"axis.{axis}.min"], gt[f"axis.{axis}.max"]
         if unset(lo) and unset(hi):
             continue
         get = ax.get_xlim if axis == "x" else ax.get_ylim
         put = ax.set_xlim if axis == "x" else ax.set_ylim
-        cur_lo, cur_hi = get()
-        put(cur_lo if unset(lo) else float(lo), cur_hi if unset(hi) else float(hi))
+        at = [
+            now if unset(v) else axis_data.on_axis(v, axis, kinds[axis], f"axis.{axis}.{end}")
+            for end, v, now in zip(("min", "max"), (lo, hi), get(), strict=True)
+        ]
+        put(*at)
 
 
 def _box_and_ticks(ax: Axes, style: Style) -> None:

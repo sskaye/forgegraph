@@ -277,7 +277,7 @@ def test_times_with_a_time_zone_are_drawn_at_their_own_clock_time(zone):
     g = graph(pd.DataFrame({"when": aware, "value": np.arange(72.0)}), "when", "value")
     plain = graph(pd.DataFrame({"when": naive, "value": np.arange(72.0)}), "when", "value")
     [line] = g.axes.get_lines()
-    assert date2num(line.get_xdata()) == pytest.approx(date2num(naive))
+    assert np.asarray(line.get_xdata(), dtype=float) == pytest.approx(date2num(naive))
     assert labels(g) == labels(plain)
 
 

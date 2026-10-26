@@ -30,11 +30,11 @@ from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.parameters import (
     KINDS,
-    NONE,
     Parameter,
     check_parameter,
     definitions,
     flatten,
+    is_none,
 )
 from forgegraph.spec.registry import Registry, load_yaml
 from forgegraph.spec.resolve import Values, resolve
@@ -116,7 +116,7 @@ def _change(where: str, entry: Any, params: dict[str, Parameter], reg: Registry,
 
 def _chain(kind: str, doc: dict[str, Any], found: dict, label: str) -> list[dict[str, Any]]:
     chain, seen, parent = [doc], set(), doc.get("extends")
-    while parent not in (None, NONE):
+    while not is_none(parent):
         if parent not in found[kind] or parent in seen:
             raise CatalogError([f"{label}: extends: no catalog '{parent}' to extend"])
         seen.add(parent)
@@ -164,7 +164,7 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
     if problems:
         raise CatalogError(problems)
     chain = _chain(kind, doc, found, label)
-    baseline = next(d["baseline"] for d in chain if d.get("baseline") not in (None, NONE))
+    baseline = next(d["baseline"] for d in chain if not is_none(d.get("baseline")))
     if baseline not in reg.docs["graphspec"]:
         raise CatalogError([f"{label}: baseline: no GraphSpec '{baseline}'"])
     values = resolve("graphspec", reg.docs["graphspec"][baseline], reg)
@@ -217,7 +217,7 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
         d = shown.value(p.path, p.default)
         for value in candidates(p, d, scene, name if kind == "layer" else ""):
             changes = tied(p.path, value, prefix)
-            unset = p.required and value in (None, NONE)  # check_parameter allows it unset
+            unset = p.required and is_none(value)  # check_parameter allows it unset
             if not unset and not _check("", p, value, reg) and changes not in options:
                 options.append(changes)
         cards.append((p, tuple(options)))

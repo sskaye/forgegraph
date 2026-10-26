@@ -31,7 +31,7 @@ from forgegraph.jobs import status as status_file
 from forgegraph.jobs.status import Attempt, DataFile, HookStatus, JobStatus, TargetStatus
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.loaded import Loaded, load_document, placed
-from forgegraph.spec.parameters import NONE
+from forgegraph.spec.parameters import is_none
 from forgegraph.spec.schedule import Cadence
 from forgegraph.spec.validate import validate
 
@@ -82,7 +82,7 @@ def load(path: Path) -> Schedule:
         raise ScheduleError(problems)
     values = loaded.resolve().plain()
     files = values["targets.files"]
-    if files in (None, NONE):
+    if is_none(files):
         raise ScheduleError(
             ["targets.files: must be set: the GraphSpec and layout files to render"]
         )
@@ -291,7 +291,7 @@ def _render_target(schedule: Schedule, target: Path) -> TargetStatus:
 
 def _hook(schedule: Schedule, which: str, error: str | None) -> HookStatus | None:
     command = schedule.values[f"{which}.command"]
-    if command in (None, NONE):
+    if is_none(command):
         return None
     command = [str(c) for c in command]
     env = {

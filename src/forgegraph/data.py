@@ -9,7 +9,7 @@ import pandas as pd
 
 from forgegraph.drawn import SpecError
 from forgegraph.spec.loaded import Loaded
-from forgegraph.spec.parameters import NONE
+from forgegraph.spec.parameters import is_none
 from forgegraph.spec.provenance import DataRecord
 
 
@@ -25,7 +25,7 @@ def read_data(
 ) -> tuple[pd.DataFrame, DataRecord]:
     """The DataFrame to draw: the one given, or the one in the Parquet file data.file names."""
     preprocessing = values["graphspec"]["data.preprocessing"]
-    reference = None if preprocessing in (None, NONE) else str(preprocessing)
+    reference = None if is_none(preprocessing) else str(preprocessing)
     if data is not None:
         return data, DataRecord(preprocessing=reference, rows_read=len(data))
     where = data_path(graphspec)

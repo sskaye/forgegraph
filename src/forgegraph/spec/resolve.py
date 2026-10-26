@@ -15,12 +15,12 @@ from forgegraph.spec.common import kind_label, suggest
 from forgegraph.spec.parameters import (
     COLLECTIONS,
     NAMES,
-    NONE,
     SECTIONS,
     Parameter,
     definitions,
     flatten,
     graph_type_files,
+    is_none,
 )
 from forgegraph.spec.registry import Registry
 
@@ -35,7 +35,7 @@ def entries(
     out: list[tuple[str, str | None, str, Any]] = []
     for section in SECTIONS:
         tree = doc.get(section)
-        if tree in (None, NONE):
+        if is_none(tree):
             continue
         if not isinstance(tree, dict):
             out.append((section, None, "", tree))
@@ -64,7 +64,7 @@ def chain(kind: str, doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]
     chain = [doc]
     seen = [doc.get("name")]
     parent = doc.get("extends")
-    while parent not in (None, NONE):
+    while not is_none(parent):
         if parent in seen:
             raise ValueError(
                 f"extends: '{parent}' extends itself, through {' → '.join(map(str, seen))}"

@@ -23,7 +23,7 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
-from forgegraph.spec.parameters import NONE, tree_set
+from forgegraph.spec.parameters import NONE, is_none, tree_set
 from forgegraph.spec.provenance import DataRecord, graph_fields, record, used
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
@@ -155,7 +155,7 @@ class Prepared:
     @property
     def title(self) -> str | None:
         title = self.values["graphspec"]["text.title"]
-        return None if title in (None, NONE) else str(title)
+        return None if is_none(title) else str(title)
 
     def draw(self, ax: Axes) -> Any:
         """Draw the graph into ax; returns what the graph type drew."""
@@ -267,7 +267,7 @@ def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | No
 
 
 def _limit(value: Any) -> float | None:
-    return None if value is None or value == NONE else float(value)
+    return None if is_none(value) else float(value)
 
 
 def xy(

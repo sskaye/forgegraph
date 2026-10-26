@@ -13,7 +13,7 @@ from typing import Any
 from forgegraph.fonts import register_pack_fonts
 from forgegraph.packs import fonts, user_config
 from forgegraph.spec.common import kind_label, suggest
-from forgegraph.spec.parameters import CORE_KINDS, NAMES, NONE
+from forgegraph.spec.parameters import CORE_KINDS, NAMES, is_none
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import chain, entries, named
 
@@ -27,7 +27,7 @@ def permission_problems(kind: str, doc: dict[str, Any], reg: Registry) -> list[s
     if reg.owner(kind, doc):
         return []
     listed = []
-    if doc.get("extends") not in (None, NONE):
+    if not is_none(doc.get("extends")):
         listed.append(("extends", str(doc["extends"])))
     paths = {f"specifications.{k}" for k in NAMES.get(kind, ()) if k not in CORE_KINDS}
     for section, _, path, value in entries(kind, doc, reg):

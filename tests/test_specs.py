@@ -9,9 +9,11 @@ from __future__ import annotations
 import copy
 import re
 
+import pandas as pd
 import pytest
 from pack_helpers import doc
 
+import forgegraph as fg
 from forgegraph.spec.parameters import (
     BASE,
     CORE_KINDS,
@@ -377,12 +379,14 @@ def test_only_forgegraph_defines_graph_types():
     assert err.startswith("extends: None, but only ForgeGraph defines graph types")
 
 
+@pytest.mark.parametrize("none", [NONE, None], ids=["word", "null"])
 @pytest.mark.parametrize("kind", DOCUMENT_KINDS)
-def test_extending_none_requires_every_parameter(kind):
+def test_extending_none_requires_every_parameter(kind, none):
     doc = copy.deepcopy(builtin().docs[kind][reference_name(kind)])
     if kind == "graph_type":
         pytest.skip("a graph type extending None is its own definition")
     doc["name"] = "copy"
+    doc["extends"] = none
     p = list(definitions(kind).values())[-1]
     *parents, name = p.path.split(".")
     section = doc["fixed_parameters" if p.fixed else "variable_parameters"]
@@ -391,6 +395,32 @@ def test_extending_none_requires_every_parameter(kind):
     del section[name]
     [err] = validate(kind, doc, reg_with((kind, doc)))
     assert err == f"extends: None, so every parameter must be listed; missing: {p.path}"
+
+
+@pytest.mark.parametrize("null", ["null", "~", ""])
+def test_yamls_null_is_none(tmp_path, null):
+    """extends and fixed_parameters take YAML's null as the word None."""
+    pd.DataFrame({"x": [1, 2, 3], "y": [2, 1, 3]}).to_parquet(tmp_path / "d.parquet")
+    (tmp_path / "g.yaml").write_text(
+        f"""name: g
+version: 0
+description: YAML's null for None.
+extends: {null}
+fixed_parameters: {null}
+variable_parameters:
+    specifications:
+        graph_type: xy
+        theme: forgegraph_base/base_theme
+        format: forgegraph_base/base_format
+    text: {{title: None}}
+    data: {{file: d.parquet, preprocessing: None}}
+    axis:
+        x: {{data: {{column: x}}}}
+        y: {{data: {{column: y}}}}
+""",
+        encoding="utf-8",
+    )
+    assert fg.render(tmp_path / "g.yaml").spec["extends"] is None
 
 
 def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():

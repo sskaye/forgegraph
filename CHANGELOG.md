@@ -7,6 +7,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 ### Fixed
 
 - The `outside-limits` and `log-axis-values` lint checks count only data points. A reference line's ends and an error bar's ends no longer count as points outside a set axis limit, or as values of 0 or below on a log axis.
+- YAML's null (`null`, `~` or nothing) is None everywhere a spec can say None. `extends: null` failed with `KeyError: None`, and a file extending null wasn't required to list every parameter.
 - Computed values are compared with an axis's limits allowing for float noise: a value is past a limit only if it's past by more than 1e-9 of the axis's span, measured in powers of ten on a log axis. A stack that totals `axis.y.max` but for its last digits isn't reported by `outside-limits`; a reference line at a computed value that equals a set limit isn't an error; bars whose values are 0 but for float noise still stand on the axis; and a tick a hair past the end of the view, which matplotlib draws, is measured for layout and lint and counts when log labels choose between plain numbers and powers of ten.
 
 ## 0.3.0 (2026-10-25)

@@ -11,7 +11,13 @@ from __future__ import annotations
 from typing import Any
 
 from forgegraph.spec.common import suggest
-from forgegraph.spec.parameters import NONE, SECTIONS, check_parameter, definitions, flatten
+from forgegraph.spec.parameters import (
+    SECTIONS,
+    check_parameter,
+    definitions,
+    flatten,
+    is_none,
+)
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
 
@@ -47,7 +53,7 @@ def resolve_layers(doc: dict[str, Any], reg: Registry) -> dict[str, Resolved]:
     for d in reversed(chain("graphspec", doc, reg)):
         label = f"GraphSpec '{d.get('name')}'"
         for section, name, entry in _layers_in(d):
-            if entry in (None, NONE):
+            if is_none(entry):
                 out.pop(name, None)
                 continue
             if not isinstance(entry, dict):
@@ -83,7 +89,7 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     parent = doc.get("extends")
     inherited = (
         resolve_layers(reg.docs["graphspec"][parent], reg)
-        if parent not in (None, NONE) and parent in reg.docs["graphspec"]
+        if not is_none(parent) and parent in reg.docs["graphspec"]
         else {}
     )
     names = reg.names()
@@ -96,13 +102,13 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         if name in inherited and inherited[name].fixed:
             errors.append(f"{where}: fixed by {inherited[name].origin}")
             continue
-        if entry in (None, NONE):
+        if is_none(entry):
             continue
         if not isinstance(entry, dict):
             errors.append(f"{where}: must be a layer: its type, then its parameters")
             continue
         kind = entry.get("type", inherited[name].value.get("type") if name in inherited else None)
-        if kind in (None, NONE):
+        if is_none(kind):
             errors.append(f"{where}.type: required: one of {', '.join(map(str, accepted))}")
             continue
         if kind not in reg.docs["layer"]:

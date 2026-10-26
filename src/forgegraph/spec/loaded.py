@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from forgegraph.spec.explain import Explained, explain
-from forgegraph.spec.parameters import NONE
+from forgegraph.spec.parameters import is_none
 from forgegraph.spec.registry import Registry, load_yaml, registry_for
 from forgegraph.spec.resolve import Values, resolve, setter
 
@@ -52,7 +52,7 @@ class Loaded:
         """Where the file or folder a parameter names is, found from the folder of the file
         that sets it; None if it's unset."""
         value = self.resolve().value(path)
-        if value in (None, NONE):
+        if is_none(value):
             return None
         return placed(value, self.folder_for(self.setter(path)))
 

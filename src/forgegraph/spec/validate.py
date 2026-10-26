@@ -33,7 +33,6 @@ from forgegraph.spec.layers import layer_problems, resolve_layers, with_defaults
 from forgegraph.spec.layout import layout_problems
 from forgegraph.spec.parameters import (
     HEADER,
-    NONE,
     SECTIONS,
     STEP,
     Parameter,
@@ -42,6 +41,7 @@ from forgegraph.spec.parameters import (
     check_value,
     definitions,
     header_definitions,
+    is_none,
 )
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import (
@@ -76,7 +76,7 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
     errors, listed = _entry_problems(kind, doc, reg, defs)
     if errors:
         return errors
-    if doc["extends"] == NONE:
+    if is_none(doc["extends"]):
         missing = [path for path in defs if path not in listed]
         if missing:
             return [
@@ -151,7 +151,7 @@ def _header(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
     names = reg.names()
     names[kind] = names[kind] - {doc["name"]}  # a file can't extend itself
     for key, p in header_definitions(kind).items():
-        if key == "extends" and doc[key] not in (None, NONE) and doc[key] not in reg.docs[kind]:
+        if key == "extends" and not is_none(doc[key]) and doc[key] not in reg.docs[kind]:
             continue  # reported by chain, with a suggestion
         if err := check_value(doc[key], p.range, names):
             errors.append(f"{key}: {err}")
@@ -212,7 +212,7 @@ def _settable(
 
 def _inherited_fixed(doc: dict[str, Any], reg: Registry) -> list[str]:
     parent = doc["extends"]
-    if parent == NONE:
+    if is_none(parent):
         return []
     inherited = resolve("graphspec", reg.docs["graphspec"][parent], reg)
     return [
@@ -240,7 +240,7 @@ def _ties_complete(values: dict[str, dict[str, Any]]) -> list[str]:
     gt = values["graph_type"]
     errors = []
     for tie in TIES:
-        if len({gt.get(path) in (None, NONE) for path in tie}) > 1:
+        if len({is_none(gt.get(path)) for path in tie}) > 1:
             category = tie[0].rsplit(".", 1)[0]
             names = " and ".join(path.rsplit(".", 1)[1] for path in tie)
             errors.append(f"{category}: set {names} together, or neither")
@@ -270,11 +270,11 @@ def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
         )
     for axis in ("axis.x", "axis.y"):
         algorithm, step = v.get(f"{axis}.tick.algorithm"), v.get(f"{axis}.tick.step")
-        if algorithm == "manual" and step in (None, NONE):
+        if algorithm == "manual" and is_none(step):
             errors.append(f"{axis}.tick.algorithm: manual needs tick.step")
-        if algorithm != "manual" and step not in (None, NONE):
+        if algorithm != "manual" and not is_none(step):
             errors.append(f"{axis}.tick.step: applies only with tick.algorithm manual")
-        if isinstance(step, str) and step != NONE and not STEP.match(step):
+        if isinstance(step, str) and not is_none(step) and not STEP.match(step):
             errors.append(
                 f"{axis}.tick.step: '{step}' isn't a count and a unit, e.g. \"2 week\" "
                 "(units: sec, min, hour, day, week, month, year)"
@@ -343,14 +343,14 @@ def drawing_problems(doc: dict[str, Any], reg: Registry | None = None) -> list[s
     problems = [
         f"{path}: must be set before the graph can be drawn"
         for path, p in definitions_for("graph_type", gt, reg).items()
-        if p.required and values.get(path) in (None, NONE)
+        if p.required and is_none(values.get(path))
     ]
     for name, r in resolve_layers(doc, reg).items():
         layer = with_defaults(r.value)
         problems += [
             f"layers.{name}.{path}: must be set before the graph can be drawn"
             for path, p in definitions("layer", layer["type"]).items()
-            if p.required and layer.get(path) in (None, NONE)
+            if p.required and is_none(layer.get(path))
         ]
     return problems
 
@@ -360,7 +360,7 @@ def named_problems(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
     extend."""
     problems = []
     for k, name in named(kind, doc, reg).items():
-        while name not in (None, NONE):
+        while not is_none(name):
             spec = reg.docs[k][name]
             problems += [f"{kind_label(k)} '{name}': {p}" for p in validate(k, spec, reg)]
             name = spec.get("extends")

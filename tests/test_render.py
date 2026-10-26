@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import re
 from pathlib import Path
+from typing import cast
 
 import matplotlib
 import numpy as np
@@ -23,7 +24,7 @@ import forgegraph as fg
 from forgegraph.drawing import xy
 from forgegraph.drawing.export import FILE_TYPES, IMAGES
 from forgegraph.drawing.figure import WATERMARK
-from forgegraph.drawing.key import keys
+from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.drawing.text import footprint
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
@@ -808,6 +809,69 @@ def test_impossible_drawings_are_errors_not_fallbacks():
 def test_each_styling_column_gets_its_own_key():
     g = render({"encoding.line.style.column": "size", "encoding.marker.shape.column": "run"})
     assert {"size", "run"} <= {k.title for k in keys(g.axes)}
+
+
+def _banded() -> pd.DataFrame:
+    """A median line and an IQR's two edges, the line style set by band (issue 22)."""
+    rows = []
+    for x in range(5):
+        rows += [
+            {"x": x, "band": "median", "edge": "line", "y": 10 + x},
+            {"x": x, "band": "IQR", "edge": "lo", "y": 8 + x},
+            {"x": x, "band": "IQR", "edge": "hi", "y": 12 + x},
+        ]
+    return pd.DataFrame(rows)
+
+
+BANDED = {
+    "axis.x.data.column": "x",
+    "axis.y.data.column": "y",
+    "encoding.color.column": NONE,
+    "encoding.line.style.column": "band",
+    "encoding.detail.column": "edge",
+    "encoding.order": "data",
+    "benchmark.data_column": NONE,
+    "benchmark.value": NONE,
+    "mark.marker.show": False,
+    "legend.method": "key",
+}
+
+
+def test_the_key_title_is_every_keys():
+    def titles(**settings) -> list[str | None]:
+        g = render({**BANDED, **settings}, data=_banded())
+        return [k.title for k in keys(g.axes)]
+
+    assert titles() == ["band"]  # column_name: its own column's
+    assert titles(**{"legend.key.title.text": NONE}) == [None]
+    assert titles(**{"legend.key.title.text": "Percentiles"}) == ["Percentiles"]
+    colored = {"encoding.color.column": "edge", "encoding.detail.column": NONE}
+    assert sorted(map(str, titles(**colored))) == ["band", "edge"]
+    assert titles(**colored, **{"legend.key.title.text": NONE}) == [None, None]
+    with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
+        titles(**colored, **{"legend.key.title.text": "Percentiles"})
+    two = {"encoding.marker.shape.column": "edge", "mark.marker.show": True}
+    with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
+        titles(**two, **{"legend.key.title.text": "Percentiles"})
+
+
+def test_style_samples_take_the_series_color_with_no_color_encoding():
+    def samples(**settings) -> tuple[set[str], fg.Graph]:
+        g = render({**BANDED, **settings}, data=_banded())
+        [key] = [k for k in keys(g.axes) if k.title == "band"]
+        return {to_hex(cast(Line2D, e.handle).get_color()) for e in key.entries}, g
+
+    colors, g = samples()
+    drawn = {to_hex(ln.get_color()) for ln in g.axes.get_lines() if ln.get_gid() != KEY}
+    assert colors == drawn == {to_hex(g.style.series_colors()[0])}
+    colors, g = samples(**{"encoding.color.column": "edge", "encoding.detail.column": NONE})
+    assert colors == {to_hex(g.style.color("font.color"))}  # neutral among the colors
+
+
+def test_the_style_keys_drawn_are_reported():
+    g = render(BANDED, data=_banded())
+    assert g.labelling == "none" and g.style_keys == ["band"]
+    assert render({**BANDED, "encoding.line.style.column": NONE}, data=_banded()).style_keys == []
 
 
 def test_each_y_column_is_its_own_line():

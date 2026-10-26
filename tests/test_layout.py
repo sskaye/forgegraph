@@ -639,6 +639,7 @@ def test_cli_renders_explains_and_loads_a_layout(project):
     report = json.loads(result.output)
     assert report["saved"] == [str(project / "fig.png")]
     assert set(report["labelling"]) == {"T.volt", "T.power"}
+    assert report["style_keys"] == {"T.volt": [], "T.power": []}
     result = runner.invoke(app, ["explain", str(path), "--json"])
     rows = json.loads(result.output)["values"]
     base = next(

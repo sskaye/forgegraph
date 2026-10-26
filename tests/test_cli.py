@@ -33,6 +33,7 @@ def test_render_load_and_recover(project):
     report = cli("render", "graphspecs/p.yaml", "-o", "out/p")
     saved = [Path(p) for p in report["saved"]]
     assert saved == [Path("out/p.png")] and report["labelling"] == "direct"
+    assert report["style_keys"] == []
     result = runner.invoke(app, ["load", "out/p.png", "--graphspec", "graphspecs/again.yaml"])
     assert result.exit_code == 0 and "data: ../data/p.parquet" in result.output
     again = runner.invoke(app, ["render", "graphspecs/again.yaml", "-o", "out/again.png"])

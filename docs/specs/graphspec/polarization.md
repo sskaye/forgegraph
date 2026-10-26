@@ -95,7 +95,7 @@ variable_parameters:          *# List of variable parameters for the G
                 marker:\
                     size: 0.5          *# \[positive float\]; Marker size in key samples, × base size; series.marker.size sets the plot's.*\
             title:\
-                text: Cell          *# \[None, column_name, text\]; Key title. column_name: the encoding.color.column column's name. None: none.*\
+                text: column_name          *# \[None, column_name, text\]; Every key's title. column_name: each key's own column's name. None: none. A text: one key only.*\
         color_bar:\
             colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; Colors for a numeric encoding.color.column: a named scale, one hex color (light to it) or two (first to second).*\
             title:\

@@ -4,6 +4,10 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ## Unreleased
 
+### Changed
+
+- A style key (one from `encoding.line.style.column`, `encoding.marker.shape.column` or `encoding.marker.fill.column`) follows `legend.key.title.text`, as the series' key does: `column_name`, the default, gives each key its own column's name, so default graphs are unchanged; `None` removes every key's title; a text titles one key, and with more than one key drawn it's an error. With no `encoding.color.column`, a style key's samples are drawn in the one series color, not the text color. `render --json` reports `style_keys`, the column each style key drawn explains (for a layout, each tile's), beside `labelling`.
+
 ### Fixed
 
 - The `outside-limits` and `log-axis-values` lint checks count only data points. A reference line's ends and an error bar's ends no longer count as points outside a set axis limit, or as values of 0 or below on a log axis.

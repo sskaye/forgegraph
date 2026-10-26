@@ -160,11 +160,16 @@ class Drawn:
 @dataclass
 class StyleKey:
     """A key explaining the line styles, marker shapes or fills one column sets: its entries,
-    its title, and the column, as an error names it."""
+    its title, and the column (column_name: the y columns' names)."""
 
     entries: list[Entry]
     title: str | None
     column: str
+
+    @property
+    def named(self) -> str:
+        """The column, as an error names it."""
+        return "column names" if self.column == COLUMN_NAME else self.column
 
 
 def _column(gt: dict[str, Any], path: str, frame: pd.DataFrame) -> str | None:
@@ -749,6 +754,18 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         "positions": tuple(gt["legend.key.positions"]),
         "inside": bool(gt["legend.key.inside"]),
     }
+    color_col = gt["encoding.color.column"]
+    title = gt["legend.key.title.text"]
+    one_title = not (unset(title) or title == COLUMN_NAME)  # a text: it can title one key
+
+    def one_key(count: int) -> None:
+        if one_title and count > 1:
+            raise DrawError(
+                f"legend.key.title.text: '{title}' titles one key, but {count} are drawn; use "
+                "column_name, for each key its own column's name, or None"
+            )
+
+    one_key(len(drawn.style_keys))
     for style_key in drawn.style_keys:
         key = labelling.legend(
             ax,
@@ -761,7 +778,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         )
         if key is None:
             raise DrawError(
-                f"style key for {style_key.column}: no position in legend.key.positions is free "
+                f"style key for {style_key.named}: no position in legend.key.positions is free "
                 "and clear of data; add positions, put keys outside (legend.key.inside: false), "
                 "widen the format or set the plot's limits to leave room"
             )
@@ -777,16 +794,15 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             raise DrawError("legend.method: direct isn't available with bars; use key or auto")
         allowed = [m for m in allowed if m != "direct"]
     tries = allowed if method == "auto" else [method]
-    color_col = gt["encoding.color.column"]
     legend_title = _title(
-        gt["legend.key.title.text"],
-        None if unset(color_col) or color_col == COLUMN_NAME else str(color_col),
+        title, None if unset(color_col) or color_col == COLUMN_NAME else str(color_col)
     )
     for m in tries:
         if m == "direct" and labelling.interior(ax, groups, style):
             drawn.labelling = "direct"
             return
         if m == "key":
+            one_key(len(drawn.style_keys) + 1)
             leg = labelling.legend(
                 ax,
                 [Entry(g.name, g.handle) for g in groups],
@@ -819,7 +835,9 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
 
 def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[StyleKey]:
     """Keys explaining line styles, marker shapes and fills set by an encoding other than
-    encoding.color.column: one per styling column."""
+    encoding.color.column: one per styling column, titled by legend.key.title.text. Their
+    samples are in the one series color, or with a color encoding in font.color, neutral
+    among the colors."""
     styled = {
         d.by: gt[d.encoding_path]
         for d in DIMENSIONS
@@ -828,7 +846,8 @@ def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[S
         and gt[d.encoding_path] != gt[COLOR.encoding_path]
     }
     choices = {d.by: d.choices(style) for d in (LINE_STYLE, MARKER_SHAPE, MARKER_FILL)}
-    grey = style.color("font.color")
+    colored = not unset(gt[COLOR.encoding_path])
+    ink = style.color("font.color") if colored else _cycle(COLOR.choices(style), 0)
     found = []
     for column in dict.fromkeys(styled.values()):
         bys = [b for b, c in styled.items() if c == column]
@@ -840,16 +859,16 @@ def _style_keys(gt: dict[str, Any], frame: pd.DataFrame, style: Style) -> list[S
             handle = Line2D(
                 [],
                 [],
-                color=grey,
+                color=ink,
                 linestyle=cast(Any, ls if gt["mark.line.show"] else "none"),
                 marker=mk if gt["mark.marker.show"] else "none",
                 markersize=style.pt("series.marker.size"),
-                markerfacecolor="none" if fill == "open" else grey,
-                markeredgecolor=grey,
+                markerfacecolor="none" if fill == "open" else ink,
+                markeredgecolor=ink,
             )
             entries.append(Entry(literal(str(value)), handle))
-        title = None if column == COLUMN_NAME else literal(str(column))
-        found.append(StyleKey(entries, title, "column names" if column == COLUMN_NAME else column))
+        title = _title(gt["legend.key.title.text"], None if column == COLUMN_NAME else str(column))
+        found.append(StyleKey(entries, title, str(column)))
     return found
 
 

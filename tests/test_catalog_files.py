@@ -192,7 +192,7 @@ def test_a_hex_color_is_the_sample_color():
 
 
 def test_a_number_is_doubled_then_halved_within_its_interval():
-    assert candidates(THEME["series.bar.gap"], 0.15, SCENE) == [0.3, 0.075, 0.15]
+    assert candidates(THEME["series.bar.gap"], 0.1, SCENE) == [0.2, 0.05, 0.1]
     p = THEME["legend.direct.max_relative_distance"]  # 0-1
     assert candidates(p, 0.8, SCENE) == [1.0, 0.4, 0.8]
     assert candidates(THEME["axis.tick.minor.count"], 0, SCENE) == [1, 0]

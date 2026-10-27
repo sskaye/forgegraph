@@ -192,7 +192,6 @@ def test_a_stack_that_totals_a_limit_but_for_float_noise_isnt_past_it():
         "encoding.color.column": "band",
         "encoding.order": "data",
         "series.aggregation": "sum",
-        "series.bar.width": 1.5,
         "legend.method": "key",
         "legend.key.inside": False,
         "legend.key.positions": ["right_top"],

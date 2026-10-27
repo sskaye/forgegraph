@@ -69,8 +69,8 @@ parameters: !fix          # !var/!fix sets whether a GraphSpec may change a prop
             edge:          # [line style]; The outline of filled markers.
                 width: !var 0.05
         bar:
-            width: !var 2.5          # [float > 0]; The bar width, × base size. Bars that would overlap are an error.
-            gap: !var 0.15          # [0-2]; The gap between side-by-side bars, × base size.
+            width: !var 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
+            gap: !var 0.1          # [0-1]; The fraction of each side-by-side bar's space left empty between it and the next bar.
             edge:          # [line style]; The bar outlines.
                 width: !var 0.05
         value_label:          # [text style]; The value labels.

@@ -82,8 +82,8 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
             edge:
                 width: 0.05          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
         bar:
-            width: 2.5          # [float > 0]; The bar width, × base size. Bars that would overlap are an error.
-            gap: 0.15          # [0-2]; The gap between side-by-side bars, × base size.
+            width: 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
+            gap: 0.1          # [0-1]; The fraction of each side-by-side bar's space left empty between it and the next bar.
             edge:
                 width: 0.05          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
         benchmark:
@@ -96,7 +96,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 edge:
                     width: 0.05          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
             bar:
-                width: 2.5          # [float > 0]; The bar width, × base size. Bars that would overlap are an error.
+                width: 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
                 edge:
                     width: 0.05          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
     benchmark:

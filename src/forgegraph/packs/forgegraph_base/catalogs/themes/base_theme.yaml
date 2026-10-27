@@ -31,8 +31,6 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         mark.line.show: false
         mark.marker.show: false
         series.offset: side_by_side
-        series.bar.width: 1.8
-        series.benchmark.bar.width: 1.8
     error_bars:          # [parameters and their values, or non-standard]; An error bar on every point, so the error bar parameters act.
         layers.spread.type: error_bar
         layers.spread.value.lower: 0.02

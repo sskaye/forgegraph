@@ -100,7 +100,7 @@ class Look:
     marker_size: float
     edge: str  # a filled marker's outline color, or "none"
     edge_width: float
-    bar_width: float
+    bar_width: float  # a fraction of the space between places (marks.Spacing)
     bar_edge: str
     bar_edge_width: float
     bar_edge_style: str
@@ -121,7 +121,7 @@ def _look(style: Style, benchmark: bool) -> Look:
         style.pt(f"{b}.marker.size"),
         edge.color if edge.visible else "none",
         edge.width,
-        style.pt(f"{b}.bar.width"),
+        float(style.theme[f"{b}.bar.width"]),  # a fraction of the space between places
         bar_edge.color if bar_edge.visible else "none",
         bar_edge.width,
         bar_edge.style if bar_edge.visible else "solid",
@@ -148,7 +148,9 @@ class Series:
     rows: Any = None  # the frame's rows it was drawn from, for layers
     place_column: str = ""  # the frame's base-axis column
     stack: marks.Stacked | None = None  # where its marks start and end (draw)
-    shifts: dict[float, float] = field(default_factory=dict)  # its offset at each place (draw)
+    shifts: dict[float, tuple[float, float]] = field(default_factory=dict)  # at each place
+    spacing: Any = None  # the space between places its bars are fractions of (draw)
+    bar_fraction: float = 0.0  # its bars' width, as a fraction of that space
 
 
 @dataclass
@@ -608,6 +610,10 @@ def draw(
     stacked = marks.stack(series, gt["series.aggregation"], log_values)
     for s, st in zip(series, stacked, strict=True):
         s.stack, s.y = st, st.top  # lines and markers sit at the top of their stack
+    places = [p for s in series for p in marks.numbers(s.x)]
+    spacing = marks.Spacing(ax, r.base, np.asarray(places, dtype=float))
+    for s in series:
+        s.spacing = spacing
     for s, shifts in zip(series, marks.slots(series, gt, style), strict=True):
         s.shifts = shifts
     drawn.label_groups, norm = _draw_marks(ax, series, gt, style, r)
@@ -666,7 +672,7 @@ def _draw_marks(
             markeredgewidth=rim_width if (open_marker or rim != "none") else 0.0,
             zorder=look.line_z,
         )
-        line.set_transform(marks.shifted(ax, r.base, s.shifts))
+        line.set_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
         handle = line
         if bars_shown:
             bar = marks.bars(ax, s, r.base, line_color)
@@ -686,7 +692,7 @@ def _draw_marks(
                 alpha=look.opacity,
                 zorder=2.5,
             )
-            dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts))
+            dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)

@@ -425,7 +425,7 @@ def error_bars(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
                 )
             places = numbers(s.x if along_value else s.y)
-            shifted = marks.shifted(ax, roles.base, s.shifts)
+            shifted = marks.shifted(ax, roles.base, s.shifts, s.spacing)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
 
 

@@ -4,18 +4,16 @@
 from __future__ import annotations
 
 import re
+from itertools import pairwise
 from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 import pytest
-from pack_helpers import allow, write_pack
-from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
-from forgegraph.spec.tags import with_tags
 
 COUNTS = pd.DataFrame(
     {
@@ -79,28 +77,49 @@ def test_bars_of_a_sum_that_is_0_but_for_float_noise_stand_on_zero():
     assert g.axes.get_ylim()[0] == 0
 
 
-def test_a_bar_is_its_width_in_points_at_any_size():
+def _spacing(g: fg.Graph) -> float:
+    """The distance between neighbouring places along x, in display px."""
+    a, b = (g.axes.transData.transform((p, 1.0))[0] for p in (0, 1))
+    return abs(b - a)
+
+
+def test_a_bar_fills_its_width_of_the_space_between_places_at_any_size():
     g = graph(color=None, **{"axis.y.data.aggregation": "sum"})
     [bars] = bar_sets(g)
-    for dpi in (72, 300):
-        g.figure.set_dpi(dpi)
-        widths = {round(r.width * 72 / dpi, 6) for r in bars.rectangles()}
-        assert widths == {round(g.style.pt("series.bar.width"), 6)}
+    fraction = float(g.style.theme["series.bar.width"])
+    for size in ((4, 3), (8, 3)):
+        g.figure.set_size_inches(*size)
+        widths = {round(r.width, 3) for r in bars.rectangles()}
+        assert widths == {round(fraction * _spacing(g), 3)}
 
 
-def test_side_by_side_bars_are_centred_at_each_place():
+def test_side_by_side_bars_share_the_space_and_are_centred_at_each_place():
     g = graph(**{"series.offset": "side_by_side"})
     adelie, chinstrap, gentoo = (centres(g)[str(b.color)] for b in bar_sets(g))
     assert adelie[0] < 0 < gentoo[0] and adelie[0] == pytest.approx(-gentoo[0])  # Biscoe
     assert adelie[1] < 1 < chinstrap[0] and adelie[1] - 1 == pytest.approx(1 - chinstrap[0])
     assert adelie[2] == pytest.approx(2)  # Torgersen: Adelie alone
-    gap = g.style.pt("series.bar.gap") * g.figure.dpi / 72
+    width, gap = (float(g.style.theme[f"series.bar.{k}"]) for k in ("width", "gap"))
+    room = width * _spacing(g) / 2  # at most two bars at a place
     biscoe_adelie, biscoe_gentoo = bar_sets(g)[0].rectangles()[0], bar_sets(g)[2].rectangles()[0]
-    assert biscoe_gentoo.x0 - biscoe_adelie.x1 == pytest.approx(gap)
+    assert biscoe_adelie.width == pytest.approx(room * (1 - gap))
+    assert biscoe_gentoo.x0 - biscoe_adelie.x1 == pytest.approx(room * gap)
+
+
+def test_bars_at_a_lone_place_fill_their_width_of_the_plot_area():
+    one = pd.DataFrame({"island": ["Biscoe"], "penguins": [44]})
+    g = graph(one, color=None)
+    [bar] = bar_sets(g)[0].rectangles()
+    assert bar.width == pytest.approx(0.8 * g.axes.bbox.width, rel=1e-6)
 
 
 def test_stacked_bars():
-    g = graph(**{"series.aggregation": "sum", "series.value_label.total.show": True})
+    stacked: dict[str, Any] = {
+        "series.aggregation": "sum",
+        "series.value_label.total.show": True,
+        "legend.key.inside": False,
+    }
+    g = graph(**stacked)
     adelie, chinstrap, gentoo = bar_sets(g)
     assert segments(adelie)[0] == (0, 0, 44)
     assert segments(gentoo)[0] == (0, 44, 168)
@@ -235,34 +254,19 @@ def test_a_label_running_into_another_bar_is_an_error():
         graph(wide, **{"series.offset": "side_by_side", "series.value_label.show": True})
 
 
-def test_bars_that_would_overlap_are_an_error():
-    """The message says where to narrow them: in the GraphSpec when the theme leaves the
-    width variable, as the base theme does; in the theme when it fixes it."""
+def test_bars_never_overlap_however_close_the_places():
     df = pd.DataFrame({"x": np.arange(200), "y": np.arange(200.0)})
+    g = fg.xy(df, "x", "y", parameters={**BARS, "axis.x.tick.algorithm": "auto"})
+    rects = sorted(bar_sets(g)[0].rectangles(), key=lambda r: r.x0)
+    assert all(b.x0 >= a.x1 - 1e-6 for a, b in pairwise(rects))
+
+
+def test_side_by_side_markers_too_wide_for_the_space_are_an_error():
+    df = pd.DataFrame({"x": np.repeat(np.arange(200), 2), "y": 1.0, "g": ["a", "b"] * 200})
     with pytest.raises(fg.SpecError) as e:
-        fg.xy(df, "x", "y", parameters={**BARS, "axis.x.tick.algorithm": "auto"})
+        fg.xy(df, "x", "y", color="g", parameters={"series.offset": "side_by_side"})
     [problem] = e.value.problems
-    assert problem.startswith("series.bar.width: each bar needs")
-    assert "set a smaller series.bar.width in the GraphSpec (now 2.5)" in problem
-
-
-def test_bars_too_wide_for_a_theme_that_fixes_their_width(tmp_path):
-    house = write_pack(tmp_path)
-    (house / "themes").mkdir()
-    (house / "themes" / "wide.yaml").write_text(
-        "name: wide\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "parameters:\n    series:\n        bar:\n            width: !fix 2.5\n"
-    )
-    allow(tmp_path, "forgegraph_base", "./house")
-    df = pd.DataFrame({"x": np.arange(200), "y": np.arange(200.0)})
-    df.to_parquet(tmp_path / "d.parquet")
-    doc = fg.graphspec("g", "xy", theme="house/wide", data_file="d.parquet",
-                       settings={"axis.x.data.column": "x", "axis.y.data.column": "y", **BARS,
-                                 "axis.x.tick.algorithm": "auto"})  # fmt: skip
-    with (tmp_path / "g.yaml").open("w") as f:
-        with_tags(YAML()).dump(doc, f)
-    with pytest.raises(fg.SpecError, match="narrow the bars in the theme"):
-        fg.render(tmp_path / "g.yaml")
+    assert problem.startswith("series.offset: 2 markers side by side need")
 
 
 def test_the_key_shows_a_swatch_of_each_bar():
@@ -273,7 +277,8 @@ def test_the_key_shows_a_swatch_of_each_bar():
     swatches = [a for a in g.axes.get_children() if a.get_gid() == KEY and isinstance(a, Rectangle)]
     swatches = [a for a in swatches if to_rgba(a.get_facecolor())[3] > 0]  # not the key's frame
     assert len(swatches) == 3
-    assert all(a.get_height() <= g.style.pt("series.bar.width") for a in swatches)
+    widest = max(b.width for b in bar_sets(g))
+    assert all(a.get_height() <= widest + 1e-9 for a in swatches)
     assert all(a.get_edgecolor()[:3] == (0, 0, 0) for a in swatches)
 
 
@@ -387,8 +392,8 @@ def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
     places = np.array([0.0, 1.0, 2.0, 1.0 + 1e-12, np.nan])  # 1 + 1e-12 is place 1
     xs = rng.choice(places, 5000)
     points = np.c_[xs, rng.uniform(0, 100, 5000)]
-    shifts = {0.0: -6.0, 1.0: 4.5}
-    transform = marks.PlaceShift(ax, "x", shifts)
+    shifts = {0.0: (0.0, -6.0), 1.0: (0.0, 4.5)}
+    transform = marks.PlaceShift(ax, "x", shifts, marks.Spacing(ax, "x", places))
     looked_up = []
     key = marks.key
     monkeypatch.setattr(marks, "key", lambda p: looked_up.append(p) or key(p))
@@ -397,7 +402,9 @@ def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
     px = g.figure.dpi / 72
     plain = ax.transData.transform(points)
     expected = plain.copy()
-    expected[:, 0] += [shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in xs]
+    expected[:, 0] += [
+        shifts.get(key(p), (0.0, 0.0))[1] * px if np.isfinite(p) else 0.0 for p in xs
+    ]
     assert np.array_equal(moved, expected, equal_nan=True)
     assert len(looked_up) <= len(places)
 
@@ -405,7 +412,7 @@ def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
 def test_series_opacity_fades_lines_markers_and_bars():
     g = graph(**{"series.opacity": 0.4, "mark.line.show": True, "mark.marker.show": True})
     assert {b.get_alpha() for b in bar_sets(g)} == {0.4}
-    lines = [ln for ln in g.axes.lines if ln.get_gid() is None and len(ln.get_xdata())]
+    lines = [ln for ln in g.axes.lines if ln.get_gid() is None and np.size(ln.get_xdata())]
     assert lines and {ln.get_alpha() for ln in lines} == {0.4}
     [key] = keys(g.axes)
     assert 0.4 in {a.get_alpha() for a in key.artists}  # the key's samples look like the series

@@ -41,8 +41,6 @@ baselines:          *# Numbered baselines: generic scenarios, each the
         mark.bar.show: true\
         mark.line.show: false\
         mark.marker.show: false\
-        series.bar.width: 1.8\
-        series.benchmark.bar.width: 1.8\
     stacked:          *# \[parameters and their values, or non-standard\]; The runs' bars stacked.*\
         axis.x.data.column: Cell\
         axis.y.data.column: "Power Density (mW/cm²)"\
@@ -56,8 +54,6 @@ baselines:          *# Numbered baselines: generic scenarios, each the
         mark.line.show: false\
         mark.marker.show: false\
         series.aggregation: sum\
-        series.bar.width: 1.8\
-        series.benchmark.bar.width: 1.8\
     labelled:          *# \[parameters and their values, or non-standard\]; The bars, each with its value.*\
         axis.x.data.column: Cell\
         axis.y.data.column: "Power Density (mW/cm²)"\

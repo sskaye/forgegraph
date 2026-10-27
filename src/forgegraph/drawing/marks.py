@@ -9,13 +9,15 @@ mark.bar; themes series.bar, series.value_label).
   added, so stacking them is an error.
 - **Bars** (mark.bar.show) run from 0 (1 on a log axis), or from the stack below, to each
   value; on a date value axis, where 0 is 1970, they're an error. Each series' bars are one
-  collection of rectangles (Bars), outlined in the theme's series.bar.edge.color and
-  edge.width (the benchmark's, series.benchmark.bar), whose width is the theme's
-  series.bar.width in points at any size: they're laid out again at every draw.
-- **Side by side** (series.offset) centres the marks at each place on it, in series order:
-  bars series.bar.gap apart, markers touching. A place with fewer series has fewer marks,
-  still centred. Bars, or side-by-side marks, wider than the space between places are an
-  error.
+  collection of rectangles (Bars), outlined in the theme's series.bar.edge (the benchmark's,
+  series.benchmark.bar.edge), that fill series.bar.width of the space between neighbouring
+  places (Spacing; with one place, of the plot area), at any size: they're laid out again at
+  every draw.
+- **Side by side** (series.offset) centres the marks at each place on it, in series order.
+  The bars at a place share their width of the space, each series series.bar.width ÷ n of
+  it (n: the most bars at any place), leaving series.bar.gap of its share empty; markers sit
+  touching, and wider than the space between places they're an error. A place with fewer
+  series has fewer marks, still centred.
 - **Value labels** (series.value_label) write each value by its mark: beyond it, or inside a
   bar's end (auto: inside where it fits); a stacked segment's at its centre; with total, each
   stack's total beyond its end. Labels beyond the plot area grow an automatic value axis;
@@ -167,9 +169,36 @@ def key(place: float) -> float:
     return round(float(place), 9)
 
 
+class Spacing:
+    """The distance between neighbouring places along the base axis, in points, as the axes
+    are now (with one place, the plot area's length): what bars' widths are fractions of."""
+
+    def __init__(self, ax: Axes, base_axis: str, places: np.ndarray) -> None:
+        self.ax, self.base_axis = ax, base_axis
+        finite = np.asarray(places, dtype=float)
+        self.places = np.unique(finite[np.isfinite(finite)])
+
+    def __call__(self) -> float:
+        px = self.ax.figure.dpi / 72  # type: ignore[union-attr]
+        vertical = self.base_axis == "x"
+        if len(self.places) < 2:
+            box = self.ax.bbox
+            return (box.width if vertical else box.height) / px
+        k = 0 if vertical else 1
+        at = [
+            self.ax.transData.transform((p, 1.0) if vertical else (1.0, p))[k] for p in self.places
+        ]
+        return float(np.min(np.abs(np.diff(at)))) / px
+
+
+def offset(shift: tuple[float, float], spacing: Spacing) -> float:
+    """A side-by-side offset in points: (a fraction of the spacing, points)."""
+    return shift[0] * spacing() + shift[1] if shift[0] else shift[1]
+
+
 def widths(s: Any, gt: dict[str, Any]) -> float:
     """A series' mark width along the base axis, in points: its bars, or its markers."""
-    return s.look.bar_width if gt["mark.bar.show"] else s.look.marker_size
+    return s.bar_fraction * s.spacing() if gt["mark.bar.show"] else s.look.marker_size
 
 
 def _present(series: list[Any]) -> dict[float, list[int]]:
@@ -182,19 +211,28 @@ def _present(series: list[Any]) -> dict[float, list[int]]:
     return at
 
 
-def slots(series: list[Any], gt: dict[str, Any], style: Style) -> list[dict[float, float]]:
-    """Each series' offset along the base axis at each of its places, in points: the marks at
-    a place centred on it, in series order, bars series.bar.gap apart."""
-    if gt["series.offset"] != "side_by_side":
-        return [{} for _ in series]
-    gap = style.pt("series.bar.gap") if gt["mark.bar.show"] else 0.0
-    out: list[dict[float, float]] = [{} for _ in series]
-    for place, present in _present(series).items():
-        each = [widths(series[i], gt) for i in present]
-        start = -(sum(each) + gap * (len(each) - 1)) / 2
-        for i, w in zip(present, each, strict=True):
-            out[i][place] = start + w / 2
-            start += w + gap
+def slots(
+    series: list[Any], gt: dict[str, Any], style: Style
+) -> list[dict[float, tuple[float, float]]]:
+    """Each series' offset along the base axis at each of its places, as (a fraction of the
+    spacing, points), the marks at a place centred on it, in series order; and each series'
+    bar width as a fraction of the spacing (bar_fraction), with its share's gap left out."""
+    side = gt["series.offset"] == "side_by_side"
+    present = _present(series)
+    n = max((len(p) for p in present.values()), default=1) if side else 1
+    gap = float(style.theme["series.bar.gap"]) if side else 0.0
+    for s in series:
+        s.bar_fraction = float(s.look.bar_width) / n * (1 - gap)
+    out: list[dict[float, tuple[float, float]]] = [{} for _ in series]
+    if not side:
+        return out
+    bars = bool(gt["mark.bar.show"])
+    for place, at in present.items():
+        each = [float(series[i].look.bar_width) / n if bars else widths(series[i], gt) for i in at]
+        start = -sum(each) / 2
+        for i, w in zip(at, each, strict=True):
+            out[i][place] = (start + w / 2, 0.0) if bars else (0.0, start + w / 2)
+            start += w
     return out
 
 
@@ -205,9 +243,12 @@ class PlaceShift(Transform):
     input_dims = output_dims = 2  # type: ignore[assignment]  # matplotlib declares them so
     pass_through = True  # it keeps no cache of its own, so it always passes a change on
 
-    def __init__(self, ax: Axes, base_axis: str, shifts: dict[float, float]) -> None:
+    def __init__(
+        self, ax: Axes, base_axis: str, shifts: dict[float, tuple[float, float]], spacing: Spacing
+    ) -> None:
         super().__init__(shorthand_name="place shift")
         self.ax, self.k, self.shifts = ax, 0 if base_axis == "x" else 1, shifts
+        self.spacing = spacing
         self.set_children(ax.transData)  # redone whenever the data transform changes
 
     def transform_non_affine(self, values: Any) -> np.ndarray:
@@ -216,7 +257,12 @@ class PlaceShift(Transform):
         out = np.array(self.ax.transData.transform(flat), dtype=float)
         px = self.ax.figure.dpi / 72  # type: ignore[union-attr]
         places, which = np.unique(flat[:, self.k], return_inverse=True)  # few places, many points
-        moves = [self.shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in places]
+        moves = [
+            offset(self.shifts.get(key(p), (0.0, 0.0)), self.spacing) * px
+            if np.isfinite(p)
+            else 0.0
+            for p in places
+        ]
         out[:, self.k] += np.asarray(moves, dtype=float)[which]
         return out.reshape(points.shape)
 
@@ -229,17 +275,19 @@ class PlaceShift(Transform):
         return self.ax.transData.inverted()
 
 
-def shifted(ax: Axes, base_axis: str, shifts: dict[float, float]) -> Any:
+def shifted(
+    ax: Axes, base_axis: str, shifts: dict[float, tuple[float, float]], spacing: Spacing
+) -> Any:
     """Data coordinates moved along the base axis by each place's offset."""
-    if not any(shifts.values()):
+    if not any(any(s) for s in shifts.values()):
         return ax.transData
-    return PlaceShift(ax, base_axis, shifts)
+    return PlaceShift(ax, base_axis, shifts, spacing)
 
 
 class Bars(PolyCollection):
-    """One series' bars: a rectangle from each bottom to each top, width points wide across
-    the base axis and moved by its place's offset. The rectangles are laid out in display px
-    again at every draw, so their width stays exact at any size or resolution.
+    """One series' bars: a rectangle from each bottom to each top, fraction of the spacing
+    wide across the base axis and moved by its place's offset. The rectangles are laid out in
+    display px again at every draw, so their width stays exact at any size or resolution.
 
     A raster renderer (Agg) rounds every tick mark to the pixel grid, so there each bar is
     placed from where its place's tick is drawn, its edges whole pixels the same distance
@@ -251,8 +299,9 @@ class Bars(PolyCollection):
         places: np.ndarray,
         stacked: Stacked,
         base_axis: str,
-        shifts: dict[float, float],
-        width: float,
+        shifts: dict[float, tuple[float, float]],
+        spacing: Spacing,
+        fraction: float,
         color: Any,
         edge: str,
         edge_width: float,
@@ -270,10 +319,15 @@ class Bars(PolyCollection):
         self.set_transform(IdentityTransform())
         self.set_snap(False)  # placed on the pixel grid here, when it's raster
         self.set_gid(BAR)
-        self.ax, self.base_axis, self.shifts = ax, base_axis, shifts
+        self.ax, self.base_axis, self.shifts, self.spacing = ax, base_axis, shifts, spacing
         self.places = np.asarray(places, dtype=float)
         self.bottom, self.top = np.asarray(stacked.bottom), np.asarray(stacked.top)
-        self.width, self.color, self.edge, self.edge_width = width, color, edge, edge_width
+        self.fraction, self.color, self.edge, self.edge_width = fraction, color, edge, edge_width
+
+    @property
+    def width(self) -> float:
+        """The bars' width in points, as the axes are now."""
+        return self.fraction * self.spacing()
 
     def rectangles(self, raster: float | None = None) -> list[Bbox]:
         """Each bar's rectangle in display px, as the axes are now; raster (the canvas's
@@ -289,7 +343,7 @@ class Bars(PolyCollection):
                 continue
             a = self.ax.transData.transform((p, lo) if vertical else (lo, p))
             b = self.ax.transData.transform((p, hi) if vertical else (hi, p))
-            shift = self.shifts.get(key(p), 0.0) * px
+            shift = offset(self.shifts.get(key(p), (0.0, 0.0)), self.spacing) * px
             start, end = sorted((a[1 - k], b[1 - k]))
             if tick is None:
                 near, far = a[k] + shift - half, a[k] + shift + half
@@ -356,7 +410,8 @@ def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
         s.stack,
         base_axis,
         s.shifts,
-        look.bar_width,
+        s.spacing,
+        s.bar_fraction,
         color,
         look.bar_edge,
         look.bar_edge_width,
@@ -380,11 +435,10 @@ def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
 def check_room(
     ax: Axes, series: list[Any], gt: dict[str, Any], style: Style, base_axis: str
 ) -> None:
-    """Bars, or side-by-side marks, must fit between neighbouring places."""
-    side = gt["series.offset"] == "side_by_side"
-    if not (gt["mark.bar.show"] or side):
+    """Side-by-side markers must fit between neighbouring places; bars always do, being a
+    fraction of the space."""
+    if gt["series.offset"] != "side_by_side" or gt["mark.bar.show"]:
         return
-    gap = style.pt("series.bar.gap") if gt["mark.bar.show"] else 0.0
     at = {p: [widths(series[i], gt) for i in present] for p, present in _present(series).items()}
     places = sorted(at)
     if len(places) < 2:
@@ -392,20 +446,13 @@ def check_room(
     k = 0 if base_axis == "x" else 1
     px = [ax.transData.transform((p, 1.0) if base_axis == "x" else (1.0, p))[k] for p in places]
     room = min(abs(b - a) for a, b in pairwise(px)) * 72 / ax.figure.dpi  # type: ignore[union-attr]
-    need = max((sum(each) + gap * (len(each) - 1)) if side else max(each) for each in at.values())
-    count = max(len(each) for each in at.values()) if side else 1
+    need = max(sum(each) for each in at.values())
+    count = max(len(each) for each in at.values())
     if need > room:
-        what = f"{count} side by side" if count > 1 else "each bar"
-        now = f"{float(style.theme['series.bar.width']):g}"
-        narrow = (
-            "narrow the bars in the theme"
-            if "series.bar.width" in style.fixed
-            else f"set a smaller series.bar.width in the GraphSpec (now {now})"
-        )
         raise DrawError(
-            f"series.bar.width: {what} {'need' if count > 1 else 'needs'} {need:.1f} pt at each "
-            f"place, but places are {room:.1f} pt apart; {narrow}, widen the format, or show "
-            "fewer places or series"
+            f"series.offset: {count} markers side by side need {need:.1f} pt at each place, "
+            f"but places are {room:.1f} pt apart; make the markers smaller "
+            "(series.marker.size), widen the format, or show fewer places or series"
         )
 
 
@@ -499,7 +546,7 @@ def value_labels(
         ):
             if not (np.isfinite(value) and np.isfinite(top)):
                 continue
-            off = shifts.get(key(place), 0.0)
+            off = offset(shifts.get(key(place), (0.0, 0.0)), s.spacing)
             text = text_of(value)
             sign = 1.0 if value >= 0 else -1.0
             if how != "none":

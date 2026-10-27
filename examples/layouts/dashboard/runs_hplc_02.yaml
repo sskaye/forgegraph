@@ -5,8 +5,8 @@ extends: None
 parameters: !var
     specifications:
         graph_type: xy
-        theme: forgegraph_base/base_theme
-        format: forgegraph_base/base_format
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
     text:
         title: HPLC-02
     data:
@@ -21,8 +21,3 @@ parameters: !var
             min: 0
     series:
         Completed runs: {}
-    grid:
-        x:
-            show: true
-        y:
-            show: true

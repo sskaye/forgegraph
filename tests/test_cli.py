@@ -54,7 +54,7 @@ def test_render_reports_problems(project):
 
 def test_explain_shows_where_values_come_from(project):
     rows = {(r["kind"], r["parameter"]): r for r in cli("explain", "graphspecs/p.yaml")["values"]}
-    assert rows["theme", "text.font"]["set_by"] == "theme 'forgegraph_base/base_theme'"
+    assert rows["theme", "text.font"]["set_by"] == "theme 'forgegraph_default/light_theme'"
     assert rows["graph_type", "axis.x.data.column"]["set_by"] == "GraphSpec 'p'"
     assert rows["graphspec", "data.file"]["value"] == "../data/p.parquet"
 
@@ -66,10 +66,10 @@ def test_schema():
 
 
 def test_schema_says_which_parameters_are_fixed():
-    lines = runner.invoke(app, ["schema", "theme"]).output.splitlines()
-    [font] = [ln for ln in lines if ln.strip().startswith("text.font =")]
-    [grid] = [ln for ln in lines if ln.strip().startswith("grid.y.show =")]
-    assert font.endswith("Fixed: set by the theme.") and "Fixed" not in grid
+    lines = runner.invoke(app, ["schema", "graph_type"]).output.splitlines()
+    [types] = [ln for ln in lines if ln.strip().startswith("layer.types =")]
+    [scale] = [ln for ln in lines if ln.strip().startswith("axis.x.scale =")]
+    assert types.endswith("Fixed: set by the graph type.") and "Fixed" not in scale
 
 
 def test_render_reports_lint(project):
@@ -83,8 +83,8 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     house = write_pack(project)
     (house / "themes").mkdir()
     (house / "themes" / "plain.yaml").write_text(
-        "name: plain\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "parameters:\n    grid:\n        y:\n            show: true\n"
+        "name: plain\nversion: 0\ndescription: test\nextends: forgegraph_default/light_theme\n"
+        "parameters:\n    grid:\n        y:\n            show: !var true\n"
     )
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n\nUse plain.\n")
@@ -110,7 +110,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     assert [p["name"] for p in listed["packs"]] == ["house"]
     assert [g["name"] for g in listed["graph_types"]] == ["xy"]  # always
     assert "reference" in [g["name"] for g in listed["layers"]]
-    assert [t["name"] for t in listed["themes"]] == ["house/plain"]  # not forgegraph_base's
+    assert [t["name"] for t in listed["themes"]] == ["house/plain"]  # not forgegraph_default's
     assert listed["references"] == [
         {"name": "house/style", "description": "House style", "nonstandard": True}
     ]
@@ -168,9 +168,8 @@ def test_catalog_lists_one_kind(project):
     listed = cli("catalog", "themes")
     assert set(listed) == {"ok", "folder", "configs", "packs", "themes", "parameters"}
     assert [t["name"] for t in listed["themes"]] == [
-        "forgegraph_base/base_theme",
-        "forgegraph_base_2/base_theme",
-    ]  # both built-in packs, which a new main config lists
+        "forgegraph_default/light_theme"
+    ]  # the built-in pack, which a new main config lists
 
 
 def test_render_keeps_dots_in_the_name(project):
@@ -187,7 +186,7 @@ def test_json_errors_are_json(project):
 
 def _unknown_packs(folder: Path) -> list[str]:
     """A folder config there naming two packs that aren't installed; the problems it gives."""
-    write_config(folder / "forgegraph.toml", "forgegraph_base", "nowhere", "elsewhere")
+    write_config(folder / "forgegraph.toml", "forgegraph_default", "nowhere", "elsewhere")
     config = folder / "forgegraph.toml"
     return [
         f"{config}: packs: no pack '{name}' is installed; a folder pack is written as a path, "
@@ -219,12 +218,12 @@ def test_explain_reports_a_pack_problem(project):
     assert result.output.splitlines() == [f"error: {p}" for p in expected]
 
 
-BASE_NAMES = ["--graph-type", "xy", "--theme", "forgegraph_base/base_theme",
-              "--format", "forgegraph_base/base_format"]  # fmt: skip
+BASE_NAMES = ["--graph-type", "xy", "--theme", "forgegraph_default/light_theme",
+              "--format", "forgegraph_default/compact_format"]  # fmt: skip
 
 
 def test_schema_graphspec_needs_its_three_names():
-    assert cli_problems("schema", "graphspec", "--theme", "forgegraph_base/base_theme") == [
+    assert cli_problems("schema", "graphspec", "--theme", "forgegraph_default/light_theme") == [
         "schema graphspec needs --graph-type, --format"
     ]
     assert "graphspec" not in cli("schema")  # every kind but graphspec
@@ -291,10 +290,10 @@ def test_schema_lists_what_a_graphspec_can_set(project):
     house = write_pack(project)
     (house / "themes").mkdir()
     (house / "themes" / "grid.yaml").write_text(
-        "name: grid\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "parameters:\n    grid:\n        y:\n            show: true\n"
+        "name: grid\nversion: 0\ndescription: test\nextends: forgegraph_default/light_theme\n"
+        "parameters:\n    grid:\n        y:\n            show: !var true\n"
     )
-    allow(project, "forgegraph_base", "./house")
+    allow(project, "forgegraph_default", "./house")
     listed = cli("schema", "graphspec", *BASE_NAMES, "--theme", "house/grid")["graphspec"]
     rows = {r["parameter"]: r for r in listed}
     assert rows["specifications.theme"]["value"] == "house/grid"
@@ -319,14 +318,14 @@ def test_commands_label_a_nonstandard_pack(project, monkeypatch):
     house = write_pack(project)
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n")
-    allow(project, "forgegraph_base", "./house")
+    allow(project, "forgegraph_default", "./house")
     note = (
-        f"Non-standard: packs 'forgegraph_base', 'house' aren't in the main config ({main}), "
+        f"Non-standard: packs 'forgegraph_default', 'house' aren't in the main config ({main}), "
         "so whatever is drawn with them is watermarked"
     )
     rendered = cli("render", "graphspecs/p.yaml", "-o", "out/p")
     assert rendered["nonstandard"] == (
-        f"Non-standard: pack 'forgegraph_base' isn't in the main config ({main}), so whatever "
+        f"Non-standard: pack 'forgegraph_default' isn't in the main config ({main}), so whatever "
         "is drawn with it is watermarked"
     )
     assert cli("explain", "graphspecs/p.yaml")["nonstandard"] == rendered["nonstandard"]
@@ -340,15 +339,17 @@ def test_commands_label_a_nonstandard_pack(project, monkeypatch):
     schema = cli("schema", "graphspec", *BASE_NAMES)
     assert schema["notes"] == [rendered["nonstandard"]]
     loaded = runner.invoke(app, ["load", "out/p.png"]).output
-    assert "non-standard: drawn with packs the main config didn't list: forgegraph_base" in loaded
+    assert (
+        "non-standard: drawn with packs the main config didn't list: forgegraph_default" in loaded
+    )
 
 
 def test_schema_says_when_a_spec_cant_be_used_here(project):
     shutil.copytree(Path(__file__).parents[1] / "examples" / "packs" / "acme", project / "acme")
     main = os.environ["FORGEGRAPH_CONFIG"]
     with open(main, "w") as f:
-        f.write(f"packs = ['forgegraph_base', '{project / 'acme'}']\n")
-    allow(project, "forgegraph_base")
+        f.write(f"packs = ['forgegraph_default', '{project / 'acme'}']\n")
+    allow(project, "forgegraph_default")
     schema = cli("schema", "graphspec", *BASE_NAMES, "--theme", "acme/acme")
     assert schema["notes"] == [
         "Not allowed here: pack 'acme' isn't in the configs that apply, so a GraphSpec here "

@@ -40,14 +40,16 @@ class Recreation:
     format: dict[str, Any] = field(default_factory=dict)
 
     def graphspec(self) -> dict[str, Any]:
-        fmt = "changed" if self.format else "forgegraph_base/base_format"
+        fmt = "changed" if self.format else "forgegraph_default/compact_format"
         settings = with_series(self.settings)
         return fg.graphspec(self.name, "xy", format=fmt, title=self.title, settings=settings)
 
     def registry(self) -> Registry:
         reg = builtin().copy()
         if self.format:
-            fmt = doc("forgegraph_base/base_format", "changed", fixed=self.format, description="")
+            fmt = doc(
+                "forgegraph_default/compact_format", "changed", fixed=self.format, description=""
+            )
             reg.add("format", fmt)
         return reg
 
@@ -348,17 +350,20 @@ class LayoutRecreation:
         into folder, and draw it, with a main config of its own allowing house, so it's
         standard."""
         write_pack(folder)
-        allow(folder, "forgegraph_base", "./house")
-        main = write_config(folder / "main.toml", "forgegraph_base", "./house")
+        allow(folder, "forgegraph_default", "./house")
+        main = write_config(folder / "main.toml", "forgegraph_default", "./house")
         fmt = doc(
-            "forgegraph_base/base_format", "slide", fixed={"figure": self.format}, description=""
+            "forgegraph_default/compact_format",
+            "slide",
+            fixed={"figure": self.format},
+            description="",
         )
         dump(fmt, folder / "house" / "formats" / "slide.yaml")
         for name, r in self.tiles.items():
             dump(r.graphspec(), folder / f"{name}.yaml")
         tiles = {name: f"{name}.yaml" for name in self.tiles}
         layout = doc(
-            "forgegraph_base/layout_example",
+            "forgegraph_default/layout",
             self.name,
             variable={
                 "specifications.format": "house/slide",

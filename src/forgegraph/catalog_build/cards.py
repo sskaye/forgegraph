@@ -25,7 +25,7 @@ graph type's or layer type's definition's), its range and the baseline's data:
 8. Then the range's words after d, in the range's order and wrapping round, without d; for
    a list default, the one-item list of each word after d's first, then d reversed.
 9. Last, d itself, which changes the drawing where the GraphSpec sets another value (the
-   base pack's example sets a benchmark).
+   default pack's example sets a benchmark).
 
 A value outside the range isn't a candidate. A card setting one of the parameters TIES ties
 to None sets the others to None too, and one setting arrangement.base_axis moves the base

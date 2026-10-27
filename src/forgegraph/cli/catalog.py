@@ -186,12 +186,12 @@ def catalog_build(
     as_json: Json = False,
 ) -> None:
     """Build a catalog page, keeping the review comments it already has: ForgeGraph's (its
-    graph types, layer types and base pack), or with --pack, that pack's themes and formats."""
+    graph types, layer types and default pack), or with --pack, that pack's themes and formats."""
     from forgegraph.catalog_build.build import build
-    from forgegraph.spec.parameters import BASE
+    from forgegraph.spec.parameters import DEFAULT
 
     chosen = _pack(pack)
-    saved = out or Path("catalog") / f"{BASE if chosen is None else chosen.name}.html"
+    saved = out or Path("catalog") / f"{DEFAULT if chosen is None else chosen.name}.html"
     lint = build(saved, chosen)
 
     def text() -> None:
@@ -206,7 +206,7 @@ def catalog_build(
 @json_errors
 def catalog_check(
     page: Annotated[Path, typer.Argument(help="A catalog page.")] = Path(
-        "catalog/forgegraph_base.html"
+        "catalog/forgegraph_default.html"
     ),
     pack: PackFolder = None,
     as_json: Json = False,

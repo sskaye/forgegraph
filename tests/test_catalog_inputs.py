@@ -10,7 +10,7 @@ import pytest
 
 import forgegraph
 from forgegraph.catalog_build import build
-from forgegraph.spec.parameters import BASE
+from forgegraph.spec.parameters import DEFAULT
 
 PACKAGE = Path(forgegraph.__file__).parent
 
@@ -35,9 +35,10 @@ def _edit(path: Path) -> None:
         "drawing/marks.py",
         "graph.py",
         "spec/resolve.py",
-        "graph_types/xy.yaml",
-        "layers/error_bar.yaml",
-        f"packs/{BASE}/themes/base_theme.yaml",
+        "specifications/graphtype_xy.yaml",
+        "specifications/layer_error_bar.yaml",
+        "specifications/catalogs/layer_note.yaml",
+        f"packs/{DEFAULT}/themes/light_theme.yaml",
         "catalog_build/page.py",
         "fonts/__init__.py",
     ],
@@ -63,23 +64,31 @@ def test_a_change_the_catalog_cant_depend_on_leaves_it_current(package, name):
     assert build.inputs_hash() == before
 
 
-def test_another_built_in_packs_files_leave_the_base_catalog_current(package):
+def test_another_packs_files_in_the_package_leave_the_default_catalog_current(package):
+    other = package / "packs" / "other"
+    shutil.copytree(package / "packs" / DEFAULT, other)
     before = build.inputs_hash()
-    _edit(package / "packs" / "forgegraph_base_2" / "themes" / "base_theme.yaml")
+    _edit(other / "themes" / "light_theme.yaml")
     assert build.inputs_hash() == before
 
 
-def test_a_packs_catalog_follows_its_own_files(package):
+def test_a_packs_catalog_follows_its_own_files(package, tmp_path):
     from forgegraph.packs import read_pack
 
-    pack = read_pack(package / "packs" / "forgegraph_base_2", "built in")
+    folder = tmp_path / "house"
+    shutil.copytree(package / "packs" / DEFAULT, folder)
+    (folder / "pack.yaml").write_text(
+        "name: house\nversion: 1.0.0\ndescription: Test pack.\n"
+        "issues: https://example.com/house/issues\nrequires: None\n"
+    )
+    pack = read_pack(folder, "folder")
     before = build.inputs_hash(pack)
-    _edit(pack.folder / "themes" / "base_theme.yaml")
+    _edit(pack.folder / "themes" / "light_theme.yaml")
     assert build.inputs_hash(pack) != before
 
 
 @pytest.mark.parametrize(
-    "name", ["drawing/xy.py", "packs/config.toml", "skill/forgegraph/SKILL.md"]
+    "name", ["drawing/xy.py", "specifications/config.toml", "skill/forgegraph/SKILL.md"]
 )
 def test_line_endings_dont_count(package, name):
     """Whatever kind of text file: a Windows checkout writes CRLF line endings."""

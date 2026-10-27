@@ -13,7 +13,7 @@ from typing import Any, cast
 import numpy as np
 import pytest
 from matplotlib.lines import Line2D
-from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, write_pack
+from pack_helpers import BUILT_IN, allow, cli_problems, doc, dump, graphspec_file, write_pack
 from PIL import Image
 from render_helpers import BASE, painted_draws, polarization, with_series
 from typer.testing import CliRunner
@@ -24,6 +24,7 @@ from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.layout import visible_extent
 from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.layout import slug
+from forgegraph.spec.parameters import definition_file
 from forgegraph.spec.registry import builtin
 from forgegraph.spec.tags import fix
 from forgegraph.spec.validate import validate
@@ -35,13 +36,14 @@ FORMAT = {"width": 200, "height": "auto", "base_size": 10}
 def _format(name: str, file_types: tuple[str, ...] = ("png",), **figure: Any) -> dict[str, Any]:
     fixed = {"figure": {**FORMAT, **figure}}
     variable = {"output.file_types": list(file_types)}
-    return doc("forgegraph_base/base_format", name, fixed=fixed, variable=variable)
+    return doc("forgegraph_default/compact_format", name, fixed=fixed, variable=variable)
 
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     """A project: the example data, GraphSpecs whose y tick labels differ in width, a theme
-    with other colors, and formats with an auto and a fixed height."""
+    with other colors, formats with an auto and a fixed height, and a layout to extend that
+    is the layout specification's own: it sets no separator's look."""
     for name, y, extra in (
         ("volt", "cell_voltage", {}),
         ("power", "power_density", {}),
@@ -50,28 +52,36 @@ def project(tmp_path, monkeypatch):
         graphspec_file(
             tmp_path,
             name,
-            theme="house/bright" if name == "bright" else "forgegraph_base/base_theme",
+            theme="house/bright" if name == "bright" else "forgegraph_default/light_theme",
             settings={**BASE, "axis.y.data.column": y, **extra},
         )
-    theme = doc("forgegraph_base/base_theme", "bright", variable={"series.colors": "tol_bright"})
+    theme = doc(
+        "forgegraph_default/light_theme", "bright", variable={"series.colors": "tol_bright"}
+    )
     dump(theme, tmp_path / "house" / "themes" / "bright.yaml")
     dump(_format("auto"), tmp_path / "house" / "formats" / "auto.yaml")
     dump(_format("fixed", height=150), tmp_path / "house" / "formats" / "fixed.yaml")
+    (tmp_path / "house" / "layouts").mkdir()
+    spec = definition_file("layout").read_text(encoding="utf-8")
+    plain = spec.replace("name: layout_example ", "name: plain ", 1)
+    (tmp_path / "house" / "layouts" / "plain.yaml").write_text(plain, encoding="utf-8")
     write_pack(tmp_path)
-    allow(tmp_path, "forgegraph_base", "./house")
+    allow(tmp_path, "forgegraph_default", "./house")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     return tmp_path
 
 
 def write_layout(
-    folder, tabs: dict[str, Any], name: str = "fig", fmt: str = "house/auto", **variable: Any
+    folder,
+    tabs: dict[str, Any],
+    name: str = "fig",
+    fmt: str = "house/auto",
+    extends: str = "house/plain",
+    **variable: Any,
 ) -> Any:
     variable = {"specifications": {"format": fmt}, **variable, "tabs": tabs}
-    return dump(
-        doc("forgegraph_base/layout_example", name, variable=variable),
-        folder / f"{name}.layout.yaml",
-    )
+    return dump(doc(extends, name, variable=variable), folder / f"{name}.layout.yaml")
 
 
 def tab(areas: list[list[str]], **tiles: str) -> dict[str, Any]:
@@ -108,7 +118,8 @@ def test_only_the_last_draw_of_a_tab_paints(project, monkeypatch):
 @pytest.mark.slow
 def test_one_save_inspects_each_tab_once_whatever_it_writes(project, monkeypatch):
     tabs = {"A": tab([["volt"]], volt="volt.yaml"), "B": tab([["power"]], power="power.yaml")}
-    layout = fg.layout(write_layout(project, tabs, fmt="forgegraph_base/base_layout_format"))
+    standard = {"fmt": "forgegraph_default/wide_format", "extends": "forgegraph_default/layout"}
+    layout = fg.layout(write_layout(project, tabs, **standard))
     assert not layout.nonstandard  # standard tabs are the ones inspected
     hashes = []
     for t in layout.tabs:
@@ -124,7 +135,8 @@ def test_a_layouts_checks_records_and_saves(project, tmp_path, monkeypatch):
     """What Graph offers, a layout offers too: lint by tab, non-standard by tab, a record
     (none with provenance off), a save under its own name, and a PNG for notebooks."""
     tabs = {"A": tab([["volt"]], volt="volt.yaml"), "B": tab([["power"]], power="power.yaml")}
-    layout = fg.layout(write_layout(project, tabs, fmt="forgegraph_base/base_layout_format"))
+    standard = {"fmt": "forgegraph_default/wide_format", "extends": "forgegraph_default/layout"}
+    layout = fg.layout(write_layout(project, tabs, **standard))
     assert layout.check() == layout.issues
     assert all(not t.nonstandard for t in layout.tabs)
     assert layout.record() is not None
@@ -146,7 +158,7 @@ def test_tiles_a_parent_layout_lists_are_found_from_its_folder(project):
     parent.rename(layouts / "shared.yaml")
     work = project / "work"
     work.mkdir()
-    allow(work, "forgegraph_base", "../house")
+    allow(work, "forgegraph_default", "../house")
     dump(doc("house/shared", "mine"), work / "mine.layout.yaml")
     layout = fg.layout(work / "mine.layout.yaml")
     assert list(layout.tabs[0].tiles) == ["v"]
@@ -438,7 +450,7 @@ def test_tile_backgrounds_can_have_rounded_corners(project):
 
 @pytest.mark.slow
 def test_the_gaps_take_the_first_tiles_theme_background(project):
-    red = doc("forgegraph_base/base_theme", "red", variable={"background.color": "#FF0000"})
+    red = doc("forgegraph_default/light_theme", "red", variable={"background.color": "#FF0000"})
     dump(red, project / "house" / "themes" / "red.yaml")
     graphspec_file(project, "reddish", theme="house/red", settings={**BASE})
     tiles = {"T": tab([["reddish", "volt"]], reddish="reddish.yaml", volt="volt.yaml")}
@@ -501,8 +513,12 @@ def test_a_layout_sets_its_formats_variable_parameters(project):
 
 
 def test_a_layout_cant_set_its_formats_fixed_parameters():
-    [found] = _check({"figure": {"width": 200}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
-    assert found == "figure.width: fixed by format 'forgegraph_base/base_layout_format'"
+    reg = builtin().copy()
+    reg.add("format", doc(BUILT_IN["format"], "pinned", fixed={"figure.width": 300}))
+    variable = {"figure": {"width": 200}, "tabs": {"T": tab([["a"]], a="a.yaml")}}
+    layout = doc(BUILT_IN["layout"], variable={**variable, "specifications": {"format": "pinned"}})
+    [found] = validate("layout", layout, reg)
+    assert found == "figure.width: fixed by format 'pinned'"
 
 
 @pytest.mark.slow
@@ -600,7 +616,7 @@ def test_a_graphspec_saves_as_a_page(project):
 
 
 def _check(variable: dict[str, Any]) -> list[str]:
-    layout = doc("forgegraph_base/layout_example", variable=variable)
+    layout = doc("forgegraph_default/layout", variable=variable)
     return validate("layout", layout, builtin().copy())
 
 
@@ -631,7 +647,7 @@ def test_sizes_need_one_per_column_or_row():
 def test_row_heights_with_height_auto_is_an_error():
     grid = {"areas": [["a"], ["b"]], "row_heights": [1, 2]}
     [found] = _check({"tabs": {"T": {"grid": grid, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}})
-    assert "format 'forgegraph_base/base_layout_format' has figure.height auto" in found
+    assert "format 'forgegraph_default/wide_format' has figure.height auto" in found
 
 
 def test_tile_names_are_unique_and_tab_names_give_distinct_files():
@@ -654,7 +670,7 @@ def test_a_layouts_tabs_replace_those_it_inherits(project):
         "specifications.format": "house/auto",
         "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
     }
-    base = doc("forgegraph_base/layout_example", "base", variable=old)
+    base = doc("forgegraph_default/layout", "base", variable=old)
     dump(base, project / "house" / "layouts" / "base.yaml")
     new = {"tabs": {"New": tab([["power"]], power="power.yaml")}}
     dump(doc("house/base", "child", variable=new), project / "child.layout.yaml")
@@ -665,7 +681,7 @@ def test_a_layouts_tabs_replace_those_it_inherits(project):
 def test_tabs_tagged_fix_cant_be_replaced_and_tags_go_on_tabs():
     reg = builtin().copy()
     base = doc(
-        "forgegraph_base/layout_example", "base", fixed={"tabs": {"Old": tab([["a"]], a="a.yaml")}}
+        "forgegraph_default/layout", "base", fixed={"tabs": {"Old": tab([["a"]], a="a.yaml")}}
     )
     reg.add("layout", base)
     child = doc("base", "child", untagged={"tabs": {"New": tab([["b"]], b="b.yaml")}})

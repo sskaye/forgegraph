@@ -85,7 +85,8 @@ def test_line_styles_by_series_with_colors_from_a_column_get_a_style_key():
 
 
 def test_each_series_shows_its_own_marks():
-    g = graph({"a": {"bar": {"show": True}, "line": {"show": False}}, "b": {}})
+    shown = {"a": {"bar": {"show": True}, "line": {"show": False}}, "b": {}}
+    g = graph(shown, **{"legend.key.inside": False})
     [bars] = [c for c in g.axes.collections if isinstance(c, Bars)]
     assert bars.top.tolist() == [1.0, 3.0, 2.0, 4.0]  # a's bars only
     a, b = drawn(g)
@@ -216,7 +217,7 @@ def test_a_series_sets_the_themes_variable_look_for_itself():
     assert a.get_markersize() == pytest.approx(0.9 * base.base)
     assert b.get_markersize() == pytest.approx(base.pt("series.marker.size"))
     assert a.get_alpha() == 0.5 and b.get_alpha() == 1
-    message = "series.a.line.width: fixed by theme 'forgegraph_base/base_theme'"
+    message = "series.a.line.width: fixed by theme 'forgegraph_default/light_theme'"
     with pytest.raises(fg.SpecError, match=re.escape(message)):
         graph({"a": {"line": {"width": 0.5}}})
 

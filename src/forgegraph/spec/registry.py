@@ -1,6 +1,6 @@
 """The registry: every spec ForgeGraph knows, by kind and name, and where each was read from.
 
-ForgeGraph's graph types and layer types and the base pack are always known; a file being
+ForgeGraph's graph types and layer types and the default pack are always known; a file being
 drawn also knows the packs its configs list (see packs), and the installed pip packs their
 specs build on.
 """
@@ -10,13 +10,20 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from functools import cache
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 from forgegraph.packs import FOLDERS as PACK_FOLDERS
 from forgegraph.packs import Config, Pack, pip_packs, read_pack, setup
-from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, NAMES, PARAMETERS, base_folder
+from forgegraph.spec.parameters import (
+    CORE_KINDS,
+    DEFAULT,
+    KINDS,
+    NAMES,
+    PARAMETERS,
+    core_files,
+    default_folder,
+)
 from forgegraph.spec.tags import loader, untag
 
 _yaml = loader()
@@ -48,7 +55,7 @@ class Registry:
     )
     paths: dict[str, dict[str, Path]] = field(default_factory=lambda: {kind: {} for kind in KINDS})
     packs: dict[str, Pack] = field(default_factory=dict)
-    allowed: frozenset[str] = frozenset({BASE})
+    allowed: frozenset[str] = frozenset({DEFAULT})
     configs: tuple[Config, ...] = ()
     nonstandard: frozenset[str] = frozenset()
 
@@ -117,7 +124,7 @@ class Registry:
     def allows(self) -> str:
         """How a pack that may not be used is described: '... which <this>'."""
         if not self.configs:
-            return f"isn't allowed: no config lists it, and without one only {BASE} may be used"
+            return f"isn't allowed: no config lists it, and without one only {DEFAULT} may be used"
         return " and ".join(str(c.path) for c in self.configs) + " doesn't allow"
 
     def spec_record(self, kind: str, name: str) -> dict[str, Any]:
@@ -143,19 +150,19 @@ class Registry:
 
 @cache
 def _core() -> Registry:
-    """ForgeGraph's graph types and layer types, and the base pack, which every pack's specs
+    """ForgeGraph's graph types and layer types, and the default pack, which every pack's specs
     may extend."""
     reg = Registry()
     for kind in CORE_KINDS:
-        for path in sorted(Path(str(files("forgegraph") / KINDS[kind])).glob("*.yaml")):
+        for path in core_files(kind):
             doc = load_yaml(path)
             if isinstance(doc, dict) and "name" in doc:
                 reg.add(kind, doc, path)
-    return reg.add_pack(read_pack(base_folder(), "built in", BASE))
+    return reg.add_pack(read_pack(default_folder(), "built in", DEFAULT))
 
 
 def builtin() -> Registry:
-    """The registry with no config: only the base pack may be used."""
+    """The registry with no config: only the default pack may be used."""
     return _core().copy()
 
 
@@ -166,7 +173,7 @@ def registry_for(start: Path) -> Registry:
     found = setup(start)
     reg = _core().copy()
     for pack in found.listed.values():
-        if pack.name != BASE:
+        if pack.name != DEFAULT:
             reg.add_pack(pack)
     reg.allowed = frozenset(found.packs)
     reg.configs = found.configs

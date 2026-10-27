@@ -16,12 +16,11 @@ from forgegraph import forgemark
 from forgegraph.catalog_build import build
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, open_commented, page
 from forgegraph.cli import app
-from forgegraph.packs import built_in_folder, read_pack
 
 pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 
 ROOT = Path(__file__).parents[1]
-CATALOG = ROOT / "catalog" / "forgegraph_base.html"
+CATALOG = ROOT / "catalog" / "forgegraph_default.html"
 FIXTURE = Path(__file__).parent / "fixtures" / "catalog_comments.html"
 # A 1x1 white PNG: the round trip is about text and ids, not pictures.
 DOT = bytes.fromhex(
@@ -72,16 +71,7 @@ def test_building_twice_gives_the_same_page(monkeypatch):
 def test_the_catalog_is_current():
     """Rebuild with `uv run forgegraph catalog build` after changing definitions or drawing."""
     assert build.current(CATALOG), (
-        "catalog/forgegraph_base.html is out of date: run forgegraph catalog build"
-    )
-
-
-def test_the_forgegraph_base_2_catalog_is_current():
-    """Rebuild with `uv run forgegraph catalog build --pack forgegraph_base_2`."""
-    pack = read_pack(built_in_folder("forgegraph_base_2"), "built in", "forgegraph_base_2")
-    assert build.current(CATALOG.parent / "forgegraph_base_2.html", pack), (
-        "catalog/forgegraph_base_2.html is out of date: "
-        "run forgegraph catalog build --pack forgegraph_base_2"
+        "catalog/forgegraph_default.html is out of date: run forgegraph catalog build"
     )
 
 
@@ -124,7 +114,7 @@ def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
     folder = write_pack(tmp_path)  # a theme without its catalog file
     (folder / "themes").mkdir()
     (folder / "themes" / "plain.yaml").write_text(
-        "name: plain\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_theme\n"
+        "name: plain\nversion: 0\ndescription: Test.\nextends: forgegraph_default/light_theme\n"
         "parameters: None\n"
     )
     [problem] = problems("--pack", str(folder), "--out", str(tmp_path / "house.html"))

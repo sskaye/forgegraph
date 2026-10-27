@@ -1,0 +1,31 @@
+# Built-in pack: forgegraph_default/layout, a layout
+
+This page mirrors src/forgegraph/packs/forgegraph_default/layouts/layout.yaml, which is the specification. A test fails if they ever differ.
+
+name: layout          *# \[text\]; The name of the layout.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
+description: One tab, in the wide format, for layouts to extend.          *# \[text\]; The description of the layout.*\
+extends: None          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
+ \
+parameters: !var          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+    specifications:\
+        format: forgegraph_default/wide_format          *# \[format\]; The format that sets the layout's size and output, in place of its tiles' formats.*\
+    separators:          *# The space and lines between and around the figures. The gaps use the background.color of the first tile's theme.*\
+        gap:\
+            inner: 0.25          *# \[float ≥ 0\]; The space between the figure's edges and the outer tiles, × base size.*\
+            outer: 1.5          *# \[float ≥ 0\]; The space between neighboring tiles, from the outermost text or line of one to that of the next, × base size.*\
+        line:          *# \[line style\]; The line along the middle of each gap between tiles. Its defaults are the first tile's theme's line.*\
+            style: None          *# \[None, solid, dashed, dotted, dashdot\]; The line style. If None, no line is drawn.*\
+            width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+            color: "#D9D9D9"          *# \[hex color\]; The color.*\
+        border:\
+            show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
+        corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
+    tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A layout's tabs replace those it inherits.*\
+        main:\
+            grid:\
+                areas: \[\[a\]\]          *# \[text grid\]; A list of tiles for each row. A . leaves a cell blank. A name repeated over a rectangle of cells makes that tile span them, e.g. \[a, a\] makes tile a span two columns.*\
+                column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. If None, they're equal.*\
+                row_heights: None          *# \[None, floats > 0\]; The relative heights of the rows' plot boxes. If None, they're equal, or as tall as the tiles need.*\
+            tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
+                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with ~, or a path relative to this file. A layout must set it.*

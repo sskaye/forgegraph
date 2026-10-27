@@ -1,5 +1,5 @@
 """The provenance record embedded in every saved file (architecture D13), as
-src/forgegraph/spec/provenance.yaml specifies it.
+src/forgegraph/specifications/provenance.yaml specifies it.
 
 minimal: the provenance level, the ForgeGraph version, the creation time, the GraphSpec as
 written (without data.file and data.preprocessing), each spec used by name and version, and

@@ -19,6 +19,7 @@ from forgegraph.packs import PackError, read_pack
 from forgegraph.packs import setup as pack_setup  # pytest would run a module's setup()
 from forgegraph.spec import registry
 from forgegraph.spec.access import name_problems
+from forgegraph.spec.parameters import specifications_folder
 from forgegraph.spec.registry import registry_for
 from forgegraph.spec.validate import validate
 
@@ -26,7 +27,7 @@ ROOT = Path(__file__).parents[1]
 ACME = ROOT / "examples" / "packs" / "acme"
 
 
-def graphspec(folder: Path, theme: str, fmt: str = "forgegraph_base/base_format") -> Path:
+def graphspec(folder: Path, theme: str, fmt: str = "forgegraph_default/compact_format") -> Path:
     return graphspec_file(folder, "g", theme=theme, format=fmt)
 
 
@@ -43,8 +44,8 @@ def user(tmp_path: Path, monkeypatch, *listed: str) -> Path:
 def test_a_missing_main_config_is_written_listing_the_built_in_packs(tmp_path, monkeypatch, capsys):
     main = tmp_path / "home" / "forgegraph" / "config.toml"
     monkeypatch.setenv(packs.MAIN_CONFIG_VARIABLE, str(main))
-    assert set(pack_setup(tmp_path).packs) == {"forgegraph_base", "forgegraph_base_2"}
-    assert packs.read_config(main).packs == ("forgegraph_base", "forgegraph_base_2")
+    assert set(pack_setup(tmp_path).packs) == {"forgegraph_default"}
+    assert packs.read_config(main).packs == ("forgegraph_default",)
     assert f"ForgeGraph wrote its main config, {main}" in capsys.readouterr().err
     shutil.copytree(ACME, tmp_path / "acme")
     with pytest.raises(
@@ -55,11 +56,11 @@ def test_a_missing_main_config_is_written_listing_the_built_in_packs(tmp_path, m
 
 
 def test_a_config_names_a_built_in_pack_like_a_pip_pack(tmp_path):
-    allow(tmp_path, "forgegraph_base_2")
+    allow(tmp_path, "forgegraph_default")
     reg = registry_for(tmp_path)
-    assert reg.allowed == {"forgegraph_base_2"}
-    assert reg.packs["forgegraph_base_2"].source == "built in"
-    assert "forgegraph_base_2/base_theme" in reg.docs["theme"]
+    assert reg.allowed == {"forgegraph_default"}
+    assert reg.packs["forgegraph_default"].source == "built in"
+    assert "forgegraph_default/light_theme" in reg.docs["theme"]
 
 
 def test_a_main_config_that_cant_be_written_is_an_error(tmp_path, monkeypatch):
@@ -91,16 +92,16 @@ def test_under_an_acme_only_config_the_base_specs_cant_be_named(tmp_path):
     config = allow(tmp_path, "./acme")
     main = os.environ[packs.MAIN_CONFIG_VARIABLE]
     with pytest.raises(fg.SpecError) as e:
-        fg.render(graphspec(tmp_path, "forgegraph_base/base_theme", "acme/slide"))
+        fg.render(graphspec(tmp_path, "forgegraph_default/light_theme", "acme/slide"))
     assert e.value.problems == [
-        "specifications.theme: 'forgegraph_base/base_theme' is in the pack "
-        f"'forgegraph_base', which {main} and {config} doesn't allow"
+        "specifications.theme: 'forgegraph_default/light_theme' is in the pack "
+        f"'forgegraph_default', which {main} and {config} doesn't allow"
     ]
 
 
 def test_a_packs_specs_may_extend_the_base_pack_even_when_only_it_is_allowed(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
-    allow(tmp_path, "./acme")  # acme/acme extends forgegraph_base/base_theme
+    allow(tmp_path, "./acme")  # acme/acme extends forgegraph_default/light_theme
     assert fg.render(graphspec(tmp_path, "acme/acme", "acme/slide")).labelling
 
 
@@ -113,22 +114,22 @@ def test_graph_types_and_layer_types_are_always_available(tmp_path):
 
 def test_a_folder_config_narrows_the_main_config(tmp_path, monkeypatch):
     shutil.copytree(ACME, tmp_path / "acme")
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    user(tmp_path, monkeypatch, "forgegraph_default", str(tmp_path / "acme"))
     project = tmp_path / "work"
     project.mkdir()
     allow(project, "../acme")
     assert set(pack_setup(project).packs) == {"acme"}  # narrowed
-    assert set(pack_setup(tmp_path / "elsewhere").packs) == {"forgegraph_base", "acme"}
+    assert set(pack_setup(tmp_path / "elsewhere").packs) == {"forgegraph_default", "acme"}
 
 
 def test_a_pack_only_a_folder_config_lists_is_nonstandard(tmp_path, monkeypatch):
     """It may be used, but whatever is drawn with it is watermarked, and its record names
     the pack."""
     shutil.copytree(ACME, tmp_path / "acme")
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    user(tmp_path, monkeypatch, "forgegraph_default", str(tmp_path / "acme"))
     work = tmp_path / "work"
     _loud(work)  # house/loud extends acme/acme, which the main config lists
-    allow(work, "forgegraph_base", "./house")
+    allow(work, "forgegraph_default", "./house")
     assert pack_setup(work).nonstandard == {"house"}
     g = fg.render(graphspec(work, "house/loud"))
     assert g.nonstandard and g.nonstandard_packs == ["house"]
@@ -137,7 +138,7 @@ def test_a_pack_only_a_folder_config_lists_is_nonstandard(tmp_path, monkeypatch)
     record = fg.load(path)
     assert record is not None
     assert record["nonstandard"] is True and record["nonstandard_packs"] == ["house"]
-    standard = fg.render(graphspec(work, "forgegraph_base/base_theme"))
+    standard = fg.render(graphspec(work, "forgegraph_default/light_theme"))
     assert not standard.nonstandard and standard.nonstandard_packs == []
 
 
@@ -167,8 +168,10 @@ def test_a_pack_spec_builds_on_a_pack_it_may_not_use(tmp_path, monkeypatch):
     config lists but the folder config doesn't allow."""
     shutil.copytree(ACME, tmp_path / "acme")
     _loud(tmp_path)
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"), str(tmp_path / "house"))
-    allow(tmp_path, "forgegraph_base", "./house")
+    user(
+        tmp_path, monkeypatch, "forgegraph_default", str(tmp_path / "acme"), str(tmp_path / "house")
+    )
+    allow(tmp_path, "forgegraph_default", "./house")
     reg = registry_for(tmp_path)
     assert validate("theme", reg.docs["theme"]["house/loud"], reg) == []
     assert name_problems("theme", "house/loud", reg) == []
@@ -212,8 +215,8 @@ def test_a_layout_and_its_tiles_use_the_layouts_configs(tmp_path):
 
 def test_a_layout_drawn_with_a_nonstandard_pack_is_watermarked(tmp_path, monkeypatch):
     shutil.copytree(ACME, tmp_path / "acme")
-    user(tmp_path, monkeypatch, "forgegraph_base")  # not acme
-    allow(tmp_path, "forgegraph_base", "./acme")
+    user(tmp_path, monkeypatch, "forgegraph_default")  # not acme
+    allow(tmp_path, "forgegraph_default", "./acme")
     graphspec(tmp_path, "acme/acme", "acme/slide")
     tab = {"grid": {"areas": [["g"]]}, "tiles": {"g": "g.yaml"}}
     layout = doc("acme/dashboard", "fig", variable={"tabs": {"T": tab}})
@@ -227,11 +230,13 @@ def test_a_layout_drawn_with_a_nonstandard_pack_is_watermarked(tmp_path, monkeyp
 
 def test_a_blank_canvas_names_its_nonstandard_packs(tmp_path, monkeypatch):
     user(tmp_path, monkeypatch)  # a main config listing no packs
-    allow(tmp_path, "forgegraph_base")
-    canvas = fg.blank("forgegraph_base/base_theme", "forgegraph_base/base_format", tmp_path)
+    allow(tmp_path, "forgegraph_default")
+    canvas = fg.blank(
+        "forgegraph_default/light_theme", "forgegraph_default/compact_format", tmp_path
+    )
     [path] = canvas.save(tmp_path / "c.png")
     record = fg.load(path)
-    assert record is not None and record["nonstandard_packs"] == ["forgegraph_base"]
+    assert record is not None and record["nonstandard_packs"] == ["forgegraph_default"]
 
 
 # --- finding packs ---------------------------------------------------------------------------
@@ -296,7 +301,7 @@ def test_a_bad_pack_yaml_is_an_error(tmp_path, text, message):
 @pytest.mark.parametrize(
     ("text", "message"),
     [
-        ('packs = ["forgegraph_base"]\ntheme = "x"\n', "theme: unknown setting"),
+        ('packs = ["forgegraph_default"]\ntheme = "x"\n', "theme: unknown setting"),
         ("packs = 3\n", "packs: a list of pack names or folder paths is required"),
         ("packs = [", "not TOML"),
     ],
@@ -319,7 +324,7 @@ def test_a_folder_copy_of_a_main_config_pack_is_an_error(tmp_path, monkeypatch):
     """A folder config can't swap in its own copy of a pack the main config lists: one name
     is one pack, so an edited copy can't pass as the standard one."""
     shutil.copytree(ACME, tmp_path / "acme")
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    user(tmp_path, monkeypatch, "forgegraph_default", str(tmp_path / "acme"))
     work = tmp_path / "work"
     shutil.copytree(ACME, work / "acme")
     allow(work, "./acme")
@@ -327,32 +332,31 @@ def test_a_folder_copy_of_a_main_config_pack_is_an_error(tmp_path, monkeypatch):
         pack_setup(work)
 
 
-@pytest.mark.parametrize("name", ["forgegraph_base", "forgegraph_base_2"])
-def test_a_folder_pack_named_like_a_built_in_pack_is_an_error(tmp_path, monkeypatch, name):
-    user(tmp_path, monkeypatch, "forgegraph_base")
+def test_a_folder_pack_named_like_a_built_in_pack_is_an_error(tmp_path, monkeypatch):
+    user(tmp_path, monkeypatch, "forgegraph_default")
     work = tmp_path / "work"
-    write_pack(work, name)
-    allow(work, f"./{name}")
-    with pytest.raises(PackError, match=f"'{name}' .*already"):
+    write_pack(work, "forgegraph_default")
+    allow(work, "./forgegraph_default")
+    with pytest.raises(PackError, match=r"'forgegraph_default' .*already"):
         pack_setup(work)
 
 
 def test_a_main_config_pack_named_like_a_built_in_pack_is_an_error(tmp_path, monkeypatch):
-    write_pack(tmp_path, "forgegraph_base_2")
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "forgegraph_base_2"))
-    with pytest.raises(PackError, match=r"'forgegraph_base_2' .*already"):
+    write_pack(tmp_path, "forgegraph_default")
+    user(tmp_path, monkeypatch, str(tmp_path / "forgegraph_default"))
+    with pytest.raises(PackError, match=r"'forgegraph_default' .*already"):
         pack_setup(tmp_path / "elsewhere")
 
 
 def test_both_configs_may_list_the_same_pack_folder(tmp_path, monkeypatch):
     """Written differently, the same folder is the same pack: standard, not an error."""
     shutil.copytree(ACME, tmp_path / "acme")
-    user(tmp_path, monkeypatch, "forgegraph_base", str(tmp_path / "acme"))
+    user(tmp_path, monkeypatch, "forgegraph_default", str(tmp_path / "acme"))
     work = tmp_path / "work"
     work.mkdir()
-    allow(work, "forgegraph_base", "../acme")
+    allow(work, "forgegraph_default", "../acme")
     found = pack_setup(work)
-    assert set(found.packs) == {"forgegraph_base", "acme"} and not found.nonstandard
+    assert set(found.packs) == {"forgegraph_default", "acme"} and not found.nonstandard
 
 
 def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
@@ -366,10 +370,10 @@ def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
     shutil.copy(bundled, house / "fonts" / "HouseSans.ttf")
     (house / "themes").mkdir()
     (house / "themes" / "t.yaml").write_text(
-        "name: t\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
+        "name: t\nversion: 0\ndescription: test\nextends: forgegraph_default/light_theme\n"
         "parameters: None\n"
     )
-    allow(tmp_path, "forgegraph_base", "./house")
+    allow(tmp_path, "forgegraph_default", "./house")
 
     def registered() -> bool:
         return str(house / "fonts" / "HouseSans.ttf") in {
@@ -378,16 +382,19 @@ def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
 
     registry_for(tmp_path)
     assert not registered()
-    fg.render(graphspec(tmp_path, "forgegraph_base/base_theme"))
+    fg.render(graphspec(tmp_path, "forgegraph_default/light_theme"))
     assert not registered()  # drawn without the pack
     fg.render(graphspec(tmp_path, "house/t"))
     assert registered()
 
 
-def test_the_reference_config_and_base_pack_are_valid():
-    assert packs.read_config(ROOT / "src" / "forgegraph" / "packs" / "config.toml").packs
+def test_the_reference_config_and_built_in_packs_are_valid():
+    assert packs.read_config(specifications_folder() / "config.toml").packs
+    major, minor, _ = fg.__version__.split(".")
     for name in packs.BUILT_IN:  # the built-in packs are released with ForgeGraph
-        assert read_pack(packs.built_in_folder(name), "built in", name).version == fg.__version__
+        pack = read_pack(packs.built_in_folder(name), "built in", name)
+        assert pack.version == fg.__version__
+        assert pack.requires == f">={major}.{minor}, <{major}.{int(minor) + 1}"
 
 
 # --- everything works under a pack ---------------------------------------------------------
@@ -398,14 +405,14 @@ def test_the_skills_examples_render_in_acmes_theme_and_format(tmp_path):
     from forgegraph import skill
 
     shutil.copytree(ACME, tmp_path / "acme")
-    allow(tmp_path, "forgegraph_base", "./acme")
+    allow(tmp_path, "forgegraph_default", "./acme")
     examples = tmp_path / "examples"
     shutil.copytree(Path(str(skill.source() / "examples")), examples)
     for path in sorted(examples.glob("*.yaml")):
         if path.name.endswith((".layout.yaml", ".schedule.yaml")):
             continue
-        text = path.read_text().replace("forgegraph_base/base_theme", "acme/acme")
-        path.write_text(text.replace("forgegraph_base/base_format", "acme/slide"))
+        text = path.read_text().replace("forgegraph_default/light_theme", "acme/acme")
+        path.write_text(text.replace("forgegraph_default/compact_format", "acme/slide"))
         g = fg.render(path)
         assert g.values["theme"]["text.font"] == "IBM Plex Serif", path.name
 
@@ -414,7 +421,7 @@ def test_a_schedule_extends_a_packs_schedule(tmp_path):
     from forgegraph.jobs.run import load
 
     shutil.copytree(ACME, tmp_path / "acme")
-    allow(tmp_path, "forgegraph_base", "./acme")
+    allow(tmp_path, "forgegraph_default", "./acme")
     graphspec(tmp_path, "acme/acme", "acme/slide")
     (tmp_path / "lab.schedule.yaml").write_text(
         "name: lab\nversion: 0\ndescription: test\nextends: acme/workday\n"

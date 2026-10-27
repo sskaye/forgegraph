@@ -12,13 +12,12 @@ from datetime import date, datetime
 
 import pandas as pd
 import pytest
-from pack_helpers import doc
+from pack_helpers import BUILT_IN, doc
 from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph.spec.layers import look_paths, looks_in
 from forgegraph.spec.parameters import (
-    BASE,
     CORE_KINDS,
     HEADER,
     KINDS,
@@ -38,7 +37,7 @@ from forgegraph.spec.parameters import (
     series_definitions,
     tree_set,
 )
-from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.registry import Registry, builtin, load_yaml
 from forgegraph.spec.resolve import resolve
 from forgegraph.spec.series import look_definitions
 from forgegraph.spec.tags import fix, var
@@ -48,8 +47,14 @@ ONE = "series.Cell Voltage (V)"  # the example GraphSpec's series
 
 
 def reference_name(kind: str) -> str:
-    """The name of the file that specifies a kind: ForgeGraph's own, or the base pack's."""
-    return REFERENCE[kind] if kind in CORE_KINDS else f"{BASE}/{REFERENCE[kind]}"
+    """The spec a test file of a kind extends: a graph type, ForgeGraph's own, or the default
+    pack's spec of the kind."""
+    return REFERENCE[kind] if kind in CORE_KINDS else BUILT_IN[kind]
+
+
+def specification(kind: str) -> dict:
+    """A kind's specification file, as loaded: no spec can name or extend it."""
+    return load_yaml(definition_file(kind))
 
 
 DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layers aren't
@@ -76,6 +81,15 @@ def child(
     listed = {{"fix": "fixed", "var": "variable", None: "untagged"}[tag]: params}
     return doc(reference_name(kind), name, description="A test file.", version=1, **listed)
 
+
+# The texts light_theme sets in semibold, a weight not every font has.
+LIGHT_SEMIBOLD = (
+    "title",
+    "axis.title",
+    "legend.label",
+    "legend.key.title",
+    "legend.color_bar.title",
+)
 
 # Values another parameter must have for this one to be valid at all.
 CONTEXT = {"figure.width": {"figure.height": 140}, "cadence.interval.unit": {"cadence.at": None}}
@@ -126,12 +140,12 @@ def where(p: Parameter, kind: str = "") -> str:
 
 @pytest.mark.parametrize("kind", DOCUMENT_KINDS)
 def test_definition_file_is_valid(kind):
-    assert validate(kind, builtin().docs[kind][reference_name(kind)]) == []
+    assert validate(kind, specification(kind)) == []
 
 
 @pytest.mark.parametrize("kind", DOCUMENT_KINDS)
 def test_definition_file_header(kind):
-    doc = builtin().docs[kind][reference_name(kind)]
+    doc = specification(kind)
     assert list(doc) == list(HEADER)
     assert doc["version"] == 0 and doc["extends"] == NONE
     header, _ = _read(kind, REFERENCE[kind])
@@ -339,9 +353,9 @@ SAMPLES = {
     "column": (["current_density"], [""]),
     "columns": ([["a", "b"], "a"], [[]]),
     "graph type": (["xy"], ["pie"]),
-    "theme": (["forgegraph_base/base_theme"], ["loud", "base_theme"]),
-    "format": (["forgegraph_base/base_format"], ["poster"]),
-    "graphspec": (["forgegraph_base/graphspec_example"], ["none-such"]),
+    "theme": (["forgegraph_default/light_theme"], ["loud", "base_theme"]),
+    "format": (["forgegraph_default/compact_format"], ["poster"]),
+    "graphspec": (["forgegraph_default/graphspec_example"], ["none-such"]),
     "layer type": (["note"], ["pie"]),
     "layer types": ([["note", "error_bar"], "note"], [[], ["pie"]]),
     "texts": ([["a.yaml"], ["prog", "-x"]], [[], [7], "a.yaml"]),
@@ -493,9 +507,9 @@ def test_a_parameter_written_twice_is_an_error(tmp_path):
 
 
 def test_extends_must_exist_and_not_loop():
-    assert validate("theme", {**child("theme"), "extends": "forgegraph_base/base_thmee"}) == [
-        "extends: unknown theme 'forgegraph_base/base_thmee'; "
-        "did you mean 'forgegraph_base/base_theme'?"
+    assert validate("theme", {**child("theme"), "extends": "forgegraph_default/light_thmee"}) == [
+        "extends: unknown theme 'forgegraph_default/light_thmee'; "
+        "did you mean 'forgegraph_default/light_theme'?"
     ]
     a = {**child("theme"), "name": "a", "extends": "b"}
     b = {**child("theme"), "name": "b", "extends": "a"}
@@ -513,7 +527,7 @@ def test_only_forgegraph_defines_graph_types():
 @pytest.mark.parametrize("none", [NONE, None], ids=["word", "null"])
 @pytest.mark.parametrize("kind", DOCUMENT_KINDS)
 def test_extending_none_requires_every_parameter(kind, none):
-    doc = copy.deepcopy(builtin().docs[kind][reference_name(kind)])
+    doc = copy.deepcopy(specification(kind))
     if kind == "graph_type":
         pytest.skip("a graph type extending None is its own definition")
     doc["name"] = "copy"
@@ -540,8 +554,8 @@ extends: {null}
 parameters: !var
     specifications:
         graph_type: xy
-        theme: forgegraph_base/base_theme
-        format: forgegraph_base/base_format
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
     text: {{title: None}}
     data: {{file: d.parquet, preprocessing: None}}
     axis:
@@ -561,10 +575,10 @@ def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
     assert validate("theme", theme, reg) == []
     r = {p: (v.value, v.fixed) for p, v in resolve("theme", theme, reg).items()}
     assert r["axis.tick.direction"] == ("in", True)
-    assert r["series.line.width"] == (0.12, False)  # fixed in default, variable here
-    assert r["axis.tick.length"] == (0.3, True)  # inherited
-    assert r["grid.x.show"] == (False, False)
-    assert r["title.font"] == ("Roboto", True)  # a member: the general text's font
+    assert r["series.line.width"] == (0.12, False)  # fixed in light_theme, variable here
+    assert r["axis.tick.length"] == (0.3, False)  # inherited
+    assert r["grid.x.show"] == (False, True)
+    assert r["title.font"] == ("Roboto", False)  # a member: the general text's font, its own tag
 
 
 def test_a_tag_with_no_value_changes_only_the_status():
@@ -574,7 +588,7 @@ def test_a_tag_with_no_value_changes_only_the_status():
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
     r = resolve("theme", theme, reg)["axis.tick.length"]
-    assert (r.value, r.fixed, r.origin) == (0.3, False, "theme 'forgegraph_base/base_theme'")
+    assert (r.value, r.fixed, r.origin) == (0.3, False, "theme 'forgegraph_default/light_theme'")
     graph = spec({"specifications.theme": "open", "axis.tick.length": 0.5})
     assert validate("graphspec", graph, reg) == []
 
@@ -596,7 +610,7 @@ def test_a_category_tag_covers_everything_in_it_and_beats_the_files_it_extends()
 
 
 def test_a_file_extending_none_tags_every_parameter():
-    base = copy.deepcopy(builtin().docs["theme"][reference_name("theme")])
+    base = copy.deepcopy(specification("theme"))
     base["name"] = "bare"
     tree = dict(base["parameters"])  # the same parameters, without the root's !fix
     tree["grid"] = fix(tree["grid"])
@@ -651,17 +665,18 @@ def spec(params: dict | None = None) -> dict:
 
 
 def test_the_reference_graphspec_sets_every_parameter_with_its_owners_description():
+    """It sets every parameter its graph type leaves variable, and any theme or format
+    parameter it sets has its owner's range and description."""
     _, listed = _read("graphspec", "graphspec_example")
     for kind in ("graph_type", "theme", "format"):
         for path, p in definitions(kind).items():
-            if kind == "theme" and path.startswith("series."):
-                continue  # each series sets them for itself
-            if p.fixed:
+            if kind == "graph_type" and p.fixed:
                 assert path not in listed, path
-                continue
-            assert path in listed, f"graphspec_example.yaml doesn't set {path}"
-            own = p.description.replace(" A GraphSpec must set it.", "")
-            assert (listed[path].range, listed[path].description) == (p.range, own), path
+            if kind == "graph_type" and not p.fixed:
+                assert path in listed, f"graphspec_example.yaml doesn't set {path}"
+            if path in listed:
+                own = p.description.replace(" A GraphSpec must set it.", "")
+                assert (listed[path].range, listed[path].description) == (p.range, own), path
 
 
 def test_the_reference_graphspecs_series_sets_every_series_parameter():
@@ -684,7 +699,7 @@ def test_the_reference_graphspecs_series_sets_every_series_parameter():
 def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
     doc = spec(
         {
-            "grid.y.show": True,
+            "axis.max_extension": 0.3,
             "axis.x.min": 0,
             f"{ONE}.line.show": False,
             "provenance.level": "minimal",
@@ -694,10 +709,13 @@ def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
 
 
 def test_a_graphspec_cannot_change_fixed_parameters():
-    doc = spec({"axis.tick.length": 0.5, "figure.width": 100})
-    assert validate("graphspec", doc) == [
-        "axis.tick.length: fixed by theme 'forgegraph_base/base_theme'",
-        "figure.width: fixed by format 'forgegraph_base/base_format'",
+    narrow = child("format", "fix", {"figure.width": 80}, name="narrow")
+    doc = spec(
+        {"axis.tick.direction": "in", "specifications.format": "narrow", "figure.width": 100}
+    )
+    assert validate("graphspec", doc, reg_with(("format", narrow))) == [
+        "axis.tick.direction: fixed by theme 'forgegraph_default/light_theme'",
+        "figure.width: fixed by format 'narrow'",
     ]
     stacked = child("graph_type", "fix", {"arrangement.stacking": "sum"}, name="stacked")
     doc = spec({"specifications.graph_type": "stacked", "arrangement.stacking": "none"})
@@ -716,7 +734,7 @@ def test_a_graphspec_names_existing_files():
     assert validate("graphspec", spec({"specifications.theme": "loud"})) == [
         "specifications.theme: must be the name of a theme"
     ]
-    theme = "forgegraph_base/base_theme"
+    theme = "forgegraph_default/light_theme"
     assert validate("graphspec", spec({"specifications.theme": [theme]})) == [
         "specifications.theme: must be a single value: the name of a theme"
     ]
@@ -744,7 +762,9 @@ def test_naming_method_is_limited_to_the_themes_methods():
 
 
 def test_drawing_needs_the_required_columns():
-    assert drawing_problems(builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]) == []
+    assert (
+        drawing_problems(builtin().docs["graphspec"]["forgegraph_default/graphspec_example"]) == []
+    )
     doc = spec({"axis.x.data.column": NONE})
     assert validate("graphspec", doc) == []
     assert drawing_problems(doc) == [
@@ -806,7 +826,8 @@ def test_impossible_requests_are_errors():
     assert validate("theme", theme, reg_with(("theme", theme))) == [
         "text.font: no font 'Comic Nonexistent' is bundled or installed"
     ]
-    theme = child("theme", "fix", {"text.font": "DejaVu Sans", "title.weight": "semibold"})
+    bold = {f"{t}.weight": "bold" for t in LIGHT_SEMIBOLD if t != "title"}
+    theme = child("theme", "fix", {"text.font": "DejaVu Sans", "title.weight": "semibold", **bold})
     assert validate("theme", theme, reg_with(("theme", theme))) == [
         "title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
     ]
@@ -850,7 +871,7 @@ def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
     from forgegraph.spec import validate as validation
     from forgegraph.spec.registry import builtin
 
-    doc = builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]
+    doc = builtin().docs["graphspec"]["forgegraph_default/graphspec_example"]
     calls = []
     explain = validation.explain
     monkeypatch.setattr(validation, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
@@ -879,7 +900,7 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     from forgegraph.spec.registry import builtin
     from forgegraph.spec.tags import with_tags
 
-    doc = {**builtin().docs["graphspec"]["forgegraph_base/graphspec_example"], "name": "mine"}
+    doc = {**builtin().docs["graphspec"]["forgegraph_default/graphspec_example"], "name": "mine"}
     path = tmp_path / "mine.yaml"
     with path.open("w", encoding="utf-8") as f:  # its descriptions hold subscripts
         with_tags(YAML()).dump(doc, f)
@@ -893,7 +914,7 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     monkeypatch.chdir(tmp_path)
     assert load_document("graphspec", doc).folder == tmp_path
 
-    named = builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]
+    named = builtin().docs["graphspec"]["forgegraph_default/graphspec_example"]
     stranger = {**named, "description": "a document of a name the registry holds"}
     reg = load_document("graphspec", stranger, builtin()).reg
-    assert reg.docs["graphspec"]["forgegraph_base/graphspec_example"] is not stranger
+    assert reg.docs["graphspec"]["forgegraph_default/graphspec_example"] is not stranger

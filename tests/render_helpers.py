@@ -8,7 +8,7 @@ from importlib.resources import files
 from typing import Any
 
 import pandas as pd
-from pack_helpers import child
+from pack_helpers import BUILT_IN, child
 
 import forgegraph as fg
 from forgegraph.drawing.export import KEY
@@ -21,7 +21,7 @@ from forgegraph.spec.series import look_definitions
 def polarization() -> pd.DataFrame:
     """The example GraphSpec's data: three cells and a benchmark, two runs each, rows not
     in current order nor in sorted cell order, with one missing reading."""
-    examples = files("forgegraph") / "packs" / "forgegraph_base" / "graphspecs"
+    examples = files("forgegraph") / "packs" / "forgegraph_default" / "graphspecs"
     frame = pd.read_parquet(str(examples / "polarization.parquet"))
     return frame.rename(columns=SHORT)
 
@@ -69,7 +69,7 @@ def with_series(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 def _child(kind: str, changes: dict[str, Any]) -> dict[str, Any]:
-    return child(kind, f"forgegraph_base/base_{kind}", changes, name="changed", version=1)
+    return child(kind, BUILT_IN[kind], changes, name="changed", version=1)
 
 
 def render(
@@ -80,7 +80,7 @@ def render(
     title: str | None = None,
 ) -> fg.Graph:
     reg: Registry = builtin().copy()
-    theme_name = "forgegraph_base/base_theme"
+    theme_name = "forgegraph_default/light_theme"
     if theme:
         reg.add("theme", _child("theme", theme))
         theme_name = "changed"

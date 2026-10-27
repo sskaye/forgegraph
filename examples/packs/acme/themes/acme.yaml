@@ -1,7 +1,7 @@
 name: acme          # [text]; The name of the theme.
 version: 0          # [int ≥ 0]; The version number of the specification.
 description: Acme's house style, a serif look with a light grid and no box.          # [text]; The description of the theme.
-extends: forgegraph_base/base_theme          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
+extends: forgegraph_default/light_theme          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
 
 parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     text:

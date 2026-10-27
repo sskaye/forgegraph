@@ -1,1 +1,0 @@
-packs = ["forgegraph_base", "forgegraph_base_2"]          # [texts]; The packs whose specs may be used: built-in and pip packs by name, and folder packs by their path from this file.

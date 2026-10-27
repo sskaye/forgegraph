@@ -699,7 +699,7 @@ cases:
 
   - id: project-theme
     data: [tips.csv]
-    config: ["forgegraph_base"]
+    config: ["forgegraph_default"]
     turns: ["Make a theme called lab for this project with Paul Tol's muted palette, then use it to plot tip against total bill from tips.csv, colored by time."]
     expect:
       graph: true
@@ -711,7 +711,7 @@ cases:
 
   - id: forgegraph-base-2-style
     data: [co2_monthly.csv]
-    config: ["forgegraph_base", "forgegraph_base_2"]
+    config: ["forgegraph_default", "forgegraph_base_2"]
     turns: ["Please draw the monthly CO₂ record in co2_monthly.csv as a line chart, using a theme from the forgegraph_base_2 pack."]
     expect:
       graph: true

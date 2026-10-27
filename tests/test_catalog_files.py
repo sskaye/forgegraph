@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import pandas as pd
 import pytest
-from pack_helpers import write_pack
+from pack_helpers import BUILT_IN, write_pack
 
 from forgegraph.catalog_build.cards import (
     SAMPLE_COLOR,
@@ -28,7 +28,7 @@ from forgegraph.spec.registry import builtin
 
 HEADER = (
     "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"
-    "baseline: forgegraph_base/graphspec_example\n"
+    "baseline: forgegraph_default/graphspec_example\n"
 )
 XY = {
     **definitions("graph_type", "xy"),
@@ -47,18 +47,18 @@ SCENE = Scene(
 
 
 def catalog_project(tmp_path, catalog: str, kind_folder: str = "formats", name: str = "plain"):
-    """A pack, house, with a format (or theme) extending the base one, and its catalog."""
+    """A pack, house, with a format (or theme) extending the default pack's, and its catalog."""
     folder = write_pack(tmp_path)
     kind = "format" if kind_folder == "formats" else "theme"
     (folder / kind_folder).mkdir()
     (folder / kind_folder / f"{name}.yaml").write_text(
-        f"name: {name}\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_{kind}\n"
+        f"name: {name}\nversion: 0\ndescription: Test.\nextends: {BUILT_IN[kind]}\n"
         "parameters: None\n"
     )
     (folder / "catalogs" / kind_folder).mkdir(parents=True)
     (folder / "catalogs" / kind_folder / f"{name}.yaml").write_text(catalog)
     reg = builtin().add_pack(read_pack(folder, "folder"))
-    reg.allowed = frozenset({"forgegraph_base", "house"})
+    reg.allowed = frozenset({"forgegraph_default", "house"})
     return reg
 
 
@@ -77,12 +77,14 @@ def _problems(tmp_path, catalog: str, **kw) -> list[str]:
 
 
 def test_a_catalog_extending_another_adds_its_baselines_after_the_ones_it_inherits(tmp_path):
-    catalog = HEADER.format(name="plain", extends="forgegraph_base/base_theme") + (
+    catalog = HEADER.format(name="plain", extends="forgegraph_default/light_theme") + (
         "baselines:\n    wide: {figure.width: 200}\n"
     )
     reg = catalog_project(tmp_path, catalog, kind_folder="themes")
     names = [b.path for b in read("theme", "house/plain", reg).baselines]
-    inherited = [b.path for b in read("theme", "forgegraph_base/base_theme", builtin()).baselines]
+    inherited = [
+        b.path for b in read("theme", "forgegraph_default/light_theme", builtin()).baselines
+    ]
     assert names == [*inherited, "figure.width"]
 
 
@@ -143,10 +145,10 @@ def test_a_layer_catalogs_settings_are_on_every_card():
 
 
 def test_every_parameter_gets_a_card_and_the_page_shows_the_variable_ones():
-    catalog = read("theme", "forgegraph_base/base_theme", builtin())
+    catalog = read("theme", "forgegraph_default/light_theme", builtin())
     carded = {p.path for p, _ in catalog.cards}
     assert carded == {p.path for p in catalog.parameters}
-    assert "grid.x.show" in catalog.variable and "text.font" not in catalog.variable
+    assert "series.marker.size" in catalog.variable and "text.font" not in catalog.variable
     shown = [c.changes[-1].path for c in place(catalog, lambda s, c: True)[1:]]
     assert set(shown) == catalog.variable
     fixed = card(catalog, "text.font", lambda s, c: True)  # placed alone, as any card
@@ -159,7 +161,9 @@ def test_a_formats_output_and_provenance_get_no_card():
     assert not gets_card("graph_type", XY["layer.types"])  # it permits; it never draws
     assert gets_card("theme", THEME["grid.x.show"])
     assert gets_card("format", definitions("format")["figure.width"])
-    paths = [p.path for p, _ in read("format", "forgegraph_base/base_format", builtin()).cards]
+    paths = [
+        p.path for p, _ in read("format", "forgegraph_default/compact_format", builtin()).cards
+    ]
     assert paths == ["figure.width", "figure.height", "figure.base_size"]
 
 
@@ -266,7 +270,7 @@ P = THEME["series.line.width"]
 def _catalog(*options: tuple[Change, ...]) -> Catalog:
     cards, variable = ((P, options),), frozenset({P.path})
     return Catalog(
-        "theme", "t", "forgegraph_base/graphspec_example", (P,), cards, variable, (B2, B3)
+        "theme", "t", "forgegraph_default/graphspec_example", (P,), cards, variable, (B2, B3)
     )
 
 

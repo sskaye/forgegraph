@@ -21,8 +21,8 @@ from forgegraph.catalog_build.page import figures
 
 ROOT = Path(__file__).parents[1]
 BASELINES = "tests/baselines"
-CATALOG = "catalog/forgegraph_base.html"
-EARLIER_CATALOG = "catalog/catalog.html"  # forgegraph_base's page before phase 6
+CATALOG = "catalog/forgegraph_default.html"
+EARLIER_CATALOG = "catalog/catalog.html"  # forgegraph_default's page before phase 6
 
 
 def _git(*args: str) -> bytes:

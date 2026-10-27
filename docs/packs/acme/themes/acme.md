@@ -1,0 +1,26 @@
+# Pack example: acme/acme, a theme
+
+This page mirrors examples/packs/acme/themes/acme.yaml, which is the specification. A test fails if they ever differ.
+
+name: acme          *# \[text\]; The name of the theme.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
+description: Acme's house style, a serif look with a light grid and no box.          *# \[text\]; The description of the theme.*\
+extends: forgegraph_default/light_theme          *# \[None, theme\]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.*\
+ \
+parameters:          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+    text:\
+        font: IBM Plex Serif          *# \[text\]; The typeface.*\
+    title:          *# \[text style\]; The graph's title.*\
+        weight: medium          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+    plot_area:\
+        border:          *# \[line style\]; The plot area's border.*\
+            sides: \[left, bottom\]          *# \[left, right, top, bottom, None\]; The sides that have a border. If None, there is no border.*\
+        aspect_ratio: 1.6          *# \[float > 0\]; The plot area's width ÷ its height.*\
+    grid:          *# \[line style\]; The grid lines.*\
+        color: "#DDDDDD"          *# \[hex color\]; The color.*\
+        x:\
+            show: true          *# \[true, false\]; Whether to draw vertical grid lines at the x ticks.*\
+        y:\
+            show: true          *# \[true, false\]; Whether to draw horizontal grid lines at the y ticks.*\
+    series:\
+        colors: tol_muted          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.*

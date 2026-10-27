@@ -1,1 +1,1 @@
-packs = ["forgegraph_base", "./journal"]
+packs = ["forgegraph_default", "./journal"]

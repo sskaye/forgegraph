@@ -2,10 +2,10 @@
 
 A pack is a folder of specs with a pack.yaml at its top: themes/, formats/, graphspecs/,
 layouts/ and schedules/, with catalogs/, references/ and fonts/. Its specs are named
-`pack/name`. ForgeGraph's built-in packs, forgegraph_base and forgegraph_base_2, are in
-this package, and a config names them like pip packs.
+`pack/name`. ForgeGraph's built-in pack, forgegraph_default, is in this package, and a
+config names it like a pip pack.
 
-A config lists the packs that may be used: `packs = [...]`, each the name forgegraph_base,
+A config lists the packs that may be used: `packs = [...]`, each the name forgegraph_default,
 a pip pack's name, or a folder pack's path from the config file. Two configs can apply to a
 file being drawn: the main config, for all work, and a folder config, forgegraph.toml in the
 file's folder or the nearest folder above it. The main config is ~/.config/forgegraph/
@@ -39,11 +39,11 @@ from ruamel.yaml import YAML
 
 from forgegraph import __version__
 from forgegraph.spec.common import ProblemsError
-from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, is_none
+from forgegraph.spec.parameters import CORE_KINDS, DEFAULT, KINDS, is_none
 
 FOLDER_CONFIG = "forgegraph.toml"
 MAIN_CONFIG_VARIABLE = "FORGEGRAPH_CONFIG"
-BUILT_IN = (BASE, "forgegraph_base_2")  # the packs ForgeGraph ships, which a new main config lists
+BUILT_IN = (DEFAULT,)  # the packs ForgeGraph ships, which a new main config lists
 ENTRY_POINTS = "forgegraph.packs"
 FIELDS = ("name", "version", "description", "issues", "requires")
 FOLDERS = {kind: folder for kind, folder in KINDS.items() if kind not in CORE_KINDS}

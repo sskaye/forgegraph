@@ -1,11 +1,11 @@
 """Parameter definitions, read from the specification files.
 
-Each kind is defined by one file. Graph types and layer types are ForgeGraph's code, each
-defined by its own file (graph_types/xy.yaml, layers/note.yaml); the other kinds by the base
-pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
-formats/base_format.yaml, layouts/layout_example.yaml, schedules/base_schedule.yaml) and its
-reference GraphSpec (graphspecs/graphspec_example.yaml). A layer file has
-only a name, version and description, and its parameters. A GraphSpec's layers and a
+Each kind is defined by one file in specifications/, which only defines it: no spec can
+name or extend it. Graph types and layer types are ForgeGraph's code, each defined by its
+own file (graphtype_xy.yaml, layer_note.yaml); the other kinds by theme.yaml, format.yaml,
+layout_example.yaml and schedule.yaml, and the reference GraphSpec,
+graphspec_example.yaml. A layer file has only a name, version and description, and its
+parameters. A GraphSpec's layers and a
 layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
 (tab_definitions). Every line of those files, header included, is
@@ -52,17 +52,20 @@ KINDS = {
     "layout": "layouts",
     "schedule": "schedules",
 }
-REFERENCE = {
-    "theme": "base_theme",
-    "format": "base_format",
+REFERENCE = {  # each kind's specification file in SPECIFICATIONS (a graph type's or layer type's
+    # name follows its prefix in PREFIXES), or the graph type or layer type that's the default
+    "theme": "theme",
+    "format": "format",
     "graph_type": "xy",
     "graphspec": "graphspec_example",
     "layer": "reference",
     "layout": "layout_example",
-    "schedule": "base_schedule",
+    "schedule": "schedule",
 }
+PREFIXES = {"graph_type": "graphtype_", "layer": "layer_"}  # of each graph and layer type's file
+SPECIFICATIONS = "specifications"  # the package folder holding the specification files
 CORE_KINDS = ("graph_type", "layer")  # ForgeGraph's code; every other kind comes from packs
-BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_KINDS
+DEFAULT = "forgegraph_default"  # ForgeGraph's built-in pack, which may be used with no config
 PARAMETERS = "parameters"  # the tree of a file's parameters, tagged !var or !fix (see tags.py)
 HEADER = ("name", "version", "description", "extends", PARAMETERS)
 LAYER_HEADER = ("name", "version", "description", "parameters")
@@ -460,15 +463,25 @@ def tree_has(tree: Any, path: str) -> bool:
     return tree_get(tree, path, marker) is not marker
 
 
-def base_folder() -> Path:
-    """The base pack's folder, in this package."""
-    return Path(str(files("forgegraph") / "packs" / BASE))
+def specifications_folder() -> Path:
+    """The folder of the specification files, in this package."""
+    return Path(str(files("forgegraph") / SPECIFICATIONS))
+
+
+def default_folder() -> Path:
+    """The default pack's folder, in this package."""
+    return Path(str(files("forgegraph") / "packs" / DEFAULT))
 
 
 def definition_file(kind: str, name: str | None = None) -> Path:
-    """A graph type's or layer type's own file, or the base pack's file defining a kind."""
-    root = Path(str(files("forgegraph"))) if kind in CORE_KINDS else base_folder()
-    return root / KINDS[kind] / f"{name or REFERENCE[kind]}.yaml"
+    """The specification file defining a kind, or a graph type's or layer type's own file."""
+    stem = name or REFERENCE[kind]
+    return specifications_folder() / f"{PREFIXES.get(kind, '')}{stem}.yaml"
+
+
+def core_files(kind: str) -> list[Path]:
+    """Every graph type's or layer type's own file."""
+    return sorted(specifications_folder().glob(f"{PREFIXES[kind]}*.yaml"))
 
 
 def _comment(node: Any, key: str) -> str | None:
@@ -703,8 +716,8 @@ def _parameters(
 
 @cache
 def _style_definitions(general: str) -> dict[str, Parameter]:
-    """A style's general parameters from styles.yaml (spec/styles.yaml), by path."""
-    path = Path(str(files("forgegraph") / "spec" / "styles.yaml"))
+    """A style's general parameters from styles.yaml (specifications/styles.yaml), by path."""
+    path = specifications_folder() / "styles.yaml"
     data = YAML().load(path.read_text(encoding="utf-8"))
     found = _walk(general, data[general], False, path)
     return {p.path: p for p in found if isinstance(p, Parameter)}
@@ -819,12 +832,11 @@ def categories(*kinds: str) -> frozenset[str]:
 @cache
 def graph_type_files() -> tuple[str, ...]:
     """Graph types with their own definition (extends None)."""
-    folder = Path(str(files("forgegraph") / KINDS["graph_type"]))
     out = []
-    for path in sorted(folder.glob("*.yaml")):
+    for path in core_files("graph_type"):
         data = loader().load(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and is_none(data.get("extends")):
-            out.append(path.stem)
+            out.append(path.stem.removeprefix(PREFIXES["graph_type"]))
     return tuple(out)
 
 

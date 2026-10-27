@@ -115,7 +115,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 width: 0.07          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
                 color: "#000000"          # [hex color]; The color.
             fill:
-                color: "#808080"          # [series, hex color]; The fill color. series uses the series' color.
+                color: "#808080"          # [None, series, hex color]; The fill color. series uses the series' color. If None, there is no fill.
                 opacity: 0.15          # [0-1]; The fill opacity.
     layers:          # The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.
         target:

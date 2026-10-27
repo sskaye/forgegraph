@@ -732,6 +732,13 @@ def test_two_values_make_a_band_filled_between_its_lines():
     assert fill.get_alpha() == style.theme["layer.reference.fill.opacity"]
 
 
+def test_two_lines_with_no_fill_color_are_two_lines_and_no_band():
+    lines = {"type": "reference", "axis": "y", "line_1": {"value": 8}, "line_2": {"value": 25}}
+    g = graph({"t": {**lines, "fill": {"color": None}}}, **{"series.line.show": False})
+    assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [8, 25]
+    assert _fills(g) == []
+
+
 def test_an_offset_moves_a_line_by_another_aggregate():
     mean, sd = RATES["rate"].mean(), RATES["rate"].std()
     plus = {"value": "rate", "aggregation": {"function": "mean"}}

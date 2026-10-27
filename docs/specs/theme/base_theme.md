@@ -98,7 +98,7 @@ parameters: !fix          *# !var/!fix sets whether a GraphSpec may ch
             line: !var          *# \[line style\]; Each line. A line drawn per series takes its series' color.*\
             label:          *# \[text style\]; Each line's label. Its color may also be line, which uses the line's color.*\
             fill: !var          *# The fill between the lines of a band.*\
-                color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
+                color: "#808080"          *# \[None, series, hex color\]; The fill color. series uses the series' color. If None, there is no fill.*\
                 opacity: 0.15          *# \[0-1\]; The fill opacity.*\
         note:          *# \[text style\]; The notes.*\
     watermark:          *# \[text style\]; The watermark drawn on non-standard graphs.*\

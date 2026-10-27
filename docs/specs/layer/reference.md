@@ -8,13 +8,13 @@ description: A horizontal or vertical line, or a shaded band between two lines, 
  \
 parameters:\
     axis: None          *# \[x, y\]; The axis the values are on. y draws horizontal lines. A GraphSpec must set it.*\
-    per_series: false          *# \[true, false\]; Whether to draw the layer once per series, from its rows, in its color.*\
-    line_1:          *# The first line. If both lines have a value, the layer is a band between them; if one is None, it's the other line alone.*\
+    per_series: false          *# \[true, false\]; If true, the layer is drawn for every series with matching color. If false, it's drawn for all data combined.*\
+    line_1:          *# The first line.*\
         value: None          *# \[None, float, date, column\]; A number, a date, or a column.*\
-        aggregation:          *# \[aggregation style\]; How the column's rows are combined into the line's value. If its function is None, the line follows each row.*\
-        offset:          *# \[aggregation style\]; A distance added to the aggregate, e.g. stddev with multiplier 3 for three standard deviations above.*\
-        scope: all          *# \[all, each\]; Which rows the aggregates are taken over: all of them, for a straight line, or those at each location, for a line that follows the data.*\
-        line:          *# \[line style, look from layer.reference.line\]; The line.*\
+        aggregation:          *# \[aggregation style\]; How the column's rows are combined into the line's value. If its function is None, the values are used as-is.*\
+        offset:          *# \[aggregation style\]; A distance added to the aggregate, e.g. 3 × stddev for three standard deviations above the aggregated value.*\
+        scope: all          *# \[all, each\]; Which rows the aggregates are taken over: all for a straight line, or each, for a line that follows the data.*\
+        line:          *# \[line style, look from layer.reference.line\]; The appearance of the line.*\
         label:          *# \[text style, look from layer.reference.label\]; The line's label.*\
             text: None          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.*\
             position: auto          *# \[auto, start_above, start_below, center_above, center_below, end_above, end_below\]; auto selects the first option that doesn't overlap the data and is invalid if inside is false.*\
@@ -22,5 +22,5 @@ parameters:\
             format: auto          *# \[auto, format\]; The format of the value. auto uses one more decimal than the axis's tick labels, or on a date axis, the tick label format.*\
     line_2:          *# \[same as line_1\]; The second line.*\
     fill:          *# \[look from layer.reference.fill\]; The fill between the lines of a band.*\
-        color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
+        color: "#808080"          *# \[None, series, hex color\]; The fill color. series uses the series' color. If None, there is no fill.*\
         opacity: 0.15          *# \[0-1\]; The fill opacity.*

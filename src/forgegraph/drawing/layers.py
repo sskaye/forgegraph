@@ -1,17 +1,18 @@
 """The layers a GraphSpec lists (layers/*.yaml), drawn on a graph type's series.
 
-- **reference**: one or two lines, with the fill of a band between two. Each is at a value
-  (on a date axis, a date or a day number; text that reads as a date is a column only if one
-  has that name), or from a column's drawn values: its aggregate times its multiplier, plus
-  its offset (an aggregate too), over all the rows for a straight line, or at each place
-  for a line that follows the data; with no aggregation, through each row. With per_series,
-  the layer is drawn once per named series, all its replicates together, in its color. A
-  date column's aggregate is a date, on a date axis only. A line outside the data widens an
-  automatic axis; outside a set limit, it's an error. Its label, placed after layout, sits
-  at one end or the middle, beside the line: auto takes the first position (LABEL_ORDER)
-  inside the plot and clear of the data and other text. A chosen position that covers
-  something is an error; one past the plot's edge widens an automatic axis. With
-  label.inside false, the label is beyond the plot area at the line's start or end.
+- **reference**: one or two lines, with the fill of a band between two (none if fill.color
+  is None). Each is at a value (on a date axis, a date or a day number; text that reads as a
+  date is a column only if one has that name), or from a column's drawn values: its
+  aggregate times its multiplier, plus its offset (an aggregate too), over all the rows for
+  a straight line, or at each place for a line that follows the data; with no aggregation,
+  through each row. With per_series, the layer is drawn once per named series, all its
+  replicates together, in its color. A date column's aggregate is a date, on a date axis
+  only. A line outside the data widens an automatic axis; outside a set limit, it's an
+  error. Its label, placed after layout, sits at one end or the middle, beside the line:
+  auto takes the first position (LABEL_ORDER) inside the plot and clear of the data and
+  other text. A chosen position that covers something is an error; one past the plot's edge
+  widens an automatic axis. With label.inside false, the label is beyond the plot area at
+  the line's start or end.
 - **error_bar**: a bar on each mark along an axis, a number or a column's distance below and
   above it. With the series aggregated (its aggregation), the distances can be an aggregate
   of the rows each mark stands for, times its multiplier: such as their standard deviation,
@@ -45,7 +46,7 @@ from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
 from forgegraph.spec.layers import look_paths
-from forgegraph.spec.parameters import as_date
+from forgegraph.spec.parameters import as_date, is_none
 
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
@@ -348,9 +349,11 @@ def _band(
     roles: Any,
 ) -> None:
     """The fill between a band's two lines, in fill.color (series: the series') and
-    fill.opacity."""
+    fill.opacity; none if fill.color is None."""
     own = look(style, layer)
     fill = own.theme["layer.reference.fill.color"]
+    if is_none(fill):
+        return
     if fill == "series" and not color:
         raise DrawError(
             f"layers.{layer['name']}.fill.color: series, but the band isn't drawn per series; "

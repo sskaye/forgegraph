@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="forgegraph-inputs" content="51b1186c9df42452c558a9bc049164149cd8070615b9f9d5f967be87c2dcaae6">
+<meta name="forgegraph-inputs" content="35b25d848813d7a6c8d6b6617ebea5f7bc63792e80f81a2bbfbe8704c062445c">
 <title>forgegraph_base_2 Catalog</title>
 <style>
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
@@ -412,7 +412,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 <details class="category" id="theme-forgegraph_base_2-base_theme-category-layer-reference-fill"><summary style="padding-left:3rem" title="layer.reference.fill">fill</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="theme-forgegraph_base_2-base_theme-param-layer-reference-fill-color"><td class="path" style="padding-left:4.1rem" title="layer.reference.fill.color">color</td><td>#808080</td><td>hex color code | series</td><td>variable</td><td>The fill color. series uses the series&#x27; color.</td></tr>
+<tr id="theme-forgegraph_base_2-base_theme-param-layer-reference-fill-color"><td class="path" style="padding-left:4.1rem" title="layer.reference.fill.color">color</td><td>#808080</td><td>hex color code | series | None</td><td>variable</td><td>The fill color. series uses the series&#x27; color. If None, there is no fill.</td></tr>
 <tr id="theme-forgegraph_base_2-base_theme-param-layer-reference-fill-opacity"><td class="path" style="padding-left:4.1rem" title="layer.reference.fill.opacity">opacity</td><td>0.15</td><td>float, 0-1</td><td>variable</td><td>The fill opacity.</td></tr>
 </table>
 </details>
@@ -1115,7 +1115,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
 <tr id="layer-reference-param-axis"><td class="path" style="padding-left:0.5rem" title="axis">axis</td><td>None</td><td>x | y</td><td>required</td><td>The axis the values are on. y draws horizontal lines. A GraphSpec must set it.</td></tr>
-<tr id="layer-reference-param-per_series"><td class="path" style="padding-left:0.5rem" title="per_series">per_series</td><td>false</td><td>true | false</td><td>variable</td><td>Whether to draw the layer once per series, from its rows, in its color.</td></tr>
+<tr id="layer-reference-param-per_series"><td class="path" style="padding-left:0.5rem" title="per_series">per_series</td><td>false</td><td>true | false</td><td>variable</td><td>If true, the layer is drawn for every series with matching color. If false, it&#x27;s drawn for all data combined.</td></tr>
 </table>
 <details class="category" id="layer-reference-category-line_1"><summary style="padding-left:0.5rem" title="line_1">line_1</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -1136,7 +1136,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 </details>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="layer-reference-param-line_1-scope"><td class="path" style="padding-left:1.6rem" title="line_1.scope">scope</td><td>all</td><td>all | each</td><td>variable</td><td>Which rows the aggregates are taken over: all of them, for a straight line, or those at each location, for a line that follows the data.</td></tr>
+<tr id="layer-reference-param-line_1-scope"><td class="path" style="padding-left:1.6rem" title="line_1.scope">scope</td><td>all</td><td>all | each</td><td>variable</td><td>Which rows the aggregates are taken over: all for a straight line, or each, for a line that follows the data.</td></tr>
 </table>
 <details class="category" id="layer-reference-category-line_1-label"><summary style="padding-left:1.75rem" title="line_1.label">label</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -1166,7 +1166,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 </details>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="layer-reference-param-line_2-scope"><td class="path" style="padding-left:1.6rem" title="line_2.scope">scope</td><td>all</td><td>all | each</td><td>variable</td><td>Which rows the aggregates are taken over: all of them, for a straight line, or those at each location, for a line that follows the data.</td></tr>
+<tr id="layer-reference-param-line_2-scope"><td class="path" style="padding-left:1.6rem" title="line_2.scope">scope</td><td>all</td><td>all | each</td><td>variable</td><td>Which rows the aggregates are taken over: all for a straight line, or each, for a line that follows the data.</td></tr>
 </table>
 <details class="category" id="layer-reference-category-line_2-label"><summary style="padding-left:1.75rem" title="line_2.label">label</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -1179,7 +1179,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 <details class="category" id="layer-reference-category-fill"><summary style="padding-left:0.5rem" title="fill">fill</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="layer-reference-param-fill-color"><td class="path" style="padding-left:1.6rem" title="fill.color">color</td><td>#808080</td><td>hex color code | series</td><td>variable</td><td>The fill color. series uses the series&#x27; color.</td></tr>
+<tr id="layer-reference-param-fill-color"><td class="path" style="padding-left:1.6rem" title="fill.color">color</td><td>#808080</td><td>hex color code | series | None</td><td>variable</td><td>The fill color. series uses the series&#x27; color. If None, there is no fill.</td></tr>
 <tr id="layer-reference-param-fill-opacity"><td class="path" style="padding-left:1.6rem" title="fill.opacity">opacity</td><td>0.15</td><td>float, 0-1</td><td>variable</td><td>The fill opacity.</td></tr>
 </table>
 </details>

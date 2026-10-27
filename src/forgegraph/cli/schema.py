@@ -154,9 +154,10 @@ def _settable(
     it, and which file gives that value; and notes on any spec named whose pack is
     non-standard here, or may not be used here."""
     from forgegraph.spec.access import found_problems, nonstandard_note
-    from forgegraph.spec.parameters import NONE, definitions
+    from forgegraph.spec.parameters import NONE, definitions, series_definitions
     from forgegraph.spec.registry import registry_for
-    from forgegraph.spec.resolve import resolve
+    from forgegraph.spec.resolve import chain, resolve
+    from forgegraph.spec.series import look_definitions
 
     reg = registry_for(root)
     chosen_names = (("graph_type", graph_type), ("theme", theme), ("format", format))
@@ -193,6 +194,7 @@ def _settable(
         for p in definitions("graphspec").values()
     ]
     methods = resolve("theme", reg.docs["theme"][theme], reg, graph_type)["legend.methods"].value
+    looks = look_definitions()
     for kind, name in chosen_names:
         params = definitions(kind, graph_type if kind == "graph_type" else None)
         values = resolve(kind, reg.docs[kind][name], reg, graph_type)
@@ -200,6 +202,10 @@ def _settable(
             if r.fixed or path not in params:
                 continue
             p = params[path]
+            if kind == "theme" and path.startswith("series."):  # each series sets it for itself
+                if path.removeprefix("series.") not in looks:
+                    continue  # the lists each series chooses from, and the benchmark's style
+                path = f"series.<series>.{path.removeprefix('series.')}"
             allowed = p.range.describe()
             if path == "legend.method":  # the theme's methods, which the check allows
                 allowed = "one of: " + ", ".join(methods)
@@ -213,4 +219,18 @@ def _settable(
                     "from": f"{kind.replace('_', ' ')} {name}",
                 }
             )
+        if kind == "graph_type":  # what each series a GraphSpec lists takes
+            rows += [
+                {
+                    "parameter": f"series.<series>.{path}",
+                    "value": p.default,
+                    "range": p.range.describe(),
+                    "required": False,
+                    "description": p.description,
+                    "from": f"graph type {name}",
+                }
+                for path, p in series_definitions(
+                    chain(kind, reg.docs[kind][name], reg)[-1]["name"]
+                ).items()
+            ]
     return rows, notes

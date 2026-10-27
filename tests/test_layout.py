@@ -15,7 +15,7 @@ import pytest
 from matplotlib.lines import Line2D
 from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, write_pack
 from PIL import Image
-from render_helpers import BASE, painted_draws, polarization
+from render_helpers import BASE, painted_draws, polarization, with_series
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -308,7 +308,7 @@ def test_the_layouts_format_replaces_each_tiles(project):
 
 
 def test_a_tile_can_be_drawn_from_a_dataframe(project):
-    doc = fg.graphspec("frame", "xy", settings=BASE)
+    doc = fg.graphspec("frame", "xy", settings=with_series(BASE))
     dump(doc, project / "frame.yaml")
     path = write_layout(project, {"T": tab([["f"]], f="frame.yaml")})
     assert fg.layout(path, data={"f": polarization()}).tabs[0].tiles["f"].data.rows_read == 96
@@ -320,7 +320,7 @@ def test_lint_names_the_tile(project):
     frame = polarization()
     frame.loc[0, "cell_voltage"] = np.nan
     frame.to_parquet(project / "gaps.parquet")
-    doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=BASE)
+    doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=with_series(BASE))
     dump(doc, project / "gaps.yaml")
     path = write_layout(project, {"T": tab([["volt", "gaps"]], volt="volt.yaml", gaps="gaps.yaml")})
     messages = fg.layout(path).warnings

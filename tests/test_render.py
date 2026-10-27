@@ -18,7 +18,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from pack_helpers import allow, dump, graphspec_file, write_pack
 from PIL import Image
-from render_helpers import BASE, painted_draws, png, polarization, render
+from render_helpers import BASE, painted_draws, png, polarization, render, with_series
 
 import forgegraph as fg
 from forgegraph.drawing import xy
@@ -92,7 +92,7 @@ def test_series_colors_follow_the_group_order_and_the_benchmark_has_its_own_styl
     assert colors[-1] == "#808080" and g.axes.get_lines()[-1].get_linewidth() == pytest.approx(
         g.style.pt("series.benchmark.line.width")
     )
-    data = render({"encoding.order": "data"})  # Cell C appears first in the data
+    data = render({"series.order": "data"})  # Cell C appears first in the data
     assert data.axes.get_lines()[0].get_color() == "#0072B2"
 
 
@@ -150,13 +150,13 @@ def test_a_numeric_color_draws_one_line_per_value():
     )  # fmt: skip
     scale = fg.xy(frame, x="t", y="v", color="d")  # on the color bar
     assert [len(np.asarray(line.get_xdata())) for line in scale.axes.lines] == [3, 3, 3]
-    named = fg.xy(frame, x="t", y="v", color="d", parameters={"encoding.color.type": "categorical"})
+    named = fg.xy(frame, x="t", y="v", color="d", parameters={"series.color_scale": "categorical"})
     labels = [t.get_text() for t in named.axes.texts if t.get_gid() == "forgegraph-series-label"]
     assert sorted(labels) == ["1960", "1970", "1980"]
     text = frame.assign(d=frame["d"].astype(str) + "s")
-    message = re.escape("encoding.color.type: continuous, but d isn't numbers")
+    message = re.escape("series.v.color_scale: continuous, but d isn't numbers")
     with pytest.raises(fg.SpecError, match=message):
-        fg.xy(text, x="t", y="v", color="d", parameters={"encoding.color.type": "continuous"})
+        fg.xy(text, x="t", y="v", color="d", parameters={"series.color_scale": "continuous"})
 
 
 def test_legend_sits_in_a_corner_clear_of_data_with_its_title():
@@ -225,8 +225,8 @@ def test_layout_fits_tick_labels_that_change_with_the_box():
     parameters = {
         "axis.x.title": "Petal length (cm)",
         "axis.y.title": "Petal width (cm)",
-        "encoding.color.type": "categorical",
-        "mark.line.show": False,
+        "series.color_scale": "categorical",
+        "series.line.show": False,
     }
     g = fg.xy(iris, x="petal_length", y="petal_width", color="species",
               title="Iris petal measurements by species", parameters=parameters)  # fmt: skip
@@ -248,29 +248,30 @@ def test_key_samples_have_the_plots_marker_size():
         for a in legend.artists
         if isinstance(a, Line2D) and a.get_marker() not in ("none", "None")
     }
-    assert sizes == {Style(g.values["theme"], g.values["format"]).pt("series.marker.size")}
+    assert sizes == {0.9 * Style(g.values["theme"], g.values["format"]).base}  # the series'
 
 
 def test_a_style_key_explains_line_styles():
-    g = render({"encoding.line.style.column": "size", "legend.method": "direct"})
+    g = render({"series.line.style": "size", "legend.method": "direct"})
     assert any(k.title == "size" for k in keys(g.axes))
 
 
-def test_column_name_groups_by_y_column():
+def test_colored_by_series_each_series_is_a_group():
     frame = polarization()
     settings = {
         "axis.y.data.column": ["cell_voltage", "temperature"],
-        "encoding.color.column": "column_name",
-        "encoding.detail.column": NONE,
+        "series.color": "series",
+        "series.split": NONE,
         "benchmark.data_column": NONE,
         "benchmark.value": NONE,
         "legend.method": "key",
         "legend.key.title.text": NONE,
     }
-    with pytest.raises(fg.SpecError, match="several y columns have no single name"):
+    with pytest.raises(fg.SpecError, match="several series have no single column name"):
         render(settings, data=frame)
     with pytest.raises(
-        fg.SpecError, match=re.escape("legend.key.title.text: encoding.color.column is column_name")
+        fg.SpecError,
+        match=re.escape("legend.key.title.text: series 'cell_voltage' is colored by series"),
     ):
         render(
             {**settings, "axis.y.title": NONE, "legend.key.title.text": "column_name"}, data=frame
@@ -287,7 +288,7 @@ def test_column_name_groups_by_y_column():
 def test_numeric_color_by_draws_a_color_bar():
     g = render(
         {
-            "encoding.color.column": "temperature",
+            "series.color": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -309,7 +310,7 @@ def test_numeric_color_by_draws_a_color_bar():
 def test_a_color_bar_title_can_read_down_its_side():
     g = render(
         {
-            "encoding.color.column": "temperature",
+            "series.color": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -325,7 +326,7 @@ def test_a_color_bar_title_can_read_down_its_side():
 def test_a_color_bar_can_go_below_the_plot():
     g = render(
         {
-            "encoding.color.column": "temperature",
+            "series.color": "temperature",
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
@@ -345,7 +346,7 @@ def test_a_color_bar_can_go_below_the_plot():
 
 
 def test_missing_values_drop_or_break_the_line():
-    drop, gap = render(), render({"mark.line.missing_values": "gap"})
+    drop, gap = render(), render({"series.line.missing_values": "gap"})
     assert drop.data.rows_dropped == {"missing x or y": 1} == gap.data.rows_dropped
     has_nan = [
         np.isnan(np.asarray(line.get_ydata(), dtype=float)).any() for line in gap.axes.get_lines()
@@ -359,7 +360,7 @@ def test_connect_order():
     by_x = render()
     xs = np.asarray(by_x.axes.get_lines()[0].get_xdata(), dtype=float)
     assert (np.diff(xs) >= 0).all()
-    by_row = render({"mark.line.connect_order": "data"})
+    by_row = render({"series.line.connect_order": "data"})
     xs = np.asarray(by_row.axes.get_lines()[0].get_xdata(), dtype=float)
     assert not (np.diff(xs) >= 0).all()
 
@@ -398,10 +399,7 @@ def test_too_many_groups_warns():
         }
     )
     g = fg.xy(frame, "x", "y", color="g")
-    assert (
-        "encoding.color.column: 12 groups but 7 colors in series.colors; colors repeat"
-        in g.warnings
-    )
+    assert "series.y.color: 12 groups but 7 colors in series.colors; colors repeat" in g.warnings
 
 
 # --- errors --------------------------------------------------------------------------------
@@ -416,21 +414,27 @@ def test_drawing_errors_name_the_parameter():
         fg.SpecError, match=re.escape("axis.x.data.type: decimal, but 'cell' isn't numbers")
     ):
         render({"axis.x.data.column": "cell", "axis.x.data.type": "decimal"})
-    with pytest.raises(fg.SpecError, match=re.escape("encoding.color.column: no column 'cel'")):
-        render({"encoding.color.column": "cel"})
+    message = "series.cell_voltage.color: no column 'cel'"
+    with pytest.raises(fg.SpecError, match=re.escape(message)):
+        render({"series.color": "cel"})
 
 
 def test_no_data_file_needs_a_dataframe():
-    doc = fg.graphspec("g", "xy", settings={"axis.x.data.column": "a", "axis.y.data.column": "b"})
+    doc = fg.graphspec(
+        "g", "xy", settings=with_series({"axis.x.data.column": "a", "axis.y.data.column": "b"})
+    )
     with pytest.raises(fg.SpecError, match=re.escape("data.file: None, so pass the data")):
         fg.render(doc)
 
 
 def test_required_columns():
     doc = fg.graphspec("g", "xy", settings={"axis.x.data.column": "a"})
+    with pytest.raises(fg.SpecError, match=re.escape("series: must list at least one series")):
+        fg.render(doc, pd.DataFrame({"a": [1.0]}))
+    doc = fg.graphspec("g", "xy", settings={"series": {"a": {}}})
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("axis.y.data.column: must be set before the graph can be drawn"),
+        match=re.escape("axis.x.data.column: must be set before the graph can be drawn"),
     ):
         fg.render(doc, pd.DataFrame({"a": [1.0]}))
 
@@ -565,8 +569,8 @@ def test_an_unchanged_graph_stays_standard_however_it_is_drawn_or_saved(tmp_path
 def _horizontal_bars() -> fg.Graph:
     """Bars along y, which are fitted to the pixel grid by the renderer's height."""
     counts = pd.DataFrame({"n": [44, 124, 56], "kind": ["Adelie", "Gentoo", "Chinstrap"]})
-    bars = {"mark.bar.show": True, "mark.line.show": False, "mark.marker.show": False}
-    return fg.xy(counts, "n", "kind", parameters={**bars, "series.base_axis": "y"})
+    bars = {"series.bar.show": True, "series.line.show": False, "series.marker.show": False}
+    return fg.xy(counts, "n", "kind", parameters={**bars, "arrangement.base_axis": "y"})
 
 
 @pytest.mark.parametrize("make", [render, _horizontal_bars], ids=["lines", "horizontal bars"])
@@ -686,7 +690,8 @@ def test_xy_draws_into_any_axes_so_layouts_can_place_it():
         FigureCanvasAgg(fig)
         left, right = fig.subplots(1, 2)
         for ax in (left, right):
-            drawn = xy.draw(ax, polarization(), g.values["graph_type"], style)
+            gt, series = g.values["graph_type"], g._prepared.series
+            drawn = xy.draw(ax, polarization(), gt, style, series=series)
             xy.label(ax, drawn, g.values["graph_type"], style)
         fig.canvas.draw()
     assert (
@@ -697,7 +702,7 @@ def test_xy_draws_into_any_axes_so_layouts_can_place_it():
 
 def _write_graphspec(path, **kw) -> None:
     """A GraphSpec drawing the example data, without writing the data."""
-    dump(fg.graphspec(path.stem, "xy", settings=BASE, **kw), path)
+    dump(fg.graphspec(path.stem, "xy", settings=with_series(BASE), **kw), path)
 
 
 def test_data_file_relative_to_the_graphspec(tmp_path):
@@ -760,7 +765,7 @@ def test_column_types_survive_parquet(tmp_path):
         "d",
         "xy",
         data_file="d.parquet",
-        settings={"axis.x.data.column": "when", "axis.y.data.column": "value"},
+        settings=with_series({"axis.x.data.column": "when", "axis.y.data.column": "value"}),
     )
     dump(doc, tmp_path / "d.yaml")
     g = fg.render(tmp_path / "d.yaml")
@@ -785,10 +790,10 @@ def test_impossible_drawings_are_errors_not_fallbacks():
     )
     no_margin = {"plot_area.gap": 0.0}  # no room beside the outer rows either
     scatter = {
-        "mark.line.show": False,
+        "series.line.show": False,
         "benchmark.data_column": NONE,
         "benchmark.value": NONE,
-        "encoding.detail.column": NONE,
+        "series.split": NONE,
     }
     with pytest.raises(
         fg.SpecError,
@@ -806,7 +811,7 @@ def test_impossible_drawings_are_errors_not_fallbacks():
 
 
 def test_each_styling_column_gets_its_own_key():
-    g = render({"encoding.line.style.column": "size", "encoding.marker.shape.column": "run"})
+    g = render({"series.line.style": "size", "series.marker.shape": "run"})
     assert {"size", "run"} <= {k.title for k in keys(g.axes)}
 
 
@@ -825,13 +830,13 @@ def _banded() -> pd.DataFrame:
 BANDED = {
     "axis.x.data.column": "x",
     "axis.y.data.column": "y",
-    "encoding.color.column": NONE,
-    "encoding.line.style.column": "band",
-    "encoding.detail.column": "edge",
-    "encoding.order": "data",
+    "series.color": "series",
+    "series.line.style": "band",
+    "series.split": "edge",
+    "series.order": "data",
     "benchmark.data_column": NONE,
     "benchmark.value": NONE,
-    "mark.marker.show": False,
+    "series.marker.show": False,
     "legend.method": "key",
 }
 
@@ -844,12 +849,12 @@ def test_the_key_title_is_every_keys():
     assert titles() == ["band"]  # column_name: its own column's
     assert titles(**{"legend.key.title.text": NONE}) == [None]
     assert titles(**{"legend.key.title.text": "Percentiles"}) == ["Percentiles"]
-    colored = {"encoding.color.column": "edge", "encoding.detail.column": NONE}
+    colored = {"series.color": "edge", "series.split": NONE}
     assert sorted(map(str, titles(**colored))) == ["band", "edge"]
     assert titles(**colored, **{"legend.key.title.text": NONE}) == [None, None]
     with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
         titles(**colored, **{"legend.key.title.text": "Percentiles"})
-    two = {"encoding.marker.shape.column": "edge", "mark.marker.show": True}
+    two = {"series.marker.shape": "edge", "series.marker.show": True}
     with pytest.raises(fg.SpecError, match=re.escape("legend.key.title.text: 'Percentiles'")):
         titles(**two, **{"legend.key.title.text": "Percentiles"})
 
@@ -863,14 +868,14 @@ def test_style_samples_take_the_series_color_with_no_color_encoding():
     colors, g = samples()
     drawn = {to_hex(ln.get_color()) for ln in g.axes.get_lines() if ln.get_gid() != KEY}
     assert colors == drawn == {to_hex(g.style.series_colors()[0])}
-    colors, g = samples(**{"encoding.color.column": "edge", "encoding.detail.column": NONE})
+    colors, g = samples(**{"series.color": "edge", "series.split": NONE})
     assert colors == {to_hex(g.style.color("text.color"))}  # neutral among the colors
 
 
 def test_the_style_keys_drawn_are_reported():
     g = render(BANDED, data=_banded())
     assert g.labelling == "none" and g.style_keys == ["band"]
-    assert render({**BANDED, "encoding.line.style.column": NONE}, data=_banded()).style_keys == []
+    assert render({**BANDED, "series.line.style": "first"}, data=_banded()).style_keys == []
 
 
 # A delivered median, two percentile bands' edges, and the programmed schedule as the
@@ -879,13 +884,13 @@ BASAL_Y = {"Delivered": 5.0, "Programmed": 5.5, "25-75%": (4.0, 6.0), "10-90%": 
 BASAL = {
     "axis.x.data.column": "x",
     "axis.y.data.column": "y",
-    "encoding.color.column": NONE,
-    "encoding.line.style.column": "basal",
-    "encoding.detail.column": "edge",
-    "encoding.order": "data",
+    "series.color": "series",
+    "series.line.style": "basal",
+    "series.split": "edge",
+    "series.order": "data",
     "benchmark.data_column": "basal",
     "benchmark.value": "Programmed",
-    "mark.marker.show": False,
+    "series.marker.show": False,
 }
 
 
@@ -992,8 +997,8 @@ def test_direct_labels_can_widen_a_date_axis(monkeypatch):
     settings = {
         "axis.x.data.column": "day",
         "axis.y.data.column": "y",
-        "encoding.color.column": "run",
-        "encoding.detail.column": NONE,
+        "series.color": "run",
+        "series.split": NONE,
         "benchmark.data_column": NONE,
         "benchmark.value": NONE,
         "legend.method": "direct",

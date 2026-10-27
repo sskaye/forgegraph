@@ -18,17 +18,15 @@ parameters: !var
                 column: Cell
             tick:
                 algorithm: all
-        y:
-            data:
-                column: Power Density (mW/cm²)
-                aggregation: max
-    mark:
-        bar:
-            show: true
-        line:
-            show: false
-        marker:
-            show: false
     series:
-        value_label:
-            show: true
+        Power Density (mW/cm²):
+            aggregation:
+                function: max
+            line:
+                show: false
+            marker:
+                show: false
+            bar:
+                show: true
+            value_label:
+                show: true

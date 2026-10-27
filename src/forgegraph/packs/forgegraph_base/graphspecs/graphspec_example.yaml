@@ -1,6 +1,6 @@
 name: graphspec_example          # [text]; The name of the GraphSpec.
 version: 0          # [int ≥ 0]; The version number of the specification.
-description: Polarization curves for cells A–C against the benchmark.          # [text]; The description of the GraphSpec.
+description: An example GraphSpec to define the specification.          # [text]; The description of the GraphSpec.
 extends: None          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
 
 parameters: !var          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
@@ -9,103 +9,95 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         theme: forgegraph_base/base_theme          # [theme];
         format: forgegraph_base/base_format          # [format];
     text:
-        title: Polarization, 60 °C          # [None, text]; Graph title. None: none.
+        title: Polarization, 60 °C          # [None, text]; The graph's title. If None, there is no title.
     data:
-        file: polarization.parquet          # [None, text]; Parquet file holding the DataFrame to draw: an absolute path, one starting with ~, or one relative to the folder of the file that sets it. None: passed through the Python API.
-        preprocessing: None          # [None, text]; Where the code that made the data is: a path, a URL, a note. Recorded in provenance, never read. None: not given.
+        file: polarization.parquet          # [None, text]; The Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.
+        preprocessing: None          # [None, text]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.
     axis:
+        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.
         x:
             data:
-                column: Cell Current (mA/cm²)          # [column]; Horizontal axis column.
-                type: auto          # [auto, decimal, integer, datetime, categorical]; The column's type. auto: datetime for dates, categorical for text, else decimal or integer.
-                aggregation: none          # [none, mean, median, sum, min, max]; Rows at one place in a series, combined. none: each drawn.
+                column: "Cell Current (mA/cm²)"          # [None, column]; The column on this axis when it's arrangement.base_axis, which a GraphSpec must then set. Otherwise, it must be None.
+                type: auto          # [auto, decimal, integer, datetime, categorical]; The column's type. auto selects datetime for dates, categorical for text, and decimal or integer for numbers.
                 order:
-                    method: source          # [source, alphanumeric, value]; Category order: as in the data, natural, or by the other axis's value.
-                    direction: ascending          # [ascending, descending]; The category order's direction.
-            title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name. None: none.
-            scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.gap × the data's range.
-            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.gap × the data's range.
+                    method: source          # [source, alphanumeric, value]; The order of the categories. source keeps the order in the data, alphanumeric sorts them naturally, and value sorts them by the other axis's value.
+                    direction: ascending          # [ascending, descending]; The direction of the category order.
+            title: column_name          # [None, column_name, text]; The axis title. column_name uses the name of axis.column if it's the base_axis or the series' column if it's not. With several series, use text or None.
+            scale: linear          # [linear, log]; The axis scale.
+            min: None          # [None, float, date]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.
+            max: None          # [None, float, date]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.
             tick:
-                algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
-                step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
+                algorithm: auto          # [auto, all, manual]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step.
+                step: None          # [None, float > 0, text]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.
                 label:
-                    format: auto          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
+                    format: auto          # [auto, format]; The tick label format. auto chooses one from the values, and for dates, from the tick unit.
         y:
             data:
-                column: Cell Voltage (V)          # [columns]; Vertical axis column, or columns for one series each.
-                type: auto          # [auto, decimal, integer, datetime, categorical]; The column's type. auto: datetime for dates, categorical for text, else decimal or integer.
-                aggregation: none          # [none, mean, median, sum, min, max]; Rows at one place in a series, combined. none: each drawn.
+                column: None          # [None, column]; The column on this axis when it's arrangement.base_axis, which a GraphSpec must then set. Otherwise, it must be None.
+                type: auto          # [auto, decimal, integer, datetime, categorical]; The column's type. auto selects datetime for dates, categorical for text, and decimal or integer for numbers.
                 order:
-                    method: source          # [source, alphanumeric, value]; Category order: as in the data, natural, or by the other axis's value.
-                    direction: ascending          # [ascending, descending]; The category order's direction.
-            title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.
-            scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.gap × the data's range.
-            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.gap × the data's range.
+                    method: source          # [source, alphanumeric, value]; The order of the categories. source keeps the order in the data, alphanumeric sorts them naturally, and value sorts them by the other axis's value.
+                    direction: ascending          # [ascending, descending]; The direction of the category order.
+            title: column_name          # [None, column_name, text]; The axis title. column_name uses the name of axis.column if it's the base_axis or the series' column if it's not. With several series, use text or None.
+            scale: linear          # [linear, log]; The axis scale.
+            min: None          # [None, float, date]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.
+            max: None          # [None, float, date]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.
             tick:
-                algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
-                step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
+                algorithm: auto          # [auto, all, manual]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step.
+                step: None          # [None, float > 0, text]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.
                 label:
-                    format: auto          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
-        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.
-    encoding:
-        color:
-            column: Cell          # [None, column_name, column]; A color per value of this column. column_name: per y column. None: one color.
-            type: auto          # [auto, categorical, continuous]; categorical: a palette color per value. continuous: a color scale and color bar, for numbers. auto: continuous for numbers.
-        line:
-            style:
-                column: None          # [None, column_name, column]; A line style per value of this column. column_name: per y column. None: one style.
-        marker:
-            shape:
-                column: None          # [None, column_name, column]; A marker shape per value of this column. column_name: per y column. None: one shape.
-            fill:
-                column: None          # [None, column_name, column]; A marker fill per value of this column. column_name: per y column. None: one fill.
-        detail:
-            column: [Cell, Run]          # [None, columns]; Columns splitting rows into separate lines, e.g. replicates. Each y column is always its own line.
-        order: sorted          # [sorted, data]; Group order: sorted, or as first seen.
-    series:
-        base_axis: x          # [x, y]; The axis series are drawn along: bars stand on it, and aggregation adds along the other.
-        aggregation: none          # [none, sum, percent]; Series at the same place: drawn as they are, stacked, or stacked to 100 %.
-        offset: none          # [none, side_by_side]; side_by_side: series at the same place are drawn beside each other.
-        value_label:
-            show: false          # [true, false]; Write each value by its mark.
-            position: auto          # [auto, inside, outside]; Inside a bar's end, beyond the mark, or inside where it fits.
-            format: auto          # [auto, text]; Number format, e.g. ",.0f"; on a date axis, a date format, e.g. "%H:%M". auto: as the value axis's tick labels.
-            total:
-                show: false          # [true, false]; With aggregation sum, also write each stack's total.
-        opacity: 1          # [0-1]; The opacity of lines, markers and bars.
-        marker:
-            size: 0.5          # [float > 0]; The marker size, × base size.
-        bar:
-            width: 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
-            gap: 0.1          # [0-1]; The fraction of each side-by-side bar's space left empty between it and the next bar.
+                    format: auto          # [auto, format]; The tick label format. auto chooses one from the values, and for dates, from the tick unit.
+    arrangement:          # How the series are placed relative to each other.
+        base_axis: x          # [x, y]; The common axis for all series. Bars stand on it, and stacking adds values along the other axis.
+        stacking: none          # [none, sum, percent]; How series at the same location are combined. none draws each as it is, sum stacks them, and percent stacks them to 100 %.
+        offset: none          # [none, side_by_side]; side_by_side draws series at the same location beside each other instead of over each other.
+        total:
+            show: false          # [true, false]; Whether to write each stack's total when stacking is sum.
+    series:          # The series drawn, each under its name in the legend. A GraphSpec must list at least one. Each series has these parameters, and it can also set the theme's variable series parameters for itself.
+        "Cell Voltage (V)":
+            column: name          # [name, column]; The column of values the series draws along the axis that isn't arrangement.base_axis. name uses the column with the series' name.
+            aggregation:          # [aggregation style]; How rows at the same location are combined into one point. If its function is None, each row is drawn.
+            split: [Cell, Run]          # [None, columns]; Columns whose values split the series into separate lines, e.g. replicates.
+            order: sorted          # [sorted, data]; The order of the series' groups: sorted, or data for the order in which they first appear.
+            color: Cell          # [series, hex color, column]; The series' color. series takes the next palette color, and a column gives each of its values its own.
+            color_scale: auto          # [auto, categorical, continuous]; For a color column: categorical uses the palette, continuous a color scale and color bar, and auto continuous for numbers.
+            opacity: 1          # [0-1]; The opacity of lines, markers and bars.
+            line:
+                show: true          # [true, false]; Whether to draw lines.
+                style: first          # [first, series, solid, dashed, dotted, dashdot, column]; The line style. first is the theme's first line style, series takes the next one, and a column gives each of its values its own.
+                connect_order: x          # [x, data]; The order in which points are connected along each line: by x, or data for the order of the rows.
+                interpolate: linear          # [linear, step_after, step_before, step_center, smooth]; How the line joins points: straight, in flat steps that change at the next point, before it or midway, or as a smooth curve.
+                missing_values: drop          # [drop, gap]; What happens to rows missing x or y. drop joins the line across them, and gap breaks the line. Lint counts both in dropped-rows.
+            marker:
+                show: true          # [true, false]; Whether to draw markers.
+                shape: first          # [first, series, circle, square, triangle_up, triangle_down, diamond, cross, plus, column]; The marker shape. first is the theme's first marker shape, series takes the next one, and a column gives each of its values its own.
+                fill: first          # [first, series, filled, open, column]; The marker fill. first is the theme's first marker fill, series takes the next one, and a column gives each of its values its own.
+                size: 0.5          # [float > 0]; The marker size, × base size.
+            bar:
+                show: false          # [true, false]; Whether to draw bars. Bars start at 0, or at 1 on a log axis, and the value axis then always includes that value.
+                width: 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
+                gap: 0.1          # [0-1]; The fraction of each side-by-side bar's space left empty between it and the next bar.
+            value_label:          # [text style]; The value labels. Its look comes from the theme's series.value_label, and a GraphSpec may change what the theme marks !var.
+                show: false          # [true, false]; Whether to write each value next to its mark.
+                position: auto          # [auto, inside, outside]; Where each value is written: inside the end of its bar, or outside, just beyond its mark. auto writes it inside if it fits and outside otherwise. On stacks, values are always inside.
+                format: auto          # [auto, format]; The value label format. auto uses the format of the value axis's tick labels.
     benchmark:
-        data_column: Cell          # [None, column_name, column]; Column marking the benchmark. column_name: a y column. None: no benchmark.
-        value: Benchmark          # [None, text, float, date]; The benchmark's value in data_column (for column_name, a y column's name; for a date column, a date), drawn in series.benchmark style. Set with data_column.
-        side: start          # [start, end]; Where the benchmark goes on a categorical axis it's a value of: before the other categories or after them.
-    mark:
-        line:
-            show: true          # [true, false]; Draw lines.
-            connect_order: x          # [x, data]; Point order along each line: by x, or by row.
-            missing_values: drop          # [drop, gap]; Rows missing x or y. drop: the line joins its neighbors. gap: the line breaks. Both are counted in lint's dropped-rows.
-        marker:
-            show: true          # [true, false]; Draw markers.
-        bar:
-            show: false          # [true, false]; Draw bars, from 0 (1 on log); the value axis then includes it.
+        data_column: Cell          # [None, series, column]; The column that identifies the benchmark. series means the benchmark is one of the series. If None, there is no benchmark.
+        value: Benchmark          # [None, text, float, date]; The benchmark's value in data_column: a series' name with series, or a date for a date column. The benchmark is drawn in the series.benchmark style. Set it together with data_column.
+        side: start          # [start, end]; Where the benchmark is placed when it's a category on a categorical axis: before the other categories or after them.
     legend:
-        method: auto          # [auto, direct, key, none]; This graph's method: one of the theme's legend.methods.
-        key:
-            positions: [top_right, top_left, bottom_right, bottom_left]          # [top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom]; Tried in order: the first clear one.
-            inside: true          # [true, false]; Inside the plot area, or outside it: top_* above it, bottom_* below the x-axis title, right_* to its right.
-            title:
-                text: column_name          # [None, column_name, text]; Every key's title. column_name: each key's own column's name. None: none. A text: one key only.
-        color_bar:
-            title:
-                text: column_name          # [None, column_name, text]; Color bar title. column_name: the encoding.color.column column's name. None: none.
-            colors: viridis          # [viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors]; The colors for a numeric color column.
+        method: auto          # [auto, direct, key, none]; How this graph names its series: one of the theme's legend.methods.
         direct:
             max_relative_distance: 0.8          # [0-1]; The farthest a direct label may be from its series, ÷ its distance to the next nearest series.
+        key:
+            positions: [top_right, top_left, bottom_right, bottom_left]          # [top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom]; The positions to try, in order. The key goes in the first one where it doesn't overlap the data.
+            inside: true          # [true, false]; Whether the key is inside the plot area. If false, top positions are above the plot area, bottom positions are below the x-axis title, and right positions are to its right.
+            title:
+                text: column_name          # [None, column_name, text]; The title of every key. column_name uses the name of each key's column. Other text is allowed only when there is one key. If None, there is no title.
+        color_bar:
+            colors: viridis          # [viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors]; The colors for a numeric color column.
+            title:
+                text: column_name          # [None, column_name, text]; The color bar's title. column_name uses the name of the series' color column. If None, there is no title.
     grid:
         x:
             show: false          # [true, false]; Whether to draw vertical grid lines at the x ticks.

@@ -13,6 +13,7 @@ from datetime import date, datetime
 import pandas as pd
 import pytest
 from pack_helpers import doc
+from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph.spec.parameters import (
@@ -23,17 +24,23 @@ from forgegraph.spec.parameters import (
     NONE,
     REFERENCE,
     Parameter,
+    _parameters,
     _read,
     _type_ok,
+    _walk,
     definition_file,
     definitions,
     parse_range,
+    series_definitions,
     tree_set,
 )
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
+from forgegraph.spec.series import look_definitions
 from forgegraph.spec.tags import fix, var
 from forgegraph.spec.validate import drawing_problems, validate
+
+ONE = "series.Cell Voltage (V)"  # the example GraphSpec's series
 
 
 def reference_name(kind: str) -> str:
@@ -45,6 +52,7 @@ DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layer
 LAYER_TYPES = sorted(builtin().docs["layer"])
 ALL = [(kind, p) for kind in DOCUMENT_KINDS for p in definitions(kind).values()]
 ALL += [(f"layer:{t}", p) for t in LAYER_TYPES for p in definitions("layer", t).values()]
+ALL += [("series", p) for p in series_definitions().values()]
 IDS = [f"{kind}:{p.path}" for kind, p in ALL]
 NUMERIC = {"int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0"}
 
@@ -84,6 +92,9 @@ LAYER_REQUIRED = {
 def check(kind: str, p: Parameter, value) -> list[str]:
     """Problems with a file that sets p to value: one extending the definition file, or for a
     layer type's parameter, a GraphSpec with that layer, named t."""
+    if kind == "series":
+        doc = child("graphspec", params={f"{ONE}.{p.path}": value})
+        return validate("graphspec", doc, reg_with(("graphspec", doc)))
     if kind.startswith("layer:"):
         layer_type = kind.split(":", 1)[1]
         entry: dict = {"type": layer_type}
@@ -102,7 +113,8 @@ def wrap(p: Parameter, value):
 
 
 def where(p: Parameter, kind: str = "") -> str:
-    return ("layers.t." if kind.startswith("layer:") else "") + p.path
+    prefix = {"series": f"{ONE}."}.get(kind, "layers.t." if kind.startswith("layer:") else "")
+    return prefix + p.path
 
 
 # --- the definition files -------------------------------------------------------------
@@ -169,7 +181,7 @@ def test_parameter_paths_are_unique_across_kinds():
 
 def test_required_parameters():
     required = [p.path for p in definitions("graph_type").values() if p.required]
-    assert required == ["axis.x.data.column", "axis.y.data.column"]
+    assert required == []  # the base axis's column is checked when drawing
 
 
 # --- ranges at their edges ------------------------------------------------------------
@@ -197,7 +209,7 @@ def test_every_listed_value_is_accepted(kind, p):
 
 @pytest.mark.parametrize(("kind", "p"), ALL, ids=IDS)
 def test_values_outside_the_range_are_rejected(kind, p):
-    if not {"text", "column", "columns"} & set(p.range.types):
+    if not {"text", "column", "columns", "value format"} & set(p.range.types):
         [err] = check(kind, p, wrap(p, "not-a-value"))
         assert "must be" in err
     if not p.range.intervals and not NUMERIC & set(p.range.types):
@@ -231,6 +243,7 @@ SAMPLES = {
     "layer type": (["note"], ["pie"]),
     "layer types": ([["note", "error_bar"], "note"], [[], ["pie"]]),
     "texts": ([["a.yaml"], ["prog", "-x"]], [[], [7], "a.yaml"]),
+    "value format": ([",.0f", "%b %-d"], [7]),
 }
 
 
@@ -265,10 +278,10 @@ def test_a_single_value_parameter_refuses_a_list():
         definitions("graph_type")["axis.x.data.column"],
         definitions("graph_type")["axis.y.data.column"],
     )
-    assert check("graph_type", x, ["a", "b"]) == [
-        "axis.x.data.column: must be a single value: a column name"
-    ]
-    assert check("graph_type", y, ["a", "b"]) == []
+    for p in (x, y):
+        assert check("graph_type", p, ["a", "b"]) == [
+            f"{p.path}: must be a single value: None or a column name"
+        ]
 
 
 def test_range_parsing():
@@ -330,7 +343,7 @@ def test_unknown_parameter_and_category():
         ("theme", "grid.line_width", 0.05, "grid.width"),
         ("theme", "axis.tick.minor.num", 4, "axis.tick.minor.count"),
         ("theme", "series.bar.edge_color", "#000000", "series.bar.edge.color"),
-        ("graphspec", "encoding.marker_shape", "Cell", "encoding.marker.shape.column"),
+        ("graphspec", "arrangement.stack", "sum", "arrangement.stacking"),
         ("schedule", "freshness.stamp", False, "freshness.stamp.show"),
     ],
 )
@@ -343,7 +356,7 @@ def test_a_renamed_parameter_suggests_its_new_name(kind, old, value, new):
 @pytest.mark.parametrize(
     ("kind", "old", "value", "new"),
     [
-        ("graphspec", "encoding.color", "Cell", "'encoding.color.column' or 'encoding.color.type'"),
+        ("graphspec", "arrangement.total", True, "'arrangement.total.show'"),
         ("schedule", "cadence.interval", 1, "'cadence.interval.count' or 'cadence.interval.unit'"),
         (
             "theme",
@@ -431,7 +444,8 @@ parameters: !var
     data: {{file: d.parquet, preprocessing: None}}
     axis:
         x: {{data: {{column: x}}}}
-        y: {{data: {{column: y}}}}
+    series:
+        y: {{}}
 """,
         encoding="utf-8",
     )
@@ -538,6 +552,8 @@ def test_the_reference_graphspec_sets_every_parameter_with_its_owners_descriptio
     _, listed = _read("graphspec", "graphspec_example")
     for kind in ("graph_type", "theme", "format"):
         for path, p in definitions(kind).items():
+            if kind == "theme" and path.startswith("series."):
+                continue  # each series sets them for itself
             if p.fixed:
                 assert path not in listed, path
                 continue
@@ -546,12 +562,29 @@ def test_the_reference_graphspec_sets_every_parameter_with_its_owners_descriptio
             assert (listed[path].range, listed[path].description) == (p.range, own), path
 
 
+def test_the_reference_graphspecs_series_sets_every_series_parameter():
+    """Its series sets every parameter its graph type gives a series, with the graph type's
+    description, and only theme parameters a series may set for itself, with the theme's."""
+    path = definition_file("graphspec", "graphspec_example")
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    [entry] = data["parameters"]["series"].values()
+    found = _parameters(_walk("", entry, False, path), entry, path, looks=False)
+    listed = {q.path: q for q in found}
+    own, look = series_definitions(), look_definitions()
+    for rel, q in own.items():
+        assert rel in listed, f"graphspec_example.yaml's series doesn't set {rel}"
+        assert (listed[rel].range, listed[rel].description) == (q.range, q.description), rel
+    for rel in set(listed) - set(own):
+        q = look[rel]
+        assert (listed[rel].range, listed[rel].description) == (q.range, q.description), rel
+
+
 def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
     doc = spec(
         {
             "grid.y.show": True,
             "axis.x.min": 0,
-            "mark.line.show": False,
+            f"{ONE}.line.show": False,
             "provenance.level": "minimal",
         }
     )
@@ -564,10 +597,10 @@ def test_a_graphspec_cannot_change_fixed_parameters():
         "axis.tick.length: fixed by theme 'forgegraph_base/base_theme'",
         "figure.width: fixed by format 'forgegraph_base/base_format'",
     ]
-    lines_only = child("graph_type", "fix", {"mark.line.show": True}, name="line")
-    doc = spec({"specifications.graph_type": "line", "mark.line.show": False})
-    assert validate("graphspec", doc, reg_with(("graph_type", lines_only))) == [
-        "mark.line.show: fixed by graph type 'line'"
+    stacked = child("graph_type", "fix", {"arrangement.stacking": "sum"}, name="stacked")
+    doc = spec({"specifications.graph_type": "stacked", "arrangement.stacking": "none"})
+    assert validate("graphspec", doc, reg_with(("graph_type", stacked))) == [
+        "arrangement.stacking: fixed by graph type 'stacked'"
     ]
 
 
@@ -588,11 +621,15 @@ def test_a_graphspec_names_existing_files():
 
 
 def test_a_graphspec_respects_fixed_values_of_the_graphspec_it_extends():
-    base = child("graphspec", "fix", {"mark.line.show": True}, name="base")
-    doc = {**spec({"mark.line.show": False}), "extends": "base"}
+    base = child("graphspec", "fix", {"arrangement.stacking": "none"}, name="base")
+    doc = {**spec({"arrangement.stacking": "sum"}), "extends": "base"}
     reg = reg_with(("graphspec", base), ("graphspec", doc))
     assert validate("graphspec", base, reg) == []
-    assert validate("graphspec", doc, reg) == ["mark.line.show: fixed by GraphSpec 'base'"]
+    assert validate("graphspec", doc, reg) == ["arrangement.stacking: fixed by GraphSpec 'base'"]
+    base = child("graphspec", "fix", {ONE: {"line": {"show": True}}}, name="base")
+    doc = {**spec({f"{ONE}.line.show": False}), "extends": "base"}
+    reg = reg_with(("graphspec", base), ("graphspec", doc))
+    assert validate("graphspec", doc, reg) == [f"{ONE}: fixed by GraphSpec 'base'"]
 
 
 def test_naming_method_is_limited_to_the_themes_methods():
@@ -609,8 +646,11 @@ def test_drawing_needs_the_required_columns():
     doc = spec({"axis.x.data.column": NONE})
     assert validate("graphspec", doc) == []
     assert drawing_problems(doc) == [
-        "axis.x.data.column: must be set before the graph can be drawn"
+        "axis.x.data.column: must be set before the graph can be drawn: the column the series "
+        "are drawn along (arrangement.base_axis)"
     ]
+    doc = spec({ONE: NONE})
+    assert drawing_problems(doc) == ["series: must list at least one series to draw"]
 
 
 def test_benchmark_column_and_value_go_together():
@@ -626,35 +666,34 @@ def test_a_graphspec_without_a_data_file_is_drawn_from_a_dataframe():
     assert validate("graphspec", doc) == [] and drawing_problems(doc) == []
 
 
-def test_several_y_columns_need_a_title_or_none():
-    two = ["cell_voltage", "temperature"]
-    assert validate(
-        "graphspec", spec({"axis.y.data.column": two, "axis.y.title": "column_name"})
-    ) == ["axis.y.title: several y columns have no single name; set a title, or None"]
-    assert validate("graphspec", spec({"axis.y.data.column": two, "axis.y.title": NONE})) == []
-    assert (
-        validate("graphspec", spec({"axis.y.data.column": two, "axis.y.title": "Voltage (V)"}))
-        == []
-    )
-    assert (
-        validate(
-            "graphspec", spec({"axis.y.data.column": "cell_voltage", "axis.y.title": "column_name"})
-        )
-        == []
-    )
+def test_several_series_need_a_title_or_none():
+    two = {f"{ONE}.color": "series", "series.Temperature (°C).color": "series"}
+    titled = {"legend.key.title.text": NONE}
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": "column_name"})) == [
+        "axis.y.title: several series have no single column name; set a title, or None"
+    ]
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": NONE})) == []
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": "Voltage (V)"})) == []
+    assert validate("graphspec", spec({**two, "axis.y.title": NONE})) == [
+        f"legend.key.title.text: series '{ONE[len('series.') :]}' is colored by series, which "
+        "has no column name; set a title, or None"
+    ]
+    assert validate("graphspec", spec({"axis.y.title": "column_name"})) == []
+
+
+def test_the_series_give_the_values_along_the_other_axis():
+    assert validate("graphspec", spec({"axis.y.data.column": "Run"})) == [
+        "axis.y.data.column: the series give the values along y; leave it None, and set each "
+        "series' column"
+    ]
 
 
 def test_impossible_requests_are_errors():
-    assert validate("graphspec", spec({"mark.line.show": False, "mark.marker.show": False})) == [
-        "mark.line.show, mark.marker.show, mark.bar.show: all false, so nothing would be drawn"
+    hidden = {f"{ONE}.line.show": False, f"{ONE}.marker.show": False}
+    assert validate("graphspec", spec(hidden)) == [
+        f"{ONE}: line.show, marker.show and bar.show are all false, so nothing would be drawn"
     ]
-    assert (
-        validate(
-            "graphspec",
-            spec({"mark.line.show": False, "mark.marker.show": False, "mark.bar.show": True}),
-        )
-        == []
-    )
+    assert validate("graphspec", spec({**hidden, f"{ONE}.bar.show": True})) == []
     assert validate("graphspec", spec({"axis.x.min": 5.0, "axis.x.max": 5.0})) == [
         "axis.x.min: must be below axis.x.max (5.0 is not below 5.0)"
     ]

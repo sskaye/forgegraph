@@ -186,8 +186,8 @@ class Obstacles:
     @classmethod
     def of(cls, ax: Axes, *, lines: bool, keys: bool, renderer: Any = None) -> Obstacles:
         """What's drawn inside the plot: every marker and bar; with lines, every line drawn
-        with a line style (the series' lines are drawn only when shown, so with
-        mark.line.show false reference lines and error-bar stems don't count either); the
+        with a line style (the series' lines are drawn only when shown, so when no series
+        shows its line, reference lines and error-bar stems don't count either); the
         plot's text (value labels, notes, a reference line's label, direct labels); with
         keys, the keys' frames. A key's own lines and text never count."""
         dense, centres = _drawn_points(ax, lines)

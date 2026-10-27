@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from pack_helpers import allow, cli, cli_problems, dump, graphspec_file, write_config, write_pack
 from PIL import Image, PngImagePlugin
-from render_helpers import BASE
+from render_helpers import BASE, with_series
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -278,7 +278,7 @@ def test_dates_with_names_beside_the_lines(project):
         {
             "axis.x.data.column": "date",
             "axis.y.data.column": "price",
-            "encoding.color.column": "symbol",
+            "series.color": "symbol",
         },
     )
     start = time.monotonic()
@@ -456,7 +456,7 @@ def test_load_of_a_file_it_cant_read_is_an_error(project):
 
 
 def test_explain_reports_a_graphspec_that_fails_validation(project):
-    doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=BASE)
+    doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=with_series(BASE))
     doc["parameters"]["text"]["colour"] = "red"
     dump(doc, project / "graphspecs" / "bad.yaml")
     [problem] = cli_problems("explain", "graphspecs/bad.yaml")

@@ -7,7 +7,7 @@ from typing import Any
 import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
-from render_helpers import polarization, render
+from render_helpers import polarization, render, with_series
 
 import forgegraph as fg
 from forgegraph.drawing.key import keys
@@ -64,8 +64,8 @@ def test_too_many_groups():
         {
             "axis.x.data.column": "x",
             "axis.y.data.column": "y",
-            "encoding.color.column": "g",
-            "encoding.detail.column": "None",
+            "series.color": "g",
+            "series.split": "None",
             "benchmark.data_column": "None",
             "benchmark.value": "None",
             "legend.method": "none",
@@ -145,7 +145,9 @@ ACROSS = {"t": {"type": "reference_line", "axis": "y", "value": 3.5}}
 
 def _layered(listed: dict[str, Any], data: pd.DataFrame = POINTS, /, **settings: Any) -> fg.Graph:
     doc = fg.graphspec(
-        "t", "xy", settings={"axis.x.data.column": "x", "axis.y.data.column": "y", **settings}
+        "t",
+        "xy",
+        settings=with_series({"axis.x.data.column": "x", "axis.y.data.column": "y", **settings}),
     )
     doc["parameters"]["layers"] = listed
     return fg.render(doc, data)
@@ -189,17 +191,17 @@ def test_a_stack_that_totals_a_limit_but_for_float_noise_isnt_past_it():
         "axis.y.data.column": "pct",
         "axis.y.min": 0,
         "axis.y.max": 100,
-        "encoding.color.column": "band",
-        "encoding.order": "data",
-        "series.aggregation": "sum",
+        "series.color": "band",
+        "series.order": "data",
+        "arrangement.stacking": "sum",
         "legend.method": "key",
         "legend.key.inside": False,
         "legend.key.positions": ["right_top"],
-        "mark.bar.show": True,
-        "mark.line.show": False,
-        "mark.marker.show": False,
+        "series.bar.show": True,
+        "series.line.show": False,
+        "series.marker.show": False,
     }
-    assert _outside(fg.render(fg.graphspec("t", "xy", settings=settings), frame)) == []
+    assert _outside(fg.render(fg.graphspec("t", "xy", settings=with_series(settings)), frame)) == []
 
 
 def test_a_point_just_past_a_limit_is_outside_it():

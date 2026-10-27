@@ -23,12 +23,9 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 column: Current density (mA/cm²)          *# \[column\]; Horizontal axis column.*\
             title: "Current density (mA/cm^2)"          *# \[None, column_name, text\]; Axis title.*\
         y:\
-            data:\
-                column: Cell voltage (V)          *# \[columns\]; Vertical axis column.*\
             title: column_name          *# \[None, column_name, text\]; Axis title.*\
-    encoding:\
-        color:\
-            column: Cell          *# \[None, column_name, column\]; A color per value of this column.*\
-    mark:\
-        marker:\
-            show: true          *# \[true, false\]; Draw markers.*
+    series:\
+        Cell voltage (V):\
+            color: Cell\
+            marker:\
+                show: true

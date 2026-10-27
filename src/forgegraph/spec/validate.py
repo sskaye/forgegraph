@@ -13,8 +13,8 @@ definitions (see parameters.py).
   extends lists as fixed. Its layers are checked by layers.py, a layout's tabs by layout.py.
 - A format's width and height can't both be auto; a graph type's legend.method must be one
   of the theme's legend.methods; the parameters TIES ties (benchmark.data_column and
-  benchmark.value) are set together or not at all; with several y columns, axis.y.title
-  is text or None; and anything else impossible (no font, nothing drawn, a backwards or
+  benchmark.value) are set together or not at all; with several series, the value axis's
+  title is text or None; and anything else impossible (no font, nothing drawn, a backwards or
   non-positive log axis) is an error, never a silent substitute.
 """
 
@@ -53,6 +53,7 @@ from forgegraph.spec.resolve import (
     resolve,
 )
 from forgegraph.spec.schedule import Cadence, CadenceError
+from forgegraph.spec.series import resolve_series, series_problems
 from forgegraph.spec.tags import UNSET, status_at
 
 # Graph-type parameters set together or not at all; the catalog's cards keep them so too.
@@ -78,7 +79,11 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
     if errors:
         return errors
     if is_none(doc["extends"]):
-        missing = [path for path, p in defs.items() if path not in listed and p.inherits is None]
+        missing = [
+            path
+            for path, p in defs.items()
+            if path not in listed and p.inherits is None and p.same is None
+        ]
         if missing:
             return [
                 "extends: None, so every parameter must be listed; missing: " + ", ".join(missing)
@@ -177,7 +182,7 @@ def _header(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
 
 
 def _graphspec_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
-    errors = layer_problems(doc, reg)
+    errors = layer_problems(doc, reg) + series_problems(doc, reg)
     if errors:
         return errors
     errors = _inherited_fixed(doc, reg)
@@ -264,24 +269,32 @@ def _ties_complete(values: dict[str, dict[str, Any]]) -> list[str]:
 def _graph_rules(values: dict[str, dict[str, Any]]) -> list[str]:
     """Combinations of graph-type values that ask for something impossible."""
     v = values["graph_type"]
+    listed = values.get("series", {})
     errors = []
-    columns = v.get("axis.y.data.column")
-    several = isinstance(columns, list) and len(columns) > 1
-    if several and v.get("axis.y.title") == "column_name":
-        errors.append("axis.y.title: several y columns have no single name; set a title, or None")
-    if (
-        several
-        and v.get("encoding.color.column") == "column_name"
-        and v.get("legend.key.title.text") == "column_name"
-    ):
+    base = v.get("arrangement.base_axis", "x")
+    value = "y" if base == "x" else "x"
+    several = len(listed) > 1
+    if not is_none(v.get(f"axis.{value}.data.column")):
         errors.append(
-            "legend.key.title.text: encoding.color.column is column_name, which has no single "
-            "name; set a title, or None"
+            f"axis.{value}.data.column: the series give the values along {value}; leave it "
+            "None, and set each series' column"
         )
-    if all(v.get(f"mark.{m}.show") is False for m in ("line", "marker", "bar")):
+    if several and v.get(f"axis.{value}.title") == "column_name":
         errors.append(
-            "mark.line.show, mark.marker.show, mark.bar.show: all false, so nothing would be drawn"
+            f"axis.{value}.title: several series have no single column name; set a title, or None"
         )
+    by_series = [n for n, s in listed.items() if s.get("color") == "series"]
+    if several and by_series and v.get("legend.key.title.text") == "column_name":
+        errors.append(
+            f"legend.key.title.text: series '{by_series[0]}' is colored by series, which has no "
+            "column name; set a title, or None"
+        )
+    for name, s in listed.items():
+        if all(s.get(f"{m}.show") is False for m in ("line", "marker", "bar")):
+            errors.append(
+                f"series.{name}: line.show, marker.show and bar.show are all false, so nothing "
+                "would be drawn"
+            )
     for axis in ("axis.x", "axis.y"):
         algorithm, step = v.get(f"{axis}.tick.algorithm"), v.get(f"{axis}.tick.step")
         if algorithm == "manual" and is_none(step):
@@ -372,6 +385,15 @@ def drawing_problems(doc: dict[str, Any], reg: Registry | None = None) -> list[s
         for path, p in definitions_for("graph_type", gt, reg).items()
         if p.required and is_none(values.get(path))
     ]
+    if "arrangement.base_axis" in values:  # a graph type that draws series
+        base = values["arrangement.base_axis"]
+        if is_none(values.get(f"axis.{base}.data.column")):
+            problems.append(
+                f"axis.{base}.data.column: must be set before the graph can be drawn: the "
+                "column the series are drawn along (arrangement.base_axis)"
+            )
+        if not resolve_series(doc, reg):
+            problems.append("series: must list at least one series to draw")
     for name, r in resolve_layers(doc, reg).items():
         layer = with_defaults(r.value)
         problems += [

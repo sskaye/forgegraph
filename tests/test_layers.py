@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+from render_helpers import with_series
 
 import forgegraph as fg
 from forgegraph.drawing.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
@@ -31,7 +32,9 @@ def doc(listed: dict[str, Any], **settings: Any) -> dict[str, Any]:
     d = fg.graphspec(
         "t",
         "xy",
-        settings={"axis.x.data.column": "conc", "axis.y.data.column": "rate", **settings},
+        settings=with_series(
+            {"axis.x.data.column": "conc", "axis.y.data.column": "rate", **settings}
+        ),
     )
     d["parameters"]["layers"] = listed
     return d
@@ -160,7 +163,7 @@ def test_a_line_at_an_aggregate():
                 "label": {"text": "aggregation"},
             }
         },
-        **{"mark.line.show": False},  # the lines between the two concentrations cross it
+        **{"series.line.show": False},  # the lines between the two concentrations cross it
     )
     [line] = layer_lines(g, REFERENCE)
     assert line.get_ydata()[0] == pytest.approx(RATES["rate"].mean())
@@ -175,7 +178,7 @@ def test_a_line_at_an_aggregate():
                 "label": {"text": "aggregation"},
             }
         },
-        **{"mark.line.show": False},  # the lines between the two concentrations cross it
+        **{"series.line.show": False},  # the lines between the two concentrations cross it
     )
     assert layer_texts(g, REFERENCE) == ["2 × std dev"]  # noqa: RUF001
 
@@ -193,7 +196,7 @@ def test_a_line_per_named_series_takes_in_its_replicates():
             }
         },
         df,
-        **{"encoding.color.column": "state", "encoding.detail.column": "run"},
+        **{"series.color": "state", "series.split": "run"},
     )
     assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [13.0, 30.0]
 
@@ -209,7 +212,7 @@ def test_a_line_per_series_in_its_color():
                 "per_series": True,
             }
         },
-        **{"encoding.color.column": "state"},
+        **{"series.color": "state"},
     )
     lines = layer_lines(g, REFERENCE)
     assert sorted(ln.get_ydata()[0] for ln in lines) == [13.0, 30.0]
@@ -232,7 +235,7 @@ AGGREGATES = {
 @pytest.mark.parametrize("how", sorted(AGGREGATES))
 @pytest.mark.parametrize("y", [["a"], ["a", "b"], ["b", "a"]])
 def test_a_line_at_an_aggregate_counts_each_row_once(how, y):
-    """However many y columns are drawn, a column's aggregate is of its rows, each once."""
+    """However many series are drawn, a column's aggregate is of its rows, each once."""
     g = graph(
         {
             "t": {
@@ -272,7 +275,7 @@ def test_a_line_per_series_at_an_aggregate_counts_each_row_once():
         **{
             "axis.x.data.column": "x",
             "axis.y.data.column": ["b"],
-            "encoding.color.column": "g",
+            "series.color": "g",
             "legend.method": "key",
             "legend.key.inside": False,
             "legend.key.title.text": "None",
@@ -313,7 +316,7 @@ def test_error_bars_of_a_constant_and_of_a_column():
                 "value": {"lower": 1, "upper": 2, "aggregation": {"function": "None"}},
             }
         },
-        **{"axis.y.data.aggregation": "mean", "encoding.color.column": "state"},
+        **{"series.aggregation.function": "mean", "series.color": "state"},
     )
     stems = [ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None"]
     y = np.asarray(stems[0].get_ydata(), dtype=float)
@@ -332,7 +335,7 @@ def test_error_bars_of_a_constant_and_of_a_column():
 
 
 def test_error_bars_by_default_are_the_data_columns_standard_deviation():
-    g = graph({"e": {"type": "error_bar"}}, **{"axis.y.data.aggregation": "mean"})
+    g = graph({"e": {"type": "error_bar"}}, **{"series.aggregation.function": "mean"})
     stem = next(ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None")
     y = np.asarray(stem.get_ydata(), dtype=float)
     assert (y[1] - y[0]) / 2 == pytest.approx(np.std([10, 12, 14, 5, 6, 7], ddof=1))  # conc 1
@@ -347,7 +350,7 @@ def test_error_bars_of_the_spread_of_aggregated_rows():
                     "value": {"lower": "rate", "upper": "rate", "aggregation": {"function": how}},
                 }
             },
-            **{"axis.y.data.aggregation": "mean", "encoding.color.column": "state"},
+            **{"series.aggregation.function": "mean", "series.color": "state"},
         )
         stem = next(ln for ln in layer_lines(g, ERROR_BAR) if ln.get_linestyle() != "None")
         y = np.asarray(stem.get_ydata(), dtype=float)
@@ -403,7 +406,7 @@ def test_error_bars_of_aggregated_rows_on_a_date_axis():
             }
         },
         DAYS,
-        **{"axis.x.data.column": "day", "axis.y.data.aggregation": "mean"},
+        **{"axis.x.data.column": "day", "series.aggregation.function": "mean"},
     )
     [line] = [ln for ln in g.axes.get_lines() if ln.get_gid() not in (ERROR_BAR,)]
     points = np.asarray(line.get_xydata(), dtype=float)
@@ -420,11 +423,11 @@ def test_error_bars_of_aggregated_rows_on_a_date_axis():
         (
             {"lower": "rate", "upper": "rate", "aggregation": {"function": "stddev"}},
             {},
-            "set axis.y.data.aggregation too",
+            "set series.rate.aggregation too",
         ),
         (
             {"lower": "rate", "upper": "rate", "aggregation": {"function": "None"}},
-            {"axis.y.data.aggregation": "mean"},
+            {"series.aggregation.function": "mean"},
             "needs value.aggregation.function",
         ),
         (
@@ -450,9 +453,9 @@ def test_error_bars_on_stacked_series_are_an_error():
         graph(
             {"e": {"type": "error_bar", "value": {"lower": 1, "upper": 1}}},
             **{
-                "axis.y.data.aggregation": "mean",
-                "encoding.color.column": "state",
-                "series.aggregation": "sum",
+                "series.aggregation.function": "mean",
+                "series.color": "state",
+                "arrangement.stacking": "sum",
             },
         )
 
@@ -464,9 +467,9 @@ def test_a_note_finds_a_clear_corner_and_keys_avoid_it():
     g = graph(
         {"n": {"type": "note", "text": "60 °C"}},
         **{
-            "encoding.color.column": "state",
+            "series.color": "state",
             "legend.method": "key",
-            "axis.y.data.aggregation": "mean",
+            "series.aggregation.function": "mean",
         },
     )
     [note] = [t for t in g.axes.texts if t.get_gid() == NOTE]
@@ -531,7 +534,7 @@ def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
     top = 30.0  # the highest rate
     g = graph(
         {"t": {"type": "reference_line", "axis": "y", "value": top, "label": {"text": "Max"}}},
-        **{"mark.line.show": False},
+        **{"series.line.show": False},
     )
     _, box = _label_box(g)
     plot = g.axes.get_window_extent()
@@ -581,7 +584,7 @@ def test_a_chosen_label_past_the_plots_edge_widens_the_axis():
                 "label": {"text": "Max", "position": "start_above"},
             }
         },
-        **{"mark.line.show": False},
+        **{"series.line.show": False},
     )
     _, box = _label_box(g)
     assert box.y1 <= g.axes.get_window_extent().y1 + 0.5
@@ -595,7 +598,7 @@ def test_a_chosen_label_past_the_plots_edge_widens_the_axis():
                     "label": {"text": "Max", "position": "start_above"},
                 }
             },
-            **{"mark.line.show": False, "axis.y.max": 30},
+            **{"series.line.show": False, "axis.y.max": 30},
         )
 
 
@@ -610,7 +613,7 @@ def test_a_label_can_give_the_aggregate_and_its_value():
                 "label": {"text": "aggregation_value"},
             }
         },
-        **{"mark.line.show": False},
+        **{"series.line.show": False},
     )
     assert layer_texts(g, REFERENCE) == ["Max: 30.0"]  # one decimal more than the ticks
 
@@ -623,13 +626,13 @@ def test_a_labels_value_takes_its_own_format_or_its_axiss():
         "aggregation": {"function": "mean"},
         "label": {"text": "value", "format": ".3f"},
     }
-    g = graph({"t": line}, **{"mark.line.show": False})
+    g = graph({"t": line}, **{"series.line.show": False})
     assert layer_texts(g, REFERENCE) == [f"{RATES['rate'].mean():.3f}"]
     line["label"] = {"text": "value"}
-    g = graph({"t": line}, **{"mark.line.show": False, "axis.y.tick.label.format": ".2f"})
+    g = graph({"t": line}, **{"series.line.show": False, "axis.y.tick.label.format": ".2f"})
     assert layer_texts(g, REFERENCE) == [f"{RATES['rate'].mean():.2f}"]
     vertical = {"type": "reference_line", "axis": "x", "value": 1.5, "label": {"text": "value"}}
-    g = graph({"t": vertical}, **{"mark.line.show": False})
+    g = graph({"t": vertical}, **{"series.line.show": False})
     x_decimals = max(
         len(t.get_text().split(".")[1]) for t in g.axes.get_xticklabels() if "." in t.get_text()
     )
@@ -644,7 +647,7 @@ def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
     df = pd.DataFrame(
         {
             "kind": ["A"] * 9 + ["B"] * 9,
-            "series": (["x"] * 3 + ["y"] * 3 + ["z"] * 3) * 2,
+            "group": (["x"] * 3 + ["y"] * 3 + ["z"] * 3) * 2,
             "value": [30, 32, 34, 20, 22, 26, 40, 45, 50, 25, 27, 29, 15, 18, 21, 35, 37, 42],
         }
     )
@@ -654,14 +657,14 @@ def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
         **{
             "axis.x.data.column": "kind",
             "axis.y.data.column": "value",
-            "axis.y.data.aggregation": "mean",
+            "series.aggregation.function": "mean",
             "axis.x.tick.algorithm": "all",
-            "encoding.color.column": "series",
-            "series.offset": "side_by_side",
+            "series.color": "group",
+            "arrangement.offset": "side_by_side",
             "legend.key.inside": False,
-            "mark.bar.show": True,
-            "mark.line.show": False,
-            "mark.marker.show": False,
+            "series.bar.show": True,
+            "series.line.show": False,
+            "series.marker.show": False,
         },
     )
     g.figure.canvas.draw()

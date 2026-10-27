@@ -1,5 +1,6 @@
-"""Bars, how series at one place combine (series.aggregation, series.offset), and value labels
-(graph_types/xy.yaml mark.bar, series.*; themes series.bar, series.value_label)."""
+"""Bars, how series at one place combine (arrangement.stacking, arrangement.offset), and value
+labels (graph_types/xy.yaml each series' bar and value_label; themes series.bar,
+series.value_label)."""
 
 from __future__ import annotations
 
@@ -23,9 +24,9 @@ COUNTS = pd.DataFrame(
     }
 )
 BARS = {
-    "mark.bar.show": True,
-    "mark.line.show": False,
-    "mark.marker.show": False,
+    "series.bar.show": True,
+    "series.line.show": False,
+    "series.marker.show": False,
     "axis.x.tick.algorithm": "all",
 }
 
@@ -63,7 +64,7 @@ def value_labels(g: fg.Graph) -> list[str]:
 
 
 def test_bars_stand_on_zero():
-    g = graph(color=None, **{"axis.y.data.aggregation": "sum"})
+    g = graph(color=None, **{"series.aggregation.function": "sum"})
     [bars] = bar_sets(g)
     assert segments(bars) == [(0, 0, 168), (1, 0, 124), (2, 0, 52)]
     assert g.axes.get_ylim()[0] == 0
@@ -72,7 +73,7 @@ def test_bars_stand_on_zero():
 
 def test_bars_of_a_sum_that_is_0_but_for_float_noise_stand_on_zero():
     noise = pd.DataFrame({"island": ["Biscoe"] * 3 + ["Dream"], "penguins": [0.3, -0.1, -0.2, 5]})
-    g = graph(noise, color=None, **{"axis.y.data.aggregation": "sum"})
+    g = graph(noise, color=None, **{"series.aggregation.function": "sum"})
     assert min(top for _, _, top in segments(bar_sets(g)[0])) < 0  # -2.8e-17
     assert g.axes.get_ylim()[0] == 0
 
@@ -84,7 +85,7 @@ def _spacing(g: fg.Graph) -> float:
 
 
 def test_a_bar_fills_its_width_of_the_space_between_places_at_any_size():
-    g = graph(color=None, **{"axis.y.data.aggregation": "sum"})
+    g = graph(color=None, **{"series.aggregation.function": "sum"})
     [bars] = bar_sets(g)
     fraction = float(g.style.theme["series.bar.width"])
     for size in ((4, 3), (8, 3)):
@@ -94,7 +95,7 @@ def test_a_bar_fills_its_width_of_the_space_between_places_at_any_size():
 
 
 def test_side_by_side_bars_share_the_space_and_are_centred_at_each_place():
-    g = graph(**{"series.offset": "side_by_side"})
+    g = graph(**{"arrangement.offset": "side_by_side"})
     adelie, chinstrap, gentoo = (centres(g)[str(b.color)] for b in bar_sets(g))
     assert adelie[0] < 0 < gentoo[0] and adelie[0] == pytest.approx(-gentoo[0])  # Biscoe
     assert adelie[1] < 1 < chinstrap[0] and adelie[1] - 1 == pytest.approx(1 - chinstrap[0])
@@ -115,8 +116,8 @@ def test_bars_at_a_lone_place_fill_their_width_of_the_plot_area():
 
 def test_stacked_bars():
     stacked: dict[str, Any] = {
-        "series.aggregation": "sum",
-        "series.value_label.total.show": True,
+        "arrangement.stacking": "sum",
+        "arrangement.total.show": True,
         "legend.key.inside": False,
     }
     g = graph(**stacked)
@@ -128,7 +129,7 @@ def test_stacked_bars():
 
 
 def test_stacked_to_a_hundred():
-    g = graph(**{"series.aggregation": "percent", "axis.y.max": 175})  # room for the key
+    g = graph(**{"arrangement.stacking": "percent", "axis.y.max": 175})  # room for the key
     tops = {}
     for bars in bar_sets(g):
         for place, _, top in segments(bars):
@@ -140,17 +141,20 @@ def test_stacked_to_a_hundred():
 @pytest.mark.parametrize(
     ("settings", "message"),
     [
-        ({"series.aggregation": "sum", "series.offset": "side_by_side"}, "use one or the other"),
-        ({"series.aggregation": "sum", "axis.y.scale": "log"}, "a log axis can't show"),
+        (
+            {"arrangement.stacking": "sum", "arrangement.offset": "side_by_side"},
+            "use one or the other",
+        ),
+        ({"arrangement.stacking": "sum", "axis.y.scale": "log"}, "a log axis can't show"),
         (
             {
-                "series.aggregation": "sum",
+                "arrangement.stacking": "sum",
                 "series.value_label.show": True,
                 "series.value_label.position": "outside",
             },
             "stacked segments are labelled inside",
         ),
-        ({"series.value_label.total.show": True}, "applies with series.aggregation sum"),
+        ({"arrangement.total.show": True}, "applies with arrangement.stacking sum"),
         ({"axis.y.min": 10}, "bars start at 0, so the axis must include it"),
     ],
 )
@@ -163,8 +167,8 @@ def test_inside_labels_need_bars():
     with pytest.raises(fg.SpecError, match="inside needs bars"):
         graph(
             **{
-                "mark.bar.show": False,
-                "mark.marker.show": True,
+                "series.bar.show": False,
+                "series.marker.show": True,
                 "series.value_label.show": True,
                 "series.value_label.position": "inside",
             }
@@ -174,20 +178,20 @@ def test_inside_labels_need_bars():
 def test_percent_of_mixed_signs_is_an_error():
     df = COUNTS.assign(penguins=[-1, 2, 3, 4, 5])
     with pytest.raises(fg.SpecError, match="a total with mixed signs isn't defined"):
-        graph(df, **{"series.aggregation": "percent"})
+        graph(df, **{"arrangement.stacking": "percent"})
 
 
 def test_stacking_needs_one_row_per_place():
     df = pd.concat([COUNTS, COUNTS.head(1)])
     with pytest.raises(fg.SpecError, match="several rows at one place; combine them"):
-        graph(df, **{"series.aggregation": "sum"})
+        graph(df, **{"arrangement.stacking": "sum"})
 
 
 def test_negative_values_stack_downward():
     df = pd.DataFrame(
         {"q": ["a", "a", "b", "b"], "s": ["x", "y", "x", "y"], "v": [3.0, -2.0, -1.0, -4.0]}
     )
-    g = fg.xy(df, "q", "v", color="s", parameters={**BARS, "series.aggregation": "sum"})
+    g = fg.xy(df, "q", "v", color="s", parameters={**BARS, "arrangement.stacking": "sum"})
     x, y = bar_sets(g)
     assert segments(x) == [(0, 0, 3), (1, 0, -1)]
     assert segments(y) == [(0, 0, -2), (1, -1, -5)]
@@ -217,7 +221,7 @@ def test_value_labels_and_the_axis_grows_to_fit_them():
     g = graph(
         color=None,
         **{
-            "axis.y.data.aggregation": "sum",
+            "series.aggregation.function": "sum",
             "series.value_label.show": True,
             "series.value_label.position": "outside",
         },
@@ -240,7 +244,7 @@ def test_a_label_inside_its_bar_stands_out_from_it():
             **BARS,
             "axis.x.tick.algorithm": "auto",
             "axis.y.tick.algorithm": "all",
-            "series.base_axis": "y",
+            "arrangement.base_axis": "y",
             "series.value_label.show": True,
         },
     )
@@ -251,7 +255,7 @@ def test_a_label_inside_its_bar_stands_out_from_it():
 def test_a_label_running_into_another_bar_is_an_error():
     with pytest.raises(fg.SpecError, match="runs into a neighbouring bar"):
         wide = COUNTS.assign(penguins=COUNTS["penguins"] * 1000)  # labels wider than bars
-        graph(wide, **{"series.offset": "side_by_side", "series.value_label.show": True})
+        graph(wide, **{"arrangement.offset": "side_by_side", "series.value_label.show": True})
 
 
 def test_bars_never_overlap_however_close_the_places():
@@ -264,16 +268,16 @@ def test_bars_never_overlap_however_close_the_places():
 def test_side_by_side_markers_too_wide_for_the_space_are_an_error():
     df = pd.DataFrame({"x": np.repeat(np.arange(200), 2), "y": 1.0, "g": ["a", "b"] * 200})
     with pytest.raises(fg.SpecError) as e:
-        fg.xy(df, "x", "y", color="g", parameters={"series.offset": "side_by_side"})
+        fg.xy(df, "x", "y", color="g", parameters={"arrangement.offset": "side_by_side"})
     [problem] = e.value.problems
-    assert problem.startswith("series.offset: 2 markers side by side need")
+    assert problem.startswith("arrangement.offset: 2 markers side by side need")
 
 
 def test_the_key_shows_a_swatch_of_each_bar():
     from matplotlib.colors import to_rgba
     from matplotlib.patches import Rectangle
 
-    g = graph(**{"series.offset": "side_by_side", "legend.method": "key"})
+    g = graph(**{"arrangement.offset": "side_by_side", "legend.method": "key"})
     swatches = [a for a in g.axes.get_children() if a.get_gid() == KEY and isinstance(a, Rectangle)]
     swatches = [a for a in swatches if to_rgba(a.get_facecolor())[3] > 0]  # not the key's frame
     assert len(swatches) == 3
@@ -284,8 +288,8 @@ def test_the_key_shows_a_swatch_of_each_bar():
 
 def test_names_beside_bars_arent_offered():
     with pytest.raises(fg.SpecError, match="direct isn't available with bars"):
-        graph(**{"series.offset": "side_by_side", "legend.method": "direct"})
-    assert graph(**{"series.offset": "side_by_side"}).labelling == "key"
+        graph(**{"arrangement.offset": "side_by_side", "legend.method": "direct"})
+    assert graph(**{"arrangement.offset": "side_by_side"}).labelling == "key"
 
 
 def test_the_benchmarks_series_stack_among_themselves():
@@ -299,9 +303,9 @@ def test_the_benchmarks_series_stack_among_themselves():
         color="run",
         parameters={
             **BARS,
-            "encoding.color.type": "categorical",
-            "series.aggregation": "sum",
-            "series.value_label.total.show": True,
+            "series.color_scale": "categorical",
+            "arrangement.stacking": "sum",
+            "arrangement.total.show": True,
             "benchmark.data_column": "who",
             "benchmark.value": "ref",
         },
@@ -372,8 +376,8 @@ def test_side_by_side_bars_are_drawn_centred_on_their_tick_to_the_pixel(base, dp
             **BARS,
             f"axis.{base}.tick.algorithm": "all",
             "axis.x.tick.algorithm": "all" if base == "x" else "auto",
-            "series.offset": "side_by_side",
-            "series.base_axis": base,
+            "arrangement.offset": "side_by_side",
+            "arrangement.base_axis": base,
             "legend.method": "key",
             f"axis.{'y' if base == 'x' else 'x'}.max": 200,
         },
@@ -410,7 +414,7 @@ def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
 
 
 def test_series_opacity_fades_lines_markers_and_bars():
-    g = graph(**{"series.opacity": 0.4, "mark.line.show": True, "mark.marker.show": True})
+    g = graph(**{"series.opacity": 0.4, "series.line.show": True, "series.marker.show": True})
     assert {b.get_alpha() for b in bar_sets(g)} == {0.4}
     lines = [ln for ln in g.axes.lines if ln.get_gid() is None and np.size(ln.get_xdata())]
     assert lines and {ln.get_alpha() for ln in lines} == {0.4}

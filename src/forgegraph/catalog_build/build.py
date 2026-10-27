@@ -96,6 +96,7 @@ TYPES = {
     "graph type": "graph type name",
     "theme": "theme name",
     "format": "format name",
+    "value format": "format",
     "graphspec": "GraphSpec name",
     "layer type": "layer type name",
     "layer types": "[layer type names]",

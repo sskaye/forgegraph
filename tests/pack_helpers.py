@@ -94,14 +94,14 @@ def graphspec_file(
 ) -> Path:
     """folder/<name>.yaml: a GraphSpec drawing the example data from data (a path from
     folder), written there if it isn't yet, with the tests' settings unless graphspec_kw
-    (fg.graphspec's) gives its own."""
-    from render_helpers import BASE, polarization
+    (fg.graphspec's) gives its own, the value axis's column a series (with_series)."""
+    from render_helpers import BASE, polarization, with_series
 
     where = folder / data
     if not where.exists():
         where.parent.mkdir(parents=True, exist_ok=True)
         polarization().to_parquet(where)
-    graphspec_kw.setdefault("settings", BASE)
+    graphspec_kw["settings"] = with_series(graphspec_kw.get("settings", BASE))
     return dump(fg.graphspec(name, "xy", data_file=data, **graphspec_kw), folder / f"{name}.yaml")
 
 

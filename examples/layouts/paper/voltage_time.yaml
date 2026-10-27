@@ -18,12 +18,9 @@ parameters: !var
                 column: hours
             title: Time (h)
         y:
-            data:
-                column: voltage_v
             title: Cell voltage (V)
-    encoding:
-        color:
-            column: cell
-    mark:
-        marker:
-            show: false
+    series:
+        voltage_v:
+            color: cell
+            marker:
+                show: false

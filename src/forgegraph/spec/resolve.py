@@ -16,6 +16,7 @@ from forgegraph.spec.common import kind_label, suggest
 from forgegraph.spec.parameters import (
     COLLECTIONS,
     NAMES,
+    NONE,
     PARAMETERS,
     Parameter,
     definitions,
@@ -170,7 +171,19 @@ def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | Non
         if p.path not in out and p.inherits is not None and p.inherits in out:
             source = out[p.inherits]
             out[p.path] = Resolved(source.value, status(p.path), source.origin, p.inherits)
+    root = f"{kind_label(kind)} '{docs[-1].get('name')}'"
+    for p in _copies(kind, doc, reg):  # with the same defaults as the parameters they copy
+        if p.path not in out:
+            out[p.path] = Resolved(NONE if p.default is None else p.default, status(p.path), root)
     return out
+
+
+def _copies(kind: str, doc: dict[str, Any], reg: Registry) -> list[Parameter]:
+    """A kind's parameters in a category with a sibling's parameters ("Same parameters as
+    x."): no file need list them."""
+    if kind != "graph_type":
+        return []
+    return [p for p in definitions_for(kind, doc, reg).values() if p.same is not None]
 
 
 def _members(kind: str, doc: dict[str, Any], reg: Registry) -> list[Parameter]:

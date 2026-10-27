@@ -19,17 +19,14 @@ parameters: !var
             title: None
             tick:
                 algorithm: all
-        y:
-            data:
-                column: Failed or aborted (%)
-    mark:
-        bar:
-            show: true
-        line:
-            show: false
-        marker:
-            show: false
     series:
-        value_label:
-            show: true
-            format: ".1f"
+        Failed or aborted (%):
+            line:
+                show: false
+            marker:
+                show: false
+            bar:
+                show: true
+            value_label:
+                show: true
+                format: ".1f"

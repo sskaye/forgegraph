@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import io
 from importlib.resources import files
 from typing import Any
@@ -12,7 +13,9 @@ from pack_helpers import child
 import forgegraph as fg
 from forgegraph.drawing.export import KEY
 from forgegraph.drawing.style import isolated
+from forgegraph.spec.parameters import series_definitions, tree_set
 from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.series import look_definitions
 
 
 def polarization() -> pd.DataFrame:
@@ -42,11 +45,27 @@ TEST_FORMAT = {"figure.width": 150, "figure.height": 140, "figure.base_size": 12
 BASE = {
     "axis.x.data.column": "current_density",
     "axis.y.data.column": "cell_voltage",
-    "encoding.color.column": "cell",
-    "encoding.detail.column": "run",
+    "series.color": "cell",
+    "series.split": "run",
     "benchmark.data_column": "cell",
     "benchmark.value": "Benchmark",
 }
+
+
+def with_series(settings: dict[str, Any]) -> dict[str, Any]:
+    """GraphSpec settings with the value axis's data.column as a series per column, named
+    after it, each taking every series parameter given under series (as fg.xy does)."""
+    out = dict(settings)
+    base = out.get("arrangement.base_axis", "x")
+    columns = out.pop(f"axis.{'y' if base == 'x' else 'x'}.data.column", None)
+    if columns is None:
+        return out
+    own = {*series_definitions(), *look_definitions()}
+    entry: dict[str, Any] = {}
+    for path in [p for p in out if p.startswith("series.") and p[len("series.") :] in own]:
+        tree_set(entry, path[len("series.") :], out.pop(path))
+    names = [columns] if isinstance(columns, str) else columns
+    return {"series": {name: copy.deepcopy(entry) for name in names}, **out}
 
 
 def _child(kind: str, changes: dict[str, Any]) -> dict[str, Any]:
@@ -73,7 +92,7 @@ def render(
         theme=theme_name,
         format=format_name,
         title=title,
-        settings={**BASE, **(settings or {})},
+        settings=with_series({**BASE, **(settings or {})}),
     )
     return fg.render(doc, polarization() if data is None else data, reg)
 

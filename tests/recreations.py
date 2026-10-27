@@ -17,6 +17,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 from pack_helpers import allow, doc, dump, write_config, write_pack
+from render_helpers import with_series
 
 import forgegraph as fg
 from forgegraph.drawing.export import KEY
@@ -40,7 +41,8 @@ class Recreation:
 
     def graphspec(self) -> dict[str, Any]:
         fmt = "changed" if self.format else "forgegraph_base/base_format"
-        return fg.graphspec(self.name, "xy", format=fmt, title=self.title, settings=self.settings)
+        settings = with_series(self.settings)
+        return fg.graphspec(self.name, "xy", format=fmt, title=self.title, settings=settings)
 
     def registry(self) -> Registry:
         reg = builtin().copy()
@@ -73,7 +75,7 @@ POLARIZATION_SETTINGS = {
     "axis.y.data.column": "cell_voltage",
     "axis.x.title": "Cell Current (mA/cm^2)",
     "axis.y.title": "Cell Voltage (V)",
-    "encoding.color.column": "cell",
+    "series.color": "cell",
     "benchmark.data_column": "cell",
     "benchmark.value": "Benchmark",
 }
@@ -190,7 +192,7 @@ RECREATIONS = [
             "axis.y.data.column": "icorr_ma",
             "axis.x.title": "Cell Voltage (V @ 100 mA)",
             "axis.y.title": "Icorr (mA)",
-            "mark.line.show": False,
+            "series.line.show": False,
         },
     ),
     Recreation(
@@ -202,8 +204,8 @@ RECREATIONS = [
             "axis.y.data.column": "cell_voltage",
             "axis.x.title": "Current Density (mA/cm^2)",
             "axis.y.title": "Cell Voltage (V)",
-            "encoding.color.column": "acd",
-            "encoding.detail.column": "cell_id",
+            "series.color": "acd",
+            "series.split": "cell_id",
             "legend.key.title.text": "ACD",
         },
     ),
@@ -216,8 +218,8 @@ RECREATIONS = [
             "axis.y.data.column": "cell_voltage",
             "axis.x.title": "Cell Current (mA/cm^2)",
             "axis.y.title": "Cell Voltage (V)",
-            "encoding.color.column": "fuel",
-            "encoding.line.style.column": "active_area",
+            "series.color": "fuel",
+            "series.line.style": "active_area",
         },
     ),
     Recreation(
@@ -231,8 +233,8 @@ RECREATIONS = [
             "axis.y.scale": "log",
             "axis.x.title": "ATH Precipitation Rate (mol ATH L^-1 s^-1)",
             "axis.y.title": "Volume (L)",
-            "encoding.color.column": "process",
-            "mark.line.show": False,
+            "series.color": "process",
+            "series.line.show": False,
         },
     ),
     Recreation(
@@ -244,22 +246,21 @@ RECREATIONS = [
             "axis.y.data.column": "thickness_um",
             "axis.x.title": "Open Area (%)",
             "axis.y.title": "Thickness (µm)",
-            "encoding.color.column": "max_power",
+            "series.color": "max_power",
             "legend.color_bar.title.text": "Max Power (mW/cm^2)",
-            "mark.line.show": False,
+            "series.line.show": False,
         },
     ),
     Recreation(
         "flow_sweep_wide",
-        "Wide data: four y columns, one series each, colored by column name "
-        "(color_by: column_name).",
+        "Wide data: four y columns, one series each, colored by series (color: series).",
         _flow_sweep(),
         {
             "axis.x.data.column": "flow_lpm",
             "axis.y.data.column": ["al_no_header", "al_5_hole", "zn_no_header", "zn_5_hole"],
             "axis.x.title": "Electrolyte Flow Rate (LPM)",
             "axis.y.title": "Cell Voltage (V)",
-            "encoding.color.column": "column_name",
+            "series.color": "series",
             "legend.key.title.text": NONE,
         },
     ),
@@ -273,7 +274,7 @@ RECREATIONS = [
             "axis.y.data.column": "cell_voltage",
             "axis.x.title": "Cell Current (mA/cm^2)",
             "axis.y.title": "Cell Voltage (V)",
-            "encoding.color.column": "run",
+            "series.color": "run",
         },
         format={"figure.base_size": 12},
     ),
@@ -327,8 +328,8 @@ def _anode_layers() -> pd.DataFrame:
 ANODE = {
     "axis.x.data.column": "current_density",
     "axis.x.title": "Current Density (mA/cm^2)",
-    "encoding.color.column": "anode",
-    "encoding.detail.column": "cell",
+    "series.color": "anode",
+    "series.split": "cell",
 }
 
 
@@ -386,7 +387,7 @@ LAYOUT_RECREATIONS = [
                     "axis.x.data.column": "cell_voltage_100ma",
                     "axis.y.data.column": "Icorr (mA)",
                     "axis.x.title": "Cell Voltage (V @ 100 mA)",
-                    "mark.line.show": False,
+                    "series.line.show": False,
                 },
                 "Previously",
             ),
@@ -399,9 +400,9 @@ LAYOUT_RECREATIONS = [
                     "axis.x.title": NONE,
                     "axis.x.tick.algorithm": "all",
                     "axis.y.data.column": "Corrosion Rate (mA/cm²)",
-                    "mark.bar.show": True,
-                    "mark.line.show": False,
-                    "mark.marker.show": False,
+                    "series.bar.show": True,
+                    "series.line.show": False,
+                    "series.marker.show": False,
                     "series.value_label.show": True,
                 },
                 "Last 3 Months",

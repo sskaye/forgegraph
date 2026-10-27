@@ -16,11 +16,7 @@ parameters: !var
         x:
             data:
                 column: Cell Current (mA/cm²)
-        y:
-            data:
-                column: Cell Voltage (V)
-    encoding:
-        color:
-            column: Cell
-        detail:
-            column: Run
+    series:
+        Cell Voltage (V):
+            split: Run
+            color: Cell

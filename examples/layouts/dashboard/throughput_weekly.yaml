@@ -18,13 +18,11 @@ parameters: !var
                 column: Week
             title: Week starting
         y:
-            data:
-                column: Completed runs
             title: Runs
             min: 0
-    encoding:
-        color:
-            column: Instrument
+    series:
+        Completed runs:
+            color: Instrument
     grid:
         x:
             show: true

@@ -16,13 +16,11 @@ parameters: !var
         x:
             data:
                 column: Cell Current (mA/cm²)
-        y:
-            data:
-                column: Cell Voltage (V)
-                aggregation: mean
-    encoding:
-        color:
-            column: Cell
+    series:
+        Cell Voltage (V):
+            aggregation:
+                function: mean
+            color: Cell
     layers:
         spread:
             type: error_bar

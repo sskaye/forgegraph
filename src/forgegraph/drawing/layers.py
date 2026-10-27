@@ -10,10 +10,10 @@
   inside the plot and clear of the data and other text. A chosen position that covers
   something is an error; one past the plot's edge widens an automatic axis.
 - **error_bar**: a bar on each mark along an axis, a number or a column's distance below and
-  above it. With the value axis aggregated (data.aggregation), the distances can be
+  above it. With the series aggregated (its aggregation), the distances can be
   multiplier times the spread of the rows each mark stands for: their standard deviation, its
   standard error, or half the 95 % confidence interval of their mean (Student's t). The
-  default is the standard deviation of the axis's own data column (data_column). Error bars
+  default is the standard deviation of the series' own column (data_column). Error bars
   follow side-by-side offsets; on stacked series they're an error.
 - **note**: text in a position by the plot area, inside or outside it. auto takes the first
   position, inside, that nothing drawn passes through: lines, markers, bars, keys and other
@@ -296,14 +296,15 @@ def _line_text(ax: Axes, gt: dict[str, Any], line: RefLine) -> str:
     return number_text(gt, line.axis, axis, line.fmt, path, extra=1, kind=line.kind)(line.at)
 
 
-def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style) -> bool:
+def label_lines(
+    ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style, with_lines: bool
+) -> bool:
     """Place each line's label once the figure is laid out (again on every pass): clear of
     what's drawn, or, at a chosen position past the plot's edge, with an automatic axis
     widened to take it. Returns True if an axis was widened, so the figure must be laid out
     again."""
     for a in [t for t in ax.texts if t.get_gid() == REFERENCE]:
         a.remove()
-    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
     widened = False
     most = float(style.theme["axis.max_extension"])
@@ -407,7 +408,7 @@ def error_bars(
         if layer["type"] != "error_bar":
             continue
         where = f"layers.{name}"
-        if gt["series.aggregation"] != "none":
+        if gt["arrangement.stacking"] != "none":
             raise DrawError(
                 f"{where}: error bars on stacked series aren't defined (a segment's uncertainty "
                 "isn't the stack's); draw the series unstacked"
@@ -416,15 +417,15 @@ def error_bars(
         along_value = axis == roles.value
         how = layer["value.aggregation.function"]
         multiplier = float(layer["value.aggregation.multiplier"])
-        aggregated = gt[f"axis.{roles.value}.data.aggregation"] != "none"
         columns = [e for e in ("lower", "upper") if isinstance(layer[f"value.{e}"], str)]
-        if not unset(how) and not aggregated and columns:  # the function acts on columns
-            raise DrawError(
-                f"{where}.value.aggregation.function: {how} is the spread of the rows a mark "
-                f"stands for, so set axis.{roles.value}.data.aggregation too"
-            )
         log = gt[f"axis.{axis}.scale"] == "log"
         for s in series:
+            aggregated = s.listed.aggregation is not None
+            if not unset(how) and not aggregated and columns:  # the function acts on columns
+                raise DrawError(
+                    f"{where}.value.aggregation.function: {how} is the spread of the rows a "
+                    f"mark stands for, so set {s.listed.path('aggregation')} too"
+                )
             centres = numbers(s.y if along_value else s.x)
             distances = {}
             for end in ("lower", "upper"):
@@ -614,12 +615,15 @@ def unplace_notes(ax: Axes) -> None:
 
 
 def notes_inside(
-    ax: Axes, layers: dict[str, dict[str, Any]], gt: dict[str, Any], style: Style
+    ax: Axes,
+    layers: dict[str, dict[str, Any]],
+    gt: dict[str, Any],
+    style: Style,
+    with_lines: bool,
 ) -> list[Bbox]:
     """Notes inside the plot area, after layout and keys, each clear of everything drawn,
     the keys and the other notes; return their boxes. When no position is clear, an automatic
     y-axis grows at the note's top or bottom, by up to axis.max_extension, to make room."""
-    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     placed: list[Bbox] = []
     inset = style.pt("layer.note.gap")
     most = float(style.theme["axis.max_extension"])

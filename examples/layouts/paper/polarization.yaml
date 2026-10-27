@@ -18,9 +18,7 @@ parameters: !var
                 column: current_density_a_cm2
             title: Current density (A/cm²)
         y:
-            data:
-                column: voltage_v
             title: Cell voltage (V)
-    encoding:
-        color:
-            column: cell
+    series:
+        voltage_v:
+            color: cell

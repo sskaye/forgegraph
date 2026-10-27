@@ -18,10 +18,10 @@ parameters: !var
                 column: Week
             title: Week starting
         y:
-            data:
-                column: Samples
             title: Samples
             min: 0
+    series:
+        Samples: {}
     grid:
         x:
             show: true

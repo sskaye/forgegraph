@@ -1,4 +1,4 @@
-"""The color bar for a numeric encoding.color.column, laid out by the theme's
+"""The color bar for a series colored by a column of numbers, laid out by the theme's
 legend.color_bar.position and legend.color_bar.title.position:
 
 - right, above: a vertical bar right of the plot box, its title above it; the bar runs from

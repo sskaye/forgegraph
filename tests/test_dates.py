@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.dates import date2num
+from render_helpers import with_series
 
 import forgegraph as fg
 from forgegraph.drawing.axes import numbers
@@ -33,7 +34,9 @@ def graph(
     columns = {"axis.x.data.column": "t", "axis.y.data.column": "n"}
     if on == "y":
         columns = {"axis.x.data.column": "n", "axis.y.data.column": "t"}
-    d = fg.graphspec("t", "xy", settings={**columns, "encoding.color.column": None, **settings})
+    d = fg.graphspec(
+        "t", "xy", settings=with_series({**columns, "series.color": "series", **settings})
+    )
     if layers:
         d["parameters"]["layers"] = layers
     return fg.render(d, df)
@@ -97,14 +100,14 @@ def test_a_date_format_on_either_axis_writes_its_ticks(on):
 def test_aggregated_dates_are_drawn_at_their_day_numbers(on):
     """The mean of a place's times, on the value axis."""
     other = "y" if on == "x" else "x"
-    g = graph(on, **{"series.base_axis": other, f"axis.{on}.data.aggregation": "mean"})
+    g = graph(on, **{"arrangement.base_axis": other, "series.aggregation.function": "mean"})
     [line] = lines(g)
     assert along(on, line.get_xydata()) == pytest.approx(DAYS)
 
 
 def test_an_aggregated_date_axis_is_drawn_at_the_dates_mean():
     df = pd.DataFrame({"n": [1.0, 1.0], "t": TIMES[:2], "g": ["a", "a"]})
-    g = graph("y", None, df, **{"axis.y.data.aggregation": "mean"})
+    g = graph("y", None, df, **{"series.aggregation.function": "mean"})
     [line] = lines(g)
     assert along("y", line.get_xydata()) == pytest.approx([DAYS[:2].mean()])
 
@@ -113,7 +116,7 @@ def test_an_aggregated_date_axis_is_drawn_at_the_dates_mean():
 def test_stacks_at_dates_add_up_on_either_base_axis(on):
     """Dates as the places series stack at, along x or y."""
     df = pd.DataFrame({"n": [1.0, 2.0, 3.0, 4.0], "t": TIMES[:2] * 2, "g": ["a", "a", "b", "b"]})
-    stacked = {"series.base_axis": on, "series.aggregation": "sum", "encoding.color.column": "g"}
+    stacked = {"arrangement.base_axis": on, "arrangement.stacking": "sum", "series.color": "g"}
     g = graph(on, None, df, **stacked)
     tops = sorted(along("y" if on == "x" else "x", ln.get_xydata()).tolist() for ln in lines(g))
     assert tops == [[1.0, 2.0], [4.0, 6.0]]
@@ -134,25 +137,25 @@ def test_a_date_axis_takes_only_a_date_format(fmt):
 @pytest.mark.parametrize("how", ["sum", "percent"])
 def test_stacking_dates_is_an_error(how):
     with pytest.raises(
-        fg.SpecError, match=re.escape(f"series.aggregation: {how} adds the values, but axis.y is")
+        fg.SpecError, match=re.escape(f"arrangement.stacking: {how} adds the values, but axis.y is")
     ):
-        graph("y", **{"series.aggregation": how})
+        graph("y", **{"arrangement.stacking": how})
 
 
 def test_adding_up_dates_is_an_error():
     with pytest.raises(
-        fg.SpecError, match=re.escape("axis.y.data.aggregation: sum adds the values, but axis.y is")
+        fg.SpecError, match=re.escape("series.t.aggregation.function: sum isn't a date")
     ):
-        graph("y", **{"axis.y.data.aggregation": "sum"})
+        graph("y", **{"series.aggregation.function": "sum"})
 
 
 def test_bars_on_a_date_value_axis_are_an_error():
-    with pytest.raises(fg.SpecError, match=re.escape("mark.bar.show: bars start at 0, which")):
-        graph("y", **{"mark.bar.show": True})
+    with pytest.raises(fg.SpecError, match=re.escape("series.t.bar.show: bars start at 0, which")):
+        graph("y", **{"series.bar.show": True})
 
 
 def test_bars_at_dates_stand_on_their_places():
-    g = graph("x", **{"mark.bar.show": True})
+    g = graph("x", **{"series.bar.show": True})
     [bars] = [c for c in g.axes.collections if isinstance(c, Bars)]
     assert bars.places == pytest.approx(DAYS)
 
@@ -160,7 +163,7 @@ def test_bars_at_dates_stand_on_their_places():
 def test_value_labels_on_a_date_axis_need_a_date_format():
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("series.value_label.show: axis.y is dates, so the labels need a date"),
+        match=re.escape("series.t.value_label.show: axis.y is dates, so the labels need a date"),
     ):
         graph("y", **{"series.value_label.show": True})
 
@@ -176,7 +179,7 @@ def test_value_labels_on_a_date_axis_write_dates(settings):
 
 
 def test_value_labels_in_a_number_format_on_a_date_axis_are_an_error():
-    with pytest.raises(fg.SpecError, match=re.escape("series.value_label.format: '.1f'")):
+    with pytest.raises(fg.SpecError, match=re.escape("series.t.value_label.format: '.1f'")):
         graph("y", **{"series.value_label.show": True, "series.value_label.format": ".1f"})
 
 
@@ -281,7 +284,7 @@ def test_error_bars_along_a_date_axis_are_days_either_side(on):
         "axis": on,
         "value": {"lower": 0.5, "upper": 0.25, "aggregation": {"function": "None"}},
     }
-    g = graph(on, {"e": layer}, **{"series.base_axis": other})
+    g = graph(on, {"e": layer}, **{"arrangement.base_axis": other})
     assert _ends(g, on) == pytest.approx([(d - 0.5, d + 0.25) for d in DAYS])
 
 
@@ -290,7 +293,7 @@ def test_error_bars_of_a_date_columns_spread_are_in_days(on):
     other = "y" if on == "x" else "x"
     df = pd.DataFrame({"n": [1.0, 1.0, 2.0, 2.0], "t": TIMES, "g": ["a"] * 4})
     layer = {"type": "error_bar", "axis": on}
-    aggregated = {"series.base_axis": other, f"axis.{on}.data.aggregation": "mean"}
+    aggregated = {"arrangement.base_axis": other, "series.aggregation.function": "mean"}
     g = graph(on, {"e": layer}, df, **aggregated)
     spread = float(np.std(DAYS[:2], ddof=1))
     assert [(hi - lo) / 2 for lo, hi in _ends(g, on)] == pytest.approx([spread, spread])
@@ -374,7 +377,9 @@ def test_lint_counts_points_outside_a_date_limit():
 )
 def test_a_date_min_must_be_below_the_max(low, high):
     settings = {"axis.x.data.column": "t", "axis.y.data.column": "n"}
-    doc = fg.graphspec("t", "xy", settings={**settings, "axis.x.min": low, "axis.x.max": high})
+    doc = fg.graphspec(
+        "t", "xy", settings=with_series({**settings, "axis.x.min": low, "axis.x.max": high})
+    )
     message = f"axis.x.min: must be below axis.x.max ({low} is not below {high})"
     assert any(message in p for p in validate("graphspec", doc))
 
@@ -452,7 +457,7 @@ def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
         "    data: {file: None, preprocessing: None}\n"
         "    axis:\n"
         "        x: {data: {column: t}, min: 2000-01-01 20:30:00, max: '2000-01-01T22:30'}\n"
-        "        y: {data: {column: n}}\n"
+        "    series: {n: {}}\n"
         "    layers:\n"
         "        r: {type: reference_line, axis: x, value: 2000-01-01 21:10:00}\n",
         encoding="utf-8",

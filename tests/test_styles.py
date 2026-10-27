@@ -12,6 +12,7 @@ from forgegraph.spec.explain import explain
 from forgegraph.spec.parameters import EXCLUDED, definitions
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
+from forgegraph.spec.series import theme_for
 from forgegraph.spec.tags import var
 from forgegraph.spec.validate import validate
 
@@ -95,18 +96,17 @@ def test_a_members_status_is_its_own():
 
 def test_a_graphspecs_setting_carries_through_to_the_members_that_inherit_it():
     _, reg = theme("open", text__size=var(), series__line__width=var(), title__size=1.05)
-    spec = fg.graphspec(
-        "g",
-        "xy",
-        theme="open",
-        settings={"text.size": 1.2, "series.line.width": 0.3, "series.marker.size": 0.6},
-    )
+    look = {"line": {"width": 0.3}, "marker": {"size": 0.6}}
+    spec = fg.graphspec("g", "xy", theme="open", settings={"text.size": 1.2, "series": {"y": look}})
     assert validate("graphspec", spec, reg) == []
-    t = explain(spec, reg).theme
+    explained = explain(spec, reg)
+    t = explained.theme
     assert t.value("axis.tick.label.size") == 1.2  # inherits text.size, which the GraphSpec set
     assert t.value("title.size") == 1.05  # set by the theme itself
-    assert t.value("series.benchmark.line.width") == 0.3
-    assert t.value("series.benchmark.marker.size") == 0.6
+    drawn = theme_for(t, explained.series.value("y")["look"])  # as its series draws it
+    assert drawn["series.benchmark.line.width"] == 0.3
+    assert drawn["series.benchmark.marker.size"] == 0.6
+    assert t.value("series.benchmark.line.width") != 0.3  # the theme's own is unchanged
 
 
 @pytest.mark.parametrize("path", ["title.font", "legend.key.title.font"])

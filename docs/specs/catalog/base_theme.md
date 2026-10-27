@@ -9,32 +9,19 @@ extends: None          *# \[None, catalog\]; The catalog this one exte
 baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, drawn with the theme this catalog shows.*\
  \
 baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
-    styled_by_size: {encoding.line.style.column: Cell Size}          *# \[parameters and their values, or non-standard\]; series.line.style acts only with encoding.line.style.column set.*\
-    colored_by_temperature: {encoding.color.column: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric encoding.color.column, so a color bar is drawn.*\
+    styled_by_size: {series.line.style: Cell Size}          *# \[parameters and their values, or non-standard\]; The theme's series.line.styles act only when a series' line.style is a column.*\
+    colored_by_temperature: {series.color: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric color column, so a color bar is drawn.*\
     fanned: {data.file: fanned.parquet}          *# \[parameters and their values, or non-standard\]; Curves ending at the same current: their labels fit only past the line ends.*\
     bars:          *# \[parameters and their values, or non-standard\]; Each cell's peak power density as a bar, so the bar parameters act.*\
         axis.x.data.column: Cell\
-        axis.y.data.column: "Power Density (mW/cm²)"\
-        axis.y.data.aggregation: max\
         axis.x.tick.algorithm: all\
-        encoding.color.column: None\
-        encoding.detail.column: None\
-        mark.bar.show: true\
-        mark.line.show: false\
-        mark.marker.show: false\
+        series: {"Power Density (mW/cm²)": {color: series, split: None, aggregation: {function: max}, bar: {show: true}, line: {show: false}, marker: {show: false}}}\
     grouped:          *# \[parameters and their values, or non-standard\]; Peak power by cell, a bar per run side by side, so the gap acts.*\
         axis.x.data.column: Cell\
-        axis.y.data.column: "Power Density (mW/cm²)"\
-        axis.y.data.aggregation: max\
         axis.x.tick.algorithm: all\
-        encoding.color.column: Run\
-        encoding.color.type: categorical\
-        encoding.detail.column: None\
         legend.key.title.text: column_name\
-        mark.bar.show: true\
-        mark.line.show: false\
-        mark.marker.show: false\
-        series.offset: side_by_side\
+        arrangement.offset: side_by_side\
+        series: {"Power Density (mW/cm²)": {color: Run, split: None, aggregation: {function: max}, color_scale: categorical, bar: {show: true}, line: {show: false}, marker: {show: false}}}\
     error_bars:          *# \[parameters and their values, or non-standard\]; An error bar on every point, so the error bar parameters act.*\
         layers.spread.type: error_bar\
         layers.spread.value.lower: 0.02\
@@ -49,38 +36,17 @@ baselines:          *# Numbered baselines: generic scenarios, each the
     dated: {data.file: dated.parquet, axis.x.data.column: Date, axis.x.title: Day}          *# \[parameters and their values, or non-standard\]; Daily dates on x, so date labels show.*\
     labelled:          *# \[parameters and their values, or non-standard\]; The bars, each with its value, so the value label parameters act.*\
         axis.x.data.column: Cell\
-        axis.y.data.column: "Power Density (mW/cm²)"\
-        axis.y.data.aggregation: max\
         axis.x.tick.algorithm: all\
-        encoding.color.column: None\
-        encoding.detail.column: None\
-        mark.bar.show: true\
-        mark.line.show: false\
-        mark.marker.show: false\
-        series.value_label.show: true\
+        series: {"Power Density (mW/cm²)": {color: series, split: None, aggregation: {function: max}, bar: {show: true}, line: {show: false}, marker: {show: false}, value_label: {show: true}}}\
     labelled_beyond:          *# \[parameters and their values, or non-standard\]; The bars, each with its value beyond it, so the value labels' own color shows.*\
         axis.x.data.column: Cell\
-        axis.y.data.column: "Power Density (mW/cm²)"\
-        axis.y.data.aggregation: max\
         axis.x.tick.algorithm: all\
-        encoding.color.column: None\
-        encoding.detail.column: None\
-        mark.bar.show: true\
-        mark.line.show: false\
-        mark.marker.show: false\
-        series.value_label.show: true\
-        series.value_label.position: outside\
+        series: {"Power Density (mW/cm²)": {color: series, split: None, aggregation: {function: max}, bar: {show: true}, line: {show: false}, marker: {show: false}, value_label: {show: true, position: outside}}}\
     wrapped:          *# \[parameters and their values, or non-standard\]; The bars, with a cell name wider than the space between ticks, so it wraps.*\
         axis.x.data.column: Cell\
-        axis.y.data.column: "Power Density (mW/cm²)"\
-        axis.y.data.aggregation: max\
         axis.x.tick.algorithm: all\
-        encoding.color.column: None\
-        encoding.detail.column: None\
-        mark.bar.show: true\
-        mark.line.show: false\
-        mark.marker.show: false\
         data.file: reinforced.parquet\
+        series: {"Power Density (mW/cm²)": {color: series, split: None, aggregation: {function: max}, bar: {show: true}, line: {show: false}, marker: {show: false}}}\
     target:          *# \[parameters and their values, or non-standard\]; A labelled reference line, so its parameters act.*\
         layers.target.type: reference_line\
         layers.target.axis: y\

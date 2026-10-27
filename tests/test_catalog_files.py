@@ -3,6 +3,8 @@ choosing each card's value and baseline."""
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pandas as pd
 import pytest
 from pack_helpers import write_pack
@@ -21,21 +23,25 @@ from forgegraph.catalog_build.cards import (
 )
 from forgegraph.catalog_build.files import Catalog, CatalogError, read
 from forgegraph.packs import read_pack
-from forgegraph.spec.parameters import definitions
+from forgegraph.spec.parameters import definitions, series_definitions
 from forgegraph.spec.registry import builtin
 
 HEADER = (
     "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"
     "baseline: forgegraph_base/graphspec_example\n"
 )
-XY = definitions("graph_type", "xy")
+XY = {
+    **definitions("graph_type", "xy"),
+    **{f"series.{p}": replace(q, path=f"series.{p}") for p, q in series_definitions().items()},
+}
 THEME = definitions("theme")
 # A GraphSpec's data and values: x and y use two of its four columns.
 SCENE = Scene(
     pd.DataFrame(
         {"Cell": ["A", "B", "A"], "x": [1.0, 2.0, 9.0], "y": [3.0, 5.0, 4.0], "t": [10, 20, 30]}
     ),
-    {"axis.x.data.column": "x", "axis.y.data.column": ["y"], "layers.line.axis": "y"},
+    {"axis.x.data.column": "x", "axis.y.data.column": None, "series.column": "y"}
+    | {"layers.line.axis": "y"},
     frozenset({"x", "y"}),
 )
 
@@ -116,7 +122,9 @@ def test_a_numbered_baseline_can_change_several_parameters():
     catalog = read("graph_type", "xy", builtin())
     overlaid = next(b for b in catalog.baselines if b.path == "overlaid")
     parts = {c.path: c.value for c in overlaid.parts}
-    assert parts["encoding.color.column"] == "Run" and parts["mark.bar.show"] is True
+    [entry] = parts["series"].values()
+    assert entry["color"] == "Run" and entry["bar"]["show"] is True
+    assert parts["axis.x.data.column"] == "Cell"
 
 
 def test_a_layer_catalog_draws_its_layer_on_every_card():
@@ -130,7 +138,7 @@ def test_a_layer_catalog_draws_its_layer_on_every_card():
 
 def test_a_layer_catalogs_settings_are_on_every_card():
     always = {c.path: c.value for c in read("layer", "error_bar", builtin()).always}
-    assert always["axis.y.data.aggregation"] == "mean"
+    assert always["series.aggregation.function"] == "mean"
     assert always["layers.error_bar.type"] == "error_bar"
 
 
@@ -156,25 +164,25 @@ def test_a_formats_output_and_provenance_get_no_card():
 
 
 def test_candidates_outside_the_range_are_dropped():
-    catalog = read("graph_type", "xy", builtin())
-    options = next(o for p, o in catalog.cards if p.path == "axis.x.data.column")
-    assert all(changes[0].value != "None" for changes in options)  # d itself: not a column
+    catalog = read("layer", "reference_line", builtin())
+    options = next(o for p, o in catalog.cards if p.path == "value")
+    assert all(changes[0].value != "None" for changes in options)  # d itself: not a value
 
 
 # --- the rule: each card's candidate values, by range ---------------------------------------
 
 
 def test_true_or_false_is_the_other():
-    assert candidates(XY["mark.line.show"], True, SCENE) == [False, True]
+    assert candidates(XY["series.line.show"], True, SCENE) == [False, True]
 
 
 def test_an_axis_column_is_each_unused_column_of_numbers():
     assert candidates(XY["axis.x.data.column"], None, SCENE) == ["t", "None"]
 
 
-def test_an_encoding_column_is_each_unused_column_then_the_words():
-    p = XY["encoding.color.column"]
-    assert candidates(p, "column_name", SCENE) == ["Cell", "t", "None", "column_name"]
+def test_a_series_column_is_each_unused_column_then_the_words():
+    p = XY["series.color"]
+    assert candidates(p, "series", SCENE) == ["Cell", "t", SAMPLE_COLOR, "series"]
 
 
 def test_a_format_is_a_number_format_then_a_date_format():
@@ -220,7 +228,7 @@ def test_a_number_defaulting_to_none_comes_from_its_axis_column():
 
 def test_words_follow_the_default_round_the_range():
     assert candidates(XY["legend.method"], "auto", SCENE) == ["direct", "key", "none", "auto"]
-    assert candidates(XY["series.base_axis"], "y", SCENE) == ["x", "y"]
+    assert candidates(XY["arrangement.base_axis"], "y", SCENE) == ["x", "y"]
 
 
 def test_a_list_takes_each_word_after_its_first_as_a_list():
@@ -245,7 +253,7 @@ def test_setting_one_of_a_tie_to_none_sets_the_other_too():
     )
     assert tied("benchmark.value", "None")[1] == Change("benchmark.data_column", "None")
     assert tied("benchmark.data_column", "Cell") == (Change("benchmark.data_column", "Cell"),)
-    assert tied("mark.line.show", "None") == (Change("mark.line.show", "None"),)
+    assert tied("series.line.show", "None") == (Change("series.line.show", "None"),)
 
 
 # --- placing the cards -----------------------------------------------------------------------

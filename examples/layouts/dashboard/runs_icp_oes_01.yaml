@@ -18,9 +18,9 @@ parameters: !var
                 column: Week
             title: Week starting
         y:
-            data:
-                column: Completed runs
             min: 0
+    series:
+        Completed runs: {}
     grid:
         x:
             show: true

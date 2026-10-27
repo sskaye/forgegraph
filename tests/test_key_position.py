@@ -19,10 +19,10 @@ SHARES = pd.DataFrame(
     }
 )
 STACKED = {
-    "mark.bar.show": True,
-    "mark.line.show": False,
-    "mark.marker.show": False,
-    "series.aggregation": "percent",
+    "series.bar.show": True,
+    "series.line.show": False,
+    "series.marker.show": False,
+    "arrangement.stacking": "percent",
     "axis.x.tick.algorithm": "all",
     "legend.method": "key",
 }

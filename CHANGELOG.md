@@ -17,6 +17,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ### Fixed
 
+- In a theme whose text is light, powers of ten on a log axis and superscripts in labels no longer give a `font-fallback` lint issue. They were always drawn in the theme's font and weight; the issue came from the faces matplotlib loads for maths but doesn't draw these with.
 - The `outside-limits` and `log-axis-values` lint checks count only data points. A reference line's ends and an error bar's ends no longer count as points outside a set axis limit, or as values of 0 or below on a log axis.
 - A style key on the benchmark's column matches the drawing: its entries are the groups the series are styled by, so a value after the benchmark no longer gets the next value's style, and the benchmark, drawn in its own style, has no style sample and is named once, by `legend.method`. When `legend.method: key` doesn't fit, the error says why: every position in `legend.key.positions` is taken or covers data, naming the position each style key took.
 - YAML's null (`null`, `~` or nothing) is None everywhere a spec can say None. `extends: null` failed with `KeyError: None`, and a file extending null wasn't required to list every parameter.

@@ -103,6 +103,22 @@ def test_font_fallback():
     assert "✈" in issue.message
 
 
+def test_maths_in_a_light_font_is_not_a_font_fallback():
+    """Maths (powers of ten on a log axis, a superscript in a title) loads its other faces
+    at the text's weight; a face it doesn't draw with isn't a font fallback."""
+    data = pd.DataFrame(
+        {"x": [1.0, 2.0, 3.0], "y": [0.1, 1e3, 1e6], "cell": ["Benchmark"] * 3, "run": [1] * 3}
+    )
+    g = render(
+        {"axis.x.data.column": "x", "axis.y.data.column": "y", "axis.y.scale": "log"},
+        theme={"text.font": "Source Sans 3", "text.weight": "light"},
+        data=data,
+        title="Area (cm^2)",
+    )
+    assert "$10^{6}$" in [t.get_text() for t in g.axes.yaxis.get_ticklabels()]
+    assert "font-fallback" not in checks(g)
+
+
 def test_dropped_rows():
     g = render()  # the example data has one missing reading
     [issue] = [i for i in g.issues if i.check == "dropped-rows"]

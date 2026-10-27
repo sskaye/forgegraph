@@ -3,12 +3,12 @@
 This page mirrors src/forgegraph/packs/forgegraph_base/catalogs/themes/base_theme.yaml, which is the specification. A test fails if they ever differ.
 
 name: base_theme          *# \[theme\]; The theme this catalog shows.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Cards for the base theme.          *# \[text\]; The description of the catalog.*\
-extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
+extends: None          *# \[None, catalog\]; The catalog this one extends. Its baselines come before this file's own, and a header field set to None here is taken from it. If None, this catalog extends no other.*\
 baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, drawn with the theme this catalog shows.*\
  \
-baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
+baselines:          *# Generic scenarios, each the baseline with one or more changes, numbered in the order they're first used. Every parameter gets one card, chosen by a rule: the first candidate value that changes the drawing, on the baseline or on the first of these scenarios where it does. The page shows the cards of the variable parameters. If there are no scenarios, this is None.*\
     styled_by_size: {series.line.style: Cell Size}          *# \[parameters and their values, or non-standard\]; The theme's series.line.styles act only when a series' line.style is a column.*\
     colored_by_temperature: {series.color: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric color column, so a color bar is drawn.*\
     fanned: {data.file: fanned.parquet}          *# \[parameters and their values, or non-standard\]; Curves ending at the same current: their labels fit only past the line ends.*\

@@ -107,6 +107,11 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             show: false          *# \[true, false\]; Whether to draw vertical grid lines at the x ticks.*\
         y:\
             show: false          *# \[true, false\]; Whether to draw horizontal grid lines at the y ticks.*\
+    output:\
+        dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
+        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
+    provenance:\
+        level: full          *# \[full, minimal, off\]; How much each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs, without those. off records nothing.*\
     layer:\
         reference:\
             line:\
@@ -116,11 +121,6 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             fill:\
                 color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
                 opacity: 0.15          *# \[0-1\]; The fill opacity.*\
-    output:\
-        dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
-        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
-    provenance:\
-        level: full          *# \[full, minimal, off\]; How much each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs, without those. off records nothing.*\
     layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses.*\
         target:\
             type: reference          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\

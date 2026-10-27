@@ -90,12 +90,9 @@ parameters: !var
         x:
             data:
                 column: hours
-        y:
-            data:
-                column: voltage
-    encoding:
-        color:
-            column: cell
+    series:
+        voltage:
+            color: cell
 ```
 
 ```bash

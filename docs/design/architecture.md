@@ -71,7 +71,7 @@ Also:
 | --- | --- | --- |
 | **GraphSpec** | One specific graph: data, graph type, column mappings, parameters, layers | a YAML file, embedded in the saved graph |
 | **Graph type** | A kind of graph (`xy`): the parameters a GraphSpec chooses, in its definition file, drawn by its module in drawing/ | `src/forgegraph/graph_types/<type>.yaml` (core only) |
-| **Layer** | An addition drawn on a graph (`reference_line`, `note`, `error_bar`), defined by its own file | `src/forgegraph/layers/<type>.yaml` (core only) |
+| **Layer** | An addition drawn on a graph (`reference`, `note`, `error_bar`), defined by its own file | `src/forgegraph/layers/<type>.yaml` (core only) |
 | **GraphSpec to extend** | A GraphSpec without data, reused by others through `extends:`. E.g. "polarization curve" = `xy` + its columns + axis titles | a pack's `graphspecs/` |
 | **Theme** | The look: fixed style (fonts, palettes, spines, ticks, legend style), plus defaults for options | a pack's `themes/` |
 | **Format** | The destination: figure size, base font size, file types, dpi, provenance level | a pack's `formats/` |
@@ -127,18 +127,17 @@ parameters: !var
         x:
             data:
                 column: hours
-        y:
-            data:
-                column: voltage
-    encoding:
-        color: cell
+    series:
+        voltage:
+            color: cell
     layers:
         target:
-            type: reference_line
+            type: reference
             axis: y
-            value: 0.7
-            label:
-                text: Target
+            line_1:
+                value: 0.7
+                label:
+                    text: Target
 ```
 
 **Python:**
@@ -250,9 +249,9 @@ A graph type is defined by its own file in `src/forgegraph/graph_types/`, starti
 - `key`: a key at the first of the GraphSpec's legend.key.positions that covers no data, or outside the plot area (legend.key.inside: false);
 - `none`.
 
-A single series is named too, unless its name is the y-axis title's text, which already names it. A numeric `encoding.color.column` is drawn on a color scale with a color bar, or with palette colors and labels when `encoding.color.type` is `categorical`; with lines shown, a line joins only points of one color.
+A single series is named too, unless its name is the y-axis title's text, which already names it. A series colored by a numeric column is drawn on a color scale with a color bar, or with palette colors and labels when its `color_scale` is `categorical`; with lines shown, a line joins only points of one color.
 
-Placement is deterministic. A direct label sits inside the plot, beside its own series, touching nothing; drawing/labels.py lists the rules. A key, and the style key that explains encoding.line.style.column, sits inside the plot area at the first position that covers no data, or outside it, with the figure laid out again around it; drawing/key.py places it. Existing labelling libraries (matplotlib-label-lines, adjustText) don't meet these rules.
+Placement is deterministic. A direct label sits inside the plot, beside its own series, touching nothing; drawing/labels.py lists the rules. A key, and the style key that explains line styles set by a column, sits inside the plot area at the first position that covers no data, or outside it, with the figure laid out again around it; drawing/key.py places it. Existing labelling libraries (matplotlib-label-lines, adjustText) don't meet these rules.
 
 ### D6. Review surface: tabbed HTML catalog, Forgemark comments
 
@@ -440,13 +439,13 @@ Every output embeds a provenance record, at its format's provenance.level (full,
 
 **Graph types:** `xy` draws lines, markers and bars: grouped, stacked, 100 % stacked and horizontal, with value labels.
 
-**Layers:** `reference_line` (horizontal or vertical, labelled), `note` (the "conditions" text block) and `error_bar`. Error bars are a layer, drawn from DataFrame columns or the spread of aggregated rows: the specification names their absence as a failing of Tableau.
+**Layers:** `reference` (horizontal or vertical lines, labelled, or a band between two; at a value, an aggregate, or following the data), `note` (the "conditions" text block) and `error_bar`. Error bars are a layer, drawn from DataFrame columns or the spread of aggregated rows: the specification names their absence as a failing of Tableau.
 
 | Capability | Status |
 | --- | --- |
 | lines and markers, color by a column, direct labels, a benchmark series | built |
 | markers-only scatter with many points | built |
-| replicates: several lines per color group (encoding.detail.column) | built |
+| replicates: several lines per color group (a series' split) | built |
 | line style by a column, with a key for the styles | built |
 | log axes, unit markup | built |
 | color by a numeric column, with a color bar | built |
@@ -579,7 +578,7 @@ Decisions made while building whose reasons aren't given above.
 
 ### Names
 
-- **Parameter names follow Vega-Lite where a standard term exists** (encoding, mark, detail), keeping ForgeGraph's nesting, snake_case and units. A third of the parameters have no Vega-Lite equivalent, so its names weren't adopted wholesale. "Legend" is the umbrella for every way of naming what colors and styles mean, as in Vega-Lite.
+- **Parameter names follow Vega-Lite where a standard term exists** (axis, legend, aggregation), keeping ForgeGraph's nesting, snake_case and units. A third of the parameters have no Vega-Lite equivalent, so its names weren't adopted wholesale. "Legend" is the umbrella for every way of naming what colors and styles mean, as in Vega-Lite.
 - **Every size is × figure.base_size,** so a theme draws correctly in any format.
 - **The command is `forgegraph`.** `fg` is a built-in command in bash and zsh, and a shell runs its built-in before any program of that name.
 - **A tab's name is what its tab shows.** File names and links use it lowercased, with spaces as hyphens, so there's no separate label to keep in step.

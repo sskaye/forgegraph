@@ -3,12 +3,12 @@
 This page mirrors src/forgegraph/catalogs/graph_types/xy.yaml, which is the specification. A test fails if they ever differ.
 
 name: xy          *# \[graph type\]; The graph type this catalog shows.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Cards for the xy graph type.          *# \[text\]; The description of the catalog.*\
-extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
+extends: None          *# \[None, catalog\]; The catalog this one extends. Its baselines come before this file's own, and a header field set to None here is taken from it. If None, this catalog extends no other.*\
 baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, drawn with the graph type this catalog shows.*\
  \
-baselines:          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*\
+baselines:          *# Generic scenarios, each the baseline with one or more changes, numbered in the order they're first used. Every parameter gets one card, chosen by a rule: the first candidate value that changes the drawing, on the baseline or on the first of these scenarios where it does. The page shows the cards of the variable parameters. If there are no scenarios, this is None.*\
     key_shown: {legend.method: key}          *# \[parameters and their values, or non-standard\]; Series named in a key, so the key's parameters act.*\
     colored_by_temperature: {series.color: "Temperature (°C)"}          *# \[parameters and their values, or non-standard\]; A numeric color column, so a color bar is drawn.*\
     colored_by_run: {series.color: Run}          *# \[parameters and their values, or non-standard\]; Colored by run, a column of numbers, so auto draws a color scale.*\

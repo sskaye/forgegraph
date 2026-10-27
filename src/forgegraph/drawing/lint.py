@@ -62,13 +62,16 @@ class Issue:
 
 @contextmanager
 def font_messages() -> Iterator[list[str]]:
-    """Collect matplotlib's messages about missing fonts and letters while drawing."""
+    """Collect matplotlib's messages about missing fonts and letters while drawing. A weight
+    a font doesn't have isn't one: a theme's weights are checked against its fonts, so that
+    comes from maths loading faces it doesn't draw with at the text's weight."""
     found: list[str] = []
 
     class _Catch(logging.Handler):
         def emit(self, record: logging.LogRecord) -> None:
-            if "findfont" in record.getMessage():
-                found.append(record.getMessage())
+            message = record.getMessage()
+            if "findfont" in message and "Failed to find font weight" not in message:
+                found.append(message)
 
     handler = _Catch(logging.WARNING)
     logger = logging.getLogger("matplotlib.font_manager")

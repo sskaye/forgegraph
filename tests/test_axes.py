@@ -81,7 +81,7 @@ def test_integer_on_fractions_is_an_error():
 
 
 def test_a_text_column_is_categorical():
-    g = graph(SAMPLES, "sample", "rate", **{"mark.line.show": False})
+    g = graph(SAMPLES, "sample", "rate", **{"series.line.show": False})
     assert labels(g) == ["Run 10", "Run 2", "Run 1"]  # as first seen
     assert ticks(g) == [0, 1, 2] or ticks(g) == [0, 2]  # the theme's algorithm, whole steps
     assert g.axes.get_xlim() == (-0.5, 2.5)
@@ -105,7 +105,7 @@ def test_category_order():
                 "sample",
                 "rate",
                 **{
-                    "mark.line.show": False,
+                    "series.line.show": False,
                     "axis.x.tick.algorithm": "all",
                     "axis.x.data.order.method": method,
                     "axis.x.data.order.direction": direction,
@@ -123,7 +123,7 @@ def test_a_pandas_categorical_keeps_its_own_order():
     df = SAMPLES.assign(
         sample=pd.Categorical(SAMPLES["sample"], ["Run 2", "Run 1", "Run 10", "unused"])
     )
-    g = graph(df, "sample", "rate", **{"mark.line.show": False, "axis.x.tick.algorithm": "all"})
+    g = graph(df, "sample", "rate", **{"series.line.show": False, "axis.x.tick.algorithm": "all"})
     assert labels(g) == ["Run 2", "Run 1", "Run 10"]  # unused levels aren't categories
 
 
@@ -361,7 +361,7 @@ def test_text_categories_take_no_format():
 def test_long_category_labels_wrap():
     names = ["North field", "South field", "East field", "West field", "Upper field", "Lower field"]
     df = pd.DataFrame({"site": names, "value": np.arange(6.0)})
-    g = graph(df, "site", "value", **{"mark.line.show": False, "axis.x.tick.algorithm": "all"})
+    g = graph(df, "site", "value", **{"series.line.show": False, "axis.x.tick.algorithm": "all"})
     assert all("\n" in t for t in labels(g))
 
 
@@ -378,11 +378,11 @@ def membranes(**theme) -> fg.Graph:
     settings = {
         "axis.x.data.column": "membrane",
         "axis.y.data.column": "value",
-        "encoding.color.column": None,
-        "encoding.detail.column": None,
+        "series.color": "series",
+        "series.split": None,
         "benchmark.data_column": None,
         "benchmark.value": None,
-        "mark.line.show": False,
+        "series.line.show": False,
     }
     theme = {"axis.tick.label.max_wrap": 0, **theme}
     return render(settings, theme=theme, format={"figure.width": 90}, data=MEMBRANES)
@@ -408,7 +408,7 @@ def test_the_theme_can_rotate_x_tick_labels():
 
 def test_series_can_be_drawn_along_y():
     df = pd.DataFrame({"depth": [0.0, 1.0, 2.0, 3.0], "temp": [20.0, 18.0, 15.0, 14.0]})
-    g = graph(df, "temp", "depth", **{"series.base_axis": "y"})
+    g = graph(df, "temp", "depth", **{"arrangement.base_axis": "y"})
     [line] = g.axes.get_lines()
     assert np.asarray(line.get_xdata()).tolist() == [
         20.0,
@@ -420,30 +420,15 @@ def test_series_can_be_drawn_along_y():
 
 
 def test_the_base_axis_takes_one_column():
-    with pytest.raises(
-        fg.SpecError, match=re.escape("axis.y.data.column: series are drawn along y")
-    ):
-        render(
-            {
-                "series.base_axis": "y",
-                "axis.y.data.column": ["cell_voltage", "temperature"],
-                "axis.y.title": "Values",
-            }
-        )
+    with pytest.raises(fg.SpecError, match=re.escape("axis.x.data.column: must be a single value")):
+        render({"axis.x.data.column": ["current_density", "temperature"]})
 
 
 def test_aggregation_draws_one_point_per_place():
     df = pd.DataFrame({"x": [1, 1, 1, 2, 2], "y": [1.0, 2.0, 3.0, 10.0, 20.0]})
-    g = graph(df, "x", "y", **{"axis.y.data.aggregation": "mean"})
+    g = graph(df, "x", "y", **{"series.aggregation.function": "mean"})
     [line] = g.axes.get_lines()
     assert np.asarray(line.get_ydata()).tolist() == [2.0, 15.0]
-
-
-def test_the_base_axis_isnt_aggregated():
-    with pytest.raises(
-        fg.SpecError, match=re.escape("axis.x.data.aggregation: series are drawn along x")
-    ):
-        render({"axis.x.data.aggregation": "mean"})
 
 
 @pytest.mark.parametrize(("side", "at"), [("start", 0), ("end", -1)])
@@ -453,12 +438,12 @@ def test_the_benchmark_keeps_its_side_whatever_the_order(side, at):
             {
                 "axis.x.data.column": "cell",
                 "axis.y.data.column": "cell_voltage",
-                "axis.y.data.aggregation": "max",
+                "series.aggregation.function": "max",
                 "axis.x.tick.algorithm": "all",
                 "axis.x.data.order.direction": direction,
-                "encoding.color.column": None,
-                "encoding.detail.column": None,
-                "mark.line.show": False,
+                "series.color": "series",
+                "series.split": None,
+                "series.line.show": False,
                 "benchmark.side": side,
             }
         )
@@ -552,3 +537,16 @@ def test_a_minor_tick_at_an_end_but_for_float_noise_is_kept():
     between = _Between(1)
     ax.yaxis.set_minor_locator(between)
     assert between() == pytest.approx([0.05, 0.15])  # 0.15000000000000002
+
+
+def test_a_tick_length_of_0_draws_labels_without_marks():
+    from render_helpers import render
+
+    g = render(theme={"axis.tick.length": 0})
+    g.figure.canvas.draw()
+    tick = g.axes.xaxis.get_major_ticks()[0]
+    assert tick.tick1line.get_markersize() == 0
+    label = g.axes.xaxis.get_ticklabels()[1].get_window_extent()
+    gap = g.style.pt("axis.tick.label.gap") * g.figure.dpi / 72
+    letters = label.y1  # the label's box top; its letters sit a little lower
+    assert g.axes.bbox.y0 - letters <= gap + 1  # no room kept for a mark

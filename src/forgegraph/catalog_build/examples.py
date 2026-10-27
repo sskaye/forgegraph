@@ -20,9 +20,19 @@ from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, SpecError, render
 from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.loaded import Loaded
-from forgegraph.spec.parameters import NONE, definitions, is_none, tree_has, tree_set
+from forgegraph.spec.parameters import (
+    NONE,
+    PARAMETERS,
+    definitions,
+    flatten,
+    is_none,
+    series_definitions,
+    tree_has,
+    tree_set,
+)
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
+from forgegraph.spec.series import look_definitions, resolve_series
 
 if TYPE_CHECKING:  # catalog_build.cards imports this module, so only to check types
     from forgegraph.catalog_build.cards import Change
@@ -33,22 +43,29 @@ FOOTNOTE = "Data as of Oct 21, 2026, 05:12 \u00b7 rendered daily at 06:00"
 SPECIAL = (NONSTANDARD, FOOTNOTED)  # baselines that aren't parameter changes
 
 
+def _set(tree: Any, path: str, value: Any) -> dict[str, Any]:
+    """tree with the value at a dotted path, an empty category (None) made a mapping."""
+    out = tree if isinstance(tree, dict) else {}
+    key, _, rest = path.partition(".")
+    out[key] = _set(out.get(key), rest, value) if rest else value
+    return out
+
+
 def _flat(changes: tuple[Change, ...]) -> list[Change]:
     return [p for c in changes for p in (c.parts or (c,))]
 
 
 def _child(kind: str, parent: str, changes: dict[str, Any]) -> dict[str, Any]:
-    defs = definitions(kind)
-    sections: dict[str, dict] = {"fixed_parameters": {}, "variable_parameters": {}}
+    """A spec extending parent with these changes, each keeping the status it inherits."""
+    tree: dict[str, Any] = {}
     for path, value in changes.items():
-        section = "fixed_parameters" if defs[path].fixed else "variable_parameters"
-        tree_set(sections[section], path, value)
+        tree_set(tree, path, value)
     return {
         "name": "catalog",
         "version": 0,
         "description": "",
         "extends": parent,
-        **{k: (v or NONE) for k, v in sections.items()},
+        PARAMETERS: tree or NONE,
     }
 
 
@@ -67,10 +84,22 @@ def draw(
     doc = copy.deepcopy(reg.docs["graphspec"][spec])
     inherited = list(resolve_layers(doc, reg)) if not is_none(doc.get("extends")) else []
     in_chain = set(resolve("graphspec", doc, reg))  # set by the GraphSpec or one it extends
-    listed = doc["variable_parameters"]
+    listed = doc[PARAMETERS]
     listed.pop("layers", None)  # a card shows one change; layers are shown on their own cards
     if inherited:  # and those it inherits are removed by name
         listed["layers"] = {name: NONE for name in inherited}
+    looks = look_definitions()
+    own_series = listed.get("series") or {}
+    resolved = resolve_series(doc, reg)
+    looked = {n: set(flatten(r.value)) & set(looks) for n, r in resolved.items()}  # set by each
+    entries = {name: {} for name in resolved}  # every series it draws
+    entries.update({n: e for n, e in own_series.items() if n in entries and isinstance(e, dict)})
+    listed["series"] = entries
+    if theme is not None:  # each series in the theme's own look, not the one it sets itself
+        own_theme = resolve("theme", reg.docs["theme"][theme], reg)
+        for name in entries:
+            for path in looked[name]:
+                entries[name] = _set(entries[name], path, own_theme.value(f"series.{path}"))
     for kind, name in (("theme", theme), ("format", format)):
         if name is None:
             continue
@@ -86,14 +115,25 @@ def draw(
         layer = c.path.split(".")[1] if c.path.startswith("layers.") else None
         if layer is not None and listed.get("layers", {}).get(layer) == NONE:
             listed["layers"][layer] = {}  # a layer it inherits, removed above, drawn anew
-        if c.path in in_chain or tree_has(listed, c.path) or layer is not None:
-            tree_set(listed, c.path, c.value)
+        within = c.path.removeprefix("series.")
+        drawn = [n for n, e in listed["series"].items() if not is_none(e)]
+        if c.path == "series":  # the GraphSpec's series, all of them, the others removed
+            gone = {n: NONE for n in drawn if n not in c.value}
+            listed["series"] = {**gone, **copy.deepcopy(c.value)}
+        elif c.path.startswith("series.") and within in series_definitions():
+            for name in drawn:  # every series
+                listed["series"][name] = _set(listed["series"][name], within, c.value)
+        elif c.path in in_chain or tree_has(listed, c.path) or layer is not None:
+            tree_set(listed, c.path, copy.deepcopy(c.value))
         elif c.path in definitions("theme"):
             others["theme"][c.path] = c.value
+            for name in drawn:  # so no series' own look hides the theme's
+                if c.path.startswith("series.") and within in looked.get(name, ()):
+                    listed["series"][name] = _set(listed["series"][name], within, c.value)
         elif c.path in definitions("format"):
             others["format"][c.path] = c.value
         else:  # the GraphSpec's or its graph type's, inherited by the baseline
-            tree_set(listed, c.path, c.value)
+            tree_set(listed, c.path, copy.deepcopy(c.value))
     for kind, values in others.items():
         if values:
             reg.add(kind, _child(kind, listed["specifications"][kind], values))

@@ -17,7 +17,6 @@ import forgegraph
 from forgegraph.spec.parameters import _comment, definition_file, graph_type_files
 
 PKG = Path(forgegraph.__file__).parent
-SECTIONS = ("fixed_parameters", "variable_parameters")
 FOLDERS = {  # a spec file's folder, and the kind of spec it holds
     "themes": "theme",
     "formats": "format",
@@ -48,10 +47,7 @@ def _comments(node: Any, prefix: str = "") -> Iterator[tuple[str, str | None]]:
 def _defined(path: Path) -> dict[str, str | None]:
     data = _load(path)
     return {
-        p: c
-        for section in SECTIONS
-        for p, c in _comments(data.get(section))
-        if not p.startswith(("layers", "tabs"))
+        p: c for p, c in _comments(data.get("parameters")) if not p.startswith(("layers", "tabs"))
     }
 
 
@@ -92,15 +88,14 @@ def _drifted(path: Path) -> Iterator[tuple[str, str, str]]:
         found += [(p, c, RESTATES["graphspec"]) for p, c in _comments(data.get("settings"))]
     else:
         found = []
-        for section in SECTIONS:
-            node = data.get(section)
-            for p, c in _comments(node):
-                if p.startswith("layers."):  # a layer's own parameter, by its type
-                    _, name, *rest = p.split(".")
-                    layer = LAYER.get(str(node["layers"][name].get("type")), {})
-                    found.append((".".join(rest), c, {} if rest == ["type"] else layer))
-                elif not p.startswith("tabs"):
-                    found.append((p, c, RESTATES[kind]))
+        node = data.get("parameters")
+        for p, c in _comments(node):
+            if p.startswith("layers."):  # a layer's own parameter, by its type
+                _, name, *rest = p.split(".")
+                layer = LAYER.get(str(node["layers"][name].get("type")), {})
+                found.append((".".join(rest), c, {} if rest == ["type"] else layer))
+            elif not p.startswith("tabs"):
+                found.append((p, c, RESTATES[kind]))
     for p, comment, definitions in found:
         expected = definitions.get(p)
         if expected is not None:

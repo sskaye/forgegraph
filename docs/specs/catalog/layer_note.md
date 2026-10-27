@@ -3,13 +3,13 @@
 This page mirrors src/forgegraph/catalogs/layers/note.yaml, which is the specification. A test fails if they ever differ.
 
 name: note          *# \[layer type\]; The layer type this catalog shows.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Cards for the note layer.          *# \[text\]; The description of the catalog.*\
-extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
-baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
-settings: None          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
-layer:          *# The layer every card draws, named after its type: its parameters.*\
-    text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note, in label markup; a line break starts a new line.*\
-    position: bottom_left          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; auto: the first clear place inside the plot area; set a position when inside is false.*\
+extends: None          *# \[None, catalog\]; The catalog this one extends. Its baselines come before this file's own, and a header field set to None here is taken from it. If None, this catalog extends no other.*\
+baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
+settings: None          *# The GraphSpec parameters every card sets so that the layer can be drawn. If there are none, this is None.*\
+layer:          *# The parameters of the layer every card draws, which is named after its type.*\
+    text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*\
+    position: bottom_left          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; auto selects the first clear location inside the plot area and is invalid if inside is false.*\
  \
-baselines: None          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*
+baselines: None          *# Generic scenarios, each the baseline with one or more changes, numbered in the order they're first used. Every parameter gets one card, chosen by a rule: the first candidate value that changes the drawing, on the baseline or on the first of these scenarios where it does. The page shows the cards of the variable parameters. If there are no scenarios, this is None.*

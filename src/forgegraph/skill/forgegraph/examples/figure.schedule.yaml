@@ -2,8 +2,8 @@ name: figure
 version: 0
 description: The example layout, rendered every weekday at 06:00.
 extends: forgegraph_base/base_schedule
-fixed_parameters: None
-variable_parameters:
+
+parameters:          # !var: a schedule that extends it may change it; !fix: it may not; on a category, all in it. Each parameter is tagged here or in the schedule it extends.
     targets:
         files: [figure.layout.yaml]
     cadence:

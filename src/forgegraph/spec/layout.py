@@ -5,7 +5,8 @@ naming the tile in each cell, `.` for a blank cell, and a name repeated over a r
 cells makes that tile span them. grid.column_widths and grid.row_heights are the relative
 sizes of the columns' and rows' plot boxes, and tiles names the GraphSpec file drawn in each
 area. The nearest file in a layout's extends chain that lists tabs decides all of them: a
-layout's tabs replace those it inherits, unless one of those lists them as fixed.
+layout's tabs replace those it inherits, unless that file tags them !fix. A tag goes on tabs,
+never inside them.
 
 Every rule here is an error naming where it is; nothing is filled in or guessed.
 """
@@ -17,9 +18,10 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
-from forgegraph.spec.parameters import SECTIONS, check_parameter, is_none, tab_definitions
+from forgegraph.spec.parameters import PARAMETERS, check_parameter, is_none, tab_definitions
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import chain, resolve
+from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
 
 BLANK = "."
 TAB_KEYS = ("grid", "tiles")
@@ -78,12 +80,23 @@ def slug(name: str) -> str:
     return re.sub(r"[^\w-]", "", folded)
 
 
-def _listed(d: dict[str, Any]) -> tuple[str, Any] | None:
-    """(section, tabs) as a file lists them, or None if it lists none."""
-    for section in SECTIONS:
-        tree = d.get(section)
-        if isinstance(tree, dict) and "tabs" in tree:
-            return section, tree["tabs"]
+def _listed(d: dict[str, Any]) -> tuple[bool, Any] | None:
+    """(fixed, tabs) as a file lists them, without their tag, or None if it lists none:
+    fixed if the file tags them !fix."""
+    tree = untag(d.get(PARAMETERS))
+    if isinstance(tree, dict) and "tabs" in tree:
+        return bool(status_at(d[PARAMETERS], "tabs")), untag(tree["tabs"])
+    return None
+
+
+def _tagged_inside(node: Any, prefix: str) -> str | None:
+    """The path of the first tag inside the tabs, or None."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(value, Tagged | TaggedMap):
+                return f"{prefix}.{key}"
+            if found := _tagged_inside(value, f"{prefix}.{key}"):
+                return found
     return None
 
 
@@ -161,17 +174,19 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     listed = _listed(doc)
     for d in chain("layout", doc, reg)[1:]:
         inherited = _listed(d)
-        if listed is not None and inherited is not None and inherited[0] == SECTIONS[0]:
-            errors.append(f"{listed[0]}.tabs: fixed by layout '{d.get('name')}'")
+        if listed is not None and inherited is not None and inherited[0]:
+            errors.append(f"tabs: fixed by layout '{d.get('name')}'")
             return errors
         if inherited is not None:
             break
     if listed is None:
         return errors
-    section, entries = listed
-    where = f"{section}.tabs"
+    _, entries = listed
+    where = "tabs"
     if not isinstance(entries, dict) or not entries:
         return [f"{where}: must be one or more tabs, each under its name"]
+    if inside := _tagged_inside(entries, where):
+        return [f"{inside}: a tag goes on tabs, not inside them"]
     grid_defs, tile_def = tab_definitions()
     names: dict[str, str] = {}  # tile name -> the tab it's in
     slugs: dict[str, str] = {}

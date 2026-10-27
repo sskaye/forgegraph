@@ -3,8 +3,8 @@
 Each kind is defined by one file. Graph types and layer types are ForgeGraph's code, each
 defined by its own file (graph_types/xy.yaml, layers/note.yaml); the other kinds by the base
 pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
-formats/base_format.yaml, layouts/base_layout.yaml, schedules/base_schedule.yaml) and its
-reference GraphSpec (graphspecs/polarization.yaml). A layer file has
+formats/base_format.yaml, layouts/layout_example.yaml, schedules/base_schedule.yaml) and its
+reference GraphSpec (graphspecs/graphspec_example.yaml). A layer file has
 only a name, version and description, and its parameters. A GraphSpec's layers and a
 layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
@@ -13,11 +13,11 @@ so they aren't parameters here; a tab's parameters come from the base layout's o
 RANGE lists the alternatives a value may take, separated by commas:
 
 - a number range `min-max`, inclusive;
-- a type word: text, int (a whole number, 0 or more), positive int, float, positive float,
-  date (a date, or a date and time: YAML's own, or ISO 8601 text; see as_date), hex color,
-  hex colors (a list of one or more), two hex colors, column, columns, graph type, theme,
-  format, graphspec, layer type, layer types, layout, schedule, texts (a list of text),
-  positive floats (a list of them), text grid (a list of rows, each a list of text);
+- a type word: text, int ≥ 0 (a whole number, 0 or more), int > 0, float, float ≥ 0,
+  float > 0, date (a date, or a date and time: YAML's own, or ISO 8601 text; see as_date),
+  hex color, hex colors (a list of one or more), two hex colors, column, columns, graph type,
+  theme, format, graphspec, layer type, layer types, layout, schedule, texts (a list of
+  text), floats > 0 (a list of them), text grid (a list of rows, each a list of text);
 - any other word is a literal value (None, true, auto, linear, ...).
 
 A parameter whose value in the definition is a list takes a list of one or more items, each
@@ -36,6 +36,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import TaggedScalar
+
+from forgegraph.spec.tags import FIX, UNSET, VAR, loader
 
 if TYPE_CHECKING:  # typing.TypeIs is Python 3.13's
     from typing_extensions import TypeIs
@@ -53,25 +56,27 @@ REFERENCE = {
     "theme": "base_theme",
     "format": "base_format",
     "graph_type": "xy",
-    "graphspec": "polarization",
-    "layer": "reference_line",
-    "layout": "base_layout",
+    "graphspec": "graphspec_example",
+    "layer": "reference",
+    "layout": "layout_example",
     "schedule": "base_schedule",
 }
 CORE_KINDS = ("graph_type", "layer")  # ForgeGraph's code; every other kind comes from packs
 BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_KINDS
-HEADER = ("name", "version", "description", "extends", "fixed_parameters", "variable_parameters")
+PARAMETERS = "parameters"  # the tree of a file's parameters, tagged !var or !fix (see tags.py)
+HEADER = ("name", "version", "description", "extends", PARAMETERS)
 LAYER_HEADER = ("name", "version", "description", "parameters")
-COLLECTIONS = {"graphspec": ("layers",), "layout": ("tabs",)}  # categories keyed by chosen names
+# Categories keyed by names a file chooses: a GraphSpec's layers and series, a layout's tabs,
+# and a graph type's series, defined by its one entry (series_definitions).
+COLLECTIONS = {"graphspec": ("layers", "series"), "layout": ("tabs",), "graph_type": ("series",)}
 NAMES = {"graphspec": ("graph_type", "theme", "format"), "layout": ("format",)}  # specs it names
-SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
 TYPE_WORDS = (
-    "text", "int", "positive int", "float", "positive float", "date", "hex color",
+    "text", "int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0", "date", "hex color",
     "hex colors", "two hex colors",
     "column", "columns", "graph type", "theme", "format", "graphspec", "layer type",
-    "layer types", "layout", "schedule", "texts", "positive floats", "text grid",
+    "layer types", "layout", "schedule", "texts", "floats > 0", "text grid", "value format",
 )  # fmt: skip
 NAME_TYPES = {
     "graph type": "graph_type",
@@ -88,10 +93,47 @@ LIST_TYPES = (
     "two hex colors",
     "layer types",
     "texts",
-    "positive floats",
+    "floats > 0",
     "text grid",
 )  # take a list even where the definition has one value
 WHOLE_LISTS = ("text grid",)  # a list checked as a whole, even where the definition is a list
+# A category marked with a style has the parameters of the category named here (its members),
+# each taking that parameter's value unless the category, or a file nearer in the extends
+# chain, sets its own.
+STYLES = {
+    "text style": "text",
+    "line style": "line",
+    "series style": "series",
+    "aggregation style": "aggregation_style",  # styles.yaml's
+}
+LOOKS = ("text style", "line style")  # in a graph type or layer: the theme's look, not its own
+_SAME = re.compile(r"Same parameters as (?P<name>\w+)\.")  # a category copying a sibling's
+# The members a style's category can't use, so they aren't its parameters (setting one is an
+# error): what it draws has no use for them.
+EXCLUDED = {
+    "axis.tick": ("style", "cap", "join"),  # tick marks are markers
+    "axis.tick.minor": ("style", "cap", "join"),
+    "plot_area.border": ("join",),  # four straight sides, drawn apart
+    "grid": ("cap", "join"),  # straight lines, clipped at the plot area's edges
+    "series.line": ("style", "color"),  # series.line.styles and series.colors set them
+    "series.marker.edge": ("cap", "join"),  # a closed outline; its corners are its shape's
+    "series.bar.edge": ("cap",),
+    "legend.key.border": ("cap",),
+    "layer.error_bar": ("cap", "join"),  # straight lines, their ends under its caps (cap.*)
+    "layer.reference.line": ("cap", "join"),  # clipped at the plot's edges
+    "series.value_label": ("alignment",),  # one line: a number
+    "legend.label": ("alignment", "color"),  # one line, in its series' color
+    "legend.key.label": ("gap",),  # legend.key.sample.gap spaces a name from its sample
+    "layer.reference.label": ("alignment",),  # placed by its position
+    "layer.note": ("alignment",),  # its lines line up on its position's side
+    "watermark": ("size", "gap", "alignment"),  # one line, spanning the plot area
+    "series.benchmark": ("bar.gap",),  # one gap for all the bars side by side
+}
+# A style's member whose range isn't its general parameter's.
+RANGES = {
+    "series.marker.edge.style": "None, solid",  # a marker's outline can't be dashed
+    "layer.reference.label.color": "line, hex color",  # line: the line's color
+}
 
 _INTERVAL = re.compile(r"^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$")
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
@@ -101,10 +143,11 @@ _ISO_DATE = re.compile(
 _COMMENT = re.compile(r"^#\s*\[(?P<range>[^\]]*)\];\s*(?P<description>.*)$")
 _TYPE_TEXT = {
     "text": "text",
-    "int": "a whole number, 0 or more",
-    "positive int": "a whole number above 0",
+    "int ≥ 0": "a whole number, 0 or more",
+    "int > 0": "a whole number above 0",
     "float": "a number",
-    "positive float": "a number above 0",
+    "float ≥ 0": "a number, 0 or more",
+    "float > 0": "a number above 0",
     "date": 'a date, e.g. 2025-08-25 or "2025-08-25T06:00"',
     "hex color": "a hex color code such as #4C78A8",
     "hex colors": "a list of hex color codes",
@@ -114,13 +157,14 @@ _TYPE_TEXT = {
     "graph type": "the name of a graph type",
     "theme": "the name of a theme",
     "format": "the name of a format",
+    "value format": 'a number or date format, e.g. ",.0f" or "%b %-d"',
     "graphspec": "the name of a GraphSpec",
     "layer type": "the name of a layer type",
     "layer types": "a list of layer type names",
     "layout": "the name of a layout",
     "schedule": "the name of a schedule",
     "texts": "a list of text",
-    "positive floats": "a list of numbers above 0",
+    "floats > 0": "a list of numbers above 0",
     "text grid": "a list of rows, each a list of text",
 }
 
@@ -154,11 +198,16 @@ class Parameter:
     default: Any
     range: Range
     description: str
-    fixed: bool  # in fixed_parameters of the definition file
+    fixed: bool  # tagged !fix in the definition file
+    inherits: str | None = None  # a style's member: the parameter it takes its value from
+    lists: bool | None = None  # a style's member: whether its general parameter takes a list
+    same: str | None = None  # in a category with a sibling's parameters: the one it copies
 
     @property
     def takes_list(self) -> bool:
         """A list whose items are each checked against the range."""
+        if self.lists is not None:
+            return self.lists
         return isinstance(self.default, list) and not set(WHOLE_LISTS) & set(self.range.types)
 
     @property
@@ -243,15 +292,17 @@ def check_value(value: Any, rng: Range, names: dict[str, set[str]] | None = None
 
 def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
     match t:
-        case "text":
+        case "text" | "value format":  # a value format is checked where it's drawn
             return isinstance(value, str) and not is_none(value)
-        case "int":
+        case "int ≥ 0":
             return _is_int(value) and value >= 0
-        case "positive int":
+        case "int > 0":
             return _is_int(value) and value > 0
         case "float":
             return _is_number(value)
-        case "positive float":
+        case "float ≥ 0":
+            return _is_number(value) and value >= 0
+        case "float > 0":
             return _is_number(value) and value > 0
         case "date":
             return as_date(value) is not None
@@ -283,11 +334,11 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
                 and bool(value)
                 and all(_type_ok("text", v, names) for v in value)
             )
-        case "positive floats":
+        case "floats > 0":
             return (
                 isinstance(value, list)
                 and bool(value)
-                and all(_type_ok("positive float", v, names) for v in value)
+                and all(_type_ok("float > 0", v, names) for v in value)
             )
         case "text grid":
             return (
@@ -375,31 +426,240 @@ def definition_file(kind: str, name: str | None = None) -> Path:
 
 
 def _comment(node: Any, key: str) -> str | None:
-    entry = node.ca.items.get(key)
-    for part in entry or []:
-        for c in part if isinstance(part, list) else [part]:
-            if c is not None and hasattr(c, "value"):
-                return c.value.strip().split("\n")[0].strip()
+    """A key's comment. ruamel keeps the comment after a tag with no value (key: !var  # ...)
+    before the next key, so it's taken from there, and not given to that key."""
+    keys = list(node)
+    i = keys.index(key)
+    if _bare(node[key]) and i + 1 < len(keys):
+        before = (node.ca.items.get(keys[i + 1]) or [None, None])[1]
+        found = _first(before)
+        if found is not None:
+            return found
+    entry = node.ca.items.get(key) or []
+    after_bare = i > 0 and _bare(node[keys[i - 1]])
+    for n, part in enumerate(entry):
+        if n == 1 and after_bare:
+            continue  # the bare tag's, before it
+        if (found := _first(part)) is not None:
+            return found
     return None
+
+
+def _bare(value: Any) -> bool:
+    return isinstance(value, TaggedScalar) and str(value.value) == ""
+
+
+def _first(part: Any) -> str | None:
+    for c in part if isinstance(part, list) else [part]:
+        if c is not None and hasattr(c, "value"):
+            return c.value.strip().split("\n")[0].strip()
+    return None
+
+
+def _tag(node: Any) -> bool | None:
+    """Whether a round-trip YAML node is tagged !fix (True) or !var (False); None if neither."""
+    tag = getattr(getattr(node, "tag", None), "value", None)
+    return {FIX: True, VAR: False}.get(tag) if isinstance(tag, str) else None
 
 
 def _parse(path: str, value: Any, comment: str | None, fixed: bool, where: Path) -> Parameter:
     m = _COMMENT.match(comment or "")
     if not m:
         raise ValueError(f"{where.name}: {path} needs '# [RANGE]; DESCRIPTION'")
-    return Parameter(path, _plain(value), parse_range(m["range"]), m["description"], fixed)
+    rng = parse_range(m["range"])
+    if "format" in rng.types and not path.endswith("specifications.format"):
+        # a format other than a spec's name: the number or date format of what it labels
+        types = tuple("value format" if t == "format" else t for t in rng.types)
+        rng = Range(rng.literals, rng.intervals, types)
+    return Parameter(path, _plain(value), rng, m["description"], fixed)
 
 
-def _walk(prefix: str, node: Any, fixed: bool, where: Path) -> list[Parameter]:
-    """The parameters in a category and its sub-categories, in file order."""
-    out = []
+@dataclass(frozen=True)
+class _Style:
+    """A category marked with a style, where it is in the file."""
+
+    path: str
+    word: str  # "text style", "line style" or "series style"
+    fixed: bool | None
+
+
+@dataclass(frozen=True)
+class _Same:
+    """A category with the same parameters, and defaults, as its sibling `source`."""
+
+    path: str
+    source: str
+    fixed: bool | None
+
+
+@dataclass(frozen=True)
+class _Bare:
+    """A style's member that its category sets without a comment: the range and description
+    are its general parameter's."""
+
+    path: str
+    value: Any
+    fixed: bool
+
+
+def _walk(
+    prefix: str,
+    node: Any,
+    fixed: bool | None,
+    where: Path,
+    in_style: bool = False,
+    skip: tuple[str, ...] = (),
+) -> list[Parameter | _Style | _Bare | _Same]:
+    """The parameters in a category and its sub-categories, in file order, each fixed or not
+    by the tag nearest it (fixed: the category's), with a marker where a style's category is;
+    in a style's category (in_style), a parameter with no comment is one of its members."""
+    out: list[Parameter | _Style | _Bare | _Same] = []
     for key in node:
+        if key in skip:
+            continue  # a collection: see spec/layers.py and spec/layout.py
         value = node[key]
-        if hasattr(value, "items"):
-            out += _walk(f"{prefix}.{key}", value, fixed, where)
+        status = _tag(value)
+        status = fixed if status is None else status
+        path = f"{prefix}.{key}" if prefix else str(key)
+        comment = _comment(node, key)
+        m = _COMMENT.match(comment or "")
+        same = _SAME.search(comment or "") if not m else None
+        if same and not hasattr(value, "items"):
+            parent = path.rsplit(".", 1)[0] if "." in path else ""
+            out.append(_Same(path, f"{parent}.{same['name']}" if parent else same["name"], status))
+        elif m and m["range"] in STYLES:
+            out.append(_Style(path, m["range"], status))
+            if hasattr(value, "items"):
+                out += _walk(path, value, status, where, in_style=True)
+        elif hasattr(value, "items"):
+            out += _walk(path, value, status, where, in_style)
+        elif in_style and not m:
+            empty = isinstance(value, TaggedScalar) and str(value.value) == ""  # a tag alone
+            out.append(_Bare(path, UNSET if empty else _plain(value), bool(status)))
         else:
-            out.append(_parse(f"{prefix}.{key}", value, _comment(node, key), fixed, where))
+            out.append(_parse(path, value, comment, bool(status), where))
     return out
+
+
+def _status_at(tree: Any, path: str, root: bool | None) -> bool:
+    """The status the definition file's tags give a path: the tag nearest it."""
+    found, node = root, tree
+    for key in path.split("."):
+        if not hasattr(node, "items") or key not in node:
+            break
+        node = node[key]
+        if (s := _tag(node)) is not None:
+            found = s
+    return bool(found)
+
+
+def _expand(
+    items: list[Parameter | _Style | _Bare | _Same],
+    words: tuple[str, ...],
+    tree: Any,
+    where: Path,
+    last: bool,
+) -> list[Parameter | _Style | _Bare | _Same]:
+    """Each style's category of these words given its members, where the category is: those
+    it sets as it sets them, the rest from their general parameters."""
+    params = {i.path: i for i in items if isinstance(i, Parameter)}
+    bare = {i.path: i for i in items if isinstance(i, _Bare)}
+    root = _tag(tree)
+    made: dict[str, list[Parameter]] = {}
+    for style in (i for i in items if isinstance(i, _Style) and i.word in words):
+        general = STYLES[style.word]
+        own: list[Parameter] = []
+        excluded = EXCLUDED.get(style.path, ())
+        generals = [g for g in params.values() if g.path.startswith(f"{general}.")]
+        if not generals and general == STYLES["aggregation style"]:
+            generals = list(_style_definitions(general).values())
+        elif not generals:  # a layout's: the theme's, which its first tile's theme sets
+            generals = [
+                g for g in definitions("theme").values() if g.path.startswith(f"{general}.")
+            ]
+        for g in generals:
+            if not g.path.startswith(f"{general}.") or g.path.startswith(f"{style.path}."):
+                continue
+            rel = g.path[len(general) + 1 :]
+            if rel in excluded or (rel.split(".")[-1] in excluded and "." not in rel):
+                continue
+            path = f"{style.path}.{rel}"
+            rng = parse_range(RANGES[path]) if path in RANGES else g.range
+            if path in bare:
+                b = bare.pop(path)
+                value = g.default if b.value is UNSET else b.value
+                params[path] = Parameter(
+                    path, value, rng, g.description, b.fixed, g.path, g.takes_list
+                )
+            elif path in params:
+                params[path] = Parameter(
+                    **{**params[path].__dict__, "inherits": g.path, "lists": g.takes_list}
+                )
+            else:
+                fixed = _status_at(tree, path, root)
+                own.append(
+                    Parameter(path, g.default, rng, g.description, fixed, g.path, g.takes_list)
+                )
+        made[style.path] = own
+    out: list[Parameter | _Style | _Bare | _Same] = []
+    for item in items:
+        if isinstance(item, _Style) and item.word in words:
+            out += made[item.path]
+        elif isinstance(item, Parameter):
+            out.append(params[item.path])
+        elif isinstance(item, _Bare):
+            if item.path not in bare:
+                out.append(params[item.path])
+            elif last:  # no style it's in has a member of its name
+                raise ValueError(f"{where.name}: {item.path} needs '# [RANGE]; DESCRIPTION'")
+            else:
+                out.append(item)
+        else:
+            out.append(item)
+    return out
+
+
+def _parameters(
+    items: list[Parameter | _Style | _Bare | _Same], tree: Any, where: Path, looks: bool = True
+) -> list[Parameter]:
+    """The file's parameters, with its styles' members: text and line styles first, since a
+    series style's members include theirs; then each category that copies a sibling's. Without
+    looks (a graph type's or layer type's file), a text or line style marks the theme's look,
+    which an entry may set where the theme leaves it variable, so it has no members here."""
+    if not looks:
+        items = [i for i in items if not (isinstance(i, _Style) and i.word in LOOKS)]
+    items = _expand(
+        items, ("text style", "line style", "aggregation style"), tree, where, last=False
+    )
+    items = _expand(items, ("series style",), tree, where, last=True)
+    out: list[Parameter] = []
+    for item in items:
+        if isinstance(item, Parameter):
+            out.append(item)
+        elif isinstance(item, _Same):
+            copied = [p for p in out if p.path.startswith(f"{item.source}.")]
+            root = _tag(tree)
+            out += [
+                Parameter(
+                    **{
+                        **p.__dict__,
+                        "path": item.path + p.path[len(item.source) :],
+                        "fixed": _status_at(tree, item.path + p.path[len(item.source) :], root),
+                        "same": p.path,
+                    }
+                )
+                for p in copied
+            ]
+    return out
+
+
+@cache
+def _style_definitions(general: str) -> dict[str, Parameter]:
+    """A style's general parameters from styles.yaml (spec/styles.yaml), by path."""
+    path = Path(str(files("forgegraph") / "spec" / "styles.yaml"))
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    found = _walk(general, data[general], False, path)
+    return {p.path: p for p in found if isinstance(p, Parameter)}
 
 
 @cache
@@ -413,32 +673,22 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
             for k in LAYER_HEADER
             if k != "parameters"
         }
-        tree = data["parameters"]
-        found: list[Parameter] = []
-        for key in tree:
-            if hasattr(tree[key], "items"):
-                found += _walk(str(key), tree[key], False, path)
-            else:
-                found.append(_parse(str(key), tree[key], _comment(tree, key), False, path))
+        found = _parameters(
+            _walk("", data[PARAMETERS], False, path), data[PARAMETERS], path, looks=False
+        )
         return header, {p.path: p for p in found}
     header = {
-        k: _parse(k, data[k], _comment(data, k), False, path) for k in HEADER if k not in SECTIONS
+        k: _parse(k, data[k], _comment(data, k), False, path) for k in HEADER if k != PARAMETERS
     }
-    params: dict[str, Parameter] = {}
-    for section in SECTIONS:
-        tree = data.get(section)
-        if is_none(tree):
-            continue
-        for category, entries in tree.items():
-            if category in COLLECTIONS.get(kind, ()):
-                continue
-            if not hasattr(entries, "items"):
-                raise ValueError(f"{path.name}: {section}.{category} must be a category")
-            for p in _walk(str(category), entries, section == SECTIONS[0], path):
-                if p.path in params:
-                    raise ValueError(f"{path.name}: {p.path} is listed twice")
-                params[p.path] = p
-    return header, params
+    tree = data[PARAMETERS]
+    root = _tag(tree)
+    for category, entries in tree.items():
+        style = _COMMENT.match(_comment(tree, category) or "")
+        if not hasattr(entries, "items") and not (style and style["range"] in STYLES):
+            raise ValueError(f"{path.name}: {PARAMETERS}.{category} must be a category")
+    items = _walk("", tree, root, path, skip=COLLECTIONS.get(kind, ()))
+    looks = kind not in CORE_KINDS
+    return header, {p.path: p for p in _parameters(items, tree, path, looks)}
 
 
 @cache
@@ -447,13 +697,29 @@ def tab_definitions() -> tuple[dict[str, Parameter], Parameter]:
     (grid.areas...), and the one each tile takes, a GraphSpec file."""
     path = definition_file("layout")
     data = YAML().load(path.read_text(encoding="utf-8"))
-    tabs = data[SECTIONS[1]]["tabs"]
+    tabs = data[PARAMETERS]["tabs"]
     tab = tabs[next(iter(tabs))]
-    grid = {p.path: p for p in _walk("grid", tab["grid"], False, path)}
+    grid = {p.path: p for p in _walk("grid", tab["grid"], False, path) if isinstance(p, Parameter)}
     tiles = tab["tiles"]
     first = next(iter(tiles))
     tile = _parse("tile", tiles[first], _comment(tiles, first), False, path)
     return grid, tile
+
+
+@cache
+def series_definitions(name: str = REFERENCE["graph_type"]) -> dict[str, Parameter]:
+    """A graph type's series' parameters, from its one series entry, by path within a series
+    (line.show...): what each series a GraphSpec lists takes. A series may also set the
+    theme's variable series parameters for itself (see spec/series.py)."""
+    path = definition_file("graph_type", name)
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    tree = data[PARAMETERS]
+    entries = tree["series"]
+    first = next(iter(entries))
+    root = _tag(tree)
+    status = _tag(entries) if _tag(entries) is not None else root
+    found = _parameters(_walk("", entries[first], status, path), entries[first], path, looks=False)
+    return {p.path: p for p in found}
 
 
 def header_definitions(kind: str) -> dict[str, Parameter]:
@@ -472,8 +738,10 @@ def definitions(kind: str, name: str | None = None) -> dict[str, Parameter]:
 @cache
 def _graphspec_definitions(name: str) -> dict[str, Parameter]:
     params = _read("graphspec", name)[1]
-    others = categories("theme", "format", "graph_type")
-    return {path: p for path, p in params.items() if path.split(".")[0] not in others}
+    names = graph_type_files()
+    others = {path for kind in ("theme", "format") for path in definitions(kind)}
+    others |= {path for gt in names for path in definitions("graph_type", gt)}
+    return {path: p for path, p in params.items() if path not in others}
 
 
 @cache
@@ -493,14 +761,18 @@ def graph_type_files() -> tuple[str, ...]:
     folder = Path(str(files("forgegraph") / KINDS["graph_type"]))
     out = []
     for path in sorted(folder.glob("*.yaml")):
-        data = YAML(typ="safe", pure=True).load(path.read_text(encoding="utf-8"))
+        data = loader().load(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and is_none(data.get("extends")):
             out.append(path.stem)
     return tuple(out)
 
 
 def _plain(value: Any) -> Any:
-    """ruamel's round-trip types -> plain Python values."""
+    """ruamel's round-trip types -> plain Python values. A tagged scalar is read as it would
+    be untagged."""
+    if isinstance(value, TaggedScalar):
+        text = str(value.value)
+        value = YAML(typ="safe", pure=True).load(text) if value.style is None else text
     if isinstance(value, list):
         return [_plain(v) for v in value]
     if isinstance(value, bool) or value is None:

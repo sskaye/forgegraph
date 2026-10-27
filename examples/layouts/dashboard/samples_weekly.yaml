@@ -2,8 +2,7 @@ name: samples_weekly
 version: 0
 description: Samples in completed runs per week, all instruments.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -19,9 +18,12 @@ variable_parameters:
                 column: Week
             title: Week starting
         y:
-            data:
-                column: Samples
             title: Samples
             min: 0
+    series:
+        Samples: {}
     grid:
-        show: true
+        x:
+            show: true
+        y:
+            show: true

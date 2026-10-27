@@ -13,6 +13,7 @@ from datetime import date, datetime
 import pandas as pd
 import pytest
 from pack_helpers import doc
+from ruamel.yaml import YAML
 
 import forgegraph as fg
 from forgegraph.spec.parameters import (
@@ -23,16 +24,23 @@ from forgegraph.spec.parameters import (
     NONE,
     REFERENCE,
     Parameter,
+    _parameters,
     _read,
     _type_ok,
+    _walk,
     definition_file,
     definitions,
     parse_range,
+    series_definitions,
     tree_set,
 )
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
+from forgegraph.spec.series import look_definitions
+from forgegraph.spec.tags import fix, var
 from forgegraph.spec.validate import drawing_problems, validate
+
+ONE = "series.Cell Voltage (V)"  # the example GraphSpec's series
 
 
 def reference_name(kind: str) -> str:
@@ -44,8 +52,9 @@ DOCUMENT_KINDS = [k for k in KINDS if k != "layer"]  # files people write; layer
 LAYER_TYPES = sorted(builtin().docs["layer"])
 ALL = [(kind, p) for kind in DOCUMENT_KINDS for p in definitions(kind).values()]
 ALL += [(f"layer:{t}", p) for t in LAYER_TYPES for p in definitions("layer", t).values()]
+ALL += [("series", p) for p in series_definitions().values()]
 IDS = [f"{kind}:{p.path}" for kind, p in ALL]
-NUMERIC = {"int", "positive int", "float", "positive float"}
+NUMERIC = {"int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0"}
 
 
 def reg_with(*docs: tuple[str, dict]) -> Registry:
@@ -56,10 +65,11 @@ def reg_with(*docs: tuple[str, dict]) -> Registry:
 
 
 def child(
-    kind: str, section: str = "variable_parameters", params: dict | None = None, name: str = "child"
+    kind: str, tag: str | None = None, params: dict | None = None, name: str = "child"
 ) -> dict:
-    """A file extending the definition file that lists the given parameters, in section."""
-    listed = {"fixed" if section == "fixed_parameters" else "variable": params}
+    """A file extending the definition file that lists the given parameters, tagged "fix"
+    or "var", or untagged so each keeps the status it inherits."""
+    listed = {{"fix": "fixed", "var": "variable", None: "untagged"}[tag]: params}
     return doc(reference_name(kind), name, description="A test file.", version=1, **listed)
 
 
@@ -82,6 +92,9 @@ LAYER_REQUIRED = {
 def check(kind: str, p: Parameter, value) -> list[str]:
     """Problems with a file that sets p to value: one extending the definition file, or for a
     layer type's parameter, a GraphSpec with that layer, named t."""
+    if kind == "series":
+        doc = child("graphspec", params={f"{ONE}.{p.path}": value})
+        return validate("graphspec", doc, reg_with(("graphspec", doc)))
     if kind.startswith("layer:"):
         layer_type = kind.split(":", 1)[1]
         entry: dict = {"type": layer_type}
@@ -91,8 +104,7 @@ def check(kind: str, p: Parameter, value) -> list[str]:
         tree_set(entry, p.path, value)
         doc = child("graphspec", params={"layers": {"t": entry}})
         return validate("graphspec", doc, reg_with(("graphspec", doc)))
-    section = "fixed_parameters" if p.fixed else "variable_parameters"
-    doc = child(kind, section, {**CONTEXT.get(p.path, {}), p.path: value})
+    doc = child(kind, None, {**CONTEXT.get(p.path, {}), p.path: value})
     return validate(kind, doc, reg_with((kind, doc)))
 
 
@@ -101,9 +113,8 @@ def wrap(p: Parameter, value):
 
 
 def where(p: Parameter, kind: str = "") -> str:
-    if kind.startswith("layer:"):
-        return "variable_parameters.layers.t." + p.path
-    return ("fixed_parameters." if p.fixed else "variable_parameters.") + p.path
+    prefix = {"series": f"{ONE}."}.get(kind, "layers.t." if kind.startswith("layer:") else "")
+    return prefix + p.path
 
 
 # --- the definition files -------------------------------------------------------------
@@ -170,7 +181,7 @@ def test_parameter_paths_are_unique_across_kinds():
 
 def test_required_parameters():
     required = [p.path for p in definitions("graph_type").values() if p.required]
-    assert required == ["axis.x.data.column", "axis.y.data.column"]
+    assert required == []  # the base axis's column is checked when drawing
 
 
 # --- ranges at their edges ------------------------------------------------------------
@@ -198,7 +209,7 @@ def test_every_listed_value_is_accepted(kind, p):
 
 @pytest.mark.parametrize(("kind", "p"), ALL, ids=IDS)
 def test_values_outside_the_range_are_rejected(kind, p):
-    if not {"text", "column", "columns"} & set(p.range.types):
+    if not {"text", "column", "columns", "value format"} & set(p.range.types):
         [err] = check(kind, p, wrap(p, "not-a-value"))
         assert "must be" in err
     if not p.range.intervals and not NUMERIC & set(p.range.types):
@@ -210,10 +221,12 @@ def test_values_outside_the_range_are_rejected(kind, p):
 FONTS = (["Source Sans 3"], ["No Such Font"])
 SAMPLES = {
     "text": (["Any text"], [7]),
-    "int": ([0, 12], [-1, 1.5, True]),
-    "positive int": ([1, 300], [0, -2, 2.5]),
+    "int ≥ 0": ([0, 12], [-1, 1.5, True]),
+    "int > 0": ([1, 300], [0, -2, 2.5]),
     "float": ([-3.5, 0], ["3"]),
-    "positive float": ([0.001, 1.15, 40], [0, -0.1, "1"]),
+    "float ≥ 0": ([0, 0.001, 40], [-0.1, "1"]),
+    "float > 0": ([0.001, 1.15, 40], [0, -0.1, "1"]),
+    "floats > 0": ([[1, 2.5]], [[0], [], 1]),
     "date": (
         [date(2025, 8, 25), datetime(2025, 8, 25, 6), "2025-08-25", "2025-08-25T06:00"],
         ["25/08/2025", "2025-02-30", "2025-08-25T6:00", 20325, True],
@@ -226,10 +239,11 @@ SAMPLES = {
     "graph type": (["xy"], ["pie"]),
     "theme": (["forgegraph_base/base_theme"], ["loud", "base_theme"]),
     "format": (["forgegraph_base/base_format"], ["poster"]),
-    "graphspec": (["forgegraph_base/polarization"], ["none-such"]),
+    "graphspec": (["forgegraph_base/graphspec_example"], ["none-such"]),
     "layer type": (["note"], ["pie"]),
     "layer types": ([["note", "error_bar"], "note"], [[], ["pie"]]),
     "texts": ([["a.yaml"], ["prog", "-x"]], [[], [7], "a.yaml"]),
+    "value format": ([",.0f", "%b %-d"], [7]),
 }
 
 
@@ -239,7 +253,7 @@ def test_type_words(kind, p):
         pytest.skip("its values depend on the cadence's other parameters")
     others = set(p.range.types)
     for t in p.range.types:
-        good, bad = FONTS if p.path == "font.family" else SAMPLES[t]
+        good, bad = FONTS if p.path.endswith("font") else SAMPLES[t]
         for value in good:
             assert check(kind, p, wrap(p, value)) == [], value
         for value in bad:
@@ -264,10 +278,10 @@ def test_a_single_value_parameter_refuses_a_list():
         definitions("graph_type")["axis.x.data.column"],
         definitions("graph_type")["axis.y.data.column"],
     )
-    assert check("graph_type", x, ["a", "b"]) == [
-        "variable_parameters.axis.x.data.column: must be a single value: a column name"
-    ]
-    assert check("graph_type", y, ["a", "b"]) == []
+    for p in (x, y):
+        assert check("graph_type", p, ["a", "b"]) == [
+            f"{p.path}: must be a single value: None or a column name"
+        ]
 
 
 def test_range_parsing():
@@ -275,7 +289,8 @@ def test_range_parsing():
     assert r.literals == ("auto",) and r.types == ("hex color",)
     assert (r.intervals[0].low, r.intervals[0].high) == (10, 2000)
     assert parse_range("-1-1").intervals[0].low == -1
-    assert parse_range("None, positive float").types == ("positive float",)
+    assert parse_range("None, float > 0").types == ("float > 0",)
+    assert parse_range("int ≥ 0, float ≥ 0").types == ("int ≥ 0", "float ≥ 0")
     with pytest.raises(ValueError):
         parse_range("5-1")
     with pytest.raises(ValueError):
@@ -284,10 +299,10 @@ def test_range_parsing():
 
 def test_messages():
     assert check("format", definitions("format")["figure.width"], 0) == [
-        "fixed_parameters.figure.width: must be auto or a number above 0"
+        "figure.width: must be auto or a number above 0"
     ]
     assert check("theme", definitions("theme")["axis.tick.direction"], "up") == [
-        "fixed_parameters.axis.tick.direction: must be one of: in, out, both"
+        "axis.tick.direction: must be one of: in, out, both"
     ]
 
 
@@ -305,7 +320,7 @@ def test_header_fields():
     doc = child("graphspec")
     doc["axis"] = {"x": {"data_column": "a"}}
     assert validate("graphspec", doc) == [
-        "axis: a category of parameters; it goes under variable_parameters or fixed_parameters"
+        "axis: a category of parameters; it goes under parameters"
     ]
     assert validate("theme", {**child("theme"), "version": -1}) == [
         "version: must be a whole number, 0 or more"
@@ -314,56 +329,65 @@ def test_header_fields():
 
 
 def test_unknown_parameter_and_category():
-    doc = child("theme", "fixed_parameters", {"axis.tick.length_mul": 0.3})
-    doc["fixed_parameters"]["axes"] = 3
+    doc = child("theme", "fix", {"axis.tick.length_mul": 0.3})
+    doc["parameters"]["axes"] = 3
     assert validate("theme", doc) == [
-        "fixed_parameters.axis.tick.length_mul: unknown parameter; "
-        "did you mean 'axis.tick.length'?",
-        "fixed_parameters.axes: unknown category; did you mean 'axis'?",
+        "axis.tick.length_mul: unknown parameter; did you mean 'axis.tick.length'?",
+        "axes: unknown category; did you mean 'axis'?",
     ]
 
 
 @pytest.mark.parametrize(
     ("kind", "old", "value", "new"),
     [
-        ("theme", "grid.line_width", 0.05, "grid.line.width"),
+        ("theme", "grid.line_width", 0.05, "grid.width"),
         ("theme", "axis.tick.minor.num", 4, "axis.tick.minor.count"),
         ("theme", "series.bar.edge_color", "#000000", "series.bar.edge.color"),
-        ("graphspec", "encoding.marker_shape", "Cell", "encoding.marker.shape.column"),
+        ("graphspec", "arrangement.stack", "sum", "arrangement.stacking"),
         ("schedule", "freshness.stamp", False, "freshness.stamp.show"),
     ],
 )
 def test_a_renamed_parameter_suggests_its_new_name(kind, old, value, new):
-    assert validate(kind, child(kind, "variable_parameters", {old: value})) == [
-        f"variable_parameters.{old}: unknown parameter; did you mean '{new}'?"
+    assert validate(kind, child(kind, "var", {old: value})) == [
+        f"{old}: unknown parameter; did you mean '{new}'?"
     ]
 
 
 @pytest.mark.parametrize(
     ("kind", "old", "value", "new"),
     [
-        ("graphspec", "encoding.color", "Cell", "'encoding.color.column' or 'encoding.color.type'"),
+        ("graphspec", "arrangement.total", True, "'arrangement.total.show'"),
         ("schedule", "cadence.interval", 1, "'cadence.interval.count' or 'cadence.interval.unit'"),
-        ("theme", "legend.key.frame", True, "'legend.key.frame.show' or 'legend.key.frame.width'"),
+        (
+            "theme",
+            "legend.key.gap",
+            0.5,
+            "'legend.key.gap.inner' or 'legend.key.gap.outer' or 'legend.key.gap.row'",
+        ),
         ("layout", "separators.line.border", True, None),
     ],
 )
 def test_a_name_that_is_now_a_category_suggests_its_parameters(kind, old, value, new):
     """A renamed parameter whose old name is now a category: its own parameters, not the
     sibling whose name is spelled closest."""
-    [problem] = validate(kind, child(kind, "variable_parameters", {old: value}))
+    [problem] = validate(kind, child(kind, "var", {old: value}))
     if new is not None:
-        assert problem == f"variable_parameters.{old}: unknown parameter; did you mean {new}?"
+        assert problem == f"{old}: unknown parameter; did you mean {new}?"
     else:  # not a category: the closest name, as before
-        assert problem.startswith(f"variable_parameters.{old}: unknown parameter; did you mean")
+        assert problem.startswith(f"{old}: unknown parameter; did you mean")
 
 
-def test_a_parameter_is_listed_once():
-    doc = child("theme", "fixed_parameters", {"grid.show": True})
-    doc["variable_parameters"] = {"grid": {"show": False}}
-    assert validate("theme", doc) == [
-        "variable_parameters.grid.show: also listed in fixed_parameters"
-    ]
+def test_a_parameter_written_twice_is_an_error(tmp_path):
+    """One tree holds every parameter, so a parameter can be listed only once: YAML refuses a
+    key written twice."""
+    from ruamel.yaml.constructor import DuplicateKeyError
+
+    from forgegraph.spec import registry
+
+    path = tmp_path / "t.yaml"
+    path.write_text("parameters:\n    grid:\n        show: true\n        show: false\n")
+    with pytest.raises(DuplicateKeyError):
+        registry.load_yaml(path)
 
 
 def test_extends_must_exist_and_not_loop():
@@ -392,27 +416,26 @@ def test_extending_none_requires_every_parameter(kind, none):
         pytest.skip("a graph type extending None is its own definition")
     doc["name"] = "copy"
     doc["extends"] = none
-    p = list(definitions(kind).values())[-1]
+    p = [q for q in definitions(kind).values() if q.inherits is None][-1]  # not a member
     *parents, name = p.path.split(".")
-    section = doc["fixed_parameters" if p.fixed else "variable_parameters"]
+    tree = doc["parameters"]
     for key in parents:
-        section = section[key]
-    del section[name]
+        tree = tree[key]
+    del tree[name]
     [err] = validate(kind, doc, reg_with((kind, doc)))
     assert err == f"extends: None, so every parameter must be listed; missing: {p.path}"
 
 
 @pytest.mark.parametrize("null", ["null", "~", ""])
 def test_yamls_null_is_none(tmp_path, null):
-    """extends and fixed_parameters take YAML's null as the word None."""
+    """extends takes YAML's null as the word None."""
     pd.DataFrame({"x": [1, 2, 3], "y": [2, 1, 3]}).to_parquet(tmp_path / "d.parquet")
     (tmp_path / "g.yaml").write_text(
         f"""name: g
 version: 0
 description: YAML's null for None.
 extends: {null}
-fixed_parameters: {null}
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -421,7 +444,8 @@ variable_parameters:
     data: {{file: d.parquet, preprocessing: None}}
     axis:
         x: {{data: {{column: x}}}}
-        y: {{data: {{column: y}}}}
+    series:
+        y: {{}}
 """,
         encoding="utf-8",
     )
@@ -429,21 +453,72 @@ variable_parameters:
 
 
 def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
-    theme = child("theme", "fixed_parameters", {"axis.tick.direction": "in"})
-    theme["variable_parameters"] = {"series": {"line": {"width": 0.12}}}
+    theme = child("theme", "fix", {"axis.tick.direction": "in"})
+    tree_set(theme["parameters"], "series.line.width", var(0.12))
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
     r = {p: (v.value, v.fixed) for p, v in resolve("theme", theme, reg).items()}
     assert r["axis.tick.direction"] == ("in", True)
     assert r["series.line.width"] == (0.12, False)  # fixed in default, variable here
     assert r["axis.tick.length"] == (0.3, True)  # inherited
-    assert r["grid.show"] == (False, False)
+    assert r["grid.x.show"] == (False, False)
+    assert r["title.font"] == ("Roboto", True)  # a member: the general text's font
+
+
+def test_a_tag_with_no_value_changes_only_the_status():
+    """A house theme can make a base parameter variable without restating its value; a
+    GraphSpec in that theme may then set it."""
+    theme = child("theme", None, {"axis.tick.length": var()}, name="open")
+    reg = reg_with(("theme", theme))
+    assert validate("theme", theme, reg) == []
+    r = resolve("theme", theme, reg)["axis.tick.length"]
+    assert (r.value, r.fixed, r.origin) == (0.3, False, "theme 'forgegraph_base/base_theme'")
+    graph = spec({"specifications.theme": "open", "axis.tick.length": 0.5})
+    assert validate("graphspec", graph, reg) == []
+
+
+def test_a_category_tag_covers_everything_in_it_and_beats_the_files_it_extends():
+    """A tag on a category applies to every parameter in it, unless one has its own; and
+    the nearest file to tag a parameter decides, whatever the files it extends say."""
+    theme = child("theme", None, {"series.marker.edge.width": fix(0.1)}, name="locked")
+    theme["parameters"]["series"]["marker"] = fix(theme["parameters"]["series"]["marker"])
+    theme["parameters"]["axis"] = var()  # a tag alone, on a whole category
+    reg = reg_with(("theme", theme))
+    assert validate("theme", theme, reg) == []
+    r = resolve("theme", theme, reg)
+    assert r.fixed("series.marker.size")  # variable in the base, fixed by the category here
+    assert r.fixed("series.marker.edge.width")
+    assert not r.fixed("axis.tick.length")  # fixed in the base, variable through axis here
+    assert not r.fixed("axis.tick.label.size")
+    assert r.fixed("series.line.width")  # untouched: the base's
+
+
+def test_a_file_extending_none_tags_every_parameter():
+    base = copy.deepcopy(builtin().docs["theme"][reference_name("theme")])
+    base["name"] = "bare"
+    tree = dict(base["parameters"])  # the same parameters, without the root's !fix
+    tree["grid"] = fix(tree["grid"])
+    base["parameters"] = tree
+    [err] = validate("theme", base, reg_with(("theme", base)))
+    assert err.startswith(
+        "extends: None, so every parameter needs a !var or !fix tag, on it or a category above "
+        "it; untagged: text.font, "
+    )
+    assert "grid.x.show" not in err
+
+
+def test_a_tag_goes_on_a_layer_not_inside_it():
+    layer = {"type": "note", "text": fix("A note.")}
+    doc = child("graphspec", None, {"layers": {"t": layer}})
+    assert validate("graphspec", doc, reg_with(("graphspec", doc))) == [
+        "layers.t.text: a tag goes on the layer or on layers, not inside"
+    ]
 
 
 def test_graph_type_heading_in_a_theme():
     theme = child("theme")
     left, bottom = {"tick": {"sides": ["left"]}}, {"tick": {"sides": ["bottom"]}}
-    theme["fixed_parameters"] = {"axis": left, "xy": {"axis": bottom}}
+    theme["parameters"] = {"axis": left, "xy": {"axis": bottom}}
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
     assert resolve("theme", theme, reg).value("axis.tick.sides") == ["left"]
@@ -452,17 +527,17 @@ def test_graph_type_heading_in_a_theme():
 
 def test_graph_type_heading_only_in_themes_and_formats():
     gt = child("graph_type")
-    gt["variable_parameters"] = {"xy": {"marks": {"mode": "lines"}}}
+    gt["parameters"] = {"xy": {"marks": {"mode": "lines"}}}
     [err] = validate("graph_type", gt, reg_with(("graph_type", gt)))
     assert "unknown" in err
 
 
 def test_format_width_and_height_cant_both_be_auto():
-    fmt = child("format", "fixed_parameters", {"figure.width": "auto", "figure.height": "auto"})
+    fmt = child("format", "fix", {"figure.width": "auto", "figure.height": "auto"})
     assert validate("format", fmt, reg_with(("format", fmt))) == [
         "size: width and height can't both be auto"
     ]
-    fmt = child("format", "fixed_parameters", {"figure.width": "auto", "figure.height": 140})
+    fmt = child("format", "fix", {"figure.width": "auto", "figure.height": 140})
     assert validate("format", fmt, reg_with(("format", fmt))) == []
 
 
@@ -474,23 +549,42 @@ def spec(params: dict | None = None) -> dict:
 
 
 def test_the_reference_graphspec_sets_every_parameter_with_its_owners_description():
-    _, listed = _read("graphspec", "polarization")
+    _, listed = _read("graphspec", "graphspec_example")
     for kind in ("graph_type", "theme", "format"):
         for path, p in definitions(kind).items():
+            if kind == "theme" and path.startswith("series."):
+                continue  # each series sets them for itself
             if p.fixed:
                 assert path not in listed, path
                 continue
-            assert path in listed, f"polarization.yaml doesn't set {path}"
+            assert path in listed, f"graphspec_example.yaml doesn't set {path}"
             own = p.description.replace(" A GraphSpec must set it.", "")
             assert (listed[path].range, listed[path].description) == (p.range, own), path
+
+
+def test_the_reference_graphspecs_series_sets_every_series_parameter():
+    """Its series sets every parameter its graph type gives a series, with the graph type's
+    description, and only theme parameters a series may set for itself, with the theme's."""
+    path = definition_file("graphspec", "graphspec_example")
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    [entry] = data["parameters"]["series"].values()
+    found = _parameters(_walk("", entry, False, path), entry, path, looks=False)
+    listed = {q.path: q for q in found}
+    own, look = series_definitions(), look_definitions()
+    for rel, q in own.items():
+        assert rel in listed, f"graphspec_example.yaml's series doesn't set {rel}"
+        assert (listed[rel].range, listed[rel].description) == (q.range, q.description), rel
+    for rel in set(listed) - set(own):
+        q = look[rel]
+        assert (listed[rel].range, listed[rel].description) == (q.range, q.description), rel
 
 
 def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
     doc = spec(
         {
-            "grid.show": True,
+            "grid.y.show": True,
             "axis.x.min": 0,
-            "mark.line.show": False,
+            f"{ONE}.line.show": False,
             "provenance.level": "minimal",
         }
     )
@@ -500,44 +594,46 @@ def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
 def test_a_graphspec_cannot_change_fixed_parameters():
     doc = spec({"axis.tick.length": 0.5, "figure.width": 100})
     assert validate("graphspec", doc) == [
-        "variable_parameters.axis.tick.length: fixed by theme 'forgegraph_base/base_theme'",
-        "variable_parameters.figure.width: fixed by format 'forgegraph_base/base_format'",
+        "axis.tick.length: fixed by theme 'forgegraph_base/base_theme'",
+        "figure.width: fixed by format 'forgegraph_base/base_format'",
     ]
-    lines_only = child("graph_type", "fixed_parameters", {"mark.line.show": True}, name="line")
-    doc = spec({"specifications.graph_type": "line", "mark.line.show": False})
-    assert validate("graphspec", doc, reg_with(("graph_type", lines_only))) == [
-        "variable_parameters.mark.line.show: fixed by graph type 'line'"
+    stacked = child("graph_type", "fix", {"arrangement.stacking": "sum"}, name="stacked")
+    doc = spec({"specifications.graph_type": "stacked", "arrangement.stacking": "none"})
+    assert validate("graphspec", doc, reg_with(("graph_type", stacked))) == [
+        "arrangement.stacking: fixed by graph type 'stacked'"
     ]
 
 
 def test_settings_are_checked_against_their_own_range():
     assert validate("graphspec", spec({"axis.x.scale": "logarithmic"})) == [
-        "variable_parameters.axis.x.scale: must be one of: linear, log"
+        "axis.x.scale: must be one of: linear, log"
     ]
 
 
 def test_a_graphspec_names_existing_files():
     assert validate("graphspec", spec({"specifications.theme": "loud"})) == [
-        "variable_parameters.specifications.theme: must be the name of a theme"
+        "specifications.theme: must be the name of a theme"
     ]
     theme = "forgegraph_base/base_theme"
     assert validate("graphspec", spec({"specifications.theme": [theme]})) == [
-        "variable_parameters.specifications.theme: must be a single value: the name of a theme"
+        "specifications.theme: must be a single value: the name of a theme"
     ]
 
 
 def test_a_graphspec_respects_fixed_values_of_the_graphspec_it_extends():
-    base = child("graphspec", "fixed_parameters", {"mark.line.show": True}, name="base")
-    doc = {**spec({"mark.line.show": False}), "extends": "base"}
+    base = child("graphspec", "fix", {"arrangement.stacking": "none"}, name="base")
+    doc = {**spec({"arrangement.stacking": "sum"}), "extends": "base"}
     reg = reg_with(("graphspec", base), ("graphspec", doc))
     assert validate("graphspec", base, reg) == []
-    assert validate("graphspec", doc, reg) == [
-        "variable_parameters.mark.line.show: fixed by GraphSpec 'base'"
-    ]
+    assert validate("graphspec", doc, reg) == ["arrangement.stacking: fixed by GraphSpec 'base'"]
+    base = child("graphspec", "fix", {ONE: {"line": {"show": True}}}, name="base")
+    doc = {**spec({f"{ONE}.line.show": False}), "extends": "base"}
+    reg = reg_with(("graphspec", base), ("graphspec", doc))
+    assert validate("graphspec", doc, reg) == [f"{ONE}: fixed by GraphSpec 'base'"]
 
 
 def test_naming_method_is_limited_to_the_themes_methods():
-    theme = child("theme", "fixed_parameters", {"legend.methods": ["key"]}, name="plain")
+    theme = child("theme", "fix", {"legend.methods": ["key"]}, name="plain")
     reg = reg_with(("theme", theme))
     doc = spec({"specifications.theme": "plain"})
     assert validate("graphspec", doc, reg) == ["legend.method: theme 'plain' allows only key"]
@@ -546,12 +642,15 @@ def test_naming_method_is_limited_to_the_themes_methods():
 
 
 def test_drawing_needs_the_required_columns():
-    assert drawing_problems(builtin().docs["graphspec"]["forgegraph_base/polarization"]) == []
+    assert drawing_problems(builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]) == []
     doc = spec({"axis.x.data.column": NONE})
     assert validate("graphspec", doc) == []
     assert drawing_problems(doc) == [
-        "axis.x.data.column: must be set before the graph can be drawn"
+        "axis.x.data.column: must be set before the graph can be drawn: the column the series "
+        "are drawn along (arrangement.base_axis)"
     ]
+    doc = spec({ONE: NONE})
+    assert drawing_problems(doc) == ["series: must list at least one series to draw"]
 
 
 def test_benchmark_column_and_value_go_together():
@@ -567,51 +666,49 @@ def test_a_graphspec_without_a_data_file_is_drawn_from_a_dataframe():
     assert validate("graphspec", doc) == [] and drawing_problems(doc) == []
 
 
-def test_several_y_columns_need_a_title_or_none():
-    two = ["cell_voltage", "temperature"]
-    assert validate(
-        "graphspec", spec({"axis.y.data.column": two, "axis.y.title": "column_name"})
-    ) == ["axis.y.title: several y columns have no single name; set a title, or None"]
-    assert validate("graphspec", spec({"axis.y.data.column": two, "axis.y.title": NONE})) == []
-    assert (
-        validate("graphspec", spec({"axis.y.data.column": two, "axis.y.title": "Voltage (V)"}))
-        == []
-    )
-    assert (
-        validate(
-            "graphspec", spec({"axis.y.data.column": "cell_voltage", "axis.y.title": "column_name"})
-        )
-        == []
-    )
+def test_several_series_need_a_title_or_none():
+    two = {f"{ONE}.color": "series", "series.Temperature (°C).color": "series"}
+    titled = {"legend.key.title.text": NONE}
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": "column_name"})) == [
+        "axis.y.title: several series have no single column name; set a title, or None"
+    ]
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": NONE})) == []
+    assert validate("graphspec", spec({**two, **titled, "axis.y.title": "Voltage (V)"})) == []
+    assert validate("graphspec", spec({**two, "axis.y.title": NONE})) == [
+        f"legend.key.title.text: series '{ONE[len('series.') :]}' is colored by series, which "
+        "has no column name; set a title, or None"
+    ]
+    assert validate("graphspec", spec({"axis.y.title": "column_name"})) == []
+
+
+def test_the_series_give_the_values_along_the_other_axis():
+    assert validate("graphspec", spec({"axis.y.data.column": "Run"})) == [
+        "axis.y.data.column: the series give the values along y; leave it None, and set each "
+        "series' column"
+    ]
 
 
 def test_impossible_requests_are_errors():
-    assert validate("graphspec", spec({"mark.line.show": False, "mark.marker.show": False})) == [
-        "mark.line.show, mark.marker.show, mark.bar.show: all false, so nothing would be drawn"
+    hidden = {f"{ONE}.line.show": False, f"{ONE}.marker.show": False}
+    assert validate("graphspec", spec(hidden)) == [
+        f"{ONE}: line.show, marker.show and bar.show are all false, so nothing would be drawn"
     ]
-    assert (
-        validate(
-            "graphspec",
-            spec({"mark.line.show": False, "mark.marker.show": False, "mark.bar.show": True}),
-        )
-        == []
-    )
+    assert validate("graphspec", spec({**hidden, f"{ONE}.bar.show": True})) == []
     assert validate("graphspec", spec({"axis.x.min": 5.0, "axis.x.max": 5.0})) == [
         "axis.x.min: must be below axis.x.max (5.0 is not below 5.0)"
     ]
     assert validate("graphspec", spec({"axis.y.scale": "log", "axis.y.min": 0})) == [
         "axis.y.min: a log axis needs values above 0, not 0"
     ]
-    theme = child("theme", "fixed_parameters", {"font.family": "Comic Nonexistent"}, name="odd")
+    theme = child("theme", "fix", {"text.font": "Comic Nonexistent"}, name="odd")
     assert validate("theme", theme, reg_with(("theme", theme))) == [
-        "fixed_parameters.font.family: no font 'Comic Nonexistent' is bundled or installed"
+        "text.font: no font 'Comic Nonexistent' is bundled or installed"
     ]
-    bold = {p: "bold" for p in ("title.weight", "axis.title.weight", "legend.label.weight")}
-    theme = child("theme", "fixed_parameters", {"font.family": "DejaVu Sans", **bold}, name="odd")
+    theme = child("theme", "fix", {"text.font": "DejaVu Sans", "title.weight": "semibold"})
     assert validate("theme", theme, reg_with(("theme", theme))) == [
-        "legend.key.title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
+        "title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
     ]
-    tree_set(theme["fixed_parameters"], "legend.key.title.weight", "bold")
+    tree_set(theme["parameters"], "title.weight", fix("bold"))
     assert validate("theme", theme, reg_with(("theme", theme))) == []
 
 
@@ -651,7 +748,7 @@ def test_validating_a_graphspec_resolves_its_values_once(monkeypatch):
     from forgegraph.spec import validate as validation
     from forgegraph.spec.registry import builtin
 
-    doc = builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    doc = builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]
     calls = []
     explain = validation.explain
     monkeypatch.setattr(validation, "explain", lambda *a, **k: calls.append(1) or explain(*a, **k))
@@ -678,11 +775,12 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
 
     from forgegraph.spec.loaded import load_document
     from forgegraph.spec.registry import builtin
+    from forgegraph.spec.tags import with_tags
 
-    doc = {**builtin().docs["graphspec"]["forgegraph_base/polarization"], "name": "mine"}
+    doc = {**builtin().docs["graphspec"]["forgegraph_base/graphspec_example"], "name": "mine"}
     path = tmp_path / "mine.yaml"
     with path.open("w", encoding="utf-8") as f:  # its descriptions hold subscripts
-        YAML().dump(doc, f)
+        with_tags(YAML()).dump(doc, f)
     loaded = load_document("graphspec", path)
     assert loaded.doc["name"] == "mine" and loaded.reg.paths["graphspec"]["mine"] == path
     assert loaded.folder == tmp_path
@@ -693,7 +791,7 @@ def test_a_document_is_loaded_with_the_registry_it_is_checked_against(tmp_path, 
     monkeypatch.chdir(tmp_path)
     assert load_document("graphspec", doc).folder == tmp_path
 
-    named = builtin().docs["graphspec"]["forgegraph_base/polarization"]
+    named = builtin().docs["graphspec"]["forgegraph_base/graphspec_example"]
     stranger = {**named, "description": "a document of a name the registry holds"}
     reg = load_document("graphspec", stranger, builtin()).reg
-    assert reg.docs["graphspec"]["forgegraph_base/polarization"] is not stranger
+    assert reg.docs["graphspec"]["forgegraph_base/graphspec_example"] is not stranger

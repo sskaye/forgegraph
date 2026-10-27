@@ -65,14 +65,14 @@ def test_paths_a_parent_schedule_sets_are_found_from_its_folder(project):
     schedules = write_pack(project / "packs") / "schedules"
     graphspec_file(schedules / "graphs", "q", "q.parquet")
     parent = schedule_doc("lab")
-    parent["variable_parameters"]["targets"] = {"files": ["graphs/q.yaml"], "output_folder": "made"}
+    parent["parameters"]["targets"] = {"files": ["graphs/q.yaml"], "output_folder": "made"}
     dump(parent, schedules / "lab.yaml")
     work = project / "work"
     work.mkdir()
     allow(work, "forgegraph_base", "../packs/house")
     child = schedule_doc("weekly")
     child["extends"] = "house/lab"
-    del child["variable_parameters"]["targets"]
+    del child["parameters"]["targets"]
     dump(child, work / "weekly.schedule.yaml")
     assert job_run.run(work / "weekly.schedule.yaml") == 0
     assert (schedules / "made" / "q.png").is_file()
@@ -164,7 +164,7 @@ def test_job_run_says_what_it_saved_and_exits_1_when_a_target_fails(project):
     assert not out["ok"] and [t["ok"] for t in out["status"]["targets"]] == [True, False]
     dump(schedule_doc(interval=7), project / "lab.schedule.yaml")  # 7 days: not allowed
     [problem] = cli_problems("job", "run", "lab.schedule.yaml")
-    assert problem.startswith("variable_parameters.interval: ")
+    assert problem.startswith("interval: ")
 
 
 @pytest.mark.slow
@@ -224,7 +224,7 @@ def test_a_layout_target_takes_its_oldest_tiles_time(project):
     old = datetime(2026, 1, 2, 3, 4).timestamp()
     os.utime(project / "q.parquet", (old, old))
     tab = {"grid": {"areas": [["p"], ["q"]]}, "tiles": {"p": "p.yaml", "q": "q.yaml"}}
-    layout = doc("forgegraph_base/base_layout", "both", variable={"tabs": {"T": tab}})
+    layout = doc("forgegraph_base/layout_example", "both", variable={"tabs": {"T": tab}})
     dump(layout, project / "both.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["both.layout.yaml"], "output_folder": "out"}),
@@ -245,7 +245,7 @@ def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
     shutil.copy(project / "p.parquet", tiles / "p.parquet")
     (tiles / "forgegraph.toml").write_text("packs = ['forgegraph_base', 'not_installed']\n")
     tab = {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}
-    layout = doc("forgegraph_base/base_layout", "tiled", variable={"tabs": {"T": tab}})
+    layout = doc("forgegraph_base/layout_example", "tiled", variable={"tabs": {"T": tab}})
     dump(layout, project / "tiled.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["tiled.layout.yaml"], "output_folder": "out"}),

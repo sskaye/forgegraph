@@ -2,8 +2,7 @@ name: polarization
 version: 0
 description: Polarization curves after the durability test.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -19,9 +18,7 @@ variable_parameters:
                 column: current_density_a_cm2
             title: Current density (A/cm²)
         y:
-            data:
-                column: voltage_v
             title: Cell voltage (V)
-    encoding:
-        color:
-            column: cell
+    series:
+        voltage_v:
+            color: cell

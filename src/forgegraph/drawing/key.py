@@ -2,9 +2,9 @@
 
 ForgeGraph lays a key out itself, with every gap measured to the letters (see
 forgegraph.drawing.text): an optional title, then one row per entry, a line sample then the
-entry's name. The theme's legend parameters set the frame, its padding (the same on every
-side), the gaps between title and rows and between rows, the sample's length and its gap to
-the name, and the key's inset from the plot box.
+entry's name. The theme's legend parameters set the border, the gap inside it (the same on
+every side), the gaps between title and rows and between rows, the sample's length and its
+gap to the name, the gap from the plot box, and the names' and title's text styles.
 
 A `Key` is measured when it's made and drawn when it's placed: inside the plot box at one of
 POSITIONS (the labelling code tries the GraphSpec's legend.key.positions in order until the
@@ -54,10 +54,11 @@ class Key:
 
     def __init__(self, entries: list[Entry], title: str | None, style: Style) -> None:
         self.entries, self.title, self.style = entries, title, style
-        t = style.theme
-        self.font = style.font("legend.label.size", "font.weight")
-        self.title_font = style.font("legend.label.size", "legend.key.title.weight")
-        self.pad = style.pt("legend.key.padding")
+        self.names = style.text("legend.key.label")
+        self.heading = style.text("legend.key.title")
+        self.font, self.title_font = self.names.font, self.heading.font
+        self.border = style.line("legend.key.border")
+        self.pad = style.pt("legend.key.gap.inner")
         self.sample = style.pt("legend.key.sample.length")
         self.sample_gap = style.pt("legend.key.sample.gap")
         names = [e.name for e in entries]
@@ -65,19 +66,18 @@ class Key:
         self.name_edges = [text.edges(n, self.font) for n in names]
         self.title_edges = text.edges(title, self.title_font) if title else None
         names_w = max((e.width for e in self.name_edges), default=0.0)
+        self.names_w = names_w
         content_w = self.sample + self.sample_gap + names_w
         if self.title_edges is not None:
             content_w = max(content_w, self.title_edges.width)
         self.content_w = content_w
         self.width = 2 * self.pad + content_w
         rows = len(entries) * self.row.height + max(0, len(entries) - 1) * style.pt(
-            "legend.key.row_gap"
+            "legend.key.gap.row"
         )
-        title_h = (
-            self.title_edges.height + style.pt("legend.key.title.gap") if self.title_edges else 0
-        )
+        title_h = self.title_edges.height + (self.heading.gap or 0.0) if self.title_edges else 0
         self.height = 2 * self.pad + title_h + rows
-        self.frame = bool(t["legend.key.frame.show"])
+        self.frame = self.border.visible
         self.artists: list[Any] = []
         self.position: str | None = None
         self.outside = False
@@ -86,18 +86,18 @@ class Key:
         self._ax: Axes | None = None
 
     def place(self, ax: Axes, position: str) -> None:
-        """Draw the key inside the plot box at a position, inset legend.key.inset from it."""
+        """Draw the key inside the plot box at a position, legend.key.gap.outer in from it."""
         cx, cy, sx, sy = POSITIONS[position]
-        inset = self.style.pt("legend.key.inset")
+        inset = self.style.pt("legend.key.gap.outer")
         left = {1: inset, 0: -self.width / 2, -1: -inset - self.width}[sx]  # from the anchor
         top = {-1: -inset, 0: self.height / 2, 1: inset + self.height}[sy]
         self._draw(ax, position, (cx, cy), left, top, outside=False)
 
     def place_outside(self, ax: Axes, position: str) -> None:
-        """Draw the key outside the plot box, legend.key.inset from it: top_* above it (the
-        title moves up), bottom_* below the x-axis title, right_* to its right."""
+        """Draw the key outside the plot box, legend.key.gap.outer from it: top_* above it
+        (the title moves up), bottom_* below the x-axis title, right_* to its right."""
         cx, cy, _, _ = POSITIONS[position]
-        inset = self.style.pt("legend.key.inset")
+        inset = self.style.pt("legend.key.gap.outer")
         side, along = position.split("_")
         if side == "right":
             left = inset
@@ -140,9 +140,9 @@ class Key:
         )
         self._place, self.position, self.outside, self._ax = to_display, position, outside, ax
         setattr(ax, _PLACED, [*keys(ax), self])
-        color = self.style.color("font.color")
         fill = self.style.color("legend.key.background")
         if self.frame or fill != "none":
+            b = self.border
             self._add(
                 ax,
                 Rectangle(
@@ -151,14 +151,16 @@ class Key:
                     self.height,
                     transform=to_display,
                     facecolor=fill,
-                    edgecolor=color if self.frame else "none",
-                    linewidth=self.style.pt("legend.key.frame.width") if self.frame else 0,
+                    edgecolor=b.color if self.frame else "none",
+                    linewidth=b.width if self.frame else 0,
+                    linestyle=b.style if self.frame else "solid",
+                    joinstyle=cast(Any, b.join),
                 ),
             )
         y = -self.pad  # the top of what comes next
         if self.title_edges is not None and self.title:
             e = self.title_edges
-            align = str(self.style.theme["legend.key.title.align"])
+            align = self.heading.alignment or "left"
             free = self.content_w - e.width
             shift = {"left": 0.0, "center": free / 2, "right": free}[align]
             self._add(
@@ -168,14 +170,15 @@ class Key:
                     y - e.top,
                     self.title,
                     fontproperties=self.title_font,
-                    color=color,
+                    color=self.heading.color,
                     va="baseline",
                     ha="left",
                     transform=to_display,
                 ),
             )
-            y -= e.height + self.style.pt("legend.key.title.gap")
-        row_gap = self.style.pt("legend.key.row_gap")
+            y -= e.height + (self.heading.gap or 0.0)
+        row_gap = self.style.pt("legend.key.gap.row")
+        align = self.names.alignment or "left"
         for entry, e in zip(self.entries, self.name_edges, strict=True):
             baseline = y - self.row.top
             centre = baseline + self.row.middle
@@ -192,18 +195,20 @@ class Key:
                         facecolor=h.color,
                         edgecolor=h.edge,
                         linewidth=h.edge_width if h.edge != "none" else 0.0,
+                        alpha=h.get_alpha(),
                     ),
                 )
             else:
                 self._sample(ax, h, centre, to_display)
+            shift = {"left": 0.0, "center": 0.5, "right": 1.0}[align] * (self.names_w - e.width)
             self._add(
                 ax,
                 Text(
-                    self.pad + self.sample + self.sample_gap - e.left,
+                    self.pad + self.sample + self.sample_gap + shift - e.left,
                     baseline,
                     entry.name,
                     fontproperties=self.font,
-                    color=color,
+                    color=self.names.color,
                     va="baseline",
                     ha="left",
                     transform=to_display,
@@ -225,6 +230,7 @@ class Key:
                 marker="none",
                 solid_capstyle="butt",  # ends exactly where the sample does
                 dash_capstyle="butt",
+                alpha=h.get_alpha(),
             ),
         )
         if h.get_marker() not in ("None", "none", None, ""):
@@ -236,10 +242,11 @@ class Key:
                     transform=to_display,
                     linestyle="none",
                     marker=h.get_marker(),
-                    markersize=self.style.pt("legend.key.sample.marker.size"),
+                    markersize=h.get_markersize(),
                     markerfacecolor=h.get_markerfacecolor(),
                     markeredgecolor=h.get_markeredgecolor(),
                     markeredgewidth=h.get_markeredgewidth(),
+                    alpha=h.get_alpha(),
                 ),
             )
 

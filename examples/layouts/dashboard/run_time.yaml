@@ -2,8 +2,7 @@ name: run_time
 version: 0
 description: Median time from start to finish of each instrument's completed runs.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -20,17 +19,14 @@ variable_parameters:
             title: None
             tick:
                 algorithm: all
-        y:
-            data:
-                column: Median run time (h)
-    mark:
-        bar:
-            show: true
-        line:
-            show: false
-        marker:
-            show: false
     series:
-        value_label:
-            show: true
-            format: ".2f"
+        Median run time (h):
+            line:
+                show: false
+            marker:
+                show: false
+            bar:
+                show: true
+            value_label:
+                show: true
+                format: ".2f"

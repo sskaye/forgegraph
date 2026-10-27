@@ -71,6 +71,33 @@ unset = is_none  # the drawing code's name for it
 
 
 @dataclass(frozen=True)
+class TextStyle:
+    """A [text style] as drawn: its font at its size and weight, its color, and its gap and
+    alignment (None where the style has none)."""
+
+    font: FontProperties
+    color: str | None
+    gap: float | None  # points
+    alignment: str | None
+
+
+@dataclass(frozen=True)
+class LineStyle:
+    """A [line style] as drawn: matplotlib's line style ("none" for None), its width in
+    points, color, cap and join."""
+
+    style: str
+    width: float
+    color: str
+    cap: str
+    join: str
+
+    @property
+    def visible(self) -> bool:
+        return self.style != "none" and self.width > 0
+
+
+@dataclass(frozen=True)
 class Style:
     theme: dict[str, Any]  # resolved theme values by path
     format: dict[str, Any]  # resolved format values by path
@@ -89,11 +116,34 @@ class Style:
         """A theme weight, as a font weight number."""
         return WEIGHTS[self.theme[path]]
 
-    def font(self, size: str | float, weight: str) -> FontProperties:
-        """The theme's font (font.family) at a theme size's path (or a size in points) and
-        a theme weight's path."""
-        points = self.pt(size) if isinstance(size, str) else float(size)
-        return text.font(str(self.theme["font.family"]), points, self.weight(weight))
+    def font(self, path: str, size: float | None = None) -> FontProperties:
+        """A text style's font, at its size or at size points."""
+        points = self.pt(f"{path}.size") if size is None else float(size)
+        return text.font(str(self.theme[f"{path}.font"]), points, self.weight(f"{path}.weight"))
+
+    def text(self, path: str) -> TextStyle:
+        """A [text style] by its category's path."""
+        t = self.theme
+        gap = f"{path}.gap"
+        return TextStyle(
+            self.font(path),
+            self.color(f"{path}.color") if f"{path}.color" in t else None,
+            self.pt(gap) if gap in t else None,
+            str(t[f"{path}.alignment"]) if f"{path}.alignment" in t else None,
+        )
+
+    def line(self, path: str) -> LineStyle:
+        """A [line style] by its category's path. A member it doesn't have is matplotlib's
+        usual one: solid, butt ends, round corners."""
+        t = self.theme
+        style = t.get(f"{path}.style", "solid")
+        return LineStyle(
+            "none" if unset(style) else LINE_STYLES[style],
+            self.pt(f"{path}.width"),
+            self.color(f"{path}.color") if f"{path}.color" in t else "none",
+            str(t.get(f"{path}.cap", "butt")),
+            str(t.get(f"{path}.join", "round")),
+        )
 
     def color(self, path: str) -> str:
         value = self.theme[path]
@@ -101,7 +151,11 @@ class Style:
 
     def series_colors(self) -> list[str]:
         """series.colors as a list: a named palette's colors, or the theme's own."""
-        value = self.theme["series.colors"]
+        return self.palette("series.colors")
+
+    def palette(self, path: str) -> list[str]:
+        """A palette as a list of colors: a named palette's, or the theme's own."""
+        value = self.theme[path]
         return list(PALETTES[value]) if isinstance(value, str) else list(value)
 
     def colormap(self) -> Colormap:
@@ -121,21 +175,33 @@ class Style:
         return {k: v for k, v in dict.items(checked) if k != "backend"}
 
     def rc(self) -> dict[str, Any]:
-        t, family = self.theme, str(self.theme["font.family"])
-        text = self.color("font.color")
+        t, family = self.theme, str(self.theme["text.font"])
+        text = self.color("text.color")
         background = self.color("background.color")
         direction = TICK_DIRECTIONS[t["axis.tick.direction"]]
+        border, grid, series = (
+            self.line("plot_area.border"),
+            self.line("grid"),
+            self.line("series.line"),
+        )
         return {
             "font.family": [family],
             "font.size": self.base,
             "text.color": text,
-            "axes.labelcolor": text,
-            "axes.edgecolor": self.color("plot_area.line.color"),
-            "font.weight": self.weight("font.weight"),
-            "xtick.color": text,
-            "ytick.color": text,
+            "axes.labelcolor": self.color("axis.title.color"),
+            "axes.edgecolor": border.color,
+            "font.weight": self.weight("text.weight"),
+            "xtick.color": self.color("axis.tick.color"),
+            "ytick.color": self.color("axis.tick.color"),
+            "xtick.labelcolor": self.color("axis.tick.label.color"),
+            "ytick.labelcolor": self.color("axis.tick.label.color"),
             "axes.titlesize": self.pt("title.size"),
             "axes.titleweight": self.weight("title.weight"),
+            "axes.titlecolor": self.color("title.color"),
+            "xaxis.labellocation": str(t["axis.title.alignment"]),
+            "yaxis.labellocation": {"left": "bottom", "center": "center", "right": "top"}[
+                str(t["axis.title.alignment"])
+            ],
             "axes.labelsize": self.pt("axis.title.size"),
             "axes.labelweight": self.weight("axis.title.weight"),
             "xtick.labelsize": self.pt("axis.tick.label.size"),
@@ -154,18 +220,18 @@ class Style:
             "ytick.major.width": self.pt("axis.tick.width"),
             "xtick.minor.visible": False,
             "ytick.minor.visible": False,
-            "axes.linewidth": self.pt("plot_area.line.width"),
-            "axes.xmargin": float(t["plot_area.margin"]),
-            "axes.ymargin": float(t["plot_area.margin"]),
+            "axes.linewidth": border.width,
+            "axes.xmargin": float(t["plot_area.gap"]),
+            "axes.ymargin": float(t["plot_area.gap"]),
             "axes.autolimit_mode": "data",
             "axes.grid": False,
-            "grid.color": self.color("grid.color"),
-            "grid.linewidth": self.pt("grid.line.width"),
-            "grid.linestyle": LINE_STYLES[t["grid.line.style"]],
-            "lines.linewidth": self.pt("series.line.width"),
-            "lines.solid_capstyle": str(t["series.line.cap"]),
-            "lines.solid_joinstyle": str(t["series.line.join"]),
-            "lines.dash_joinstyle": str(t["series.line.join"]),
+            "grid.color": grid.color,
+            "grid.linewidth": grid.width,
+            "grid.linestyle": grid.style,
+            "lines.linewidth": series.width,
+            "lines.solid_capstyle": series.cap,
+            "lines.solid_joinstyle": series.join,
+            "lines.dash_joinstyle": series.join,
             "lines.markersize": self.pt("series.marker.size"),
             "lines.markeredgewidth": self.pt("series.marker.edge.width"),
             "figure.facecolor": background,

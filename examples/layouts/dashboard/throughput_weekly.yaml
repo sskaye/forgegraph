@@ -2,8 +2,7 @@ name: throughput_weekly
 version: 0
 description: Completed runs per week (Mon–Sun, by finish time) for each instrument.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -19,12 +18,13 @@ variable_parameters:
                 column: Week
             title: Week starting
         y:
-            data:
-                column: Completed runs
             title: Runs
             min: 0
-    encoding:
-        color:
-            column: Instrument
+    series:
+        Completed runs:
+            color: Instrument
     grid:
-        show: true
+        x:
+            show: true
+        y:
+            show: true

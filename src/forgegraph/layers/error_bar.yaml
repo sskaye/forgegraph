@@ -1,12 +1,11 @@
 name: error_bar          # [text]; The name of the layer type.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: An error bar on each point or bar.          # [text]; The description of the layer type.
 
-parameters:          # The layer's parameters, which a GraphSpec's layers entry sets after its type.
-    axis: y          # [x, y]; Axis the bars extend along.
+parameters:
+    axis: y          # [x, y]; The axis the bars extend along.
     value:
-        lower: data_column          # [data_column, float, column]; Distance below each value: a number or a column. data_column: the axis's data column.
-        upper: data_column          # [data_column, float, column]; Distance above each value: a number or a column. data_column: the axis's data column.
-        aggregation:          # With aggregated data columns: the distances are multiplier × an aggregate of lower's and upper's columns.
-            function: stddev          # [None, stddev, stderr, ci]; The aggregate; ci: half the 95 % confidence interval. None: the column's values as given.
-            multiplier: 1          # [float]; What the aggregate is multiplied by, e.g. 2 for two standard deviations.
+        lower: data_column          # [data_column, float, column]; The distance below each value: a number or a column. data_column uses the axis's data column.
+        upper: data_column          # [data_column, float, column]; The distance above each value: a number or a column. data_column uses the axis's data column.
+        aggregation:          # [aggregation style]; When the data columns are aggregated, the distances are this aggregate of the lower and upper columns.
+            function: stddev

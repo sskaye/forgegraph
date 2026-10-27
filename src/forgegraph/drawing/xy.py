@@ -5,10 +5,15 @@
 them). Every graph type's module provides these three.
 Every visual value comes from the resolved theme (via Style); nothing here is a style
 constant (architecture principle 4).
+
+A GraphSpec lists its series by name (spec/series.py). Each is drawn from its own column,
+along the base axis (arrangement.base_axis), with its own settings and its own look: the
+theme with the series parameters it sets for itself.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
@@ -22,7 +27,7 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, limits, marks, ticks
+from forgegraph.drawing import colorbar, layers, limits, marks, spacing, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
@@ -33,47 +38,60 @@ from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
 from forgegraph.spec.parameters import as_date
 
-Y_COLUMN = "__forgegraph_y_column__"  # the y column a long-form row came from
+SERIES = "__forgegraph_series__"  # the series a long-form row belongs to
 COLUMN_NAME = "column_name"
+_HEX = re.compile(r"^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
+SMOOTH_STEPS = 16  # points drawn between neighbouring points on a smooth line
 
 
 @dataclass(frozen=True)
 class Dimension:
-    """A style a column can set: its name here, its parameter, the theme's choices for it
-    (and what a warning calls them), and those choices as matplotlib draws them."""
+    """A style a series sets: its name here, its parameter within a series, the theme's
+    choices for it (and what a warning calls them), those choices as matplotlib draws them,
+    and a value named in the parameter as matplotlib draws it (None if it isn't one)."""
 
     by: str
-    encoding_path: str
+    path: str
     theme_path: str
     words: str
     choices: Callable[[Style], list[Any]]
+    named: Callable[[Any], Any]
 
 
 COLOR = Dimension(
-    "color_by", "encoding.color.column", "series.colors", "colors", lambda s: s.series_colors()
+    "color",
+    "color",
+    "series.colors",
+    "colors",
+    lambda s: s.series_colors(),
+    lambda v: v if isinstance(v, str) and _HEX.match(v) else None,
 )
 LINE_STYLE = Dimension(
-    "line_style_by",
-    "encoding.line.style.column",
-    "series.line.style",
+    "line_style",
+    "line.style",
+    "series.line.styles",
     "line styles",
-    lambda s: [LINE_STYLES[v] for v in s.theme["series.line.style"]],
+    lambda s: [LINE_STYLES[v] for v in s.theme["series.line.styles"]],
+    lambda v: LINE_STYLES.get(v) if isinstance(v, str) else None,
 )
 MARKER_SHAPE = Dimension(
-    "marker_shape_by",
-    "encoding.marker.shape.column",
-    "series.marker.shape",
+    "marker_shape",
+    "marker.shape",
+    "series.marker.shapes",
     "marker shapes",
-    lambda s: [MARKERS[v] for v in s.theme["series.marker.shape"]],
+    lambda s: [MARKERS[v] for v in s.theme["series.marker.shapes"]],
+    lambda v: MARKERS.get(v) if isinstance(v, str) else None,
 )
 MARKER_FILL = Dimension(
-    "marker_fill_by",
-    "encoding.marker.fill.column",
-    "series.marker.fill",
+    "marker_fill",
+    "marker.fill",
+    "series.marker.fills",
     "marker fills",
-    lambda s: list(s.theme["series.marker.fill"]),
+    lambda s: list(s.theme["series.marker.fills"]),
+    lambda v: v if v in ("filled", "open") else None,
 )
 DIMENSIONS = (COLOR, LINE_STYLE, MARKER_SHAPE, MARKER_FILL)  # in Series' order
+STYLED = (LINE_STYLE, MARKER_SHAPE, MARKER_FILL)  # the dimensions a style key explains
 
 
 __all__ = ["DrawError", "draw", "label", "place"]
@@ -81,12 +99,43 @@ __all__ = ["DrawError", "draw", "label", "place"]
 
 @dataclass
 class Roles:
-    """Which axis series are drawn along (series.base_axis) and which holds their values."""
+    """Which axis series are drawn along (arrangement.base_axis) and which holds their
+    values."""
 
     base: str  # "x" or "y"
     value: str
     base_column: str
-    value_columns: list[str]
+    value_columns: list[str]  # the series' columns, each once
+
+
+@dataclass
+class Listed:
+    """A series the GraphSpec lists: its name, its settings by path within it, the style it's
+    drawn in (the theme with what it sets for itself), its column, and how its rows are
+    styled: each dimension's column (SERIES for series), or its value where no column sets
+    it."""
+
+    name: str
+    values: dict[str, Any]
+    style: Style
+    column: str
+    by: dict[str, str] = field(default_factory=dict)
+    fixed: dict[str, Any] = field(default_factory=dict)
+    numeric_color: bool = False  # colors on a scale, from numbers
+    grouping: list[str] = field(default_factory=list)  # the columns a drawn series' rows share
+
+    def path(self, path: str) -> str:
+        """A parameter's path, as an error names it."""
+        return f"series.{self.name}.{path}"
+
+    def shows(self, mark: str) -> bool:
+        """Whether the series draws its lines, markers or bars."""
+        return bool(self.values[f"{mark}.show"])
+
+    @property
+    def aggregation(self) -> str | None:
+        how = self.values["aggregation.function"]
+        return None if unset(how) else str(how)
 
 
 @dataclass(frozen=True)
@@ -95,26 +144,40 @@ class Look:
     benchmark's (series.benchmark.*): sizes in points."""
 
     line_width: float
+    line_cap: str
+    line_join: str
     marker_size: float
     edge: str  # a filled marker's outline color, or "none"
     edge_width: float
-    bar_width: float
+    bar_width: float  # a fraction of the space between places (marks.Spacing)
+    bar_gap: float  # the fraction of a side-by-side bar's share left empty
     bar_edge: str
     bar_edge_width: float
+    bar_edge_style: str
+    bar_join: str
+    opacity: float
     line_z: float
     bar_z: float
 
 
 def _look(style: Style, benchmark: bool) -> Look:
-    b = "benchmark." if benchmark else ""
+    b = "series.benchmark" if benchmark else "series"
+    line = style.line(f"{b}.line")
+    edge, bar_edge = style.line(f"{b}.marker.edge"), style.line(f"{b}.bar.edge")
     return Look(
-        style.pt(f"series.{b}line.width"),
-        style.pt(f"series.{b}marker.size"),
-        style.color(f"series.{b}marker.edge.color"),
-        style.pt(f"series.{b}marker.edge.width"),
-        style.pt(f"series.{b}bar.width"),
-        style.color(f"series.{b}bar.edge.color"),
-        style.pt(f"series.{b}bar.edge.width"),
+        line.width,
+        line.cap,
+        line.join,
+        style.pt(f"{b}.marker.size"),
+        edge.color if edge.visible else "none",
+        edge.width,
+        float(style.theme[f"{b}.bar.width"]),  # a fraction of the space between places
+        float(style.theme["series.bar.gap"]),
+        bar_edge.color if bar_edge.visible else "none",
+        bar_edge.width,
+        bar_edge.style if bar_edge.visible else "solid",
+        bar_edge.join,
+        float(style.theme[f"{b}.opacity"]),
         3 if benchmark else 2,
         2.8 if benchmark else 1.8,
     )
@@ -128,15 +191,27 @@ class Series:
     linestyle: str
     marker: str
     fill: str  # filled | open
-    label: str | None  # the color group's name, or the benchmark's
+    label: str | None  # its name: the series', its color group's, or the benchmark's
     look: Look
+    listed: Listed  # the series the GraphSpec lists that it's drawn for
     benchmark: bool = False
-    values: np.ndarray | None = None  # a numeric encoding.color.column's value at each point
+    values: np.ndarray | None = None  # a numeric color column's value at each point
     order: tuple[int, ...] = ()  # position of its groups, for drawing and legend order
     rows: Any = None  # the frame's rows it was drawn from, for layers
     place_column: str = ""  # the frame's base-axis column
     stack: marks.Stacked | None = None  # where its marks start and end (draw)
-    shifts: dict[float, float] = field(default_factory=dict)  # its offset at each place (draw)
+    shifts: dict[float, tuple[float, float]] = field(default_factory=dict)  # at each place
+    spacing: Any = None  # the space between places its bars are fractions of (draw)
+    bar_fraction: float = 0.0  # its bars' width, as a fraction of that space
+
+    def shows(self, mark: str) -> bool:
+        """Whether it draws its lines, markers or bars."""
+        return self.listed.shows(mark)
+
+    @property
+    def style(self) -> Style:
+        """The style it's drawn in: the theme with what its series sets for itself."""
+        return self.listed.style
 
 
 @dataclass
@@ -151,6 +226,7 @@ class Drawn:
     categories: dict[str, list[Any]] = field(default_factory=dict)  # a categorical axis's
     # what place() and label() need from draw(), once the figure's size is final
     series: list[Series] = field(default_factory=list)
+    listed: list[Listed] = field(default_factory=list)
     roles: Roles | None = None
     ref_lines: list[layers.RefLine] = field(default_factory=list)
     layers: dict[str, dict[str, Any]] = field(default_factory=dict)  # each layer, by name
@@ -158,11 +234,16 @@ class Drawn:
     style_keys: list[StyleKey] = field(default_factory=list)
     y_title: str | None = None  # the value axis's title
 
+    @property
+    def lines(self) -> bool:
+        """Whether any series draws lines: then lines are obstacles (labels.Obstacles.of)."""
+        return any(s.shows("line") for s in self.listed)
+
 
 @dataclass
 class StyleKey:
     """A key explaining the line styles, marker shapes or fills one column sets: its entries,
-    its title, and the column (column_name: the y columns' names)."""
+    its title, and the column (series: the series' names)."""
 
     entries: list[Entry]
     title: str | None
@@ -171,60 +252,52 @@ class StyleKey:
     @property
     def named(self) -> str:
         """The column, as an error names it."""
-        return "column names" if self.column == COLUMN_NAME else self.column
-
-
-def _column(gt: dict[str, Any], path: str, frame: pd.DataFrame) -> str | None:
-    """A "by" or benchmark column's name in the long-form frame, or None."""
-    name = gt[path]
-    if unset(name):
-        return None
-    if name == COLUMN_NAME:
-        return Y_COLUMN
-    if name not in frame.columns:
-        raise DrawError(f"{path}: no column '{name}' in the data; columns are {_names(frame)}")
-    return str(name)
+        return "the series" if self.column == "series" else self.column
 
 
 def _names(frame: pd.DataFrame) -> str:
     return ", ".join(str(c) for c in frame.columns if not str(c).startswith("__forgegraph"))
 
 
-def roles(df: pd.DataFrame, gt: dict[str, Any]) -> Roles:
-    """The base axis's column and the value axis's columns, checked against the data."""
-    base = gt["series.base_axis"]
-    value = "y" if base == "x" else "x"
-    listed = {}
-    for name in ("x", "y"):
-        columns = gt[f"axis.{name}.data.column"]
-        listed[name] = [columns] if isinstance(columns, str) else list(columns)
-        missing = [n for n in listed[name] if n not in df.columns]
-        if missing:
+def _listed(df: pd.DataFrame, series: dict[str, tuple[dict[str, Any], Style]]) -> list[Listed]:
+    """The series the GraphSpec lists, each with its column checked against the data."""
+    out = []
+    for name, (values, style) in series.items():
+        column = name if values["column"] == "name" else str(values["column"])
+        if column not in df.columns:
+            named = " (column: name, the series' name)" if values["column"] == "name" else ""
             raise DrawError(
-                f"axis.{name}.data.column: no column '{missing[0]}' in the data; columns are "
+                f"series.{name}.column: no column '{column}' in the data{named}; columns are "
                 f"{_names(df)}"
             )
-    if len(listed[base]) > 1:
+        out.append(Listed(name, values, style, column))
+    return out
+
+
+def roles(df: pd.DataFrame, gt: dict[str, Any], listed: list[Listed]) -> Roles:
+    """The base axis's column and the series' columns, checked against the data."""
+    base = gt["arrangement.base_axis"]
+    value = "y" if base == "x" else "x"
+    column = gt[f"axis.{base}.data.column"]
+    if column not in df.columns:
         raise DrawError(
-            f"axis.{base}.data.column: series are drawn along {base} (series.base_axis), so it "
-            f"takes one column, not {len(listed[base])}"
+            f"axis.{base}.data.column: no column '{column}' in the data; columns are {_names(df)}"
         )
-    return Roles(base, value, str(listed[base][0]), [str(c) for c in listed[value]])
+    return Roles(base, value, str(column), list(dict.fromkeys(s.column for s in listed)))
 
 
-def long_form(df: pd.DataFrame, gt: dict[str, Any]) -> tuple[pd.DataFrame, Roles]:
-    """One row per (row, value column), with the value column's name in Y_COLUMN and the
-    data row's position in layers.ROW."""
-    r = roles(df, gt)
+def long_form(df: pd.DataFrame, listed: list[Listed]) -> pd.DataFrame:
+    """One row per (row, series), with the series' name in SERIES, its value in Y_VALUE and
+    the data row's position in layers.ROW."""
     df = cast(pd.DataFrame, df.apply(_clock_time))
     frames = []
-    for y in r.value_columns:
+    for s in listed:
         part = df.copy()
         part[layers.ROW] = np.arange(len(df))
-        part[Y_VALUE] = df[y]
-        part[Y_COLUMN] = y
+        part[Y_VALUE] = df[s.column]
+        part[SERIES] = s.name
         frames.append(part)
-    return pd.concat(frames, ignore_index=True), r
+    return pd.concat(frames, ignore_index=True)
 
 
 def _clock_time(column: pd.Series) -> pd.Series:
@@ -248,34 +321,37 @@ def _cycle(items: list[Any], i: int) -> Any:
 
 
 def build_series(
-    df: pd.DataFrame, gt: dict[str, Any], style: Style, drawn: Drawn
+    df: pd.DataFrame,
+    gt: dict[str, Any],
+    style: Style,
+    drawn: Drawn,
+    series: dict[str, tuple[dict[str, Any], Style]],
 ) -> tuple[list[Series], pd.DataFrame, Roles, _Encodings]:
     """The series to draw, in base and value terms: each Series' x is along the base axis and
-    its y along the value axis (series.base_axis); categories are at their positions. With
-    them, the frame they're drawn from, the axes' roles, and how the rows were grouped and
-    styled."""
-    frame, r = long_form(df, gt)
+    its y along the value axis (arrangement.base_axis); categories are at their positions.
+    With them, the frame they're drawn from, the axes' roles, and how the rows were grouped
+    and styled."""
+    listed = _listed(df, series)
+    r = roles(df, gt, listed)
+    frame = long_form(df, listed)
+    drawn.listed = listed
     kind = _kinds(frame, r, gt, drawn)
-    frame = _drawable_rows(frame, r, gt, kind, drawn)
-    enc = _encodings(frame, gt, style)
-    frame = _category_positions(frame, r, gt, kind, enc, drawn)
-    series = _series(frame, r, gt, style, enc)
-    _group_warnings(enc, drawn)
-    return series, frame, r, enc
+    frame = _drawable_rows(frame, r, gt, kind, listed, drawn)
+    enc = _encodings(frame, gt, style, listed)
+    frame = _category_positions(frame, r, gt, kind, enc, listed, drawn)
+    drawn_series = _series(frame, r, enc, listed)
+    _group_warnings(enc, listed, drawn)
+    return drawn_series, frame, r, enc
 
 
 @dataclass
 class _Encodings:
     """How a frame's rows become series, and how each is styled (build_series)."""
 
-    by: dict[str, str | None]  # each style's column, by its Dimension's by
-    path_columns: list[str]  # encoding.detail.column
-    bench_col: str | None
+    bench_col: str | None  # SERIES when the benchmark is one of the series
     bench_value: Any
-    numeric_color: bool  # colors on a scale, from numbers
     is_bench: pd.Series  # which rows are the benchmark's
-    orders: dict[str, list[Any]]  # each style's groups, in order
-    grouping: list[str]  # the columns a series' rows share
+    orders: dict[tuple[str, str], list[Any]]  # each (dimension, column)'s groups, in order
     choices: dict[str, list[Any]]  # each style's choices, by its Dimension's by
 
 
@@ -296,45 +372,50 @@ def _kinds(frame: pd.DataFrame, r: Roles, gt: dict[str, Any], drawn: Drawn) -> d
     drawn.kinds = kind
     for name, column in ((r.base, x), (r.value, Y_VALUE)):
         if kind[name] == "categorical" and axis_data.reads_as_dates(_col(frame, column)):
+            where = f"axis.{name}.data.column" if column == x else "series"
             shown = x if column == x else ", ".join(ys)
             drawn.warnings.append(
                 Issue(
                     "dates-as-text",
-                    f"axis.{name}.data.column: '{shown}' is text that reads as dates; make it a "
-                    "date column for a time axis",
+                    f"{where}: '{shown}' is text that reads as dates; make it a date column "
+                    "for a time axis",
                 )
             )
     return kind
 
 
+NOT_DATES = ("sum", "stddev", "stderr", "ci")  # aggregates that dates can't have
+
+
 def _drawable_rows(
-    frame: pd.DataFrame, r: Roles, gt: dict[str, Any], kind: dict[str, str], drawn: Drawn
+    frame: pd.DataFrame,
+    r: Roles,
+    gt: dict[str, Any],
+    kind: dict[str, str],
+    listed: list[Listed],
+    drawn: Drawn,
 ) -> pd.DataFrame:
     """The rows that can be drawn, counting the rest; aggregations and log scales the data
     can't have are errors."""
     x, ys = r.base_column, r.value_columns
-    aggregation = gt[f"axis.{r.value}.data.aggregation"]
-    if gt[f"axis.{r.base}.data.aggregation"] != "none":
-        raise DrawError(
-            f"axis.{r.base}.data.aggregation: series are drawn along {r.base}, so its values are "
-            f"where points go; aggregate the values instead, with axis.{r.value}.data.aggregation"
-        )
-    if aggregation != "none" and kind[r.value] == "categorical":
-        raise DrawError(
-            f"axis.{r.value}.data.aggregation: {aggregation}, but the axis is categorical"
-        )
-    if aggregation == "sum" and kind[r.value] == "date":
-        raise DrawError(
-            f"axis.{r.value}.data.aggregation: sum adds the values, but axis.{r.value} is dates, "
-            "which can't be added; use mean, median, min or max"
-        )
+    for s in listed:
+        how = s.aggregation
+        if how is not None and kind[r.value] == "categorical":
+            raise DrawError(
+                f"{s.path('aggregation.function')}: {how}, but axis.{r.value} is categorical"
+            )
+        if how in NOT_DATES and kind[r.value] == "date":
+            raise DrawError(
+                f"{s.path('aggregation.function')}: {how} isn't a date, but axis.{r.value} is "
+                "dates; use mean, median, min, max or percentile"
+            )
     no_x = _col(frame, x).isna()
     no_y = _col(frame, Y_VALUE).isna()
     if bool(no_x.any()) or bool(no_y.any()):
         drawn.rows_dropped["missing x or y"] = int((no_x | no_y).sum())
-    gap = gt["mark.line.missing_values"] == "gap"
-    keep = ~no_x if gap else ~(no_x | no_y)  # with gap, a missing y breaks the line
-    frame = cast(pd.DataFrame, frame.loc[keep])
+    gaps = [s.name for s in listed if s.values["line.missing_values"] == "gap"]
+    gap = _col(frame, SERIES).isin(gaps)  # with gap, a missing y breaks the line
+    frame = cast(pd.DataFrame, frame.loc[~no_x & (gap | ~no_y)])
     drawn.rows_plotted = int(_col(frame, Y_VALUE).notna().sum())
     for axis, column, name in (
         (f"axis.{r.base}", x, x),
@@ -352,69 +433,104 @@ def _drawable_rows(
     return frame
 
 
-def _encodings(frame: pd.DataFrame, gt: dict[str, Any], style: Style) -> _Encodings:
-    """Which columns group and style the series, the benchmark's rows, and each style's
-    groups in order."""
-    by = {d.by: _column(gt, d.encoding_path, frame) for d in DIMENSIONS}
-    paths = gt["encoding.detail.column"]
-    path_columns = [] if unset(paths) else ([paths] if isinstance(paths, str) else list(paths))
-    for p in path_columns:
-        if p not in frame.columns:
-            raise DrawError(
-                f"encoding.detail.column: no column '{p}' in the data; columns are {_names(frame)}"
-            )
-    bench_col = _column(gt, "benchmark.data_column", frame)
-    bench_value = gt["benchmark.value"]
-
-    color_type = gt["encoding.color.type"]
-    color_col = by[COLOR.by]
-    data_color = color_col is not None and color_col != Y_COLUMN
-    numbers = (
-        color_col is not None
-        and data_color
-        and pd.api.types.is_numeric_dtype(_col(frame, color_col))
-    )
-    if color_type == "continuous" and data_color and not numbers:
+def _setting(d: Dimension, s: Listed, frame: pd.DataFrame, style: Style) -> None:
+    """How one dimension styles a series' rows: by a column, by series, or one value."""
+    value = s.values[d.path]
+    if value == "first":
+        s.fixed[d.by] = d.choices(style)[0]
+    elif value == "series":
+        s.by[d.by] = SERIES
+    elif (named := d.named(value)) is not None:
+        s.fixed[d.by] = named
+    elif value not in frame.columns:
         raise DrawError(
-            f"encoding.color.type: continuous, but {color_col} isn't numbers; "
-            "use categorical or auto"
+            f"{s.path(d.path)}: no column '{value}' in the data; columns are {_names(frame)}"
         )
-    numeric_color = numbers and color_type != "categorical"  # drawn on a color scale
-    how = gt["encoding.order"]
-    is_bench = pd.Series(False, index=frame.index)
-    if bench_col is not None:
-        is_bench = _is_benchmark(_col(frame, bench_col), bench_value)
-    if bench_col is not None and not bool(is_bench.any()):
-        where = "no y column is named" if bench_col == Y_COLUMN else f"no rows where {bench_col} is"
-        raise DrawError(f"benchmark.value: {where} '{bench_value}'")
-    others = cast(pd.DataFrame, frame.loc[~is_bench])  # the benchmark has its own style
-    orders = {
-        path: _order(_col(others, col), how)
-        for path, col in by.items()
-        if col is not None and not (path == COLOR.by and numeric_color)
-    }
-    lines_shown = bool(gt["mark.line.show"])  # a line joins only one color's points
-    grouping = [
-        col
-        for path, col in by.items()
-        if col is not None and not (path == COLOR.by and numeric_color and not lines_shown)
-    ]
-    grouping += [
-        c for c in [*path_columns, Y_COLUMN] if c not in grouping
-    ]  # each y column: its own line
-    choices = {d.by: d.choices(style) for d in DIMENSIONS}
+    else:
+        s.by[d.by] = str(value)
 
-    return _Encodings(
-        by,
-        path_columns,
-        bench_col,
-        bench_value,
-        bool(numeric_color),
-        is_bench,
-        orders,
-        grouping,
-        choices,
-    )
+
+def _encodings(
+    frame: pd.DataFrame, gt: dict[str, Any], style: Style, listed: list[Listed]
+) -> _Encodings:
+    """Which columns group and style each series, the benchmark's rows, and each style's
+    groups in order."""
+    for s in listed:
+        for d in DIMENSIONS:
+            _setting(d, s, frame, style)
+        for p in _splits(s):
+            if p not in frame.columns:
+                raise DrawError(
+                    f"{s.path('split')}: no column '{p}' in the data; columns are {_names(frame)}"
+                )
+        color_col = s.by.get(COLOR.by)
+        data_color = color_col is not None and color_col != SERIES
+        numbers = data_color and pd.api.types.is_numeric_dtype(_col(frame, str(color_col)))
+        if s.values["color_scale"] == "continuous" and data_color and not numbers:
+            raise DrawError(
+                f"{s.path('color_scale')}: continuous, but {color_col} isn't numbers; use "
+                "categorical or auto"
+            )
+        s.numeric_color = bool(numbers) and s.values["color_scale"] != "categorical"
+        s.grouping = [
+            col
+            for by, col in s.by.items()
+            if not (by == COLOR.by and s.numeric_color and not s.shows("line"))
+        ]  # a line joins only one color's points
+        s.grouping += [c for c in [*_splits(s), SERIES] if c not in s.grouping]
+    numeric = {s.by[COLOR.by] for s in listed if s.numeric_color}
+    if len(numeric) > 1:
+        raise DrawError(
+            f"series: colored on a scale by {', '.join(sorted(numeric))}, but a graph has one "
+            "color bar; color them by one column"
+        )
+
+    bench_col = gt["benchmark.data_column"]
+    bench_value = gt["benchmark.value"]
+    is_bench = pd.Series(False, index=frame.index)
+    if unset(bench_col):
+        bench_col = None
+    elif bench_col == "series":
+        bench_col = SERIES
+        is_bench = _col(frame, SERIES) == str(bench_value)
+        if not bool(is_bench.any()):
+            names = ", ".join(s.name for s in listed)
+            raise DrawError(f"benchmark.value: no series is named '{bench_value}'; they're {names}")
+    elif bench_col not in frame.columns:
+        raise DrawError(
+            f"benchmark.data_column: no column '{bench_col}' in the data; columns are "
+            f"{_names(frame)}"
+        )
+    else:
+        bench_col = str(bench_col)
+        is_bench = _is_benchmark(_col(frame, bench_col), bench_value)
+        if not bool(is_bench.any()):
+            raise DrawError(f"benchmark.value: no rows where {bench_col} is '{bench_value}'")
+    others = cast(pd.DataFrame, frame.loc[~is_bench])  # the benchmark has its own style
+    drawn_names = set(_col(others, SERIES))
+    orders: dict[tuple[str, str], list[Any]] = {}
+    for s in listed:
+        own = cast(pd.DataFrame, others.loc[_col(others, SERIES) == s.name])
+        for by, col in s.by.items():
+            if by == COLOR.by and s.numeric_color:
+                continue
+            if col == SERIES:  # the series in the order they're listed
+                named = [t.name for t in listed if t.by.get(by) == SERIES]
+                orders[by, col] = [n for n in named if n in drawn_names]
+                continue
+            found = orders.setdefault((by, col), [])
+            found += [v for v in _order(_col(own, col), s.values["order"]) if v not in found]
+    for (by, col), values in orders.items():
+        if col != SERIES:
+            how = next(s.values["order"] for s in listed if s.by.get(by) == col)
+            orders[by, col] = sorted(values, key=natural) if how == "sorted" else values
+    choices = {d.by: d.choices(style) for d in DIMENSIONS}
+    return _Encodings(bench_col, bench_value, is_bench, orders, choices)
+
+
+def _splits(s: Listed) -> list[str]:
+    split = s.values["split"]
+    return [] if unset(split) else ([split] if isinstance(split, str) else list(split))
 
 
 def _is_benchmark(values: pd.Series, value: Any) -> pd.Series:
@@ -427,10 +543,9 @@ def _is_benchmark(values: pd.Series, value: Any) -> pd.Series:
         at = axis_data.value_number(value)
         return pd.Series(axis_data.numbers(values) == at, index=values.index)
     if isinstance(value, date):  # YAML's date, not text
-        name = "column_name (the y columns' names)" if values.name == Y_COLUMN else values.name
         raise DrawError(
-            f"benchmark.value: {value} is a date, but benchmark.data_column {name} isn't dates; "
-            "quote it to match text"
+            f"benchmark.value: {value} is a date, but benchmark.data_column {values.name} isn't "
+            "dates; quote it to match text"
         )
     return (values.astype(str) == str(value)) | (values == value)
 
@@ -441,13 +556,16 @@ def _category_positions(
     gt: dict[str, Any],
     kind: dict[str, str],
     enc: _Encodings,
+    listed: list[Listed],
     drawn: Drawn,
 ) -> pd.DataFrame:
     """Each categorical axis's categories, in order (the benchmark's at its side), with the
     frame's values replaced by their positions."""
     x = r.base_column
-    aggregation = gt[f"axis.{r.value}.data.aggregation"]
-    grouping, bench_col, bench_value = enc.grouping, enc.bench_col, enc.bench_value
+    functions = {s.aggregation for s in listed}
+    how = functions.pop() if len(functions) == 1 else None
+    grouping = list(dict.fromkeys(c for s in listed for c in s.grouping))
+    bench_col, bench_value = enc.bench_col, enc.bench_value
     for name, column in ((r.base, x), (r.value, Y_VALUE)):
         if kind[name] != "categorical":
             continue
@@ -459,7 +577,7 @@ def _category_positions(
             )
         if method == "value":
             totals = frame.groupby([*grouping, column], sort=False, dropna=True)[other]
-            per = totals.agg(aggregation if aggregation != "none" else "sum")
+            per = totals.agg(how if how in ("mean", "median", "sum", "min", "max") else "sum")
             by_frame = per.reset_index()
             cats = axis_data.categories(
                 cast(pd.Series, by_frame[column]),
@@ -482,89 +600,101 @@ def _category_positions(
     return frame
 
 
-def _series(
-    frame: pd.DataFrame, r: Roles, gt: dict[str, Any], style: Style, enc: _Encodings
-) -> list[Series]:
-    """One series per group of rows, styled by its groups; the benchmark last, on top."""
-    x = r.base_column
-    aggregation = gt[f"axis.{r.value}.data.aggregation"]
-    by, orders, grouping, is_bench = enc.by, enc.orders, enc.grouping, enc.is_bench
-    bench_col, bench_value, numeric_color = enc.bench_col, enc.bench_value, enc.numeric_color
-    series: list[Series] = []
-    groups = (
-        frame.groupby([*grouping, is_bench.rename("__bench__")], sort=False, dropna=False)
-        if grouping
-        else frame.groupby(is_bench.rename("__bench__"), sort=False)
+def _points(rows: pd.DataFrame, x: str, s: Listed) -> tuple[np.ndarray, np.ndarray]:
+    """A drawn series' points: one per row, or with an aggregation one per place, its rows'
+    aggregate times aggregation.multiplier."""
+    how = s.aggregation
+    if how is None:
+        return axis_data.numbers(_col(rows, x)), axis_data.numbers(_col(rows, Y_VALUE))
+    values = pd.Series(axis_data.numbers(_col(rows, Y_VALUE)), index=rows.index)
+    percentile = float(s.values["aggregation.percentile"])
+    points = values.groupby(_col(rows, x), sort=False, dropna=False).agg(
+        lambda v: layers.combine(np.asarray(v, dtype=float), how, percentile)
     )
-    for key, group in groups:
-        key = key if isinstance(key, tuple) else (key,)
-        values = dict(zip([*grouping, "__bench__"], key, strict=True))
-        rows = cast(pd.DataFrame, group)
-        if gt["mark.line.connect_order"] == "x":
-            rows = rows.sort_values(by=x, kind="stable")
-        if aggregation != "none":  # one point per place: the aggregate of its rows
-            points = rows.groupby(x, sort=False, dropna=False)[Y_VALUE].agg(aggregation)
-            xs, ys_ = axis_data.numbers(points.index), axis_data.numbers(points)
-        else:
-            xs, ys_ = axis_data.numbers(_col(rows, x)), axis_data.numbers(_col(rows, Y_VALUE))
-        index = {
-            path: (
-                orders[path].index(values[col])
-                if col is not None and path in orders and values[col] in orders[path]
-                else 0
-            )
-            for path, col in by.items()
-        }
-        bench = bool(values["__bench__"])
-        if bench:
-            b = style.theme
-            s = Series(
-                xs,
-                ys_,
-                style.color("series.benchmark.color"),
-                LINE_STYLES[b["series.benchmark.line.style"]],
-                MARKERS[b["series.benchmark.marker.shape"]],
-                b["series.benchmark.marker.fill"],
-                None if bench_col == x else str(bench_value),  # named on its axis already
-                _look(style, True),
-                benchmark=True,
-            )
-        else:
-            color_col = by[COLOR.by]
-            label = None if color_col is None or numeric_color else str(values[color_col])
-            color, line, shape, fill = (_cycle(enc.choices[d.by], index[d.by]) for d in DIMENSIONS)
-            s = Series(
-                xs,
-                ys_,
-                color,
-                line,
-                shape,
-                fill,
-                label,
-                _look(style, False),
-                values=np.asarray(_col(rows, color_col), dtype=float)
-                if numeric_color and color_col
-                else None,
-                order=tuple(index.values()),
-            )
-        s.rows, s.place_column = rows.index, x
-        series.append(s)
-    series.sort(key=lambda s: (s.benchmark, s.order))  # group order; the benchmark last, on top
-    return series
+    multiplier = float(s.values["aggregation.multiplier"])
+    return axis_data.numbers(points.index), np.asarray(points, dtype=float) * multiplier
 
 
-def _group_warnings(enc: _Encodings, drawn: Drawn) -> None:
+def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]) -> list[Series]:
+    """One series per group of each listed series' rows, styled by its groups; the benchmark
+    last, on top."""
+    x = r.base_column
+    out: list[Series] = []
+    for position, s in enumerate(listed):
+        own = _col(frame, SERIES) == s.name
+        rows_of = cast(pd.DataFrame, frame.loc[own])
+        is_bench = enc.is_bench.loc[own].rename("__bench__")
+        groups = rows_of.groupby([*s.grouping, is_bench], sort=False, dropna=False)
+        for key, group in groups:
+            key = key if isinstance(key, tuple) else (key,)
+            values = dict(zip([*s.grouping, "__bench__"], key, strict=True))
+            rows = cast(pd.DataFrame, group)
+            if s.values["line.connect_order"] == "x":
+                rows = rows.sort_values(by=x, kind="stable")
+            xs, ys_ = _points(rows, x, s)
+            if bool(values["__bench__"]):
+                b = s.style.theme
+                d = Series(
+                    xs,
+                    ys_,
+                    s.style.palette("series.benchmark.colors")[0],  # each list's first item
+                    LINE_STYLES[b["series.benchmark.line.styles"][0]],
+                    MARKERS[b["series.benchmark.marker.shapes"][0]],
+                    b["series.benchmark.marker.fills"][0],
+                    None if enc.bench_col == x else str(enc.bench_value),  # on its axis already
+                    _look(s.style, True),
+                    s,
+                    benchmark=True,
+                )
+            else:
+                index = {
+                    by: enc.orders[by, col].index(values[col])
+                    if (by, col) in enc.orders and values[col] in enc.orders[by, col]
+                    else 0
+                    for by, col in s.by.items()
+                }
+                color, line, shape, fill = (
+                    _cycle(enc.choices[dim.by], index[dim.by])
+                    if dim.by in s.by
+                    else s.fixed[dim.by]
+                    for dim in DIMENSIONS
+                )
+                color_col = s.by.get(COLOR.by)
+                label = None if s.numeric_color else s.name
+                if color_col is not None and not s.numeric_color:
+                    label = str(values[color_col])
+                d = Series(
+                    xs,
+                    ys_,
+                    color,
+                    line,
+                    shape,
+                    fill,
+                    label,
+                    _look(s.style, False),
+                    s,
+                    values=np.asarray(_col(rows, str(color_col)), dtype=float)
+                    if s.numeric_color
+                    else None,
+                    order=(position, *(index.get(dim.by, 0) for dim in DIMENSIONS)),
+                )
+            d.rows, d.place_column = rows.index, x
+            out.append(d)
+    out.sort(key=lambda d: (d.benchmark, d.order))  # group order; the benchmark last, on top
+    return out
+
+
+def _group_warnings(enc: _Encodings, listed: list[Listed], drawn: Drawn) -> None:
     """A style with more groups than the theme has choices repeats them: a warning."""
-    by, orders, numeric_color = enc.by, enc.orders, enc.numeric_color
-    for d in DIMENSIONS:
-        if by[d.by] is None or (d is COLOR and numeric_color):
-            continue
-        groups, choices, what = len(orders[d.by]), len(enc.choices[d.by]), d.words
-        if groups > choices:
+    for (by, col), groups in enc.orders.items():
+        d = next(d for d in DIMENSIONS if d.by == by)
+        s = next(s for s in listed if s.by.get(by) == col)
+        n, what = len(enc.choices[by]), d.words
+        if len(groups) > n:
             drawn.warnings.append(
                 Issue(
                     "too-many-groups",
-                    f"{d.encoding_path}: {groups} groups but {choices} {what} in "
+                    f"{s.path(d.path)}: {len(groups)} groups but {n} {what} in "
                     f"{d.theme_path}; {what} repeat",
                 )
             )
@@ -585,26 +715,32 @@ def draw(
     style: Style,
     title: str | None = None,
     listed: dict[str, dict[str, Any]] | None = None,
+    series: dict[str, tuple[dict[str, Any], Style]] | None = None,
 ) -> Drawn:
     """Draw an xy graph of df into ax, from the graph type's resolved values `gt`, with the
-    GraphSpec's layers (`listed`, by name)."""
+    GraphSpec's layers (`listed`, by name) and series (by name: its values, and the style
+    it's drawn in)."""
     drawn = Drawn()
     listed = listed or {}
-    series, frame, r, enc = build_series(df, gt, style, drawn)
-    marks.check(gt, r.value, drawn.kinds[r.value])
+    drawn_series, frame, r, enc = build_series(df, gt, style, drawn, series or {})
+    marks.check(drawn.listed, gt, r.value, drawn.kinds[r.value])
     log_values = gt[f"axis.{r.value}.scale"] == "log"
-    stacked = marks.stack(series, gt["series.aggregation"], log_values)
-    for s, st in zip(series, stacked, strict=True):
+    stacked = marks.stack(drawn_series, gt["arrangement.stacking"], log_values)
+    for s, st in zip(drawn_series, stacked, strict=True):
         s.stack, s.y = st, st.top  # lines and markers sit at the top of their stack
-    for s, shifts in zip(series, marks.slots(series, gt, style), strict=True):
+    places = [p for s in drawn_series for p in marks.numbers(s.x)]
+    space = marks.Spacing(ax, r.base, np.asarray(places, dtype=float))
+    for s in drawn_series:
+        s.spacing = space
+    for s, shifts in zip(drawn_series, marks.slots(drawn_series, gt), strict=True):
         s.shifts = shifts
-    drawn.label_groups, norm = _draw_marks(ax, series, gt, style, r)
-    layers.error_bars(ax, listed, series, frame, gt, style, r)
-    lines = layers.reference_lines(ax, listed, series, frame, style, drawn.kinds)
-    _axes(ax, series, lines, gt, style, drawn, r)
-    drawn.y_title = _decorate(ax, gt, style, r, title, norm)
-    drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = series, r, lines, listed
-    drawn.style_keys = _style_keys(gt, enc, style)
+    drawn.label_groups, norm = _draw_marks(ax, drawn_series, style, r)
+    layers.error_bars(ax, listed, drawn_series, frame, gt, style, r)
+    lines = layers.reference_lines(ax, listed, drawn_series, frame, style, drawn.kinds, r)
+    _axes(ax, drawn_series, lines, gt, style, drawn, r)
+    drawn.y_title = _decorate(ax, gt, style, r, title, norm, drawn.listed)
+    drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = drawn_series, r, lines, listed
+    drawn.style_keys = _style_keys(gt, enc, style, drawn.listed)
     layers.notes_outside(ax, listed, style)
     return drawn
 
@@ -614,14 +750,95 @@ def _as_xy(r: Roles, base: Any, value: Any) -> tuple[Any, Any]:
     return (base, value) if r.base == "x" else (value, base)
 
 
+def _path(
+    base: np.ndarray, value: np.ndarray, how: str, where: str
+) -> tuple[np.ndarray, np.ndarray, list[int] | None]:
+    """A line's vertices, in base and value terms, as line.interpolate joins its points, and
+    which of them are the points (None: all of them)."""
+    if how == "linear" or len(base) < 2:
+        return base, value, None
+    if how == "smooth":
+        return _smooth(base, value, where)
+    b, v, marked = [base[0]], [value[0]], [0]
+    for i in range(1, len(base)):
+        b0, v0, b1, v1 = base[i - 1], value[i - 1], base[i], value[i]
+        if how == "step_after":  # flat until the next point
+            b += [b1, b1]
+            v += [v0, v1]
+        elif how == "step_before":  # at the next point's value from the start
+            b += [b0, b1]
+            v += [v1, v1]
+        else:  # step_center: the step midway
+            middle = (b0 + b1) / 2
+            b += [middle, middle, b1]
+            v += [v0, v1, v1]
+        marked.append(len(b) - 1)
+    return np.asarray(b, dtype=float), np.asarray(v, dtype=float), marked
+
+
+def _smooth(
+    base: np.ndarray, value: np.ndarray, where: str
+) -> tuple[np.ndarray, np.ndarray, list[int]]:
+    """A smooth curve through the points: piecewise monotone cubic (Fritsch & Carlson 1980),
+    so it never overshoots them; a missing value breaks it."""
+    steps = np.diff(base)
+    finite = steps[np.isfinite(steps)]
+    if len(finite) and not ((finite > 0).all() or (finite < 0).all()):
+        raise DrawError(
+            f"{where}: smooth needs the points in order along the base axis, one at each "
+            "place; set line.connect_order to x, and aggregation to combine rows at one place"
+        )
+    b_out: list[float] = []
+    v_out: list[float] = []
+    marked: list[int] = []
+    start = 0
+    for stop in [*np.flatnonzero(~np.isfinite(value)).tolist(), len(value)]:
+        if stop > start:
+            bs, vs, at = _monotone(base[start:stop], value[start:stop])
+            marked += [len(b_out) + i for i in at]
+            b_out += bs.tolist()
+            v_out += vs.tolist()
+        if stop < len(value):  # the missing value, which breaks the line
+            b_out.append(float(base[stop]))
+            v_out.append(float("nan"))
+        start = stop + 1
+    return np.asarray(b_out, dtype=float), np.asarray(v_out, dtype=float), marked
+
+
+def _monotone(b: np.ndarray, v: np.ndarray) -> tuple[np.ndarray, np.ndarray, list[int]]:
+    """Points along a monotone cubic through (b, v), and which of them are (b, v)."""
+    if len(b) < 3:
+        return b, v, list(range(len(b)))
+    h = np.diff(b)
+    delta = np.diff(v) / h
+    m = np.empty(len(b))
+    m[0], m[-1] = delta[0], delta[-1]
+    m[1:-1] = np.where(delta[:-1] * delta[1:] > 0, (delta[:-1] + delta[1:]) / 2, 0.0)
+    for k in range(len(delta)):
+        if delta[k] == 0:
+            m[k] = m[k + 1] = 0.0
+            continue
+        a, c = m[k] / delta[k], m[k + 1] / delta[k]
+        if a * a + c * c > 9:  # keeps the curve between the points' values
+            t = 3 / np.hypot(a, c)
+            m[k], m[k + 1] = t * a * delta[k], t * c * delta[k]
+    t = np.linspace(0, 1, SMOOTH_STEPS + 1)[:-1]
+    h00, h10 = 2 * t**3 - 3 * t**2 + 1, t**3 - 2 * t**2 + t
+    h01, h11 = -2 * t**3 + 3 * t**2, t**3 - t**2
+    bs = [b[k] + t * h[k] for k in range(len(h))] + [b[-1:]]
+    vs = [
+        h00 * v[k] + h10 * h[k] * m[k] + h01 * v[k + 1] + h11 * h[k] * m[k + 1]
+        for k in range(len(h))
+    ] + [v[-1:]]
+    return np.concatenate(bs), np.concatenate(vs), [k * SMOOTH_STEPS for k in range(len(b))]
+
+
 def _draw_marks(
-    ax: Axes, series: list[Series], gt: dict[str, Any], style: Style, r: Roles
+    ax: Axes, series: list[Series], style: Style, r: Roles
 ) -> tuple[list[labelling.Labelled], Normalize | None]:
-    """Each series' line, markers and bars (a numeric encoding.color.column's markers on its color
+    """Each series' line, markers and bars (a numeric color column's markers on its color
     scale); returns the names to label, with what's drawn under each, and the color scale's
     range, if there is one."""
-    bars_shown = bool(gt["mark.bar.show"])
-    lines_shown, markers_shown = bool(gt["mark.line.show"]), bool(gt["mark.marker.show"])
     cmap, norm = style.colormap(), None
     if any(s.values is not None for s in series):
         all_values = np.concatenate([s.values for s in series if s.values is not None])
@@ -631,28 +848,38 @@ def _draw_marks(
     colors: dict[str, Any] = {}
     for s in series:
         look = s.look
+        lines_shown, markers_shown = s.shows("line"), s.shows("marker")
         line_color = s.color
         if s.values is not None and norm is not None:
             line_color = cmap(norm(float(np.nanmean(s.values))))
         open_marker = s.fill == "open"
         rim, rim_width = look.edge, look.edge_width
         px, py = _as_xy(r, s.x, s.y)
+        how = s.listed.values["line.interpolate"] if lines_shown else "linear"
+        where = s.listed.path("line.interpolate")
+        base, value, marked = _path(np.asarray(s.x, float), np.asarray(s.y, float), how, where)
+        lx, ly = _as_xy(r, base, value)
         (line,) = ax.plot(
-            px,
-            py,
+            lx,
+            ly,
             color=line_color,
             linestyle=s.linestyle if lines_shown else "none",
             linewidth=look.line_width,
+            solid_capstyle=cast(Any, look.line_cap),
+            solid_joinstyle=cast(Any, look.line_join),
+            dash_joinstyle=cast(Any, look.line_join),
+            alpha=look.opacity,
             marker=s.marker if markers_shown and s.values is None else "none",
+            markevery=marked,
             markersize=look.marker_size,
             markerfacecolor="none" if open_marker else line_color,
             markeredgecolor=line_color if (open_marker or rim == "none") else rim,
             markeredgewidth=rim_width if (open_marker or rim != "none") else 0.0,
             zorder=look.line_z,
         )
-        line.set_transform(marks.shifted(ax, r.base, s.shifts))
+        line.set_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
         handle = line
-        if bars_shown:
+        if s.shows("bar"):
             bar = marks.bars(ax, s, r.base, line_color)
             if not (lines_shown or markers_shown):
                 handle = bar  # the key's sample is a swatch of the bar
@@ -667,14 +894,15 @@ def _draw_marks(
                 s=look.marker_size**2,
                 edgecolors="none" if look.edge == "none" else look.edge,
                 linewidths=look.edge_width,
+                alpha=look.opacity,
                 zorder=2.5,
             )
-            dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts))
+            dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)
             paths.setdefault(s.label, []).append(
-                np.c_[axis_data.numbers(px), axis_data.numbers(py)]
+                np.c_[axis_data.numbers(lx), axis_data.numbers(ly)]
             )
     groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
     return groups, norm
@@ -709,12 +937,13 @@ def _axes(
         else:
             ticks.minor_ticks(axis, style)
     _limits(ax, gt, drawn.kinds)
-    if bool(gt["mark.bar.show"]) and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
+    with_bars = [s for s in series if s.shows("bar")]
+    if with_bars and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
         log = gt[f"axis.{r.value}.scale"] == "log"
         floor = 1.0 if log else 0.0
         get = ax.get_ylim if r.value == "y" else ax.get_xlim
         put = ax.set_ylim if r.value == "y" else ax.set_xlim
-        stacks = [np.r_[s.stack.bottom, s.stack.top] for s in series if s.stack is not None]
+        stacks = [np.r_[s.stack.bottom, s.stack.top] for s in with_bars if s.stack is not None]
         ends = np.asarray(np.concatenate(stacks) if stacks else [], dtype=float)
         ends = ends[~np.isnan(ends)]
         if len(ends) and not limits.outside(ends, floor, max(ends.max(), floor), log)[0].any():
@@ -729,27 +958,29 @@ def _decorate(
     r: Roles,
     title: str | None,
     norm: Normalize | None,
+    listed: list[Listed],
 ) -> str | None:
     """The axis titles and the title, the plot box's sides and ticks, the grid, and the
     color bar for a color scale's range (norm); returns the value axis's title."""
     columns = {r.base: [r.base_column], r.value: r.value_columns}
     xt = _title(gt["axis.x.title"], columns["x"][0] if len(columns["x"]) == 1 else None)
     yt = _title(gt["axis.y.title"], columns["y"][0] if len(columns["y"]) == 1 else None)
+    titled = style.font("axis.title")
     if xt:
-        ax.set_xlabel(xt)
+        ax.set_xlabel(xt, fontproperties=titled)
     if yt:
-        ax.set_ylabel(yt)
+        ax.set_ylabel(yt, fontproperties=titled)
     if title:
         ax.set_title(markup(title))
+        spacing.align_title(ax, style)
     _box_and_ticks(ax, style)
-    if bool(style.theme["grid.show"]):
-        ax.grid(True)
+    shown = [a for a in ("x", "y") if bool(style.theme[f"grid.{a}.show"])]
+    if shown:
+        ax.grid(True, axis=cast(Any, "both" if len(shown) == 2 else shown[0]))
         ax.set_axisbelow(True)
     if norm is not None:
-        color_col = gt["encoding.color.column"]
-        bar_title = _title(
-            gt["legend.color_bar.title.text"], None if unset(color_col) else str(color_col)
-        )
+        color_col = next(s.by[COLOR.by] for s in listed if s.numeric_color)
+        bar_title = _title(gt["legend.color_bar.title.text"], color_col)
         colorbar.add(ax, norm, style.colormap(), bar_title, style)
     return yt if r.value == "y" else xt
 
@@ -758,9 +989,9 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     """What needs the figure's final size: bars' room, value labels and reference lines'
     labels. True if an axis was widened, so the figure must be laid out again."""
     r = cast(Roles, drawn.roles)  # draw() set it
-    marks.check_room(ax, drawn.series, gt, style, r.base)
-    widened = marks.value_labels(ax, drawn.series, gt, style, r.base, drawn.kinds[r.value])
-    return layers.label_lines(ax, drawn.ref_lines, gt, style) or widened
+    marks.check_room(ax, drawn.series, gt, r.base)
+    widened = marks.value_labels(ax, drawn.series, gt, r.base, drawn.kinds[r.value])
+    return layers.label_lines(ax, drawn.ref_lines, gt, style, drawn.lines) or widened
 
 
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
@@ -772,18 +1003,24 @@ def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     layers.unplace_notes(ax)
     axis_data.check_fit(ax, gt, style)
     _name_series(ax, drawn, gt, style)
-    layers.notes_inside(ax, drawn.layers, gt, style)
+    layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)
+
+
+def _legend_column(listed: list[Listed]) -> str | None:
+    """The column the series' names come from, when their colors all come from one."""
+    colors = {s.by.get(COLOR.by) for s in listed}
+    one = colors.pop() if len(colors) == 1 else None
+    return None if one is None or one == SERIES else one
 
 
 def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     groups = drawn.label_groups
-    with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
+    with_lines = drawn.lines  # whether lines are obstacles: labels.Obstacles.of
     taken: list = []
     where = {
         "positions": tuple(gt["legend.key.positions"]),
         "inside": bool(gt["legend.key.inside"]),
     }
-    color_col = gt["encoding.color.column"]
     title = gt["legend.key.title.text"]
     one_title = not (unset(title) or title == COLUMN_NAME)  # a text: it can title one key
 
@@ -818,14 +1055,12 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         drawn.labelling = "none"  # one series named by the y-axis title already
         return
     allowed = [m for m in style.theme["legend.methods"] if m not in ("auto", "none")]
-    if bool(gt["mark.bar.show"]):  # names beside bars would need rules of their own
+    if any(s.shows("bar") for s in drawn.listed):  # names beside bars would need rules
         if method == "direct":
             raise DrawError("legend.method: direct isn't available with bars; use key or auto")
         allowed = [m for m in allowed if m != "direct"]
     tries = allowed if method == "auto" else [method]
-    legend_title = _title(
-        title, None if unset(color_col) or color_col == COLUMN_NAME else str(color_col)
-    )
+    legend_title = _title(title, _legend_column(drawn.listed))
     for m in tries:
         if m == "direct" and labelling.interior(ax, groups, style):
             drawn.labelling = "direct"
@@ -871,42 +1106,54 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     raise DrawError(f"legend.method: {method} doesn't fit this graph{why}; {hint}")
 
 
-def _style_keys(gt: dict[str, Any], enc: _Encodings, style: Style) -> list[StyleKey]:
-    """Keys explaining line styles, marker shapes and fills set by an encoding other than
-    encoding.color.column: one per styling column, titled by legend.key.title.text. Their
-    entries are the groups the series were styled by (enc.orders), so not the benchmark,
-    which has its own style and is named by legend.method. Their samples are in the one
-    series color, or with a color encoding in font.color, neutral among the colors."""
-    styled = {
-        d.by: gt[d.encoding_path]
-        for d in DIMENSIONS
-        if d is not COLOR
-        and not unset(gt[d.encoding_path])
-        and gt[d.encoding_path] != gt[COLOR.encoding_path]
-    }
-    choices = {d.by: d.choices(style) for d in (LINE_STYLE, MARKER_SHAPE, MARKER_FILL)}
-    colored = not unset(gt[COLOR.encoding_path])
-    ink = style.color("font.color") if colored else _cycle(COLOR.choices(style), 0)
+def _style_keys(
+    gt: dict[str, Any], enc: _Encodings, style: Style, listed: list[Listed]
+) -> list[StyleKey]:
+    """Keys explaining line styles, marker shapes and fills a column (or series) sets, where
+    it isn't the column the series' colors come from: one per styling column, titled by
+    legend.key.title.text. Their entries are the groups the series were styled by
+    (enc.orders), so not the benchmark, which has its own style and is named by
+    legend.method. Their samples are in the one series' color, or with several colors in
+    text.color, neutral among them; their markers are the size the first series they style
+    draws."""
+    styled: dict[str, list[str]] = {}  # each styling column's dimensions
+    for s in listed:
+        for d in STYLED:
+            col = s.by.get(d.by)
+            if col is not None and col != s.by.get(COLOR.by) and d.by not in styled.get(col, []):
+                styled.setdefault(col, []).append(d.by)
+    one = listed[0].fixed.get(COLOR.by, _cycle(COLOR.choices(style), 0)) if listed else None
+    colored = len(listed) > 1 or any(s.by.get(COLOR.by) not in (None, SERIES) for s in listed)
+    ink = style.color("text.color") if colored else one
     found = []
-    for column in dict.fromkeys(styled.values()):
-        bys = [b for b, c in styled.items() if c == column]
+    for column, bys in styled.items():
+        users = [s for s in listed if any(s.by.get(b) == column for b in bys)]
+        size = users[0].style.pt("series.marker.size")
+        lines = any(s.shows("line") for s in users)
+        markers = any(s.shows("marker") for s in users)
         entries = []
-        for i, value in enumerate(enc.orders[bys[0]]):
-            ls, mk, fill = (_cycle(choices[b], i if b in bys else 0) for b in choices)
+        for i, value in enumerate(enc.orders.get((bys[0], column), [])):
+            ls, mk, fill = (
+                _cycle(enc.choices[d.by], i if d.by in bys else 0)
+                if d.by in bys or d.by not in users[0].fixed
+                else users[0].fixed[d.by]
+                for d in STYLED
+            )
             handle = Line2D(
                 [],
                 [],
                 color=ink,
-                linestyle=cast(Any, ls if gt["mark.line.show"] else "none"),
-                marker=mk if gt["mark.marker.show"] else "none",
-                markersize=style.pt("series.marker.size"),
+                linestyle=cast(Any, ls if lines else "none"),
+                marker=mk if markers else "none",
+                markersize=size,
                 markerfacecolor="none" if fill == "open" else ink,
                 markeredgecolor=ink,
             )
             entries.append(Entry(literal(str(value)), handle))
-        title = _title(gt["legend.key.title.text"], None if column == COLUMN_NAME else str(column))
+        name = "series" if column == SERIES else column
+        title = _title(gt["legend.key.title.text"], None if column == SERIES else column)
         if entries:  # none when every row is the benchmark's
-            found.append(StyleKey(entries, title, str(column)))
+            found.append(StyleKey(entries, title, name))
     return found
 
 
@@ -926,10 +1173,14 @@ def _limits(ax: Axes, gt: dict[str, Any], kinds: dict[str, str]) -> None:
 
 
 def _box_and_ticks(ax: Axes, style: Style) -> None:
-    sides = style.theme["plot_area.sides"]
+    sides = style.theme["plot_area.border.sides"]
     sides = [] if unset(sides) else list(sides)
+    border = style.line("plot_area.border")
     for side in ("left", "bottom", "top", "right"):
-        ax.spines[side].set_visible(side in sides)
+        spine = ax.spines[side]
+        spine.set_visible(side in sides and border.visible)
+        spine.set_linestyle(cast(Any, border.style if border.visible else "solid"))
+        spine.set_capstyle(cast(Any, border.cap))
     ticks = style.theme["axis.tick.sides"]
     ticks = [] if unset(ticks) else list(ticks)
     ax.tick_params(

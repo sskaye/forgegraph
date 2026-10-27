@@ -2,8 +2,7 @@ name: layers
 version: 0
 description: Polarization curves, the mean of each cell's runs with ±1 standard deviation, a target line and the test conditions.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -17,22 +16,21 @@ variable_parameters:
         x:
             data:
                 column: Cell Current (mA/cm²)
-        y:
-            data:
-                column: Cell Voltage (V)
-                aggregation: mean
-    encoding:
-        color:
-            column: Cell
+    series:
+        Cell Voltage (V):
+            aggregation:
+                function: mean
+            color: Cell
     layers:
         spread:
             type: error_bar
         target:
-            type: reference_line
+            type: reference
             axis: y
-            value: 1.2
-            label:
-                text: Target 1.2 V
+            line_1:
+                value: 1.2
+                label:
+                    text: Target 1.2 V
         conditions:
             type: note
             text: "60 °C, 1 atm, H_{2}/air"

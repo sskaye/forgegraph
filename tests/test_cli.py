@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from pack_helpers import allow, cli, cli_problems, dump, graphspec_file, write_config, write_pack
 from PIL import Image, PngImagePlugin
-from render_helpers import BASE
+from render_helpers import BASE, with_series
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -36,6 +36,8 @@ def test_render_load_and_recover(project):
     assert report["style_keys"] == []
     result = runner.invoke(app, ["load", "out/p.png", "--graphspec", "graphspecs/again.yaml"])
     assert result.exit_code == 0 and "data: ../data/p.parquet" in result.output
+    recovered = (project / "graphspecs" / "again.yaml").read_text()
+    assert "\nparameters: !var\n" in recovered  # its tags, as written
     again = runner.invoke(app, ["render", "graphspecs/again.yaml", "-o", "out/again.png"])
     assert again.exit_code == 0, again.output
 
@@ -52,7 +54,7 @@ def test_render_reports_problems(project):
 
 def test_explain_shows_where_values_come_from(project):
     rows = {(r["kind"], r["parameter"]): r for r in cli("explain", "graphspecs/p.yaml")["values"]}
-    assert rows["theme", "font.family"]["set_by"] == "theme 'forgegraph_base/base_theme'"
+    assert rows["theme", "text.font"]["set_by"] == "theme 'forgegraph_base/base_theme'"
     assert rows["graph_type", "axis.x.data.column"]["set_by"] == "GraphSpec 'p'"
     assert rows["graphspec", "data.file"]["value"] == "../data/p.parquet"
 
@@ -65,8 +67,8 @@ def test_schema():
 
 def test_schema_says_which_parameters_are_fixed():
     lines = runner.invoke(app, ["schema", "theme"]).output.splitlines()
-    [font] = [ln for ln in lines if ln.strip().startswith("font.family =")]
-    [grid] = [ln for ln in lines if ln.strip().startswith("grid.show =")]
+    [font] = [ln for ln in lines if ln.strip().startswith("text.font =")]
+    [grid] = [ln for ln in lines if ln.strip().startswith("grid.y.show =")]
     assert font.endswith("Fixed: set by the theme.") and "Fixed" not in grid
 
 
@@ -82,7 +84,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     (house / "themes").mkdir()
     (house / "themes" / "plain.yaml").write_text(
         "name: plain\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        y:\n            show: true\n"
     )
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n\nUse plain.\n")
@@ -107,7 +109,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     assert listed["configs"] == [os.environ["FORGEGRAPH_CONFIG"], str(project / "forgegraph.toml")]
     assert [p["name"] for p in listed["packs"]] == ["house"]
     assert [g["name"] for g in listed["graph_types"]] == ["xy"]  # always
-    assert "reference_line" in [g["name"] for g in listed["layers"]]
+    assert "reference" in [g["name"] for g in listed["layers"]]
     assert [t["name"] for t in listed["themes"]] == ["house/plain"]  # not forgegraph_base's
     assert listed["references"] == [
         {"name": "house/style", "description": "House style", "nonstandard": True}
@@ -276,7 +278,7 @@ def test_dates_with_names_beside_the_lines(project):
         {
             "axis.x.data.column": "date",
             "axis.y.data.column": "price",
-            "encoding.color.column": "symbol",
+            "series.color": "symbol",
         },
     )
     start = time.monotonic()
@@ -290,13 +292,14 @@ def test_schema_lists_what_a_graphspec_can_set(project):
     (house / "themes").mkdir()
     (house / "themes" / "grid.yaml").write_text(
         "name: grid\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        y:\n            show: true\n"
     )
     allow(project, "forgegraph_base", "./house")
     listed = cli("schema", "graphspec", *BASE_NAMES, "--theme", "house/grid")["graphspec"]
     rows = {r["parameter"]: r for r in listed}
     assert rows["specifications.theme"]["value"] == "house/grid"
-    assert rows["grid.show"]["value"] is True and rows["grid.show"]["from"] == "theme house/grid"
+    grid = rows["grid.y.show"]
+    assert grid["value"] is True and grid["from"] == "theme house/grid"
     assert rows["axis.x.scale"]["from"] == "graph type xy"
     assert "output.file_types" in rows and "series.colors" not in rows  # fixed in the theme
     missing = runner.invoke(app, ["schema", "graphspec", *BASE_NAMES, "--theme", "nope", "--json"])
@@ -453,11 +456,11 @@ def test_load_of_a_file_it_cant_read_is_an_error(project):
 
 
 def test_explain_reports_a_graphspec_that_fails_validation(project):
-    doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=BASE)
-    doc["variable_parameters"]["text"]["colour"] = "red"
+    doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=with_series(BASE))
+    doc["parameters"]["text"]["colour"] = "red"
     dump(doc, project / "graphspecs" / "bad.yaml")
     [problem] = cli_problems("explain", "graphspecs/bad.yaml")
-    assert problem.startswith("variable_parameters.text.colour: unknown parameter")
+    assert problem.startswith("text.colour: unknown parameter")
     result = runner.invoke(app, ["explain", "graphspecs/bad.yaml"])
     assert result.exit_code == 1 and f"error: {problem}" in result.output
 

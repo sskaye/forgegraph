@@ -21,8 +21,9 @@ from pydantic import Field
 
 from forgegraph import __version__
 from forgegraph.spec.common import Model
-from forgegraph.spec.parameters import NAMES
+from forgegraph.spec.parameters import NAMES, PARAMETERS
 from forgegraph.spec.registry import Registry
+from forgegraph.spec.tags import to_json
 
 
 class DataRecord(Model):
@@ -105,19 +106,16 @@ def plain(value: Any) -> Any:
 
 
 def recorded(spec: dict[str, Any], full: bool) -> dict[str, Any]:
-    """A GraphSpec as provenance records it: below full, without the data's file and
-    preprocessing reference."""
+    """A GraphSpec as provenance records it, its tags in their JSON form (see tags.py): below
+    full, without the data's file and preprocessing reference."""
     spec = copy.deepcopy(spec)
-    if full:
-        return spec
-    for section in ("fixed_parameters", "variable_parameters"):
-        listed = spec.get(section)
-        if isinstance(listed, dict) and isinstance(listed.get("data"), dict):
-            listed["data"].pop("file", None)
-            listed["data"].pop("preprocessing", None)
-            if not listed["data"]:
-                del listed["data"]
-    return spec
+    listed = spec.get(PARAMETERS)
+    if not full and isinstance(listed, dict) and isinstance(listed.get("data"), dict):
+        listed["data"].pop("file", None)
+        listed["data"].pop("preprocessing", None)
+        if not listed["data"]:
+            del listed["data"]
+    return to_json(spec)
 
 
 def used(values: dict[str, dict[str, Any]], reg: Registry) -> dict[str, Any]:

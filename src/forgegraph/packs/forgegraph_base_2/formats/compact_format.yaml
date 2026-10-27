@@ -1,13 +1,11 @@
 name: compact_format          # [text]; The name of the format.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: About 4 in across at 11 pt, saved at 200 dpi.          # [text]; The description of the format.
 extends: forgegraph_base/base_format          # [None, format]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.
 
-fixed_parameters:          # List of fixed parameters for the format.
+parameters:          # !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     figure:
-        width: 106          # [auto, positive float]; Width, mm. auto: from height and plot_area.aspect. Not both auto.
-        base_size: 11          # [positive float]; Base size, pt. Text, lines, ticks and gaps are multiples of it.
+        width: 106          # [auto, float > 0]; The figure's width in mm. auto calculates it from the height and plot_area.aspect_ratio. Width and height can't both be auto.
+        base_size: 11          # [float > 0]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.
     output:
-        dpi: 200          # [positive int]; Resolution of png, jpg and tiff, dots per inch.
-
-variable_parameters: None          # List of variable parameters for the format, None if none.
+        dpi: 200          # [int > 0]; The resolution of png, jpg and tiff files, in dots per inch.

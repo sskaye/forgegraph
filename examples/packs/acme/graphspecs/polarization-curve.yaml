@@ -1,32 +1,27 @@
 name: polarization-curve          # [text]; The name of the GraphSpec.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: Acme's polarization curve, cell voltage against current density, one line per cell.          # [text]; The description of the GraphSpec.
 extends: None          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
 
-fixed_parameters: None          # List of fixed parameters for the GraphSpec, None if none.
-
-variable_parameters:          # List of variable parameters for the GraphSpec, None if none.
+parameters: !var          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     specifications:
         graph_type: xy          # [graph type]; The graph type.
         theme: acme/acme          # [theme]; The theme.
         format: acme/slide          # [format]; The format.
     text:
-        title: None          # [None, text]; Graph title. None: none.
+        title: None          # [None, text]; The graph's title. If None, there is no title.
     data:
-        file: None          # [None, text]; Parquet file holding the DataFrame to draw. None: passed through the Python API.
-        preprocessing: None          # [None, text]; Where the code that made the data is. None: not given.
+        file: None          # [None, text]; The Parquet file holding the DataFrame to draw. If None, the DataFrame is passed through the Python API.
+        preprocessing: None          # [None, text]; Where the code that made the data is. If None, it's not given.
     axis:
         x:
             data:
-                column: Current density (mA/cm²)          # [column]; Horizontal axis column.
-            title: "Current density (mA/cm^2)"          # [None, column_name, text]; Axis title.
+                column: Current density (mA/cm²)          # [None, column]; The column on this axis when it's arrangement.base_axis.
+            title: "Current density (mA/cm^2)"          # [None, column_name, text]; The axis title.
         y:
-            data:
-                column: Cell voltage (V)          # [columns]; Vertical axis column.
-            title: column_name          # [None, column_name, text]; Axis title.
-    encoding:
-        color:
-            column: Cell          # [None, column_name, column]; A color per value of this column.
-    mark:
-        marker:
-            show: true          # [true, false]; Draw markers.
+            title: column_name          # [None, column_name, text]; The axis title.
+    series:
+        Cell voltage (V):
+            color: Cell          # [series, hex color, column]; The series' color.
+            marker:
+                show: true          # [true, false]; Whether to draw markers.

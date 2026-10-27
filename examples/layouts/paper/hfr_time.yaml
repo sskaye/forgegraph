@@ -2,8 +2,7 @@ name: hfr_time
 version: 0
 description: High-frequency resistance over the durability test.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme
@@ -19,12 +18,9 @@ variable_parameters:
                 column: hours
             title: Time (h)
         y:
-            data:
-                column: hfr_mohm_cm2
             title: HFR (mΩ·cm²)
-    encoding:
-        color:
-            column: cell
-    mark:
-        marker:
-            show: false
+    series:
+        hfr_mohm_cm2:
+            color: cell
+            marker:
+                show: false

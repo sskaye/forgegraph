@@ -12,8 +12,8 @@ graph type's or layer type's definition's), its range and the baseline's data:
 2. A column in the range: each column of the baseline's data, in the data's order, that the
    GraphSpec drawn doesn't already use, and whose type the parameter takes: numbers for an
    axis's column or a layer's, any other.
-3. A font family: each bundled family but d. A parameter whose name ends in format, with
-   text in its range: FORMATS.
+3. A font family: each bundled family but d. A number or date format (a value format, or
+   text for a parameter whose name ends in format): FORMATS.
 4. Other text in its range: SAMPLE_TEXT.
 5. A hex color in its range: SAMPLE_COLOR.
 6. A number with a numeric default: 2d, then d/2 (rounded down for a whole number; for
@@ -28,7 +28,8 @@ graph type's or layer type's definition's), its range and the baseline's data:
    base pack's example sets a benchmark).
 
 A value outside the range isn't a candidate. A card setting one of the parameters TIES ties
-to None sets the others to None too.
+to None sets the others to None too, and one setting arrangement.base_axis moves the base
+column to that axis (moved()).
 
 place() puts each card on its first candidate that draws, and differently from the baseline
 it's drawn on, on the first such baseline: the catalog's GraphSpec first, then its numbered
@@ -65,7 +66,7 @@ SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # ea
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
 SAMPLE_TEXT = "Sample text"
 SAMPLE_COLOR = "#D55E00"
-NUMBERS = ("int", "positive int", "float", "positive float")
+NUMBERS = ("int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0")
 
 
 @dataclass(frozen=True)
@@ -136,14 +137,16 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
             for c in frame.columns
             if c not in scene.used and (not numbers or pd.api.types.is_numeric_dtype(frame[c]))
         ]
-    if "text" in rng.types and p.path.endswith("family"):  # a font
+    if "text" in rng.types and p.path.endswith("font"):  # a font
         out += [f for f in bundled_families() if f != d]
-    if "text" in rng.types:
+    if "value format" in rng.types:
+        out += FORMATS
+    elif "text" in rng.types:
         out += FORMATS if p.path.endswith("format") else (SAMPLE_TEXT,)
     if "hex color" in rng.types:
         out.append(SAMPLE_COLOR)
     if rng.intervals or set(NUMBERS) & set(rng.types):
-        whole = not rng.intervals and not {"float", "positive float"} & set(rng.types)
+        whole = not rng.intervals and not {"float", "float ≥ 0", "float > 0"} & set(rng.types)
         if isinstance(d, int | float) and not isinstance(d, bool):
             out += _within(p, d, [1] if d == 0 else [2 * d, d // 2 if whole else d / 2])
         elif is_none(d):
@@ -163,9 +166,11 @@ def _within(p: Parameter, d: float, values: list[float]) -> list[float]:
 
 
 def _column(scene: Scene, axis: Any) -> pd.Series | None:
-    """The numbers of an axis's column (its first, for several), if they are numbers."""
+    """The numbers of an axis's column (the series' on the axis they're drawn on), if they
+    are numbers."""
     name = scene.values.get(f"axis.{axis}.data.column")
-    name = name[0] if isinstance(name, list) else name
+    if is_none(name):
+        name = scene.values.get("series.column")
     if name not in scene.data.columns or not pd.api.types.is_numeric_dtype(scene.data[name]):
         return None
     return cast(pd.Series, scene.data[name]).dropna()
@@ -174,7 +179,7 @@ def _column(scene: Scene, axis: Any) -> pd.Series | None:
 def _from_data(p: Parameter, scene: Scene, layer: str) -> list[float]:
     """A number for a parameter defaulting to None, from its axis's column."""
     parts = p.path.split(".")
-    if layer and p.path == "value":
+    if layer and p.path.split(".")[-1] == "value":
         column = _column(scene, scene.values.get(f"layers.{layer}.axis"))
         return [] if column is None else [float(column.median())]
     column = _column(scene, parts[1]) if parts[0] == "axis" and not layer else None
@@ -188,14 +193,14 @@ def _from_data(p: Parameter, scene: Scene, layer: str) -> list[float]:
 
 
 def _words(p: Parameter, d: Any) -> list[Any]:
-    """The range's words after d (for a list, its first), in the range's order and wrapping
-    round, without it; for a list, each as a one-item list."""
+    """The range's words after d (for a list parameter, its first), in the range's order and
+    wrapping round, without it; for a list parameter, each as a one-item list."""
     words = list(p.range.literals)
-    first = d[0] if isinstance(d, list) and d else d
-    first = NONE if first is None else first
+    first = d[0] if p.takes_list and isinstance(d, list) and d else d
+    first = NONE if first is None or isinstance(first, list) else first
     i = words.index(first) if first in words else len(words) - 1
     after = [w for w in words[i + 1 :] + words[: i + 1] if w != first]
-    return [[w] for w in after] if isinstance(d, list) else after
+    return [[w] for w in after] if p.takes_list else after
 
 
 def tied(path: str, value: Any, prefix: str = "") -> tuple[Change, ...]:
@@ -208,10 +213,29 @@ def tied(path: str, value: Any, prefix: str = "") -> tuple[Change, ...]:
     return (own, *(Change(f"{prefix}{q}", NONE) for q in others))
 
 
+def moved(changes: tuple[Change, ...], scene: Scene) -> tuple[Change, ...]:
+    """A card setting arrangement.base_axis, with the base column moved to that axis: only
+    the base axis has a column."""
+    own = changes[0]
+    if own.path != "arrangement.base_axis":
+        return changes
+    base = scene.values.get("arrangement.base_axis", "x")
+    if own.value == base:
+        return changes
+    column = scene.values.get(f"axis.{base}.data.column")
+    return (
+        own,
+        Change(f"axis.{own.value}.data.column", column),
+        Change(f"axis.{base}.data.column", NONE),
+    )
+
+
 def show(value: Any) -> str:
     """A parameter value as the specification files write it."""
     if isinstance(value, list):
         return "[" + ", ".join(show(v) for v in value) + "]"
+    if isinstance(value, dict):  # a GraphSpec's series, as YAML writes a mapping in one line
+        return "{" + ", ".join(f"{k}: {show(v)}" for k, v in value.items()) + "}"
     if isinstance(value, bool):
         return "true" if value else "false"
     if value is None:

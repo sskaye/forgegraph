@@ -10,6 +10,7 @@ import typer
 from ruamel.yaml import YAML
 
 from forgegraph.cli import Json, app, fail, json_errors, report
+from forgegraph.spec.tags import with_tags
 
 
 @app.command(short_help="Draw a GraphSpec or layout and save it in its format's file types.")
@@ -139,7 +140,7 @@ def load_cmd(
     if graphspec is not None and "graphspec" not in record:
         fail([f"{file.name} records no GraphSpec (its format's provenance is off)"])
     if graphspec is not None:
-        yaml = YAML()
+        yaml = with_tags(YAML())
         yaml.indent(mapping=4, sequence=6, offset=4)
         with graphspec.open("w", encoding="utf-8") as f:
             yaml.dump(record["graphspec"], f)

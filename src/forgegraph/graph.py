@@ -24,10 +24,12 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
-from forgegraph.spec.parameters import NONE, is_none, tree_set
+from forgegraph.spec.parameters import NONE, PARAMETERS, is_none, series_definitions, tree_set
 from forgegraph.spec.provenance import DataRecord, graph_fields, record, used
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
+from forgegraph.spec.series import look_definitions, theme_for
+from forgegraph.spec.tags import from_json, var
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
@@ -164,6 +166,19 @@ class Prepared:
         title = self.values["graphspec"]["text.title"]
         return None if is_none(title) else str(title)
 
+    @property
+    def series(self) -> dict[str, tuple[dict[str, Any], Style]]:
+        """Each series by name: its values, and the style it's drawn in, the theme with what
+        it sets for itself."""
+        s = self.style
+        return {
+            name: (
+                values,
+                Style(theme_for(self.explained.theme, values["look"]), s.format, s.fixed),
+            )
+            for name, values in self.values.get("series", {}).items()
+        }
+
     def draw(self, ax: Axes) -> Any:
         """Draw the graph into ax; returns what the graph type drew."""
         try:
@@ -174,6 +189,7 @@ class Prepared:
                 self.style,
                 self.title,
                 self.values.get("layers", {}),
+                self.series,
             )
         except self.module.DrawError as e:
             raise SpecError([str(e)]) from None
@@ -281,7 +297,7 @@ def _limit(value: Any) -> float | None:
 
 def xy(
     data: pd.DataFrame,
-    x: str,
+    x: str | list[str],
     y: str | list[str],
     *,
     title: str | None = None,
@@ -291,26 +307,44 @@ def xy(
     line_style: str | None = None,
     marker_shape: str | None = None,
     marker_fill: str | None = None,
-    detail: str | list[str] | None = None,
+    split: str | list[str] | None = None,
     parameters: dict[str, Any] | None = None,
     registry: Registry | None = None,
 ) -> Graph:
-    """Draw y against x from a DataFrame. color, line_style, marker_shape, marker_fill and
-    detail set the encoding's columns (encoding.color.column, encoding.line.style.column,
-    encoding.marker.shape.column, ...); `parameters` sets any other variable
-    parameter by path, e.g. {"mark.line.show": False, "axis.x.scale": "log"}. registry: as
-    for render."""
-    settings: dict[str, Any] = {"axis.x.data.column": x, "axis.y.data.column": y}
+    """Draw y against x from a DataFrame: a series for each y column, named after it. color,
+    line_style, marker_shape, marker_fill and split set each series' color, line.style,
+    marker.shape, marker.fill and split; `parameters` sets any other variable parameter by
+    path, e.g. {"axis.x.scale": "log"}, and a series parameter under series, e.g.
+    {"series.bar.show": True}, for every series. With arrangement.base_axis y, the series are
+    drawn along y: y is then the column they're drawn along, and x their columns. registry:
+    as for render."""
+    parameters = dict(parameters or {})
+    base = parameters.get("arrangement.base_axis", "x")
+    along, columns = (x, y) if base == "x" else (y, x)
+    settings: dict[str, Any] = {"series": {}, f"axis.{base}.data.column": along}
+    each: dict[str, Any] = {}
     for path, value in (
-        ("encoding.color.column", color),
-        ("encoding.line.style.column", line_style),
-        ("encoding.marker.shape.column", marker_shape),
-        ("encoding.marker.fill.column", marker_fill),
-        ("encoding.detail.column", detail),
+        ("color", color),
+        ("line.style", line_style),
+        ("marker.shape", marker_shape),
+        ("marker.fill", marker_fill),
+        ("split", split),
     ):
         if value is not None:
+            each[path] = value
+    own = {*series_definitions(), *look_definitions()}
+    for path, value in parameters.items():
+        within = path.removeprefix("series.")
+        if path.startswith("series.") and within in own:
+            each[within] = value
+        else:
             settings[path] = value
-    settings.update(parameters or {})
+    entry: dict[str, Any] = {}
+    for path, value in each.items():
+        tree_set(entry, path, value)
+    names = [columns] if isinstance(columns, str) else columns
+    settings["series"] = {str(name): dict(entry) for name in names}  # a name may have dots;
+    # first, so another path under series is in the GraphSpec as given, to be reported
     return render(
         graphspec("graph", "xy", theme=theme, format=format, title=title, settings=settings),
         data,
@@ -333,7 +367,8 @@ def graphspec(
     """A GraphSpec document, named `name`, extending nothing: the graph type, theme and format
     it's drawn with; data_file, the Parquet file it's drawn from (None: a DataFrame passed
     to render); preprocessing, a note of how that data was prepared; its title; and
-    `settings`, any other variable parameter by path, e.g. {"axis.x.scale": "log"}."""
+    `settings`, any other variable parameter by path, e.g. {"axis.x.scale": "log"}. Its
+    parameters are tagged !var, so a GraphSpec extending it may change any of them."""
     variable: dict[str, dict[str, Any]] = {
         "specifications": {
             "graph_type": graph_type,
@@ -353,11 +388,14 @@ def graphspec(
         "version": 0,
         "description": description,
         "extends": NONE,
-        "fixed_parameters": NONE,
-        "variable_parameters": variable,
+        PARAMETERS: var(variable),
     }
 
 
 def load(path: str | Path) -> dict[str, Any] | None:
-    """The provenance record stored in a graph file (its GraphSpec is under "graphspec")."""
-    return export.read(Path(path))
+    """The provenance record stored in a graph file (its GraphSpec is under "graphspec", a
+    layout's file under "layout"), with their !var and !fix tags."""
+    record = export.read(Path(path))
+    if record is None:
+        return None
+    return {k: from_json(v) if k in ("graphspec", "layout") else v for k, v in record.items()}

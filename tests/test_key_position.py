@@ -9,6 +9,7 @@ import pytest
 import forgegraph as fg
 from forgegraph.drawing import text
 from forgegraph.drawing.key import keys
+from forgegraph.drawing.marks import Bars
 
 SHARES = pd.DataFrame(
     {
@@ -18,10 +19,10 @@ SHARES = pd.DataFrame(
     }
 )
 STACKED = {
-    "mark.bar.show": True,
-    "mark.line.show": False,
-    "mark.marker.show": False,
-    "series.aggregation": "percent",
+    "series.bar.show": True,
+    "series.line.show": False,
+    "series.marker.show": False,
+    "arrangement.stacking": "percent",
     "axis.x.tick.algorithm": "all",
     "legend.method": "key",
 }
@@ -72,6 +73,11 @@ def test_a_key_outside_leaves_less_room_for_the_bars():
     many = pd.DataFrame(
         {"grade": list("DEFGHIJ") * 2, "cut": ["Fair"] * 7 + ["Ideal"] * 7, "n": [1.0] * 14}
     )
-    params = {**STACKED, "legend.key.inside": False, "legend.key.positions": ["right_center"]}
-    with pytest.raises(fg.SpecError, match=r"series\.bar\.width"):
-        fg.xy(many, "grade", "n", color="cut", parameters=params)
+    outside = {**STACKED, "legend.key.inside": False, "legend.key.positions": ["right_center"]}
+    above = {**STACKED, "legend.key.inside": False, "legend.key.positions": ["top_center"]}
+
+    def bar_width(params: dict) -> float:
+        g = fg.xy(many, "grade", "n", color="cut", parameters=params)
+        return max(b.width for b in g.axes.collections if isinstance(b, Bars))
+
+    assert bar_width(outside) < bar_width(above)  # the key beside the plot narrows it

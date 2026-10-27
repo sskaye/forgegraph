@@ -14,25 +14,31 @@ from forgegraph.spec.resolve import (
     Resolved,
     Values,
     definitions_for,
+    inherit,
     named,
     resolve,
 )
+from forgegraph.spec.series import resolve_series
+from forgegraph.spec.series import with_defaults as series_defaults
 
 
 @dataclass
 class Explained:
     """Every value a graph is drawn with, by kind, with whether it's fixed and which file set
     it. `layers` holds each layer by name: its type and every parameter of that type, as
-    {"type": ..., path: value}."""
+    {"type": ..., path: value}; `series` each series by name: every series parameter of its
+    graph type, as {path: value}, with the theme parameters it sets for itself under "look"."""
 
     graphspec: Values
     layers: Values
+    series: Values
     graph_type: Values
     theme: Values
     format: Values
 
     def kinds(self) -> dict[str, Values]:
-        """The values by kind, in this order: graphspec, layers, graph_type, theme, format."""
+        """The values by kind, in this order: graphspec, layers, series, graph_type, theme,
+        format."""
         return {f.name: getattr(self, f.name) for f in fields(self)}
 
     def plain(self) -> dict[str, dict[str, Any]]:
@@ -55,6 +61,12 @@ def explain(
             for name, r in resolve_layers(doc, reg).items()
         }
     )
+    series = Values(
+        {
+            name: Resolved(series_defaults(r.value), r.fixed, r.origin)
+            for name, r in resolve_series(doc, reg).items()
+        }
+    )
     out: dict[str, Values] = {}
     for kind, name in chosen.items():
         if kind == "format" and format is not None:
@@ -65,6 +77,7 @@ def explain(
         heading = chosen["graph_type"] if kind in HEADINGS else None
         values = resolve(kind, other, reg, heading)
         values.update({p: r for p, r in spec.items() if p in defs})
+        inherit(values, defs)
         out[kind] = values
     graphspec = Values({p: r for p, r in spec.items() if p in own})
-    return Explained(graphspec, layers, out["graph_type"], out["theme"], out["format"])
+    return Explained(graphspec, layers, series, out["graph_type"], out["theme"], out["format"])

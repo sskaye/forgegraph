@@ -1,0 +1,31 @@
+name: reference          # [layer type]; The layer type this catalog shows.
+version: 0          # [int ≥ 0]; The version number of the specification.
+description: Cards for the reference layer.          # [text]; The description of the catalog.
+extends: None          # [None, catalog]; The catalog this one extends. Its baselines come before this file's own, and a header field set to None here is taken from it. If None, this catalog extends no other.
+baseline: forgegraph_base/graphspec_example          # [graphspec]; The GraphSpec every card changes, without its own layers.
+settings: None          # The GraphSpec parameters every card sets so that the layer can be drawn. If there are none, this is None.
+layer:          # The parameters of the layer every card draws, which is named after its type. If None, the layer's defaults are used.
+    axis: y          # [x, y]; The axis the values are on. y draws horizontal lines.
+    line_1:
+        value: 1.45          # [None, float, date, column]; A number, a date, or a column.
+
+baselines:          # Generic scenarios, each the baseline with one or more changes, numbered in the order they're first used. Every parameter gets one card, chosen by a rule: the first candidate value that changes the drawing, on the baseline or on the first of these scenarios where it does. The page shows the cards of the variable parameters. If there are no scenarios, this is None.
+    aggregated:          # [parameters and their values, or non-standard]; A line at the highest cell voltage.
+        layers.reference.line_1.value: "Cell Voltage (V)"
+        layers.reference.line_1.aggregation.function: max
+    valued:          # [parameters and their values, or non-standard]; A line at the mean cell voltage, labelled with it.
+        layers.reference.line_1.value: "Cell Voltage (V)"
+        layers.reference.line_1.aggregation.function: mean
+        layers.reference.line_1.label.text: aggregation_value
+    labelled:          # [parameters and their values, or non-standard]; A band between two lines, each labelled at a chosen position, so the labels can go beyond the plot area.
+        layers.reference.line_1.label: {text: Target, position: end_above}
+        layers.reference.line_2: {value: 1.3, label: {text: Limit, position: end_below}}
+    band:          # [parameters and their values, or non-standard]; A band two standard deviations either side of the mean cell voltage, each line labelled with its value.
+        layers.reference.line_1: {value: "Cell Voltage (V)", aggregation: {function: mean}, offset: {function: stddev, multiplier: 2}, label: {text: aggregation_value}}
+        layers.reference.line_2: {value: "Cell Voltage (V)", aggregation: {function: mean}, offset: {function: stddev, multiplier: -2}, label: {text: aggregation_value}}
+    quartiles:          # [parameters and their values, or non-standard]; A band between the cell voltage's first and third quartiles, so each line's percentile acts.
+        layers.reference.line_1: {value: "Cell Voltage (V)", aggregation: {function: percentile, percentile: 25}}
+        layers.reference.line_2: {value: "Cell Voltage (V)", aggregation: {function: percentile, percentile: 75}}
+    percentile_offsets:          # [parameters and their values, or non-standard]; Lines at the median cell voltage, each offset by a fraction of a percentile, so each offset's percentile acts.
+        layers.reference.line_1: {value: "Cell Voltage (V)", aggregation: {function: median}, offset: {function: percentile, percentile: 10, multiplier: 0.05}}
+        layers.reference.line_2: {value: "Cell Voltage (V)", aggregation: {function: median}, offset: {function: percentile, percentile: 90, multiplier: -0.05}}

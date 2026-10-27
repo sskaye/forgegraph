@@ -1,10 +1,13 @@
-"""The color bar for a numeric encoding.color.column, laid out by the theme's
-legend.color_bar.layout:
+"""The color bar for a series colored by a column of numbers, laid out by the theme's
+legend.color_bar.position and legend.color_bar.title.position:
 
-- title_above: a vertical bar right of the plot box, its title above it, left-aligned; the
-  bar runs from the box's bottom to a title gap below the title;
-- title_along: a vertical bar the box's height, its title beside it reading downward;
-- below: a horizontal bar half the box's width under the x-axis title, its title above it.
+- right, above: a vertical bar right of the plot box, its title above it; the bar runs from
+  the box's bottom to a title gap below the title;
+- right, beside: a vertical bar the box's height, its title beside it reading downward;
+- below, above: a horizontal bar half the box's width under the x-axis title, its title
+  above it.
+
+The title's alignment places it along the bar: from its start, centred, or to its end.
 
 The bar's position is worked out each time the figure is drawn (an axes locator), from the
 plot box and the letters around it, so it follows the layout. Its ticks and title use the
@@ -20,7 +23,7 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Colormap, Normalize
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation
 
-from forgegraph.drawing import spacing, text
+from forgegraph.drawing import text
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.layout import texts_of, tick_marks
 from forgegraph.drawing.style import Style
@@ -72,10 +75,11 @@ def add(
 ) -> Axes:
     """Draw the color bar for ax, with its title if given, and return its Axes. Its long
     axis has the plot's minor ticks."""
-    layout = str(style.theme["legend.color_bar.layout"])
-    prop = spacing.axis_title_font(style)
+    layout = _layout(style)
+    look = style.text("legend.color_bar.title")
+    prop, alignment = look.font, look.alignment or "left"
     edges = text.edges(title, prop) if title else None
-    title_gap = style.pt("axis.title.gap")
+    title_gap = look.gap or 0.0
     head = edges.height + title_gap if edges is not None and layout != TITLE_ALONG else 0.0
     cax = ax.inset_axes((0, 0, 1, 1))
     cax.set_axes_locator(_Place(ax, style, layout, head))
@@ -86,13 +90,40 @@ def add(
     if edges is None or not title:
         return cax
     if layout == TITLE_ALONG:  # reads downward: its letters face away from the bar
-        bar.set_label(title, rotation=270, va="bottom")
+        bar.set_label(title, rotation=270, va="bottom", fontproperties=prop, color=look.color)
+        if alignment != "center":  # along the bar: its start at the top, or its end at the bottom
+            label = cax.yaxis.label
+            label.set_y(1.0 if alignment == "left" else 0.0)
+            label.set_verticalalignment("top" if alignment == "left" else "bottom")
         return cax
     fig = ax.figure
+    across, start = {
+        "left": (0.0, edges.left),
+        "center": (0.5, (edges.left + edges.right) / 2),
+        "right": (1.0, edges.right),
+    }[alignment]
     above_bar = (
-        Affine2D().translate(-edges.left, title_gap + edges.bottom).scale(1 / 72)
+        Affine2D().translate(-start, title_gap + edges.bottom).scale(1 / 72)
         + fig.dpi_scale_trans  # type: ignore[union-attr]
-        + ScaledTranslation(0, 1, cast(Any, cax.transAxes))
+        + ScaledTranslation(across, 1, cast(Any, cax.transAxes))
     )
-    cax.text(0, 0, title, fontproperties=prop, ha="left", va="baseline", transform=above_bar)
+    cax.text(
+        0,
+        0,
+        title,
+        fontproperties=prop,
+        color=look.color,
+        ha="left",
+        va="baseline",
+        transform=above_bar,
+    )
     return cax
+
+
+def _layout(style: Style) -> str:
+    """The bar's and its title's places, as one of TITLE_ABOVE, TITLE_ALONG and BELOW."""
+    position = str(style.theme["legend.color_bar.position"])
+    title = str(style.theme["legend.color_bar.title.position"])
+    if position == "below":
+        return BELOW
+    return TITLE_ALONG if title == "beside" else TITLE_ABOVE

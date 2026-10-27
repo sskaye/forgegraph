@@ -5,9 +5,9 @@ This page mirrors examples/layouts/paper/cell_performance.layout.yaml, which is 
 name: cell_performance\
 version: 0\
 description: Voltage and resistance over a durability test, and the polarization curves after it, for cells A–C.\
-extends: forgegraph_base/base_layout\
-fixed_parameters: None\
-variable_parameters:\
+extends: forgegraph_base/layout_example\
+ \
+parameters:          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
         format: journal/journal-double\
     tabs:\

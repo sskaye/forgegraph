@@ -18,12 +18,12 @@ baseline's drawing is an error, fixed by adding a baseline that shows it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from forgegraph.catalog_build.cards import Change, Scene, candidates, gets_card, tied
+from forgegraph.catalog_build.cards import Change, Scene, candidates, gets_card, moved, tied
 from forgegraph.catalog_build.examples import SPECIAL, data
 from forgegraph.graph import SpecError
 from forgegraph.packs import Pack
@@ -35,9 +35,12 @@ from forgegraph.spec.parameters import (
     definitions,
     flatten,
     is_none,
+    series_definitions,
 )
 from forgegraph.spec.registry import Registry, load_yaml
 from forgegraph.spec.resolve import Values, resolve
+from forgegraph.spec.series import resolve_series
+from forgegraph.spec.series import with_defaults as series_defaults
 
 FOLDERS = {kind: KINDS[kind] for kind in ("theme", "format", "graph_type", "layer")}
 HEADER = ("name", "version", "description", "extends", "baseline", "baselines")
@@ -84,7 +87,17 @@ def _settable(reg: Registry, graph_type: str) -> dict[str, Parameter]:
     for kind in ("theme", "format", "graphspec"):
         out.update(definitions(kind))
     out.update(definitions("graph_type", graph_type))
+    out.update(_series(graph_type))
     return out
+
+
+def _series(graph_type: str) -> dict[str, Parameter]:
+    """A graph type's series parameters, as series.<parameter>: a change to one sets it on
+    every series the GraphSpec lists."""
+    return {
+        f"series.{p}": replace(q, path=f"series.{p}")
+        for p, q in series_definitions(graph_type).items()
+    }
 
 
 def _check(where: str, p: Parameter, value: Any, reg: Registry) -> list[str]:
@@ -101,8 +114,8 @@ def _change(where: str, entry: Any, params: dict[str, Parameter], reg: Registry,
         return None, [f"{where}: must be parameters and their values, non-standard, or footnoted"]
     changes, problems = [], []
     for path, value in entry.items():
-        if str(path).startswith("layers."):
-            changes.append(Change(str(path), value))
+        if str(path).startswith("layers.") or path == "series":
+            changes.append(Change(str(path), value))  # checked when it's drawn
             continue
         if path not in params:
             problems.append(f"{where}: unknown parameter '{path}'")
@@ -139,6 +152,12 @@ def _scene(
     except SpecError as e:
         raise CatalogError([f"baseline '{baseline}': {p}" for p in e.problems]) from None
     drawn = {p: v for p, v in values.plain().items() if not p.startswith("layers.")}
+    listed = resolve_series(reg.docs["graphspec"][baseline], reg)
+    for name, r in list(listed.items())[:1]:  # what a series parameter's card changes
+        entry = series_defaults(r.value)
+        drawn.update({f"series.{p}": v for p, v in entry.items() if p != "look"})
+        column = name if entry["column"] == "name" else entry["column"]
+        drawn["series.column"] = column
     drawn.update({c.path: c.value for c in always})
     used: set[str] = set()
     for path, value in drawn.items():
@@ -184,6 +203,8 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
                 bases[str(bname)] = change
 
     own = definitions(kind, name if kind in ("graph_type", "layer") else None)
+    if kind == "graph_type":
+        own = {**own, **_series(name)}
     always: tuple[Change, ...] = ()
     prefix = ""
     if kind == "layer":
@@ -216,7 +237,7 @@ def read(kind: str, name: str, reg: Registry) -> Catalog:
         options: list[tuple[Change, ...]] = []
         d = shown.value(p.path, p.default)
         for value in candidates(p, d, scene, name if kind == "layer" else ""):
-            changes = tied(p.path, value, prefix)
+            changes = moved(tied(p.path, value, prefix), scene)
             unset = p.required and is_none(value)  # check_parameter allows it unset
             if not unset and not _check("", p, value, reg) and changes not in options:
                 options.append(changes)

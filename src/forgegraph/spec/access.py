@@ -30,9 +30,9 @@ def permission_problems(kind: str, doc: dict[str, Any], reg: Registry) -> list[s
     if not is_none(doc.get("extends")):
         listed.append(("extends", str(doc["extends"])))
     paths = {f"specifications.{k}" for k in NAMES.get(kind, ()) if k not in CORE_KINDS}
-    for section, _, path, value in entries(kind, doc, reg):
+    for _, path, value in entries(kind, doc, reg):
         if path in paths and isinstance(value, str):
-            listed.append((f"{section}.{path}", value))
+            listed.append((path, value))
     problems = []
     for where, name in listed:
         pack = name.split("/")[0] if "/" in name else None

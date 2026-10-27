@@ -3,16 +3,15 @@
 This page mirrors examples/packs/acme/layouts/dashboard.yaml, which is the specification. A test fails if they ever differ.
 
 name: dashboard          *# \[text\]; The name of the layout.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Acme's dashboard spacing on a slide; a layout extends it and lists its own tabs.          *# \[text\]; The description of the layout.*\
-extends: forgegraph_base/base_layout          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
+extends: forgegraph_base/layout_example          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
  \
-fixed_parameters: None          *# List of fixed parameters for the layout, None if none.*\
- \
-variable_parameters:          *# List of variable parameters for the layout, None if none.*\
+parameters:          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
-        format: acme/slide          *# \[format\]; Size and output of the whole layout.*\
+        format: acme/slide          *# \[format\]; The format that sets the size and output of the whole layout.*\
     separators:\
-        gap: 2          *# \[positive float\]; Space between neighbouring tiles, × base size.*\
+        gap:\
+            outer: 2          *# \[float ≥ 0\]; The space between neighboring tiles, from the outermost text or line of one to that of the next, × base size.*\
         line:\
-            show: true          *# \[true, false\]; Draw a line along the middle of each gap between tiles.*
+            width: 0.05          *# \[float ≥ 0\]; The width of the line along the middle of each gap between tiles, × base size. If 0, no line is drawn.*

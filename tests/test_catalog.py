@@ -125,7 +125,7 @@ def test_cli_build_reports_what_stops_a_build(tmp_path, monkeypatch):
     (folder / "themes").mkdir()
     (folder / "themes" / "plain.yaml").write_text(
         "name: plain\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters: None\n"
+        "parameters: None\n"
     )
     [problem] = problems("--pack", str(folder), "--out", str(tmp_path / "house.html"))
     assert "plain" in problem and "catalog" in problem

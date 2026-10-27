@@ -13,7 +13,7 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
    from every other label;
 4. in open space: prefer positions close to its own series and far from the others, with a
    slight preference for either end of the line;
-5. if nothing passes, the x-axis grows by as little as it takes, up to max_axis_extension of
+5. if nothing passes, the x-axis grows by as little as it takes, up to axis.max_extension of
    its range;
 6. otherwise direct doesn't fit.
 """
@@ -21,6 +21,7 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -185,8 +186,8 @@ class Obstacles:
     @classmethod
     def of(cls, ax: Axes, *, lines: bool, keys: bool, renderer: Any = None) -> Obstacles:
         """What's drawn inside the plot: every marker and bar; with lines, every line drawn
-        with a line style (the series' lines are drawn only when shown, so with
-        mark.line.show false reference lines and error-bar stems don't count either); the
+        with a line style (the series' lines are drawn only when shown, so when no series
+        shows its line, reference lines and error-bar stems don't count either); the
         plot's text (value labels, notes, a reference line's label, direct labels); with
         keys, the keys' frames. A key's own lines and text never count."""
         dense, centres = _drawn_points(ax, lines)
@@ -230,9 +231,9 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
     fig = ax.figure
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     px = fig.dpi / 72.0
-    clearance = style.pt("legend.direct.clearance") * px
+    clearance = style.pt("legend.label.gap") * px
     association = float(style.theme["legend.direct.max_relative_distance"])
-    prop = style.font("legend.label.size", "legend.label.weight")
+    prop = style.font("legend.label")
     label_edges = [text.edges(g.name, prop) for g in groups]
     sizes = [(e.width * px, e.height * px) for e in label_edges]  # each label's letters
 
@@ -338,36 +339,49 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
     """Interior labels (rules 1-6), growing the x-axis as little as it takes (rule 5)."""
     if place_interior(ax, groups, style):
         return True
-    x0, x1 = ax.get_xlim()
-    most = float(style.theme["legend.direct.max_axis_extension"])
+    most = float(style.theme["axis.max_extension"])
+    if not grow_until(ax, "x", "max", lambda: place_interior(ax, groups, style, draw=False), most):
+        return False
+    return place_interior(ax, groups, style)
+
+
+def grow_until(ax: Axes, axis: str, end: str, fits: Callable[[], bool], most: float) -> bool:
+    """Extend an axis at one end (min or max) by as little as it takes, to 1/64 of most (a
+    fraction of its range), until fits(); keep its ticks, since the extra room is for labels.
+    False, with the axis as it was, if even most doesn't do it."""
     if most <= 0:
         return False
-    # The extra room is for labels: keep the ticks the layout made room for.
-    locator = ax.xaxis.get_major_locator()
-    ticks = np.asarray(ax.get_xticks(), dtype=float)  # a date axis's are a list
-    ax.xaxis.set_major_locator(FixedLocator(list(ticks[limits.in_view(ax.xaxis, ticks)])))
+    which = ax.xaxis if axis == "x" else ax.yaxis
+    get, put = (ax.get_xlim, ax.set_xlim) if axis == "x" else (ax.get_ylim, ax.set_ylim)
+    log = (ax.get_xscale() if axis == "x" else ax.get_yscale()) == "log"
+    lo, hi = get()
+    locator = which.get_major_locator()
+    ticks = np.asarray(which.get_majorticklocs(), dtype=float)  # a date axis's are a list
+    which.set_major_locator(FixedLocator(list(ticks[limits.in_view(which, ticks)])))
 
     def extend(fraction: float) -> None:
-        if ax.get_xscale() == "log":
-            ax.set_xlim(x0, x1 * (x1 / x0) ** fraction)
+        if log:
+            grow = (hi / lo) ** fraction
+            put(lo, hi * grow) if end == "max" else put(lo / grow, hi)
         else:
-            ax.set_xlim(x0, x1 + fraction * (x1 - x0))
+            grow = fraction * (hi - lo)
+            put(lo, hi + grow) if end == "max" else put(lo - grow, hi)
 
     extend(most)
-    if not place_interior(ax, groups, style, draw=False):
-        ax.xaxis.set_major_locator(locator)
-        ax.set_xlim(x0, x1)
+    if not fits():
+        which.set_major_locator(locator)
+        put(lo, hi)
         return False
-    fails, fits = 0.0, most  # the smallest extension that fits, to 1/64 of the most allowed
+    failed, fitted = 0.0, most  # the smallest extension that fits
     for _ in range(6):
-        middle = (fails + fits) / 2
+        middle = (failed + fitted) / 2
         extend(middle)
-        if place_interior(ax, groups, style, draw=False):
-            fits = middle
+        if fits():
+            fitted = middle
         else:
-            fails = middle
-    extend(fits)
-    return place_interior(ax, groups, style)
+            failed = middle
+    extend(fitted)
+    return True
 
 
 def _clear_of_data(ax: Axes, key: Key, lines: bool) -> bool:

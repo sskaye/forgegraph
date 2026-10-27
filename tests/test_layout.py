@@ -8,14 +8,14 @@ import json
 import re
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
 from matplotlib.lines import Line2D
 from pack_helpers import allow, cli_problems, doc, dump, graphspec_file, write_pack
 from PIL import Image
-from render_helpers import BASE, painted_draws, polarization
+from render_helpers import BASE, painted_draws, polarization, with_series
 from typer.testing import CliRunner
 
 import forgegraph as fg
@@ -25,15 +25,16 @@ from forgegraph.drawing.layout import visible_extent
 from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.layout import slug
 from forgegraph.spec.registry import builtin
+from forgegraph.spec.tags import fix
 from forgegraph.spec.validate import validate
 
 runner = CliRunner()
 FORMAT = {"width": 200, "height": "auto", "base_size": 10}
 
 
-def _format(name: str, **figure: Any) -> dict[str, Any]:
+def _format(name: str, file_types: tuple[str, ...] = ("png",), **figure: Any) -> dict[str, Any]:
     fixed = {"figure": {**FORMAT, **figure}}
-    variable = {"output.file_types": ["png"]}
+    variable = {"output.file_types": list(file_types)}
     return doc("forgegraph_base/base_format", name, fixed=fixed, variable=variable)
 
 
@@ -68,7 +69,8 @@ def write_layout(
 ) -> Any:
     variable = {"specifications": {"format": fmt}, **variable, "tabs": tabs}
     return dump(
-        doc("forgegraph_base/base_layout", name, variable=variable), folder / f"{name}.layout.yaml"
+        doc("forgegraph_base/layout_example", name, variable=variable),
+        folder / f"{name}.layout.yaml",
     )
 
 
@@ -205,7 +207,7 @@ def test_with_height_auto_each_plot_keeps_its_aspect_or_more(project):
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
     )
     layout = fg.layout(path)
-    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect_ratio"])
     for box in boxes(layout).values():
         assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
 
@@ -218,7 +220,7 @@ def test_with_width_auto_each_plot_keeps_its_aspect_too(project):
         fmt="house/tall",
     )
     layout = fg.layout(path)
-    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect_ratio"])
     for box in boxes(layout).values():
         assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
     height = layout.tabs[0].figure.get_size_inches()[1] * 25.4
@@ -306,7 +308,7 @@ def test_the_layouts_format_replaces_each_tiles(project):
 
 
 def test_a_tile_can_be_drawn_from_a_dataframe(project):
-    doc = fg.graphspec("frame", "xy", settings=BASE)
+    doc = fg.graphspec("frame", "xy", settings=with_series(BASE))
     dump(doc, project / "frame.yaml")
     path = write_layout(project, {"T": tab([["f"]], f="frame.yaml")})
     assert fg.layout(path, data={"f": polarization()}).tabs[0].tiles["f"].data.rows_read == 96
@@ -318,7 +320,7 @@ def test_lint_names_the_tile(project):
     frame = polarization()
     frame.loc[0, "cell_voltage"] = np.nan
     frame.to_parquet(project / "gaps.parquet")
-    doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=BASE)
+    doc = fg.graphspec("gaps", "xy", data_file="gaps.parquet", settings=with_series(BASE))
     dump(doc, project / "gaps.yaml")
     path = write_layout(project, {"T": tab([["volt", "gaps"]], volt="volt.yaml", gaps="gaps.yaml")})
     messages = fg.layout(path).warnings
@@ -340,7 +342,7 @@ def test_lines_run_between_tiles_but_not_through_a_span(project):
                 bright="bright.yaml",
             )
         },
-        separators={"line": {"show": True}},
+        separators={"line": {"width": 0.05}},
     )
     t = fg.layout(path).tabs[0]
     lines = [a for a in t.figure.artists if isinstance(a, Line2D)]
@@ -355,7 +357,7 @@ def test_lines_run_between_tiles_but_not_through_a_span(project):
 def test_a_blank_cell_counts_as_a_tile_for_lines(project):
     areas = [["volt", "power"], ["bright", "."]]
     tiles = {"volt": "volt.yaml", "power": "power.yaml", "bright": "bright.yaml"}
-    path = write_layout(project, {"T": tab(areas, **tiles)}, separators={"line": {"show": True}})
+    path = write_layout(project, {"T": tab(areas, **tiles)}, separators={"line": {"width": 0.05}})
     t = fg.layout(path).tabs[0]
     lines = [a for a in t.figure.artists if isinstance(a, Line2D)]
     vertical = [ln for ln in lines if np.ptp(np.asarray(ln.get_xdata())) == 0]
@@ -363,34 +365,93 @@ def test_a_blank_cell_counts_as_a_tile_for_lines(project):
     assert len(vertical) == 2 and len(horizontal) == 2  # beside and above the blank cell too
 
 
-def test_a_border_runs_round_the_tiles_a_gap_from_the_edge(project):
+def test_a_border_runs_round_the_tiles_through_the_middle_of_the_inner_gap(project):
     path = write_layout(
         project,
         {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
         separators={"border": {"show": True}},
     )
     t = fg.layout(path).tabs[0]
-    [border] = [a for a in t.figure.artists if isinstance(a, Line2D)]  # no lines between
+    [border] = [
+        a for a in t.figure.artists if isinstance(a, Line2D) and np.size(a.get_xdata()) == 5
+    ]
     xs = np.asarray(border.get_xdata())
-    gap = 1.5 * 10 / 72  # inches
+    gap = 1.5 * 10 / 72  # inches: gap.inner
     width = t.figure.get_size_inches()[0]
-    assert len(xs) == 5 and min(xs) * width == pytest.approx(gap / 2)
+    assert min(xs) * width == pytest.approx(gap / 2)
     renderer = t.figure.canvas.get_renderer()  # type: ignore[attr-defined]
     left = visible_extent(t.tiles["volt"].axes, renderer).x0 / t.figure.dpi
     assert left == pytest.approx(gap, abs=0.01)
 
 
-@pytest.mark.slow
-def test_the_separator_color_fills_the_gaps(project):
+def test_the_inner_gap_is_at_the_figures_edges_and_the_outer_between_tiles(project):
     path = write_layout(
         project,
         {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
-        separators={"color": "#FF0000"},
+        separators={"gap": {"inner": 1.0, "outer": 3.0}},
     )
-    [png] = fg.layout(path).save(project / "out" / "fig.png")
+    t = fg.layout(path).tabs[0]
+    renderer = t.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    volt, power = (visible_extent(t.tiles[n].axes, renderer) for n in ("volt", "power"))
+    dpi = t.figure.dpi
+    assert volt.x0 / dpi == pytest.approx(1.0 * 10 / 72, abs=0.01)
+    assert (power.x0 - volt.x1) / dpi == pytest.approx(3.0 * 10 / 72, abs=0.01)
+
+
+def _lines_between(t) -> list[Line2D]:
+    return [a for a in t.figure.artists if isinstance(a, Line2D)]
+
+
+def test_the_lines_between_tiles_take_the_first_tiles_theme_line(project):
+    from matplotlib.colors import to_hex
+
+    tiles = {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    t = fg.layout(write_layout(project, tiles)).tabs[0]
+    [line] = _lines_between(t)
+    theme = t.style.theme
+    assert to_hex(line.get_color()) == theme["line.color"].lower()
+    assert line.get_linewidth() == pytest.approx(theme["line.width"] * 10)  # the layout's base
+    own = {"line": {"width": 0.2, "color": "#336699", "style": "dashed"}}
+    t = fg.layout(write_layout(project, tiles, "own", separators=own)).tabs[0]
+    [line] = _lines_between(t)
+    assert (to_hex(line.get_color()), line.get_linewidth(), line.get_linestyle()) == (
+        "#336699",
+        pytest.approx(2.0),
+        "--",
+    )
+    none = {"line": {"style": None}, "border": {"show": True}}
+    t = fg.layout(write_layout(project, tiles, "none", separators=none)).tabs[0]
+    assert _lines_between(t) == []  # no line, so no border either
+
+
+def test_tile_backgrounds_can_have_rounded_corners(project):
+    from matplotlib.patches import FancyBboxPatch
+
+    tiles = {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
+    t = fg.layout(write_layout(project, tiles, separators={"corner_radius": 1.0})).tabs[0]
+    rounded = [a for a in t.figure.artists if isinstance(a, FancyBboxPatch)]
+    assert len(rounded) == 2
+    assert cast(Any, rounded[0].get_boxstyle()).rounding_size == pytest.approx(
+        10 / 72
+    )  # 1 base size, in inches
+
+
+@pytest.mark.slow
+def test_the_gaps_take_the_first_tiles_theme_background(project):
+    red = doc("forgegraph_base/base_theme", "red", variable={"background.color": "#FF0000"})
+    dump(red, project / "house" / "themes" / "red.yaml")
+    graphspec_file(project, "reddish", theme="house/red", settings={**BASE})
+    tiles = {"T": tab([["reddish", "volt"]], reddish="reddish.yaml", volt="volt.yaml")}
+    none = {"line": {"style": None}}
+    [png] = fg.layout(write_layout(project, tiles, separators=none)).save(project / "o" / "r.png")
     pixels: np.ndarray = np.asarray(Image.open(png).convert("RGB"))
-    assert tuple(pixels[0, 0]) == (255, 0, 0)  # the figure's edge
-    assert tuple(pixels[pixels.shape[0] // 2, pixels.shape[1] // 2]) == (255, 0, 0)  # the gap
+    assert tuple(pixels[0, -1]) == (255, 0, 0)  # the figure's edge, by the second tile too
+    tiles = {"T": tab([["volt", "reddish"]], reddish="reddish.yaml", volt="volt.yaml")}
+    [png] = fg.layout(write_layout(project, tiles, "w", separators=none)).save(
+        project / "o" / "w.png"
+    )
+    pixels = np.asarray(Image.open(png).convert("RGB"))
+    assert tuple(pixels[0, -1]) == (255, 255, 255)
 
 
 # Tabs and output
@@ -400,7 +461,8 @@ def test_the_separator_color_fills_the_gaps(project):
 def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     types = {"output": {"file_types": ["png", "pdf", "html"]}}
     dump(
-        {**_format("all"), "variable_parameters": types}, project / "house" / "formats" / "all.yaml"
+        _format("all", tuple(types["output"]["file_types"])),
+        project / "house" / "formats" / "all.yaml",
     )
     path = write_layout(
         project,
@@ -440,16 +502,13 @@ def test_a_layout_sets_its_formats_variable_parameters(project):
 
 def test_a_layout_cant_set_its_formats_fixed_parameters():
     [found] = _check({"figure": {"width": 200}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
-    assert (
-        found
-        == "variable_parameters.figure.width: fixed by format 'forgegraph_base/base_layout_format'"
-    )
+    assert found == "figure.width: fixed by format 'forgegraph_base/base_layout_format'"
 
 
 @pytest.mark.slow
 def test_with_a_border_the_tab_bars_line_is_its_top(project):
     dump(
-        {**_format("page"), "variable_parameters": {"output": {"file_types": ["html"]}}},
+        _format("page", ("html",)),
         project / "house" / "formats" / "page.yaml",
     )
     path = write_layout(
@@ -463,7 +522,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     text = page_file.read_text()
     figure = layout.tabs[0].figure
     width_pt = figure.get_size_inches()[0] * 72
-    out, half = 1.5 * 10 / 2, 0.05 * 10 / 2  # the border's centre and half its width, pt
+    out, half = 1.5 * 10 / 2, 0.07 * 10 / 2  # the border's centre and half its width, pt
     svg = base64.b64decode(re.findall(r"base64,([^\"]+)", text)[0])
     box = re.search(rb'viewBox="([^"]+)"', svg)
     assert box is not None
@@ -471,7 +530,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     assert (left, top) == pytest.approx((out - half, out + half), abs=1e-3)  # top side cut off
     assert width == pytest.approx(width_pt - 2 * out + 2 * half, abs=1e-3)
     assert f"main {{ max-width: {width:g}pt; }}" in text
-    assert "border-bottom: 0.5pt solid #D9D9D9" in text  # the tab bar's line, as the border
+    assert "border-bottom: 0.7pt solid #000000" in text  # the tab bar's line, as the border
 
 
 @pytest.mark.slow
@@ -541,7 +600,7 @@ def test_a_graphspec_saves_as_a_page(project):
 
 
 def _check(variable: dict[str, Any]) -> list[str]:
-    layout = doc("forgegraph_base/base_layout", variable=variable)
+    layout = doc("forgegraph_base/layout_example", variable=variable)
     return validate("layout", layout, builtin().copy())
 
 
@@ -566,9 +625,7 @@ def test_grid_rules(grid, tiles, message):
 def test_sizes_need_one_per_column_or_row():
     grid = {"areas": [["a", "b"]], "column_widths": [1, 2, 3]}
     found = _check({"tabs": {"T": {"grid": grid, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}})
-    assert found == [
-        "variable_parameters.tabs.T.grid.column_widths: 3 sizes, but the grid has 2 columns"
-    ]
+    assert found == ["tabs.T.grid.column_widths: 3 sizes, but the grid has 2 columns"]
 
 
 def test_row_heights_with_height_auto_is_an_error():
@@ -597,12 +654,24 @@ def test_a_layouts_tabs_replace_those_it_inherits(project):
         "specifications.format": "house/auto",
         "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
     }
-    base = doc("forgegraph_base/base_layout", "base", variable=old)
+    base = doc("forgegraph_base/layout_example", "base", variable=old)
     dump(base, project / "house" / "layouts" / "base.yaml")
     new = {"tabs": {"New": tab([["power"]], power="power.yaml")}}
     dump(doc("house/base", "child", variable=new), project / "child.layout.yaml")
     layout = fg.layout(project / "child.layout.yaml")
     assert [t.name for t in layout.tabs] == ["New"]
+
+
+def test_tabs_tagged_fix_cant_be_replaced_and_tags_go_on_tabs():
+    reg = builtin().copy()
+    base = doc(
+        "forgegraph_base/layout_example", "base", fixed={"tabs": {"Old": tab([["a"]], a="a.yaml")}}
+    )
+    reg.add("layout", base)
+    child = doc("base", "child", untagged={"tabs": {"New": tab([["b"]], b="b.yaml")}})
+    assert validate("layout", child, reg) == ["tabs: fixed by layout 'base'"]
+    inside = {"tabs": {"T": {"grid": fix({"areas": [["a"]]}), "tiles": {"a": "a.yaml"}}}}
+    assert _check(inside) == ["tabs.T.grid: a tag goes on tabs, not inside them"]
 
 
 def test_unset_and_missing_tiles_are_errors(project):

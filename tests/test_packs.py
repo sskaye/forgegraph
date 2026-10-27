@@ -77,7 +77,7 @@ def test_a_folder_config_allows_its_packs(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")
     g = fg.render(graphspec(tmp_path, "acme/acme", "acme/slide"))
-    assert g.values["theme"]["font.family"] == "IBM Plex Serif"
+    assert g.values["theme"]["text.font"] == "IBM Plex Serif"
     record = g.record()
     assert record is not None and record["specs"]["theme"] == {
         "name": "acme/acme",
@@ -93,7 +93,7 @@ def test_under_an_acme_only_config_the_base_specs_cant_be_named(tmp_path):
     with pytest.raises(fg.SpecError) as e:
         fg.render(graphspec(tmp_path, "forgegraph_base/base_theme", "acme/slide"))
     assert e.value.problems == [
-        "variable_parameters.specifications.theme: 'forgegraph_base/base_theme' is in the pack "
+        "specifications.theme: 'forgegraph_base/base_theme' is in the pack "
         f"'forgegraph_base', which {main} and {config} doesn't allow"
     ]
 
@@ -108,7 +108,7 @@ def test_graph_types_and_layer_types_are_always_available(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")
     reg = registry_for(tmp_path)
-    assert "xy" in reg.docs["graph_type"] and "reference_line" in reg.docs["layer"]
+    assert "xy" in reg.docs["graph_type"] and "reference" in reg.docs["layer"]
 
 
 def test_a_folder_config_narrows_the_main_config(tmp_path, monkeypatch):
@@ -157,8 +157,7 @@ def _loud(root: Path, extends: str = "acme/acme") -> Path:
     house = write_pack(root)
     (house / "themes").mkdir()
     (house / "themes" / "loud.yaml").write_text(
-        f"name: loud\nversion: 0\ndescription: test\nextends: {extends}\n"
-        "fixed_parameters: None\nvariable_parameters: None\n"
+        f"name: loud\nversion: 0\ndescription: test\nextends: {extends}\nparameters: None\n"
     )
     return house
 
@@ -368,7 +367,7 @@ def test_a_packs_fonts_are_registered_once_its_specs_are_used(tmp_path):
     (house / "themes").mkdir()
     (house / "themes" / "t.yaml").write_text(
         "name: t\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters: None\n"
+        "parameters: None\n"
     )
     allow(tmp_path, "forgegraph_base", "./house")
 
@@ -408,7 +407,7 @@ def test_the_skills_examples_render_in_acmes_theme_and_format(tmp_path):
         text = path.read_text().replace("forgegraph_base/base_theme", "acme/acme")
         path.write_text(text.replace("forgegraph_base/base_format", "acme/slide"))
         g = fg.render(path)
-        assert g.values["theme"]["font.family"] == "IBM Plex Serif", path.name
+        assert g.values["theme"]["text.font"] == "IBM Plex Serif", path.name
 
 
 def test_a_schedule_extends_a_packs_schedule(tmp_path):
@@ -419,7 +418,7 @@ def test_a_schedule_extends_a_packs_schedule(tmp_path):
     graphspec(tmp_path, "acme/acme", "acme/slide")
     (tmp_path / "lab.schedule.yaml").write_text(
         "name: lab\nversion: 0\ndescription: test\nextends: acme/workday\n"
-        "fixed_parameters: None\nvariable_parameters:\n    targets:\n        files: [g.yaml]\n"
+        "parameters:\n    targets:\n        files: [g.yaml]\n"
     )
     schedule = load(tmp_path / "lab.schedule.yaml")
     assert schedule.cadence.describe().startswith("Mon")

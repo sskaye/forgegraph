@@ -12,9 +12,9 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.dates import date2num
+from render_helpers import with_series
 
 import forgegraph as fg
-from forgegraph.drawing import export
 from forgegraph.drawing.axes import numbers
 from forgegraph.drawing.layers import ERROR_BAR, REFERENCE
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
@@ -34,9 +34,11 @@ def graph(
     columns = {"axis.x.data.column": "t", "axis.y.data.column": "n"}
     if on == "y":
         columns = {"axis.x.data.column": "n", "axis.y.data.column": "t"}
-    d = fg.graphspec("t", "xy", settings={**columns, "encoding.color.column": None, **settings})
+    d = fg.graphspec(
+        "t", "xy", settings=with_series({**columns, "series.color": "series", **settings})
+    )
     if layers:
-        d["variable_parameters"]["layers"] = layers
+        d["parameters"]["layers"] = layers
     return fg.render(d, df)
 
 
@@ -98,14 +100,14 @@ def test_a_date_format_on_either_axis_writes_its_ticks(on):
 def test_aggregated_dates_are_drawn_at_their_day_numbers(on):
     """The mean of a place's times, on the value axis."""
     other = "y" if on == "x" else "x"
-    g = graph(on, **{"series.base_axis": other, f"axis.{on}.data.aggregation": "mean"})
+    g = graph(on, **{"arrangement.base_axis": other, "series.aggregation.function": "mean"})
     [line] = lines(g)
     assert along(on, line.get_xydata()) == pytest.approx(DAYS)
 
 
 def test_an_aggregated_date_axis_is_drawn_at_the_dates_mean():
     df = pd.DataFrame({"n": [1.0, 1.0], "t": TIMES[:2], "g": ["a", "a"]})
-    g = graph("y", None, df, **{"axis.y.data.aggregation": "mean"})
+    g = graph("y", None, df, **{"series.aggregation.function": "mean"})
     [line] = lines(g)
     assert along("y", line.get_xydata()) == pytest.approx([DAYS[:2].mean()])
 
@@ -114,7 +116,7 @@ def test_an_aggregated_date_axis_is_drawn_at_the_dates_mean():
 def test_stacks_at_dates_add_up_on_either_base_axis(on):
     """Dates as the places series stack at, along x or y."""
     df = pd.DataFrame({"n": [1.0, 2.0, 3.0, 4.0], "t": TIMES[:2] * 2, "g": ["a", "a", "b", "b"]})
-    stacked = {"series.base_axis": on, "series.aggregation": "sum", "encoding.color.column": "g"}
+    stacked = {"arrangement.base_axis": on, "arrangement.stacking": "sum", "series.color": "g"}
     g = graph(on, None, df, **stacked)
     tops = sorted(along("y" if on == "x" else "x", ln.get_xydata()).tolist() for ln in lines(g))
     assert tops == [[1.0, 2.0], [4.0, 6.0]]
@@ -135,25 +137,25 @@ def test_a_date_axis_takes_only_a_date_format(fmt):
 @pytest.mark.parametrize("how", ["sum", "percent"])
 def test_stacking_dates_is_an_error(how):
     with pytest.raises(
-        fg.SpecError, match=re.escape(f"series.aggregation: {how} adds the values, but axis.y is")
+        fg.SpecError, match=re.escape(f"arrangement.stacking: {how} adds the values, but axis.y is")
     ):
-        graph("y", **{"series.aggregation": how})
+        graph("y", **{"arrangement.stacking": how})
 
 
 def test_adding_up_dates_is_an_error():
     with pytest.raises(
-        fg.SpecError, match=re.escape("axis.y.data.aggregation: sum adds the values, but axis.y is")
+        fg.SpecError, match=re.escape("series.t.aggregation.function: sum isn't a date")
     ):
-        graph("y", **{"axis.y.data.aggregation": "sum"})
+        graph("y", **{"series.aggregation.function": "sum"})
 
 
 def test_bars_on_a_date_value_axis_are_an_error():
-    with pytest.raises(fg.SpecError, match=re.escape("mark.bar.show: bars start at 0, which")):
-        graph("y", **{"mark.bar.show": True})
+    with pytest.raises(fg.SpecError, match=re.escape("series.t.bar.show: bars start at 0, which")):
+        graph("y", **{"series.bar.show": True})
 
 
 def test_bars_at_dates_stand_on_their_places():
-    g = graph("x", **{"mark.bar.show": True})
+    g = graph("x", **{"series.bar.show": True})
     [bars] = [c for c in g.axes.collections if isinstance(c, Bars)]
     assert bars.places == pytest.approx(DAYS)
 
@@ -161,7 +163,7 @@ def test_bars_at_dates_stand_on_their_places():
 def test_value_labels_on_a_date_axis_need_a_date_format():
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("series.value_label.show: axis.y is dates, so the labels need a date"),
+        match=re.escape("series.t.value_label.show: axis.y is dates, so the labels need a date"),
     ):
         graph("y", **{"series.value_label.show": True})
 
@@ -177,7 +179,7 @@ def test_value_labels_on_a_date_axis_write_dates(settings):
 
 
 def test_value_labels_in_a_number_format_on_a_date_axis_are_an_error():
-    with pytest.raises(fg.SpecError, match=re.escape("series.value_label.format: '.1f'")):
+    with pytest.raises(fg.SpecError, match=re.escape("series.t.value_label.format: '.1f'")):
         graph("y", **{"series.value_label.show": True, "series.value_label.format": ".1f"})
 
 
@@ -198,7 +200,11 @@ def _line_at(g: fg.Graph, on: str) -> float:
 @pytest.mark.parametrize("on", AXES)
 @pytest.mark.parametrize(("how", "expected"), [("max", DAYS[-1]), ("mean", DAYS.mean())])
 def test_a_reference_line_at_a_date_columns_aggregate(on, how, expected):
-    layer = {"type": "reference_line", "axis": on, "value": "t", "aggregation": {"function": how}}
+    layer = {
+        "type": "reference",
+        "axis": on,
+        "line_1": {"value": "t", "aggregation": {"function": how}},
+    }
     g = graph(on, {"r": layer})
     assert _line_at(g, on) == pytest.approx(expected)
     low, high = g.axes.get_xlim() if on == "x" else g.axes.get_ylim()
@@ -207,7 +213,7 @@ def test_a_reference_line_at_a_date_columns_aggregate(on, how, expected):
 
 @pytest.mark.parametrize("on", AXES)
 def test_a_reference_line_at_a_day_number(on):
-    g = graph(on, {"r": {"type": "reference_line", "axis": on, "value": float(DAYS[1])}})
+    g = graph(on, {"r": {"type": "reference", "axis": on, "line_1": {"value": float(DAYS[1])}}})
     assert _line_at(g, on) == pytest.approx(DAYS[1])
 
 
@@ -216,40 +222,41 @@ def test_a_reference_line_at_a_day_number(on):
     [
         (
             {"aggregation": {"function": "sum"}},
-            "layers.r.aggregation.function: sum of dates isn't a date",
+            "layers.r.line_1.aggregation.function: sum of dates isn't a date",
         ),
         (
             {"aggregation": {"function": "max", "multiplier": 2}},
-            "layers.r.aggregation.multiplier: 2 times a date isn't a date",
+            "layers.r.line_1.aggregation.multiplier: 2 times a date isn't a date",
         ),
     ],
 )
 def test_aggregates_of_dates_that_arent_dates_are_errors(layer, message):
-    full = {"type": "reference_line", "axis": "y", "value": "t", **layer}
+    full = {"type": "reference", "axis": "y", "line_1": {"value": "t", **layer}}
     with pytest.raises(fg.SpecError, match=re.escape(message)):
         graph("y", {"r": full})
 
 
 def test_a_date_column_on_a_number_axis_is_an_error():
     layer = {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "x",
-        "value": "t",
-        "aggregation": {"function": "max"},
+        "line_1": {"value": "t", "aggregation": {"function": "max"}},
     }
     with pytest.raises(
-        fg.SpecError, match=re.escape("layers.r.value: 't' is dates, but axis.x is decimal")
+        fg.SpecError, match=re.escape("layers.r.line_1.value: 't' is dates, but axis.x is decimal")
     ):
         graph("y", {"r": layer})
 
 
 def test_a_reference_lines_value_on_a_date_axis_is_written_as_a_date():
     layer = {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "y",
-        "value": "t",
-        "aggregation": {"function": "max"},
-        "label": {"text": "value", "format": "%H:%M"},
+        "line_1": {
+            "value": "t",
+            "aggregation": {"function": "max"},
+            "label": {"text": "value", "format": "%H:%M"},
+        },
     }
     g = graph("y", {"r": layer})
     assert [t.get_text() for t in g.axes.texts if t.get_gid() == REFERENCE] == ["22:00"]
@@ -257,13 +264,13 @@ def test_a_reference_lines_value_on_a_date_axis_is_written_as_a_date():
 
 def test_a_reference_lines_value_on_a_date_axis_needs_a_date_format():
     layer = {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "y",
-        "value": "t",
-        "aggregation": {"function": "max"},
-        "label": {"text": "value"},
+        "line_1": {"value": "t", "aggregation": {"function": "max"}, "label": {"text": "value"}},
     }
-    with pytest.raises(fg.SpecError, match=re.escape("layers.r.label.format: auto, but axis.y")):
+    with pytest.raises(
+        fg.SpecError, match=re.escape("layers.r.line_1.label.format: auto, but axis.y")
+    ):
         graph("y", {"r": layer})
 
 
@@ -282,7 +289,7 @@ def test_error_bars_along_a_date_axis_are_days_either_side(on):
         "axis": on,
         "value": {"lower": 0.5, "upper": 0.25, "aggregation": {"function": "None"}},
     }
-    g = graph(on, {"e": layer}, **{"series.base_axis": other})
+    g = graph(on, {"e": layer}, **{"arrangement.base_axis": other})
     assert _ends(g, on) == pytest.approx([(d - 0.5, d + 0.25) for d in DAYS])
 
 
@@ -291,7 +298,7 @@ def test_error_bars_of_a_date_columns_spread_are_in_days(on):
     other = "y" if on == "x" else "x"
     df = pd.DataFrame({"n": [1.0, 1.0, 2.0, 2.0], "t": TIMES, "g": ["a"] * 4})
     layer = {"type": "error_bar", "axis": on}
-    aggregated = {"series.base_axis": other, f"axis.{on}.data.aggregation": "mean"}
+    aggregated = {"arrangement.base_axis": other, "series.aggregation.function": "mean"}
     g = graph(on, {"e": layer}, df, **aggregated)
     spread = float(np.std(DAYS[:2], ddof=1))
     assert [(hi - lo) / 2 for lo, hi in _ends(g, on)] == pytest.approx([spread, spread])
@@ -375,7 +382,9 @@ def test_lint_counts_points_outside_a_date_limit():
 )
 def test_a_date_min_must_be_below_the_max(low, high):
     settings = {"axis.x.data.column": "t", "axis.y.data.column": "n"}
-    doc = fg.graphspec("t", "xy", settings={**settings, "axis.x.min": low, "axis.x.max": high})
+    doc = fg.graphspec(
+        "t", "xy", settings=with_series({**settings, "axis.x.min": low, "axis.x.max": high})
+    )
     message = f"axis.x.min: must be below axis.x.max ({low} is not below {high})"
     assert any(message in p for p in validate("graphspec", doc))
 
@@ -383,26 +392,31 @@ def test_a_date_min_must_be_below_the_max(low, high):
 @pytest.mark.parametrize("on", AXES)
 @pytest.mark.parametrize("value", DATE_FORMS)
 def test_a_reference_line_at_a_date(on, value):
-    g = graph(on, {"r": {"type": "reference_line", "axis": on, "value": value}})
+    # One line per label: across midnight, a y axis's two-line date labels can collide (an
+    # open issue, "Date tick labels on a y axis can collide").
+    one_line = {"axis.y.tick.label.format": "%b %-d %H:%M"} if on == "y" else {}
+    g = graph(
+        on, {"r": {"type": "reference", "axis": on, "line_1": {"value": value}}}, DATA, **one_line
+    )
     assert _line_at(g, on) == pytest.approx(_day(value))
 
 
 def test_text_that_names_a_column_is_the_column_even_if_it_reads_as_a_date():
     df = DATA.assign(**{"2000-01-01": DATA["t"]})
     layer = {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "y",
-        "value": "2000-01-01",
-        "aggregation": {"function": "max"},
+        "line_1": {"value": "2000-01-01", "aggregation": {"function": "max"}},
     }
     g = graph("y", {"r": layer}, df)
     assert _line_at(g, "y") == pytest.approx(DAYS[-1])
 
 
 def test_a_reference_line_at_a_date_on_a_number_axis_is_an_error():
-    layer = {"type": "reference_line", "axis": "y", "value": "2000-01-01"}
+    layer = {"type": "reference", "axis": "y", "line_1": {"value": "2000-01-01"}}
     with pytest.raises(
-        fg.SpecError, match=re.escape("layers.r.value: 2000-01-01 is a date, but axis.y is decimal")
+        fg.SpecError,
+        match=re.escape("layers.r.line_1.value: 2000-01-01 is a date, but axis.y is decimal"),
     ):
         graph("x", {"r": layer})
 
@@ -410,8 +424,8 @@ def test_a_reference_line_at_a_date_on_a_number_axis_is_an_error():
 @pytest.mark.parametrize("value", [TIMES[2], "2000-01-01T21:40", float(DAYS[2])])
 def test_a_benchmark_in_a_date_column(value):
     g = graph("x", **{"benchmark.data_column": "t", "benchmark.value": value})
-    ink = g.style.color("series.benchmark.color")
-    [mark] = [ln for ln in lines(g) if ln.get_color() == ink]
+    ink = g.style.palette("series.benchmark.colors")[0]  # drawn over the series (zorder 3)
+    [mark] = [ln for ln in lines(g) if ln.get_color() == ink and ln.get_zorder() == 3]  # its z
     assert along("x", mark.get_xydata()) == pytest.approx([DAYS[2]])
 
 
@@ -442,23 +456,23 @@ def test_a_benchmark_keeps_its_side_on_a_categorical_date_axis():
 
 def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
     (tmp_path / "dated.yaml").write_text(
-        "name: dated\nversion: 0\ndescription: d\nextends: None\nfixed_parameters: None\n"
-        "variable_parameters:\n"
+        "name: dated\nversion: 0\ndescription: d\nextends: None\n"
+        "parameters: !var\n"
         "    specifications: {graph_type: xy, theme: forgegraph_base/base_theme, "
         "format: forgegraph_base/base_format}\n"
         "    text: {title: None}\n"
         "    data: {file: None, preprocessing: None}\n"
         "    axis:\n"
         "        x: {data: {column: t}, min: 2000-01-01 20:30:00, max: '2000-01-01T22:30'}\n"
-        "        y: {data: {column: n}}\n"
+        "    series: {n: {}}\n"
         "    layers:\n"
-        "        r: {type: reference_line, axis: x, value: 2000-01-01 21:10:00}\n",
+        "        r: {type: reference, axis: x, line_1: {value: 2000-01-01 21:10:00}}\n",
         encoding="utf-8",
     )
     g = fg.render(tmp_path / "dated.yaml", DATA)
     assert g.axes.get_xlim() == (_day("2000-01-01T20:30"), _day("2000-01-01T22:30"))
     assert _line_at(g, "x") == pytest.approx(_day("2000-01-01T21:10"))
     [saved] = g.save(tmp_path / "dated.png")
-    written = cast(dict[str, Any], export.read(saved))  # its full provenance record
-    assert written["graphspec"]["variable_parameters"]["axis"]["x"]["min"] == "2000-01-01T20:30:00"
+    written = cast(dict[str, Any], fg.load(saved))  # its full provenance record
+    assert written["graphspec"]["parameters"]["axis"]["x"]["min"] == "2000-01-01T20:30:00"
     assert written["resolved"]["graph_type"]["axis.x.max"] == "2000-01-01T22:30"

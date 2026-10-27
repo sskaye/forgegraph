@@ -3,20 +3,16 @@ version: 0          # [int ≥ 0]; The version number of the specification.
 description: Acme's house style, a serif look with a light grid and no box.          # [text]; The description of the theme.
 extends: forgegraph_base/base_theme          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
 
-
 parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     text:
         font: IBM Plex Serif          # [text]; The typeface.
-    title:
+    title:          # [text style]; The graph's title.
         weight: medium          # [light, regular, medium, semibold, bold]; The weight.
-    axis:
-        title:
-            weight: regular          # [light, regular, medium, semibold, bold]; The weight.
     plot_area:
-        border:
+        border:          # [line style]; The plot area's border.
             sides: [left, bottom]          # [left, right, top, bottom, None]; The sides that have a border. If None, there is no border.
         aspect_ratio: 1.6          # [float > 0]; The plot area's width ÷ its height.
-    grid:
+    grid:          # [line style]; The grid lines.
         color: "#DDDDDD"          # [hex color]; The color.
         x:
             show: true          # [true, false]; Whether to draw vertical grid lines at the x ticks.

@@ -31,8 +31,8 @@ def test_a_text_style_has_the_general_texts_parameters():
         member, general = defs[f"title.{name}"], defs[f"text.{name}"]
         assert member.inherits == f"text.{name}"
         assert (member.range, member.description) == (general.range, general.description)
-    assert defs["title.size"].default == 1.05  # the base theme sets its own
-    assert defs["title.font"].default == "Roboto"  # the general text's
+    assert defs["title.size"].default == defs["text.size"].default  # the general text's
+    assert defs["title.font"].default == "Roboto"
     assert defs["axis.tick.label.max_wrap"].inherits is None  # its own parameter
 
 
@@ -57,38 +57,44 @@ def test_a_series_style_has_every_series_parameter():
     defs = definitions("theme")
     assert defs["series.benchmark.line.width"].inherits == "series.line.width"
     assert defs["series.benchmark.value_label.size"].inherits == "series.value_label.size"
-    assert defs["series.benchmark.colors"].default == ["#808080"]
+    assert defs["series.benchmark.colors"].default == defs["series.colors"].default
     assert "series.benchmark.benchmark.colors" not in defs
 
 
 def test_a_member_takes_the_general_value_from_the_nearest_file_that_sets_it():
-    d, reg = theme(text__font="DejaVu Sans", axis__title__font="Source Sans 3")
-    r = resolve("theme", d, reg)
+    _d, reg = theme("base", title__size=1.05)
+    child = doc("base", "child", untagged={"text.font": "DejaVu Sans", "text.size": 1.2})
+    child["parameters"]["axis"] = {"title": {"font": "Source Sans 3"}}
+    reg.add("theme", child)
+    r = resolve("theme", child, reg)
     assert r.value("title.font") == "DejaVu Sans"  # follows the new general font
     assert r.value("axis.tick.label.font") == "DejaVu Sans"
     assert r.value("axis.title.font") == "Source Sans 3"  # its own, set here
-    assert r.value("title.size") == 1.05  # the base theme's own, not the general's
-    assert r["title.font"].origin == "theme 'house'"
+    assert r.value("title.size") == 1.05  # its own, from the theme it extends
+    assert r.value("axis.title.size") == 1.2  # the new general size
+    assert r["title.font"].origin == "theme 'child'"
 
 
 def test_styles_inside_styles_follow_their_chain():
     d, reg = theme(line__width=0.1, series__line__width=0.2)
     r = resolve("theme", d, reg)
-    assert r.value("grid.width") == 0.05  # the base theme sets the grid's
+    assert r.value("grid.width") == 0.1  # the new general line's
     assert r.value("plot_area.border.cap") == "projecting"
     assert r.value("series.benchmark.line.width") == 0.2  # from series.line, not line
     assert r.value("layer.error_bar.cap.width") == 0.25
 
 
 def test_a_members_status_is_its_own():
-    r = resolve("theme", builtin().docs["theme"][BASE], builtin())
+    d, reg = theme(series__benchmark__marker__size=var())
+    r = resolve("theme", d, reg)
     assert r.fixed("title.font")
     assert not r.fixed("series.benchmark.marker.size")  # tagged !var with no value
     assert r.value("series.benchmark.marker.size") == 0.5
+    assert r.fixed("series.marker.edge.width")  # its general's tag is the general's own
 
 
 def test_a_graphspecs_setting_carries_through_to_the_members_that_inherit_it():
-    _, reg = theme("open", text__size=var(), series__line__width=var())
+    _, reg = theme("open", text__size=var(), series__line__width=var(), title__size=1.05)
     spec = fg.graphspec(
         "g",
         "xy",
@@ -98,7 +104,7 @@ def test_a_graphspecs_setting_carries_through_to_the_members_that_inherit_it():
     assert validate("graphspec", spec, reg) == []
     t = explain(spec, reg).theme
     assert t.value("axis.tick.label.size") == 1.2  # inherits text.size, which the GraphSpec set
-    assert t.value("title.size") == 1.05  # set by the base theme itself
+    assert t.value("title.size") == 1.05  # set by the theme itself
     assert t.value("series.benchmark.line.width") == 0.3
     assert t.value("series.benchmark.marker.size") == 0.6
 

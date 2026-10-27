@@ -117,8 +117,8 @@ def _entry_problems(
         if heading is None and value is not UNSET:
             listed.add(path)
         p = defs.get(path)
-        if p is None and value is UNSET and _is_category(path, defs, others):
-            continue  # a tag alone on a category: everything in it takes that status
+        if p is None and (value is UNSET or value is None) and _is_category(path, defs, others):
+            continue  # an empty category, or a tag alone on one: everything in it takes that status
         if p is None and path in others:
             p, owner, fixed = others[path]
             if fixed:

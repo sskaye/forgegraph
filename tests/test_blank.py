@@ -23,7 +23,9 @@ def test_a_canvas_is_drawn_in_its_theme_and_saved_watermarked(tmp_path):
         canvas.axes.set_title("Anything")
     [line] = canvas.axes.get_lines()
     assert line.get_color() == "#0072B2"  # okabe_ito's first
-    assert line.get_linewidth() == pytest.approx(0.15 * 18)  # series.line.width times base size
+    assert line.get_linewidth() == pytest.approx(
+        canvas.style.pt("series.line.width")
+    )  # times the base size
     [path] = canvas.save(tmp_path / "c.png")
     assert any(a.get_gid() == WATERMARK for a in canvas.axes.get_children())
     record = fg.load(path)

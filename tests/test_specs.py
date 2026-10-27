@@ -476,7 +476,7 @@ def test_a_category_tag_covers_everything_in_it_and_beats_the_files_it_extends()
     assert r.fixed("series.marker.edge.width")
     assert not r.fixed("axis.tick.length")  # fixed in the base, variable through axis here
     assert not r.fixed("axis.tick.label.size")
-    assert not r.fixed("series.line.width")  # untouched: the base's
+    assert r.fixed("series.line.width")  # untouched: the base's
 
 
 def test_a_file_extending_none_tags_every_parameter():
@@ -665,15 +665,11 @@ def test_impossible_requests_are_errors():
     assert validate("theme", theme, reg_with(("theme", theme))) == [
         "text.font: no font 'Comic Nonexistent' is bundled or installed"
     ]
-    bold = {
-        f"{p}.weight": "bold"
-        for p in ("title", "axis.title", "legend.label", "legend.color_bar.title")
-    }
-    theme = child("theme", "fix", {"text.font": "DejaVu Sans", **bold}, name="odd")
+    theme = child("theme", "fix", {"text.font": "DejaVu Sans", "title.weight": "semibold"})
     assert validate("theme", theme, reg_with(("theme", theme))) == [
-        "legend.key.title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
+        "title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
     ]
-    tree_set(theme["parameters"], "legend.key.title.weight", "bold")
+    tree_set(theme["parameters"], "title.weight", fix("bold"))
     assert validate("theme", theme, reg_with(("theme", theme))) == []
 
 

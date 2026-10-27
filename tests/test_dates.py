@@ -382,7 +382,10 @@ def test_a_date_min_must_be_below_the_max(low, high):
 @pytest.mark.parametrize("on", AXES)
 @pytest.mark.parametrize("value", DATE_FORMS)
 def test_a_reference_line_at_a_date(on, value):
-    g = graph(on, {"r": {"type": "reference_line", "axis": on, "value": value}})
+    # One line per label: across midnight, a y axis's two-line date labels can collide (an
+    # open issue, "Date tick labels on a y axis can collide").
+    one_line = {"axis.y.tick.label.format": "%b %-d %H:%M"} if on == "y" else {}
+    g = graph(on, {"r": {"type": "reference_line", "axis": on, "value": value}}, DATA, **one_line)
     assert _line_at(g, on) == pytest.approx(_day(value))
 
 
@@ -409,8 +412,8 @@ def test_a_reference_line_at_a_date_on_a_number_axis_is_an_error():
 @pytest.mark.parametrize("value", [TIMES[2], "2000-01-01T21:40", float(DAYS[2])])
 def test_a_benchmark_in_a_date_column(value):
     g = graph("x", **{"benchmark.data_column": "t", "benchmark.value": value})
-    ink = g.style.palette("series.benchmark.colors")[0]
-    [mark] = [ln for ln in lines(g) if ln.get_color() == ink]
+    ink = g.style.palette("series.benchmark.colors")[0]  # drawn over the series (zorder 3)
+    [mark] = [ln for ln in lines(g) if ln.get_color() == ink and ln.get_zorder() == 3]  # its z
     assert along("x", mark.get_xydata()) == pytest.approx([DAYS[2]])
 
 

@@ -37,11 +37,12 @@ def test_sizes_come_from_the_theme_and_base_font():
     g = render(format={"figure.base_size": 10})
     ax = g.axes
     tick = ax.get_xticklabels()[0]
-    assert tick.get_fontsize() == pytest.approx(0.9 * 10)
-    assert ax.xaxis.label.get_fontsize() == pytest.approx(1.05 * 10)
-    assert ax.xaxis.label.get_fontweight() in ("semibold", 600)
-    assert ax.get_lines()[0].get_linewidth() == pytest.approx(0.15 * 10)
-    assert ax.spines["left"].get_linewidth() == pytest.approx(0.08 * 10)
+    t = g.style.theme
+    assert tick.get_fontsize() == pytest.approx(t["axis.tick.label.size"] * 10)
+    assert ax.xaxis.label.get_fontsize() == pytest.approx(t["axis.title.size"] * 10)
+    assert ax.xaxis.label.get_fontweight() in (t["axis.title.weight"], "normal", 400)
+    assert ax.get_lines()[0].get_linewidth() == pytest.approx(t["series.line.width"] * 10)
+    assert ax.spines["left"].get_linewidth() == pytest.approx(t["plot_area.border.width"] * 10)
 
 
 def test_given_dimensions_are_exact_and_auto_ones_fit(tmp_path):
@@ -78,7 +79,7 @@ def test_series_colors_rejects_an_unknown_palette():
 
 
 def test_series_colors_follow_the_group_order_and_the_benchmark_has_its_own_style():
-    g = render()
+    g = render(theme={"series.benchmark.colors": ["#808080"]})
     colors = [line.get_color() for line in g.axes.get_lines()]
     assert colors[:6] == [
         "#0072B2",
@@ -128,7 +129,7 @@ def test_interior_labels_name_each_cell_in_its_color():
         "Cell A": "#0072B2",
         "Cell B": "#E69F00",
         "Cell C": "#009E73",
-        "Benchmark": "#808080",
+        "Benchmark": "#0072B2",  # each list's first item: the palette's first color
     }
 
 
@@ -208,12 +209,13 @@ def test_log_ticks_by_matplotlib_are_powers_of_ten():
 
 
 def test_log_tick_labels_fit():
-    """With room for 10 labels, the linear algorithm asks breaks_log for 7 across these 3.3
-    decades: 1e-05, 3e-05, ... whose labels would overlap. The fit drops to powers of ten."""
-    frame = pd.DataFrame({"rate": np.geomspace(1e-5, 1e-2, 10), "v": np.geomspace(50, 2e5, 10)})
+    """Across these 4 decades breaks_log gives 1e-06, 3e-06, ..., whose labels would overlap.
+    The fit drops to powers of ten."""
+    frame = pd.DataFrame({"rate": np.geomspace(1e-6, 1e-2, 10), "v": np.geomspace(50, 2e5, 10)})
+    assert len(breaks_log(1e-6, 1e-2, 10) or []) > 5
     g = fg.xy(frame, x="rate", y="v", parameters={"axis.x.scale": "log", "axis.y.scale": "log"})
     assert [i.check for i in g.issues] == []
-    assert len(g.axes.xaxis.get_majorticklocs()) < 7
+    assert all(float(np.log10(t)).is_integer() for t in g.axes.xaxis.get_majorticklocs())
 
 
 def test_layout_fits_tick_labels_that_change_with_the_box():
@@ -238,7 +240,7 @@ def test_a_date_axis_has_no_offset_text_beside_it():
 
 
 def test_key_samples_have_the_plots_marker_size():
-    big = {"series.marker.size": 0.9, "series.benchmark.marker.size": 0.9}
+    big = {"series.marker.size": 0.9}
     g = render({"legend.method": "key", **big})
     [legend] = keys(g.axes)
     sizes = {
@@ -296,9 +298,10 @@ def test_numeric_color_by_draws_a_color_bar():
     assert title.get_text() == "Temperature (°C)"
     renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]
     letters, box, px = footprint(title, renderer), g.axes.bbox, g.figure.dpi / 72
-    assert bar.bbox.x0 == pytest.approx(letters.x0, abs=0.5)  # left-aligned with the bar
+    middle = (bar.bbox.x0 + bar.bbox.x1) / 2  # centred over the bar (its alignment)
+    assert (letters.x0 + letters.x1) / 2 == pytest.approx(middle, abs=0.5)
     assert letters.y1 == pytest.approx(box.y1, abs=0.5)  # level with the plot box's top
-    gap = g.style.pt("axis.title.gap") * px
+    gap = g.style.pt("legend.color_bar.title.gap") * px
     assert letters.y0 - bar.bbox.y1 == pytest.approx(gap, abs=0.5)
     assert bar.bbox.y0 == pytest.approx(box.y0)
 

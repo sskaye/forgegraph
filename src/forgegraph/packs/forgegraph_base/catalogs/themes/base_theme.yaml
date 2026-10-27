@@ -54,6 +54,18 @@ baselines:          # Numbered baselines: generic scenarios, each the baseline w
         mark.line.show: false
         mark.marker.show: false
         series.value_label.show: true
+    labelled_beyond:          # [parameters and their values, or non-standard]; The bars, each with its value beyond it, so the value labels' own color shows.
+        axis.x.data.column: Cell
+        axis.y.data.column: "Power Density (mW/cm²)"
+        axis.y.data.aggregation: max
+        axis.x.tick.algorithm: all
+        encoding.color.column: None
+        encoding.detail.column: None
+        mark.bar.show: true
+        mark.line.show: false
+        mark.marker.show: false
+        series.value_label.show: true
+        series.value_label.position: outside
     wrapped:          # [parameters and their values, or non-standard]; The bars, with a cell name wider than the space between ticks, so it wraps.
         axis.x.data.column: Cell
         axis.y.data.column: "Power Density (mW/cm²)"

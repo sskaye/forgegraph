@@ -79,30 +79,11 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             total:\
                 show: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
         opacity: 1          *# \[0-1\]; The opacity of lines, markers and bars.*\
-        line:\
-            width: 0.15          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
         marker:\
             size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
-            edge:\
-                width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
         bar:\
             width: 0.8          *# \[0-1\]; The fraction of the distance between neighboring bar positions that the bars at one position fill.*\
             gap: 0.1          *# \[0-1\]; The fraction of each side-by-side bar's space left empty between it and the next bar.*\
-            edge:\
-                width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
-        benchmark:\
-            line:\
-                styles: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\
-                width: 0.15          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
-            marker:\
-                shapes: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
-                size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
-                edge:\
-                    width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
-            bar:\
-                width: 0.8          *# \[0-1\]; The fraction of the distance between neighboring bar positions that the bars at one position fill.*\
-                edge:\
-                    width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
     benchmark:\
         data_column: Cell          *# \[None, column_name, column\]; Column marking the benchmark. column_name: a y column. None: no benchmark.*\
         value: Benchmark          *# \[None, text, float, date\]; The benchmark's value in data_column (for column_name, a y column's name; for a date column, a date), drawn in series.benchmark style. Set with data_column.*\
@@ -127,8 +108,6 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             title:\
                 text: column_name          *# \[None, column_name, text\]; Color bar title. column_name: the encoding.color.column column's name. None: none.*\
             colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; The colors for a numeric color column.*\
-        label:\
-            gap: 0.2          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
         direct:\
             max_relative_distance: 0.8          *# \[0-1\]; The farthest a direct label may be from its series, ÷ its distance to the next nearest series.*\
     grid:\

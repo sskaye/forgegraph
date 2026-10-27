@@ -1,4 +1,4 @@
-# Format specification: <!-- fmc:2 -->wide_format<!-- /fmc:2 -->
+# Format specification: wide_format
 
 <!-- fmc:1 -->This page mirrors src/forgegraph/packs/forgegraph_base/formats/base_format.yaml,<!-- /fmc:1 --> which is the specification. A test fails if they ever differ.
 
@@ -27,14 +27,6 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec or lay
   timestamp: "2026-10-27T19:05:05.573Z"
   resolved: false
   body: fix
-- id: 2
-  anchor_text: graph_format
-  context_before: "# Format specification:"
-  context_after: "This page mirrors src/forgegraph/packs/forgegraph_base/formats/base_format.yaml,"
-  author: "Steven Kaye"
-  timestamp: "2026-10-27T19:06:27.774Z"
-  resolved: false
-  body: "Is there an issue with name collisions for specs inside a pack? If so, we’d need the pack name as part of the spec name. If not, I like this one."
 - id: 3
   anchor_text: "450"
   context_before: "he setting of the one above them unless explicitly overridden.*\\ figure:\\ width:"

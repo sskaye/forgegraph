@@ -81,7 +81,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 show: false          *# \[true, false\]; Whether to draw bars. Bars start at 0, or at 1 on a log axis, and the value axis then always includes that value.*\
                 width: 0.8          *# \[0-1\]; The fraction of the distance between neighboring bar positions that the bars at one position fill.*\
                 gap: 0.1          *# \[0-1\]; The fraction of each side-by-side bar's space left empty between it and the next bar.*\
-            value_label:          *# \[text style\]; The value labels. Its look comes from the theme's series.value_label, and a GraphSpec may change what the theme marks !var.*\
+            value_label:          *# \[text style, look from series.value_label\]; The value labels.*\
                 show: false          *# \[true, false\]; Whether to write each value next to its mark.*\
                 position: auto          *# \[auto, inside, outside\]; Where each value is written: inside the end of its bar, or outside, just beyond its mark. auto writes it inside if it fits and outside otherwise. On stacks, values are always inside.*\
                 format: auto          *# \[auto, format\]; The value label format. auto uses the format of the value axis's tick labels.*\
@@ -121,7 +121,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             fill:\
                 color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
                 opacity: 0.15          *# \[0-1\]; The fill opacity.*\
-    layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses.*\
+    layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.*\
         target:\
             type: reference          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
             axis: y          *# \[x, y\]; The axis the values are on. y draws horizontal lines.*\

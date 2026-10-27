@@ -6,15 +6,15 @@ GraphSpec changes an inherited layer's parameters by naming it, replaces it by g
 type, and removes it with None; it can't change a layer tagged !fix, itself or through the
 layers category. A tag goes on a layer or on layers, never inside a layer.
 
-A layer type's category whose look comes from the theme ("Its look comes from the theme's
-layer.note") takes the theme category's parameters, and a layer may set, for itself alone,
+A layer type's category whose look comes from the theme (`[look from layer.note]` in its
+brackets) takes the theme category's parameters, and a layer may set, for itself alone,
 those the theme leaves variable (look_paths).
 """
 
 from __future__ import annotations
 
-import re
 from functools import cache
+from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
@@ -22,49 +22,60 @@ from ruamel.yaml import YAML
 from forgegraph.spec.common import suggest
 from forgegraph.spec.parameters import (
     PARAMETERS,
-    _comment,
+    Notes,
+    category_notes,
     check_parameter,
     definition_file,
     definitions,
     flatten,
     is_none,
+    styles_in,
 )
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
 from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
 
-_LOOK = re.compile(r"Its look comes from the theme's ([\w.]+?),")
-_SAME = re.compile(r"Same parameters as (\w+)\.")
-
 
 @cache
 def look_paths(kind: str) -> dict[str, str]:
     """The theme parameters a layer type's entry may set for itself, by their path in the
-    entry: each a parameter of a theme category its look comes from."""
-    path = definition_file("layer", kind)
+    entry (see looks_in)."""
+    return looks_in(definition_file("layer", kind))
+
+
+def looks_in(path: Path) -> dict[str, str]:
+    """The theme parameters an entry of the layer type defined at path may set for itself, by
+    their path in the entry: those of the theme category each of its categories takes its
+    look from (look from), which must have the category's style; a copy of a category (same
+    as) takes the same."""
     data = YAML().load(path.read_text(encoding="utf-8"))
+    theme, styles = definitions("theme"), styles_in("theme")
     looks: dict[str, str] = {}  # each category's path in the entry ("" for all of it): its theme's
 
-    def walk(node: Any, prefix: str, comment: str | None) -> None:
-        if comment and (m := _LOOK.search(comment)):
-            looks[prefix] = m[1]
+    def take(prefix: str, found: Notes | None) -> None:
+        if found is None or found.look is None:
+            return
+        where = f"{path.name}: {prefix or PARAMETERS}: look from {found.look}"
+        if not any(t.startswith(f"{found.look}.") for t in theme):
+            raise ValueError(f"{where}: no theme category")
+        if styles.get(found.look) != found.style:
+            raise ValueError(f"{where}: {_a(styles.get(found.look))}, not {_a(found.style)}")
+        looks[prefix] = found.look
+
+    def walk(node: Any, prefix: str) -> None:
         for key in node if hasattr(node, "items") else []:
             here = f"{prefix}.{key}" if prefix else str(key)
-            text = _comment(node, key)
-            if text and (same := _SAME.search(text)):  # a sibling's, under its own name
-                parent = prefix + "." if prefix else ""
-                source = parent + same[1]
-                looks.update(
-                    {
-                        here + k[len(source) :]: v
-                        for k, v in dict(looks).items()
-                        if k.startswith(source)
-                    }
-                )
-            walk(node[key], here, text)
+            found = category_notes(node, key, f"{path.name}: {here}")
+            if found is not None and found.same is not None:  # a sibling's, under its own name
+                source = f"{prefix}.{found.same}" if prefix else found.same
+                for k, v in dict(looks).items():
+                    if k == source or k.startswith(f"{source}."):
+                        looks[here + k[len(source) :]] = v
+            take(here, found)
+            walk(node[key], here)
 
-    walk(data[PARAMETERS], "", _comment(data, PARAMETERS))
-    theme = definitions("theme")
+    take("", category_notes(data, PARAMETERS, f"{path.name}: {PARAMETERS}"))
+    walk(data[PARAMETERS], "")
     out = {}
     for prefix, category in looks.items():
         for t in theme:
@@ -72,6 +83,10 @@ def look_paths(kind: str) -> dict[str, str]:
                 member = t[len(category) + 1 :]
                 out[f"{prefix}.{member}" if prefix else member] = t
     return out
+
+
+def _a(style: str | None) -> str:
+    return f"a {style}" if style else "no style"
 
 
 def _layers_in(d: dict[str, Any]) -> list[tuple[bool, str, Any]]:

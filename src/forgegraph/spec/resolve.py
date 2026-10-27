@@ -179,8 +179,8 @@ def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | Non
 
 
 def _copies(kind: str, doc: dict[str, Any], reg: Registry) -> list[Parameter]:
-    """A kind's parameters in a category with a sibling's parameters ("Same parameters as
-    x."): no file need list them."""
+    """A kind's parameters in a category with a sibling's parameters (`[same as x]`): no file
+    need list them."""
     if kind != "graph_type":
         return []
     return [p for p in definitions_for(kind, doc, reg).values() if p.same is not None]

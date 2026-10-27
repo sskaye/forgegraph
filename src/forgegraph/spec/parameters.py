@@ -107,7 +107,8 @@ STYLES = {
     "aggregation style": "aggregation_style",  # styles.yaml's
 }
 LOOKS = ("text style", "line style")  # in a graph type or layer: the theme's look, not its own
-_SAME = re.compile(r"Same parameters as (?P<name>\w+)\.")  # a category copying a sibling's
+_NAME = re.compile(r"^\w+$")
+_PATH = re.compile(r"^\w+(\.\w+)*$")
 # The members a style's category can't use, so they aren't its parameters (setting one is an
 # error): what it draws has no use for them.
 EXCLUDED = {
@@ -190,6 +191,51 @@ class Range:
         parts = [*self.literals, *(i.describe() for i in self.intervals)]
         parts += [_TYPE_TEXT[t] for t in self.types]
         return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " or " + parts[-1]
+
+
+@dataclass(frozen=True)
+class Notes:
+    """What a category's brackets say about it, the only part of its comment code reads: its
+    style, the sibling whose parameters and defaults it has (same as), and the theme category
+    its look comes from (look from). Its description is for people."""
+
+    style: str | None = None
+    same: str | None = None
+    look: str | None = None
+
+
+def notes(text: str, where: str) -> Notes:
+    """A category's annotations, separated by commas: a style word, `same as <sibling>` and
+    `look from <theme category>`. Anything else is an error."""
+    found: dict[str, str] = {}
+    for item in (s.strip() for s in text.split(",")):
+        name = item.removeprefix("same as ").strip()
+        path = item.removeprefix("look from ").strip()
+        if item in STYLES:
+            key, value, twice = "style", item, "two styles"
+        elif item.startswith("same as ") and _NAME.match(name):
+            key, value, twice = "same", name, "two 'same as'"
+        elif item.startswith("look from ") and _PATH.match(path):
+            key, value, twice = "look", path, "two 'look from'"
+        else:
+            raise ValueError(
+                f"{where}: unknown annotation '{item}'; a category's brackets take a style "
+                f"({', '.join(STYLES)}), same as <sibling> or look from <theme category>"
+            )
+        if key in found:
+            raise ValueError(f"{where}: {twice}")
+        found[key] = value
+    return Notes(**found)
+
+
+def category_notes(node: Any, key: str, where: str) -> Notes | None:
+    """A category's annotations, if its comment has brackets; None if it has none, or if key
+    is a parameter, whose brackets are its range."""
+    value = node[key]
+    if not (hasattr(value, "items") or value is None or _bare(value)):
+        return None
+    m = _COMMENT.match(_comment(node, key) or "")
+    return notes(m["range"], where) if m else None
 
 
 @dataclass(frozen=True)
@@ -523,12 +569,14 @@ def _walk(
         path = f"{prefix}.{key}" if prefix else str(key)
         comment = _comment(node, key)
         m = _COMMENT.match(comment or "")
-        same = _SAME.search(comment or "") if not m else None
-        if same and not hasattr(value, "items"):
+        found = category_notes(node, key, f"{where.name}: {path}") or Notes()
+        if found.same is not None:
+            if found.same not in node or found.same == key:
+                raise ValueError(f"{where.name}: {path}: same as {found.same}: no sibling category")
             parent = path.rsplit(".", 1)[0] if "." in path else ""
-            out.append(_Same(path, f"{parent}.{same['name']}" if parent else same["name"], status))
-        elif m and m["range"] in STYLES:
-            out.append(_Style(path, m["range"], status))
+            out.append(_Same(path, f"{parent}.{found.same}" if parent else found.same, status))
+        elif found.style is not None:
+            out.append(_Style(path, found.style, status))
             if hasattr(value, "items"):
                 out += _walk(path, value, status, where, in_style=True)
         elif hasattr(value, "items"):
@@ -665,7 +713,11 @@ def _style_definitions(general: str) -> dict[str, Parameter]:
 @cache
 def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Parameter]]:
     """(header, parameters) of a definition file."""
-    path = definition_file(kind, name)
+    return read_file(kind, definition_file(kind, name))
+
+
+def read_file(kind: str, path: Path) -> tuple[dict[str, Parameter], dict[str, Parameter]]:
+    """(header, parameters) of the file at path, defining a kind."""
     data = YAML().load(path.read_text(encoding="utf-8"))
     if kind == "layer":
         header = {
@@ -683,12 +735,21 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
     tree = data[PARAMETERS]
     root = _tag(tree)
     for category, entries in tree.items():
-        style = _COMMENT.match(_comment(tree, category) or "")
-        if not hasattr(entries, "items") and not (style and style["range"] in STYLES):
+        found = category_notes(tree, category, f"{path.name}: {category}")
+        if not hasattr(entries, "items") and not (found and found.style):
             raise ValueError(f"{path.name}: {PARAMETERS}.{category} must be a category")
     items = _walk("", tree, root, path, skip=COLLECTIONS.get(kind, ()))
     looks = kind not in CORE_KINDS
     return header, {p.path: p for p in _parameters(items, tree, path, looks)}
+
+
+@cache
+def styles_in(kind: str) -> dict[str, str]:
+    """Each of a kind's categories marked with a style, by path: its style word."""
+    path = definition_file(kind)
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    items = _walk("", data[PARAMETERS], False, path)
+    return {i.path: i.word for i in items if isinstance(i, _Style)}
 
 
 @cache

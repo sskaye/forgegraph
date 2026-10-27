@@ -21,7 +21,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 step: None          # [None, float > 0, text]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.
                 label:
                     format: auto          # [auto, format]; The tick label format. auto chooses one from the values, and for dates, from the tick unit.
-        y:          # The vertical axis. Same parameters as x.
+        y:          # [same as x]; The vertical axis.
     arrangement:          # How the series are placed relative to each other.
         base_axis: x          # [x, y]; The common axis for all series. Bars stand on it, and stacking adds values along the other axis.
         stacking: none          # [none, sum, percent]; How series at the same location are combined. none draws each as it is, sum stacks them, and percent stacks them to 100 %.
@@ -48,7 +48,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 fill: first          # [first, series, filled, open, column]; The marker fill. first is the theme's first marker fill, series takes the next one, and a column gives each of its values its own.
             bar:
                 show: false          # [true, false]; Whether to draw bars. Bars start at 0, or at 1 on a log axis, and the value axis then always includes that value.
-            value_label:          # [text style]; The value labels. Its look comes from the theme's series.value_label, and a GraphSpec may change what the theme marks !var.
+            value_label:          # [text style, look from series.value_label]; The value labels.
                 show: false          # [true, false]; Whether to write each value next to its mark.
                 position: auto          # [auto, inside, outside]; Where each value is written: inside the end of its bar, or outside, just beyond its mark. auto writes it inside if it fits and outside otherwise. On stacks, values are always inside.
                 format: auto          # [auto, format]; The value label format. auto uses the format of the value axis's tick labels.

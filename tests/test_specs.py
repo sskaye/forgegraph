@@ -16,6 +16,7 @@ from pack_helpers import doc
 from ruamel.yaml import YAML
 
 import forgegraph as fg
+from forgegraph.spec.layers import look_paths, looks_in
 from forgegraph.spec.parameters import (
     BASE,
     CORE_KINDS,
@@ -23,6 +24,7 @@ from forgegraph.spec.parameters import (
     KINDS,
     NONE,
     REFERENCE,
+    Notes,
     Parameter,
     _parameters,
     _read,
@@ -30,7 +32,9 @@ from forgegraph.spec.parameters import (
     _walk,
     definition_file,
     definitions,
+    notes,
     parse_range,
+    read_file,
     series_definitions,
     tree_set,
 )
@@ -159,6 +163,104 @@ def test_definition_file_layout(kind, name):
             assert re.search(r"\S {10}# ", line), (
                 f"line {n}: comment must sit ten spaces after the text"
             )
+
+
+# --- a category's annotations: the only part of its comment code reads -------------------
+
+
+def test_a_categorys_brackets_hold_its_annotations():
+    assert notes("same as x", "t.yaml: y") == Notes(same="x")
+    assert notes("line style, look from layer.reference.line", "t.yaml: line") == Notes(
+        "line style", look="layer.reference.line"
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("same as", "unknown annotation 'same as'"),
+        ("looks from layer.note", "unknown annotation 'looks from layer.note'"),
+        ("text style, line style", "two styles"),
+        ("same as x, same as y", "two 'same as'"),
+    ],
+)
+def test_an_annotation_outside_the_set_is_an_error(text, message):
+    with pytest.raises(ValueError, match=re.escape(f"t.yaml: y: {message}")):
+        notes(text, "t.yaml: y")
+
+
+def test_a_copied_category_has_its_siblings_parameters_and_defaults():
+    axes = definitions("graph_type")
+    assert axes["axis.y.scale"].same == "axis.x.scale"
+    assert axes["axis.y.scale"].default == axes["axis.x.scale"].default
+    assert definitions("layer", "reference")["line_2.scope"].same == "line_1.scope"
+
+
+def test_a_layers_look_comes_from_the_theme_category_its_brackets_name():
+    looks = look_paths("reference")
+    assert looks["line_1.line.width"] == "layer.reference.line.width"
+    assert looks["line_2.label.weight"] == "layer.reference.label.weight"  # copied from line_1
+    assert looks["fill.opacity"] == "layer.reference.fill.opacity"
+    assert look_paths("note")["size"] == "layer.note.size"
+
+
+LAYER_FILE = """\
+name: t          # [text]; The name of the layer type.
+version: 0          # [int ≥ 0]; The version number of the specification.
+description: A test layer.          # [text]; The description of the layer type.
+
+parameters:
+    text: None          # [text]; The text.
+    first:          # {first}
+        value: 1          # [float]; A value.
+    second:          # {second}
+"""
+
+
+def _layer_file(tmp_path, first: str = "The first.", second: str = "[same as first]; The second."):
+    path = tmp_path / "t.yaml"
+    path.write_text(LAYER_FILE.format(first=first, second=second), encoding="utf-8")
+    return path
+
+
+def test_a_description_is_never_read(tmp_path):
+    """Its wording can change freely: without brackets, a sentence saying where a look comes
+    from, or that a category copies another, means nothing to the code."""
+    path = _layer_file(
+        tmp_path,
+        first="The first. Its look comes from the theme's layer.note, and so on.",
+        second="[same as first]; The second. Same parameters as text.",
+    )
+    assert looks_in(path) == {}
+    assert read_file("layer", path)[1]["second.value"].same == "first.value"
+
+
+def test_a_look_from_a_theme_category_takes_its_parameters(tmp_path):
+    path = _layer_file(tmp_path, first="[text style, look from layer.note]; The first.")
+    looks = looks_in(path)
+    assert looks["first.size"] == "layer.note.size"
+    assert looks["second.weight"] == "layer.note.weight"
+
+
+@pytest.mark.parametrize(
+    ("first", "message"),
+    [
+        ("[look from layer.notes]; x.", "first: look from layer.notes: no theme category"),
+        (
+            "[line style, look from layer.note]; x.",
+            "first: look from layer.note: a text style, not a line style",
+        ),
+    ],
+)
+def test_a_look_must_come_from_a_theme_category_of_its_style(tmp_path, first, message):
+    with pytest.raises(ValueError, match=re.escape(f"t.yaml: {message}")):
+        looks_in(_layer_file(tmp_path, first=first))
+
+
+def test_a_copied_category_must_name_a_sibling(tmp_path):
+    path = _layer_file(tmp_path, second="[same as frist]; The second.")
+    with pytest.raises(ValueError, match=r"t\.yaml: second: same as frist: no sibling category"):
+        read_file("layer", path)
 
 
 @pytest.mark.parametrize(("kind", "p"), ALL, ids=IDS)

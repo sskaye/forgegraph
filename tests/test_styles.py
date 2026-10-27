@@ -154,6 +154,7 @@ def test_each_text_takes_its_own_color_and_font():
     g = render(
         theme={
             "title.color": "#AA0000",
+            "title.font": "IBM Plex Serif",
             "axis.title.font": "DejaVu Sans",
             "axis.title.weight": "bold",
             "axis.tick.label.color": "#00AA00",
@@ -164,6 +165,7 @@ def test_each_text_takes_its_own_color_and_font():
     )
     g.figure.canvas.draw()
     assert to_hex(g.axes.title.get_color()) == "#aa0000"
+    assert g.axes.title.get_fontproperties().get_family() == ["IBM Plex Serif"]
     assert g.axes.xaxis.label.get_fontproperties().get_family() == ["DejaVu Sans"]
     assert to_hex(g.axes.xaxis.get_ticklabels()[0].get_color()) == "#00aa00"
     minor = g.axes.xaxis.get_minor_ticks()[0]

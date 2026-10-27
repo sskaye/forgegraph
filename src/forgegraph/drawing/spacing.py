@@ -152,8 +152,10 @@ def _title_pad(ax: Axes, style: Style) -> None:
 
 
 def align_title(ax: Axes, style: Style) -> None:
-    """Put the title at the plot box's left, centre or right (title.alignment). Matplotlib's
-    set_title centres it again, so this follows every call."""
+    """Put the title in its font at the plot box's left, centre or right (title.alignment).
+    Matplotlib's set_title sets its own font and centres it again, so this follows every
+    call."""
+    ax.title.set_fontproperties(title_font(style))
     alignment = cast(Any, str(style.theme["title.alignment"]))
     ax.title.set_horizontalalignment(alignment)
     ax.title.set_x({"left": 0.0, "center": 0.5, "right": 1.0}[alignment])

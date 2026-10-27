@@ -25,11 +25,12 @@ parameters: !var
         spread:
             type: error_bar
         target:
-            type: reference_line
+            type: reference
             axis: y
-            value: 1.2
-            label:
-                text: Target 1.2 V
+            line_1:
+                value: 1.2
+                label:
+                    text: Target 1.2 V
         conditions:
             type: note
             text: "60 °C, 1 atm, H_{2}/air"

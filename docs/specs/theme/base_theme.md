@@ -94,9 +94,12 @@ parameters: !fix          *# !var/!fix sets whether a GraphSpec may ch
         error_bar:          *# \[line style\]; The error bars.*\
             cap:\
                 width: 0.25          *# \[float > 0\]; The width of each error bar's caps, × base size.*\
-        reference_line:\
-            line:          *# \[line style\]; The line. A line drawn per series takes its series' color.*\
-            label:          *# \[text style\]; The line's label. Its color may also be line, which uses the line's color.*\
+        reference:          *# The defaults for every reference layer's lines, labels and fill.*\
+            line: !var          *# \[line style\]; Each line. A line drawn per series takes its series' color.*\
+            label:          *# \[text style\]; Each line's label. Its color may also be line, which uses the line's color.*\
+            fill: !var          *# The fill between the lines of a band.*\
+                color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
+                opacity: 0.15          *# \[0-1\]; The fill opacity.*\
         note:          *# \[text style\]; The notes.*\
     watermark:          *# \[text style\]; The watermark drawn on non-standard graphs.*\
         text: NON-STANDARD          *# \[text\]; The watermark's text.*\

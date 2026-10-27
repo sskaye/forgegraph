@@ -108,7 +108,7 @@ def test_graph_types_and_layer_types_are_always_available(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")
     reg = registry_for(tmp_path)
-    assert "xy" in reg.docs["graph_type"] and "reference_line" in reg.docs["layer"]
+    assert "xy" in reg.docs["graph_type"] and "reference" in reg.docs["layer"]
 
 
 def test_a_folder_config_narrows_the_main_config(tmp_path, monkeypatch):

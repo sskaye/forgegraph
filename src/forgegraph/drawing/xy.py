@@ -600,21 +600,6 @@ def _category_positions(
     return frame
 
 
-AGGREGATES = {"mean": np.mean, "median": np.median, "sum": np.sum, "min": np.min, "max": np.max}
-
-
-def _combine(values: np.ndarray, how: str, percentile: float) -> float:
-    """The rows at one place, as one value (a series' aggregation.function)."""
-    v = values[np.isfinite(values)]
-    if not len(v):
-        return float("nan")
-    if how in ("stddev", "stderr", "ci"):
-        return layers.spread(v, how)
-    if how == "percentile":
-        return float(np.percentile(v, percentile))
-    return float(AGGREGATES[how](v))
-
-
 def _points(rows: pd.DataFrame, x: str, s: Listed) -> tuple[np.ndarray, np.ndarray]:
     """A drawn series' points: one per row, or with an aggregation one per place, its rows'
     aggregate times aggregation.multiplier."""
@@ -624,7 +609,7 @@ def _points(rows: pd.DataFrame, x: str, s: Listed) -> tuple[np.ndarray, np.ndarr
     values = pd.Series(axis_data.numbers(_col(rows, Y_VALUE)), index=rows.index)
     percentile = float(s.values["aggregation.percentile"])
     points = values.groupby(_col(rows, x), sort=False, dropna=False).agg(
-        lambda v: _combine(np.asarray(v, dtype=float), how, percentile)
+        lambda v: layers.combine(np.asarray(v, dtype=float), how, percentile)
     )
     multiplier = float(s.values["aggregation.multiplier"])
     return axis_data.numbers(points.index), np.asarray(points, dtype=float) * multiplier
@@ -751,7 +736,7 @@ def draw(
         s.shifts = shifts
     drawn.label_groups, norm = _draw_marks(ax, drawn_series, style, r)
     layers.error_bars(ax, listed, drawn_series, frame, gt, style, r)
-    lines = layers.reference_lines(ax, listed, drawn_series, frame, style, drawn.kinds)
+    lines = layers.reference_lines(ax, listed, drawn_series, frame, style, drawn.kinds, r)
     _axes(ax, drawn_series, lines, gt, style, drawn, r)
     drawn.y_title = _decorate(ax, gt, style, r, title, norm, drawn.listed)
     drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = drawn_series, r, lines, listed

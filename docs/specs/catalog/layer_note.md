@@ -9,7 +9,7 @@ extends: None          *# \[None, catalog\]; The catalog this one exte
 baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
 settings: None          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
 layer:          *# The layer every card draws, named after its type: its parameters.*\
-    text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note, in label markup; a line break starts a new line.*\
-    position: bottom_left          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; auto: the first clear place inside the plot area; set a position when inside is false.*\
+    text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*\
+    position: bottom_left          *# \[auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right\]; auto selects the first clear location inside the plot area and is invalid if inside is false.*\
  \
 baselines: None          *# Numbered baselines: generic scenarios, each the baseline with one or more changes, numbered in order of first use. Every parameter gets one card, by rule (the page shows the variable ones): its first candidate value that changes the drawing, on the baseline or on the first of these where it does. None if none.*

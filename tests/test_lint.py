@@ -140,7 +140,7 @@ def test_a_key_over_markers_is_found_without_testing_points_one_by_one(monkeypat
 # --- outside-limits: what counts as a point --------------------------------------------------
 
 POINTS = pd.DataFrame({"x": [10, 20, 30, 40], "y": [1, 3, 2, 4]})
-ACROSS = {"t": {"type": "reference_line", "axis": "y", "value": 3.5}}
+ACROSS = {"t": {"type": "reference", "axis": "y", "line_1": {"value": 3.5}}}
 
 
 def _layered(listed: dict[str, Any], data: pd.DataFrame = POINTS, /, **settings: Any) -> fg.Graph:
@@ -159,7 +159,7 @@ def _outside(g: fg.Graph) -> list[str]:
 
 def test_a_reference_lines_ends_arent_points():
     assert _outside(_layered(ACROSS, **{"axis.x.min": 5, "axis.x.max": 45})) == []
-    down = {"t": {"type": "reference_line", "axis": "x", "value": 25}}
+    down = {"t": {"type": "reference", "axis": "x", "line_1": {"value": 25}}}
     assert _outside(_layered(down, **{"axis.y.min": 1.5, "axis.y.max": 5})) == [
         "1 below axis.y.min: those points aren't drawn"
     ]

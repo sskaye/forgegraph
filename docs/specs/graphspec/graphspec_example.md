@@ -107,18 +107,28 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             show: false          *# \[true, false\]; Whether to draw vertical grid lines at the x ticks.*\
         y:\
             show: false          *# \[true, false\]; Whether to draw horizontal grid lines at the y ticks.*\
+    layer:\
+        reference:\
+            line:\
+                style: solid          *# \[None, solid, dashed, dotted, dashdot\]; The line style. If None, no line is drawn.*\
+                width: 0.07          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+                color: "#000000"          *# \[hex color\]; The color.*\
+            fill:\
+                color: "#808080"          *# \[series, hex color\]; The fill color. series uses the series' color.*\
+                opacity: 0.15          *# \[0-1\]; The fill opacity.*\
     output:\
         dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
         file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
     provenance:\
         level: full          *# \[full, minimal, off\]; How much each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs, without those. off records nothing.*\
-    layers:          *# Layers drawn on the graph, each under a name of the GraphSpec's choosing, drawn in this order.*\
+    layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses.*\
         target:\
-            type: reference_line          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
-            axis: y          *# \[x, y\]; Axis the value is on: y draws a horizontal line.*\
-            value: 1.2          *# \[float, date, column\]; The line's value, or a column to aggregate. On a datetime axis, a date, e.g. 2025-08-25.*\
-            label:\
-                text: Target 1.2 V          *# \[None, aggregation, value, aggregation_value, text\]; aggregation: e.g. Mean. value: e.g. 14.9. aggregation_value: Mean: 14.9. None: no label. Other text: written as given.*\
+            type: reference          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
+            axis: y          *# \[x, y\]; The axis the values are on. y draws horizontal lines.*\
+            line_1:\
+                value: 1.2          *# \[None, float, date, column\]; A number, a date, or a column.*\
+                label:\
+                    text: Target 1.2 V          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.*\
         conditions:\
             type: note          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
-            text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note, in label markup; a line break starts a new line.*
+            text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*

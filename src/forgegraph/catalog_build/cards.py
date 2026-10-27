@@ -179,7 +179,7 @@ def _column(scene: Scene, axis: Any) -> pd.Series | None:
 def _from_data(p: Parameter, scene: Scene, layer: str) -> list[float]:
     """A number for a parameter defaulting to None, from its axis's column."""
     parts = p.path.split(".")
-    if layer and p.path == "value":
+    if layer and p.path.split(".")[-1] == "value":
         column = _column(scene, scene.values.get(f"layers.{layer}.axis"))
         return [] if column is None else [float(column.median())]
     column = _column(scene, parts[1]) if parts[0] == "axis" and not layer else None

@@ -37,7 +37,7 @@ def test_a_packs_table_shows_its_own_values():
 def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
     text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
-    assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference_line"} <= panels
+    assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference"} <= panels
     assert f'<p id="version" class="version">version {forgegraph.__version__}</p>' in text
 
 

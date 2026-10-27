@@ -57,7 +57,7 @@ REFERENCE = {
     "format": "base_format",
     "graph_type": "xy",
     "graphspec": "graphspec_example",
-    "layer": "reference_line",
+    "layer": "reference",
     "layout": "layout_example",
     "schedule": "base_schedule",
 }
@@ -120,11 +120,11 @@ EXCLUDED = {
     "series.bar.edge": ("cap",),
     "legend.key.border": ("cap",),
     "layer.error_bar": ("cap", "join"),  # straight lines, their ends under its caps (cap.*)
-    "layer.reference_line.line": ("cap", "join"),  # a straight line, clipped at the edges
+    "layer.reference.line": ("cap", "join"),  # clipped at the plot's edges
     "series.value_label": ("alignment",),  # one line: a number
     "legend.label": ("alignment", "color"),  # one line, in its series' color
     "legend.key.label": ("gap",),  # legend.key.sample.gap spaces a name from its sample
-    "layer.reference_line.label": ("alignment",),  # placed by its position
+    "layer.reference.label": ("alignment",),  # placed by its position
     "layer.note": ("alignment",),  # its lines line up on its position's side
     "watermark": ("size", "gap", "alignment"),  # one line, spanning the plot area
     "series.benchmark": ("bar.gap",),  # one gap for all the bars side by side
@@ -132,7 +132,7 @@ EXCLUDED = {
 # A style's member whose range isn't its general parameter's.
 RANGES = {
     "series.marker.edge.style": "None, solid",  # a marker's outline can't be dashed
-    "layer.reference_line.label.color": "line, hex color",  # line: the line's color
+    "layer.reference.label.color": "line, hex color",  # line: the line's color
 }
 
 _INTERVAL = re.compile(r"^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$")
@@ -426,11 +426,33 @@ def definition_file(kind: str, name: str | None = None) -> Path:
 
 
 def _comment(node: Any, key: str) -> str | None:
-    entry = node.ca.items.get(key)
-    for part in entry or []:
-        for c in part if isinstance(part, list) else [part]:
-            if c is not None and hasattr(c, "value"):
-                return c.value.strip().split("\n")[0].strip()
+    """A key's comment. ruamel keeps the comment after a tag with no value (key: !var  # ...)
+    before the next key, so it's taken from there, and not given to that key."""
+    keys = list(node)
+    i = keys.index(key)
+    if _bare(node[key]) and i + 1 < len(keys):
+        before = (node.ca.items.get(keys[i + 1]) or [None, None])[1]
+        found = _first(before)
+        if found is not None:
+            return found
+    entry = node.ca.items.get(key) or []
+    after_bare = i > 0 and _bare(node[keys[i - 1]])
+    for n, part in enumerate(entry):
+        if n == 1 and after_bare:
+            continue  # the bare tag's, before it
+        if (found := _first(part)) is not None:
+            return found
+    return None
+
+
+def _bare(value: Any) -> bool:
+    return isinstance(value, TaggedScalar) and str(value.value) == ""
+
+
+def _first(part: Any) -> str | None:
+    for c in part if isinstance(part, list) else [part]:
+        if c is not None and hasattr(c, "value"):
+            return c.value.strip().split("\n")[0].strip()
     return None
 
 

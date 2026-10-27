@@ -109,7 +109,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     assert listed["configs"] == [os.environ["FORGEGRAPH_CONFIG"], str(project / "forgegraph.toml")]
     assert [p["name"] for p in listed["packs"]] == ["house"]
     assert [g["name"] for g in listed["graph_types"]] == ["xy"]  # always
-    assert "reference_line" in [g["name"] for g in listed["layers"]]
+    assert "reference" in [g["name"] for g in listed["layers"]]
     assert [t["name"] for t in listed["themes"]] == ["house/plain"]  # not forgegraph_base's
     assert listed["references"] == [
         {"name": "house/style", "description": "House style", "nonstandard": True}

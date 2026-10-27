@@ -5,16 +5,26 @@ layer.types, and that layer type's parameters. Through extends, layers merge by 
 GraphSpec changes an inherited layer's parameters by naming it, replaces it by giving another
 type, and removes it with None; it can't change a layer tagged !fix, itself or through the
 layers category. A tag goes on a layer or on layers, never inside a layer.
+
+A layer type's category whose look comes from the theme ("Its look comes from the theme's
+layer.note") takes the theme category's parameters, and a layer may set, for itself alone,
+those the theme leaves variable (look_paths).
 """
 
 from __future__ import annotations
 
+import re
+from functools import cache
 from typing import Any
+
+from ruamel.yaml import YAML
 
 from forgegraph.spec.common import suggest
 from forgegraph.spec.parameters import (
     PARAMETERS,
+    _comment,
     check_parameter,
+    definition_file,
     definitions,
     flatten,
     is_none,
@@ -22,6 +32,46 @@ from forgegraph.spec.parameters import (
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
 from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
+
+_LOOK = re.compile(r"Its look comes from the theme's ([\w.]+?),")
+_SAME = re.compile(r"Same parameters as (\w+)\.")
+
+
+@cache
+def look_paths(kind: str) -> dict[str, str]:
+    """The theme parameters a layer type's entry may set for itself, by their path in the
+    entry: each a parameter of a theme category its look comes from."""
+    path = definition_file("layer", kind)
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    looks: dict[str, str] = {}  # each category's path in the entry ("" for all of it): its theme's
+
+    def walk(node: Any, prefix: str, comment: str | None) -> None:
+        if comment and (m := _LOOK.search(comment)):
+            looks[prefix] = m[1]
+        for key in node if hasattr(node, "items") else []:
+            here = f"{prefix}.{key}" if prefix else str(key)
+            text = _comment(node, key)
+            if text and (same := _SAME.search(text)):  # a sibling's, under its own name
+                parent = prefix + "." if prefix else ""
+                source = parent + same[1]
+                looks.update(
+                    {
+                        here + k[len(source) :]: v
+                        for k, v in dict(looks).items()
+                        if k.startswith(source)
+                    }
+                )
+            walk(node[key], here, text)
+
+    walk(data[PARAMETERS], "", _comment(data, PARAMETERS))
+    theme = definitions("theme")
+    out = {}
+    for prefix, category in looks.items():
+        for t in theme:
+            if t.startswith(f"{category}."):
+                member = t[len(category) + 1 :]
+                out[f"{prefix}.{member}" if prefix else member] = t
+    return out
 
 
 def _layers_in(d: dict[str, Any]) -> list[tuple[bool, str, Any]]:
@@ -80,12 +130,20 @@ def resolve_layers(doc: dict[str, Any], reg: Registry) -> dict[str, Resolved]:
 
 
 def with_defaults(layer: dict[str, Any]) -> dict[str, Any]:
-    """A layer as {"type": ..., path: value}, with every parameter its type defines."""
+    """A layer as {"type": ..., path: value}, with every parameter its type defines, and
+    under "look" the theme parameters it sets for itself, by their path in the layer. One of
+    its own parameters whose look comes from the theme is there only if the layer sets it."""
     kind = layer["type"]
     listed = flatten({k: v for k, v in layer.items() if k != "type"})
+    looks = look_paths(kind)
     return {
         "type": kind,
-        **{p: listed.get(p, d.default) for p, d in definitions("layer", kind).items()},
+        **{
+            p: listed.get(p, d.default)
+            for p, d in definitions("layer", kind).items()
+            if p not in looks
+        },
+        "look": {p: v for p, v in listed.items() if p in looks},
     }
 
 
@@ -93,8 +151,10 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     """Problems with the layers a GraphSpec lists, and with the layers it ends up with."""
     errors = []
     try:
-        gt_name = named("graphspec", doc, reg)["graph_type"]
+        chosen = named("graphspec", doc, reg)
+        gt_name, theme_name = chosen["graph_type"], chosen["theme"]
         gt = resolve("graph_type", reg.docs["graph_type"][gt_name], reg)
+        theme = resolve("theme", reg.docs["theme"][theme_name], reg, gt_name)
     except (ValueError, KeyError):
         return []
     accepted = gt.value("layer.types", []) or []
@@ -136,11 +196,18 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
                 f"{where}.type: graph type '{gt_name}' takes only {', '.join(map(str, accepted))}"
             )
             continue
-        defs = definitions("layer", str(kind))
+        defs, looks = definitions("layer", str(kind)), look_paths(str(kind))
+        theme_defs = definitions("theme")
         for path, value in flatten({k: v for k, v in entry.items() if k != "type"}).items():
-            p = defs.get(path)
+            p = defs.get(path) or (theme_defs[looks[path]] if path in looks else None)
             if p is None:
-                errors.append(f"{where}.{path}: unknown parameter of {kind}{suggest(path, defs)}")
+                known = [*defs, *looks]
+                if any(k.startswith(f"{path}.") for k in known) and is_none(value):
+                    continue  # an empty category
+                errors.append(f"{where}.{path}: unknown parameter of {kind}{suggest(path, known)}")
+                continue
+            if path in looks and theme.fixed(looks[path], theme_defs[looks[path]].fixed):
+                errors.append(f"{where}.{path}: fixed by theme '{theme_name}'")
                 continue
             for suffix, message in check_parameter(p, value, names):
                 errors.append(f"{where}.{path}{suffix}: {message}")

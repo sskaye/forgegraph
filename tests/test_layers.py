@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.colors import to_hex
 from render_helpers import with_series
 
 import forgegraph as fg
@@ -63,7 +64,7 @@ def test_layers_are_checked_against_their_type():
         "layers.t.txt: unknown parameter of note; did you mean 'text'?"
     ]
     assert validate("graphspec", doc({"t": {"axis": "y"}})) == [
-        "layers.t.type: required: one of reference_line, note, error_bar"
+        "layers.t.type: required: one of reference, note, error_bar"
     ]
     assert validate("graphspec", doc({"t": {"type": "note", "position": "middle"}}))[0].startswith(
         "layers.t.position: must be one of: auto, top_left"
@@ -75,7 +76,7 @@ def test_a_layer_type_the_graph_type_doesnt_take_is_an_error():
     narrow = copy.deepcopy(reg.docs["graph_type"]["xy"])
     narrow.update(name="narrow", extends="xy", parameters={"layer": {"types": fix(["note"])}})
     reg.add("graph_type", narrow)
-    d = doc({"t": {"type": "reference_line", "axis": "y", "value": 1}})
+    d = doc({"t": {"type": "reference", "axis": "y", "line_1": {"value": 1}}})
     d["parameters"]["specifications"]["graph_type"] = "narrow"
     assert validate("graphspec", d, reg) == ["layers.t.type: graph type 'narrow' takes only note"]
 
@@ -91,10 +92,9 @@ def test_layers_merge_by_name_through_extends():
     parent = doc(
         {
             "target": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": 1.0,
-                "label": {"text": "Aim"},
+                "line_1": {"value": 1.0, "label": {"text": "Aim"}},
             },
             "conditions": {"type": "note", "text": "60 °C"},
             "gone": {"type": "note", "text": "removed"},
@@ -102,20 +102,22 @@ def test_layers_merge_by_name_through_extends():
     )
     parent["name"] = "parent"
     reg.add("graphspec", parent)
-    child = doc({"target": {"value": 2.0}, "gone": "None", "extra": {"type": "note", "text": "x"}})
+    extra = {"type": "note", "text": "x"}
+    child = doc({"target": {"line_1": {"value": 2.0}}, "gone": "None", "extra": extra})
     child.update(name="child", extends="parent")
     reg.add("graphspec", child)
     assert validate("graphspec", child, reg) == []
     layers = {name: r.value for name, r in explain(child, reg).layers.items()}
     assert list(layers) == ["target", "conditions", "extra"]
-    assert layers["target"]["value"] == 2.0 and layers["target"]["label.text"] == "Aim"
+    assert layers["target"]["line_1.value"] == 2.0
+    assert layers["target"]["line_1.label.text"] == "Aim"
 
 
 def test_a_fixed_layer_cant_be_changed():
     reg = builtin().copy()
     parent = doc({})
     parent["parameters"]["layers"] = fix(
-        {"target": {"type": "reference_line", "axis": "y", "value": 1.0}}
+        {"target": {"type": "reference", "axis": "y", "line_1": {"value": 1.0}}}
     )
     parent.update(name="parent")
     reg.add("graphspec", parent)
@@ -129,22 +131,26 @@ def test_a_fixed_layer_cant_be_changed():
 
 
 def test_a_reference_line_at_a_value_with_its_label():
-    g = graph({"t": {"type": "reference_line", "axis": "y", "value": 15, "label": {"text": "Aim"}}})
+    g = graph(
+        {"t": {"type": "reference", "axis": "y", "line_1": {"value": 15, "label": {"text": "Aim"}}}}
+    )
     [line] = layer_lines(g, REFERENCE)
     assert np.asarray(line.get_ydata()).tolist() == [15, 15]
     assert layer_texts(g, REFERENCE) == ["Aim"]
 
 
 def test_a_line_outside_the_data_widens_the_axis_or_is_an_error():
-    g = graph({"t": {"type": "reference_line", "axis": "y", "value": 50}})
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": {"value": 50}}})
     assert g.axes.get_ylim()[1] > 50
     with pytest.raises(fg.SpecError, match=re.escape("the line at 50 is outside axis.y.max")):
-        graph({"t": {"type": "reference_line", "axis": "y", "value": 50}}, **{"axis.y.max": 40})
+        graph(
+            {"t": {"type": "reference", "axis": "y", "line_1": {"value": 50}}}, **{"axis.y.max": 40}
+        )
 
 
 def test_a_line_at_a_limit_but_for_float_noise_is_at_it():
-    at_most: dict[str, Any] = {"type": "reference_line", "axis": "y", "value": "rate"}
-    at_most["aggregation"] = {"function": "max", "multiplier": 1.1}
+    at_most: dict[str, Any] = {"type": "reference", "axis": "y", "line_1": {"value": "rate"}}
+    at_most["line_1"]["aggregation"] = {"function": "max", "multiplier": 1.1}
     tall = RATES.assign(rate=RATES["rate"] * 100 / 30)  # max 100; 1.1 * 100 is 110.00000000000001
     g = graph({"t": at_most}, tall, **{"axis.y.max": 110})
     assert g.axes.get_ylim()[1] == 110
@@ -156,11 +162,13 @@ def test_a_line_at_an_aggregate():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "rate",
-                "aggregation": {"function": "mean"},
-                "label": {"text": "aggregation"},
+                "line_1": {
+                    "value": "rate",
+                    "aggregation": {"function": "mean"},
+                    "label": {"text": "aggregation"},
+                },
             }
         },
         **{"series.line.show": False},  # the lines between the two concentrations cross it
@@ -171,11 +179,13 @@ def test_a_line_at_an_aggregate():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "rate",
-                "aggregation": {"function": "stddev", "multiplier": 2},
-                "label": {"text": "aggregation"},
+                "line_1": {
+                    "value": "rate",
+                    "aggregation": {"function": "stddev", "multiplier": 2},
+                    "label": {"text": "aggregation"},
+                },
             }
         },
         **{"series.line.show": False},  # the lines between the two concentrations cross it
@@ -188,11 +198,10 @@ def test_a_line_per_named_series_takes_in_its_replicates():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "rate",
-                "aggregation": {"function": "max"},
                 "per_series": True,
+                "line_1": {"value": "rate", "aggregation": {"function": "max"}},
             }
         },
         df,
@@ -205,11 +214,10 @@ def test_a_line_per_series_in_its_color():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "rate",
-                "aggregation": {"function": "max"},
                 "per_series": True,
+                "line_1": {"value": "rate", "aggregation": {"function": "max"}},
             }
         },
         **{"series.color": "state"},
@@ -239,10 +247,9 @@ def test_a_line_at_an_aggregate_counts_each_row_once(how, y):
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "b",
-                "aggregation": {"function": how},
+                "line_1": {"value": "b", "aggregation": {"function": how}},
             }
         },
         TWO_Y,
@@ -264,11 +271,10 @@ def test_a_line_per_series_at_an_aggregate_counts_each_row_once():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "b",
                 "per_series": True,
-                "aggregation": {"function": "sum"},
+                "line_1": {"value": "b", "aggregation": {"function": "sum"}},
             }
         },
         df,
@@ -287,16 +293,26 @@ def test_a_line_per_series_at_an_aggregate_counts_each_row_once():
 
 
 @pytest.mark.parametrize(
-    ("layer", "message"),
+    ("axis", "line", "message"),
     [
-        ({"value": "rate"}, "value: a column, so set aggregation.function"),
-        ({"value": 3, "aggregation": {"function": "mean"}}, "applies only when value is a column"),
-        ({"value": "nope", "aggregation": {"function": "mean"}}, "no column 'nope'"),
+        ("x", {"value": "rate"}, "layers.t.line_1: a line that follows the data runs along"),
+        (
+            "y",
+            {"value": 3, "aggregation": {"function": "mean"}},
+            "layers.t.line_1.aggregation.function: applies only when value is a column",
+        ),
+        (
+            "y",
+            {"value": 3, "offset": {"function": "stddev"}},
+            "layers.t.line_1.offset.function: applies only when value is a column",
+        ),
+        ("y", {"value": "nope", "aggregation": {"function": "mean"}}, "no column 'nope'"),
+        ("y", {}, "layers.t: set line_1.value, line_2.value, or both"),
     ],
 )
-def test_reference_line_errors(layer, message):
+def test_reference_errors(axis, line, message):
     with pytest.raises(fg.SpecError, match=re.escape(message)):
-        graph({"t": {"type": "reference_line", "axis": "y", **layer}})
+        graph({"t": {"type": "reference", "axis": axis, "line_1": line}})
 
 
 # --- error bars ------------------------------------------------------------------------------
@@ -533,7 +549,13 @@ def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
 
     top = 30.0  # the highest rate
     g = graph(
-        {"t": {"type": "reference_line", "axis": "y", "value": top, "label": {"text": "Max"}}},
+        {
+            "t": {
+                "type": "reference",
+                "axis": "y",
+                "line_1": {"value": top, "label": {"text": "Max"}},
+            }
+        },
         **{"series.line.show": False},
     )
     _, box = _label_box(g)
@@ -544,10 +566,9 @@ def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
 
 LIMIT = {
     "t": {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "y",
-        "value": 8,
-        "label": {"text": "Limit", "position": "start_above"},
+        "line_1": {"value": 8, "label": {"text": "Limit", "position": "start_above"}},
     }
 }  # the line at conc 1 runs from 5 to 14, through the label
 
@@ -578,24 +599,22 @@ def test_a_chosen_label_past_the_plots_edge_widens_the_axis():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": top,
-                "label": {"text": "Max", "position": "start_above"},
+                "line_1": {"value": top, "label": {"text": "Max", "position": "start_above"}},
             }
         },
         **{"series.line.show": False},
     )
     _, box = _label_box(g)
     assert box.y1 <= g.axes.get_window_extent().y1 + 0.5
-    with pytest.raises(fg.SpecError, match=r"axis.y.max: layers.t: its label reach"):
+    with pytest.raises(fg.SpecError, match=r"axis.y.max: layers.t.line_1: its label reach"):
         graph(
             {
                 "t": {
-                    "type": "reference_line",
+                    "type": "reference",
                     "axis": "y",
-                    "value": 30,
-                    "label": {"text": "Max", "position": "start_above"},
+                    "line_1": {"value": 30, "label": {"text": "Max", "position": "start_above"}},
                 }
             },
             **{"series.line.show": False, "axis.y.max": 30},
@@ -606,11 +625,13 @@ def test_a_label_can_give_the_aggregate_and_its_value():
     g = graph(
         {
             "t": {
-                "type": "reference_line",
+                "type": "reference",
                 "axis": "y",
-                "value": "rate",
-                "aggregation": {"function": "max"},
-                "label": {"text": "aggregation_value"},
+                "line_1": {
+                    "value": "rate",
+                    "aggregation": {"function": "max"},
+                    "label": {"text": "aggregation_value"},
+                },
             }
         },
         **{"series.line.show": False},
@@ -620,18 +641,24 @@ def test_a_label_can_give_the_aggregate_and_its_value():
 
 def test_a_labels_value_takes_its_own_format_or_its_axiss():
     line = {
-        "type": "reference_line",
+        "type": "reference",
         "axis": "y",
-        "value": "rate",
-        "aggregation": {"function": "mean"},
-        "label": {"text": "value", "format": ".3f"},
+        "line_1": {
+            "value": "rate",
+            "aggregation": {"function": "mean"},
+            "label": {"text": "value", "format": ".3f"},
+        },
     }
     g = graph({"t": line}, **{"series.line.show": False})
     assert layer_texts(g, REFERENCE) == [f"{RATES['rate'].mean():.3f}"]
-    line["label"] = {"text": "value"}
+    line["line_1"]["label"] = {"text": "value"}
     g = graph({"t": line}, **{"series.line.show": False, "axis.y.tick.label.format": ".2f"})
     assert layer_texts(g, REFERENCE) == [f"{RATES['rate'].mean():.2f}"]
-    vertical = {"type": "reference_line", "axis": "x", "value": 1.5, "label": {"text": "value"}}
+    vertical = {
+        "type": "reference",
+        "axis": "x",
+        "line_1": {"value": 1.5, "label": {"text": "value"}},
+    }
     g = graph({"t": vertical}, **{"series.line.show": False})
     x_decimals = max(
         len(t.get_text().split(".")[1]) for t in g.axes.get_xticklabels() if "." in t.get_text()
@@ -683,3 +710,121 @@ def test_error_bars_on_side_by_side_bars_are_drawn_on_their_bars():
         np.testing.assert_allclose(drawn[finite], now[finite], atol=0.01)
         xs = sorted(set(np.round(drawn[finite][:, 0], 1)))
         assert any(np.allclose(xs, c, atol=1.0) for c in centres.values())  # on one series' bars
+
+
+# --- reference bands, offsets and lines that follow the data ---------------------------------
+
+
+def _fills(g: fg.Graph) -> list[Any]:
+    return [p for p in [*g.axes.patches, *g.axes.collections] if p.get_gid() == REFERENCE]
+
+
+def test_two_values_make_a_band_filled_between_its_lines():
+    band = {"type": "reference", "axis": "y", "line_1": {"value": 8}, "line_2": {"value": 25}}
+    g = graph({"t": band}, **{"series.line.show": False})
+    assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [8, 25]
+    [fill] = _fills(g)
+    box = fill.get_window_extent()
+    lo, hi = (g.axes.transData.transform((0, v))[1] for v in (8, 25))
+    assert box.y0 == pytest.approx(lo, abs=1) and box.y1 == pytest.approx(hi, abs=1)
+    style = g.style
+    assert to_hex(fill.get_facecolor()) == style.theme["layer.reference.fill.color"].lower()
+    assert fill.get_alpha() == style.theme["layer.reference.fill.opacity"]
+
+
+def test_an_offset_moves_a_line_by_another_aggregate():
+    mean, sd = RATES["rate"].mean(), RATES["rate"].std()
+    plus = {"value": "rate", "aggregation": {"function": "mean"}}
+    band = {
+        "type": "reference",
+        "axis": "y",
+        "line_1": {**plus, "offset": {"function": "stddev", "multiplier": 2}},
+        "line_2": {**plus, "offset": {"function": "stddev", "multiplier": -2}},
+    }
+    g = graph({"t": band}, **{"series.line.show": False})
+    found = sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE))
+    assert found == pytest.approx([mean - 2 * sd, mean + 2 * sd])
+
+
+def test_the_label_names_the_aggregate_and_its_offset():
+    line = {
+        "value": "rate",
+        "aggregation": {"function": "mean"},
+        "offset": {"function": "stddev", "multiplier": -2},
+        "label": {"text": "aggregation"},
+    }
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": line}}, **{"axis.y.max": 40})
+    assert layer_texts(g, REFERENCE) == ["Mean − 2 × std dev"]  # noqa: RUF001
+
+
+def test_scope_each_follows_the_data_place_by_place():
+    line = {"value": "rate", "aggregation": {"function": "max"}, "scope": "each"}
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": line}})
+    [ref] = layer_lines(g, REFERENCE)
+    assert np.asarray(ref.get_xdata()).tolist() == [1.0, 2.0]
+    assert np.asarray(ref.get_ydata()).tolist() == [14.0, 30.0]
+
+
+def test_a_column_with_no_aggregation_runs_through_each_row():
+    df = pd.DataFrame({"conc": [3.0, 1.0, 2.0], "rate": [5.0, 1.0, 2.0], "limit": [9.0, 7.0, 8.0]})
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": {"value": "limit"}}}, df)
+    [ref] = layer_lines(g, REFERENCE)
+    assert np.asarray(ref.get_xdata()).tolist() == [1.0, 2.0, 3.0]  # in order along x
+    assert np.asarray(ref.get_ydata()).tolist() == [7.0, 8.0, 9.0]
+
+
+def test_a_band_per_series_takes_each_series_color():
+    plus = {"value": "rate", "aggregation": {"function": "mean"}}
+    band = {
+        "type": "reference",
+        "axis": "y",
+        "per_series": True,
+        "line_1": {**plus, "offset": {"function": "stddev"}},
+        "line_2": {**plus, "offset": {"function": "stddev", "multiplier": -1}},
+        "fill": {"color": "series"},
+    }
+    g = graph({"t": band}, **{"series.color": "state", "series.line.show": False})
+    colors = sorted(to_hex(f.get_facecolor()) for f in _fills(g))
+    palette = sorted(c.lower() for c in g.style.series_colors()[:2])
+    assert colors == palette
+    del band["per_series"]
+    with pytest.raises(fg.SpecError, match=re.escape("fill.color: series, but the band isn't")):
+        graph({"t": band}, **{"series.color": "state"})
+
+
+def test_a_label_outside_sits_beyond_the_plot_area():
+    line = {"value": 15, "label": {"text": "Aim", "position": "end_above", "inside": False}}
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": line}})
+    [label] = [t for t in g.axes.texts if t.get_gid() == REFERENCE]
+    g.figure.canvas.draw()
+    assert label.get_window_extent().x0 >= g.axes.get_window_extent().x1  # past the right edge
+    assert label.get_window_extent().x1 <= g.figure.bbox.x1  # room made for it
+    line["label"]["position"] = "auto"
+    with pytest.raises(fg.SpecError, match=re.escape("label.inside is false")):
+        graph({"t": {"type": "reference", "axis": "y", "line_1": line}})
+
+
+def test_a_layer_sets_the_themes_variable_look_for_itself():
+    lines = {
+        "type": "reference",
+        "axis": "y",
+        "line_1": {"value": 8, "line": {"width": 0.3}},
+        "line_2": {"value": 25},
+    }
+    g = graph({"t": lines}, **{"series.line.show": False})
+    widths = sorted(ln.get_linewidth() for ln in layer_lines(g, REFERENCE))
+    base = g.style
+    assert widths == pytest.approx([base.pt("layer.reference.line.width"), 0.3 * base.base])
+    message = "layers.t.size: fixed by theme 'forgegraph_base/base_theme'"
+    with pytest.raises(fg.SpecError, match=re.escape(message)):
+        graph({"t": {"type": "note", "text": "x", "size": 2}})
+
+
+def test_error_bars_can_be_a_percentile_of_the_rows():
+    bars = {"type": "error_bar", "value": {"aggregation": {"function": "percentile"}}}
+    g = graph({"e": bars}, **{"series.aggregation.function": "mean"})
+    [stem] = [ln for ln in layer_lines(g, ERROR_BAR) if ln.get_marker() in ("None", "", None)]
+    ys = np.asarray(stem.get_ydata(), dtype=float)
+    low, high = ys[0::3], ys[1::3]
+    medians = RATES.groupby("conc")["rate"].median().to_numpy()
+    assert ((high - low) / 2).tolist() == pytest.approx(medians.tolist())

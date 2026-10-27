@@ -14,4 +14,5 @@ baselines:          *# Numbered baselines: generic scenarios, each the
     power:          *# \[parameters and their values, or non-standard\]; Power density, whose values suit distances along either axis.*\
         layers.error_bar.value.lower: 4\
         layers.error_bar.value.upper: 4\
-        series: {"Power Density (mW/cm²)": {color: Cell, split: \[Cell, Run\]}}
+        series: {"Power Density (mW/cm²)": {color: Cell, split: None, aggregation: {function: mean}}}\
+    percentile_spread: {layers.error_bar.value.aggregation: {function: percentile, multiplier: 0.02}}          *# \[parameters and their values, or non-standard\]; Distances that are a fiftieth of a percentile of each place's rows, so the percentile acts.*

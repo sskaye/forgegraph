@@ -124,7 +124,7 @@ def draw(
             for name in drawn:  # every series
                 listed["series"][name] = _set(listed["series"][name], within, c.value)
         elif c.path in in_chain or tree_has(listed, c.path) or layer is not None:
-            tree_set(listed, c.path, c.value)
+            tree_set(listed, c.path, copy.deepcopy(c.value))
         elif c.path in definitions("theme"):
             others["theme"][c.path] = c.value
             for name in drawn:  # so no series' own look hides the theme's
@@ -133,7 +133,7 @@ def draw(
         elif c.path in definitions("format"):
             others["format"][c.path] = c.value
         else:  # the GraphSpec's or its graph type's, inherited by the baseline
-            tree_set(listed, c.path, c.value)
+            tree_set(listed, c.path, copy.deepcopy(c.value))
     for kind, values in others.items():
         if values:
             reg.add(kind, _child(kind, listed["specifications"][kind], values))

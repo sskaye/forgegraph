@@ -47,11 +47,12 @@ baselines:          *# Numbered baselines: generic scenarios, each the
         axis.x.tick.algorithm: all\
         data.file: reinforced.parquet\
         series: {"Power Density (mW/cm²)": {color: series, split: None, aggregation: {function: max}, bar: {show: true}, line: {show: false}, marker: {show: false}}}\
-    target:          *# \[parameters and their values, or non-standard\]; A labelled reference line, so its parameters act.*\
-        layers.target.type: reference_line\
+    target:          *# \[parameters and their values, or non-standard\]; A reference band with a labelled line, so its lines', label's and fill's parameters act.*\
+        layers.target.type: reference\
         layers.target.axis: y\
-        layers.target.value: 1.2\
-        layers.target.label.text: Target\
+        layers.target.line_1.value: 1.2\
+        layers.target.line_1.label.text: Target\
+        layers.target.line_2.value: 1.4\
     noted:          *# \[parameters and their values, or non-standard\]; A note, so its parameters act.*\
         layers.conditions.type: note\
         layers.conditions.text: "60 °C, 1 atm, H\_{2}/air"

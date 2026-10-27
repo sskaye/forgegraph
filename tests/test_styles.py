@@ -50,7 +50,7 @@ def test_a_line_style_has_the_general_lines_parameters_less_those_it_cant_use():
 
 def test_a_style_can_widen_or_narrow_a_members_range():
     defs = definitions("theme")
-    assert "line" in defs["layer.reference_line.label.color"].range.literals
+    assert "line" in defs["layer.reference.label.color"].range.literals
     assert defs["series.marker.edge.style"].range.literals == ("None", "solid")
 
 

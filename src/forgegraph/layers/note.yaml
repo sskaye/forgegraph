@@ -1,8 +1,8 @@
 name: note          # [text]; The name of the layer type.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: A block of text by the plot area, such as test conditions.          # [text]; The description of the layer type.
 
-parameters:          # The layer's parameters, which a GraphSpec's layers entry sets after its type.
-    text: None          # [text]; The note, in label markup; a line break starts a new line. A GraphSpec must set it.
-    position: auto          # [auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right]; auto: the first clear place inside the plot area; set a position when inside is false.
-    inside: true          # [true, false]; Inside the plot area, or outside it.
+parameters:          # [text style]; The note. Its look comes from the theme's layer.note, and a GraphSpec may change what the theme marks !var.
+    text: None          # [text]; The note's text, in label markup. A line break starts a new line. A GraphSpec must set it.
+    position: auto          # [auto, top_left, top_center, top_right, bottom_left, bottom_center, bottom_right]; auto selects the first clear location inside the plot area and is invalid if inside is false.
+    inside: true          # [true, false]; Whether the note is inside the plot area or outside it.

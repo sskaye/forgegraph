@@ -164,9 +164,9 @@ def test_a_formats_output_and_provenance_get_no_card():
 
 
 def test_candidates_outside_the_range_are_dropped():
-    catalog = read("layer", "reference_line", builtin())
-    options = next(o for p, o in catalog.cards if p.path == "value")
-    assert all(changes[0].value != "None" for changes in options)  # d itself: not a value
+    catalog = read("layer", "note", builtin())
+    options = next(o for p, o in catalog.cards if p.path == "text")
+    assert all(changes[0].value != "None" for changes in options)  # d itself: a note needs text
 
 
 # --- the rule: each card's candidate values, by range ---------------------------------------
@@ -222,7 +222,7 @@ def test_a_number_defaulting_to_none_comes_from_its_axis_column():
     assert candidates(XY["axis.y.max"], None, SCENE) == [4.0, "None"]
     step = candidates(XY["axis.x.tick.step"], None, SCENE)
     assert step == [SAMPLE_TEXT, 2.0, "None"]  # a quarter of 1-9, to one figure
-    value = definitions("layer", "reference_line")["value"]
+    value = definitions("layer", "reference")["line_1.value"]
     assert candidates(value, None, SCENE, "line") == ["t", 4.0, "None"]  # the layer's axis
 
 

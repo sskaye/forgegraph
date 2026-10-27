@@ -71,4 +71,4 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             title:\
                 text: column_name          *# \[None, column_name, text\]; The color bar's title. column_name uses the name of the series' color column. If None, there is no title.*\
     layer:\
-        types: !fix \[reference_line, note, error_bar\]          *# \[layer types\]; The layer types that a GraphSpec of this graph type may use.*
+        types: !fix \[reference, note, error_bar\]          *# \[layer types\]; The layer types that a GraphSpec of this graph type may use.*

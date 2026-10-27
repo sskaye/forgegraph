@@ -26,7 +26,7 @@ from forgegraph.spec.registry import builtin
 
 HEADER = (
     "name: {name}\nversion: 0\ndescription: Test.\nextends: {extends}\n"
-    "baseline: forgegraph_base/polarization\n"
+    "baseline: forgegraph_base/graphspec_example\n"
 )
 XY = definitions("graph_type", "xy")
 THEME = definitions("theme")
@@ -47,7 +47,7 @@ def catalog_project(tmp_path, catalog: str, kind_folder: str = "formats", name: 
     (folder / kind_folder).mkdir()
     (folder / kind_folder / f"{name}.yaml").write_text(
         f"name: {name}\nversion: 0\ndescription: Test.\nextends: forgegraph_base/base_{kind}\n"
-        "fixed_parameters: None\nvariable_parameters: None\n"
+        "parameters: None\n"
     )
     (folder / "catalogs" / kind_folder).mkdir(parents=True)
     (folder / "catalogs" / kind_folder / f"{name}.yaml").write_text(catalog)
@@ -257,7 +257,9 @@ P = THEME["series.line.width"]
 
 def _catalog(*options: tuple[Change, ...]) -> Catalog:
     cards, variable = ((P, options),), frozenset({P.path})
-    return Catalog("theme", "t", "forgegraph_base/polarization", (P,), cards, variable, (B2, B3))
+    return Catalog(
+        "theme", "t", "forgegraph_base/graphspec_example", (P,), cards, variable, (B2, B3)
+    )
 
 
 def test_a_card_is_its_first_candidate_on_the_first_baseline_it_changes():

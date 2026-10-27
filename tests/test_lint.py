@@ -147,7 +147,7 @@ def _layered(listed: dict[str, Any], data: pd.DataFrame = POINTS, /, **settings:
     doc = fg.graphspec(
         "t", "xy", settings={"axis.x.data.column": "x", "axis.y.data.column": "y", **settings}
     )
-    doc["variable_parameters"]["layers"] = listed
+    doc["parameters"]["layers"] = listed
     return fg.render(doc, data)
 
 

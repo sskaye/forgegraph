@@ -3,15 +3,13 @@
 This page mirrors src/forgegraph/graph_types/xy.yaml, which is the specification. A test fails if they ever differ.
 
 name: xy          *# \[text\]; The name of the graph type.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Draws y against x, one series per group of rows.          *# \[text\]; The description of the graph type.*\
 extends: None          *# \[None, graph type\]; Each parameter not listed is inherited from this graph type. If None, this file must list every parameter.*\
  \
-fixed_parameters:          *# List of fixed parameters for the graph type, None if none.*\
-    layer:\
+parameters: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+    layer: !fix\
         types: \[reference_line, note, error_bar\]          *# \[layer types\]; Layer types a GraphSpec of this graph type may list.*\
- \
-variable_parameters:          *# List of variable parameters for the graph type, None if none.*\
     axis:\
         x:\
             data:\
@@ -27,7 +25,7 @@ variable_parameters:          *# List of variable parameters for the g
             max: None          *# \[None, float, date\]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
-                step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
+                step: None          *# \[None, float > 0, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
                 label:\
                     format: auto          *# \[auto, text\]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.*\
         y:\
@@ -44,7 +42,7 @@ variable_parameters:          *# List of variable parameters for the g
             max: None          *# \[None, float, date\]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.*\
             tick:\
                 algorithm: auto          *# \[auto, all, manual\]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.*\
-                step: None          *# \[None, positive float, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
+                step: None          *# \[None, float > 0, text\]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.*\
                 label:\
                     format: auto          *# \[auto, text\]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.*\
     encoding:\

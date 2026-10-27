@@ -24,10 +24,11 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
-from forgegraph.spec.parameters import NONE, is_none, tree_set
+from forgegraph.spec.parameters import NONE, PARAMETERS, is_none, tree_set
 from forgegraph.spec.provenance import DataRecord, graph_fields, record, used
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
+from forgegraph.spec.tags import from_json, var
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
@@ -333,7 +334,8 @@ def graphspec(
     """A GraphSpec document, named `name`, extending nothing: the graph type, theme and format
     it's drawn with; data_file, the Parquet file it's drawn from (None: a DataFrame passed
     to render); preprocessing, a note of how that data was prepared; its title; and
-    `settings`, any other variable parameter by path, e.g. {"axis.x.scale": "log"}."""
+    `settings`, any other variable parameter by path, e.g. {"axis.x.scale": "log"}. Its
+    parameters are tagged !var, so a GraphSpec extending it may change any of them."""
     variable: dict[str, dict[str, Any]] = {
         "specifications": {
             "graph_type": graph_type,
@@ -353,11 +355,14 @@ def graphspec(
         "version": 0,
         "description": description,
         "extends": NONE,
-        "fixed_parameters": NONE,
-        "variable_parameters": variable,
+        PARAMETERS: var(variable),
     }
 
 
 def load(path: str | Path) -> dict[str, Any] | None:
-    """The provenance record stored in a graph file (its GraphSpec is under "graphspec")."""
-    return export.read(Path(path))
+    """The provenance record stored in a graph file (its GraphSpec is under "graphspec", a
+    layout's file under "layout"), with their !var and !fix tags."""
+    record = export.read(Path(path))
+    if record is None:
+        return None
+    return {k: from_json(v) if k in ("graphspec", "layout") else v for k, v in record.items()}

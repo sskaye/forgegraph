@@ -15,7 +15,8 @@ from typer.testing import CliRunner
 
 import forgegraph as fg
 from forgegraph.cli import app
-from forgegraph.spec.parameters import NONE, definitions, tree_set
+from forgegraph.spec.parameters import NONE, PARAMETERS, tree_set
+from forgegraph.spec.tags import fix, var, with_tags
 
 needs_node = pytest.mark.skipif(
     shutil.which("node") is None and not os.environ.get("FORGEGRAPH_REQUIRE_NODE"),
@@ -52,7 +53,7 @@ def dump(doc: dict[str, Any], path: Path) -> Path:
     """Write a YAML document, making its folder."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
-        YAML().dump(doc, f)
+        with_tags(YAML()).dump(doc, f)
     return path
 
 
@@ -62,33 +63,30 @@ def doc(
     *,
     fixed: dict[str, Any] | None = None,
     variable: dict[str, Any] | None = None,
+    untagged: dict[str, Any] | None = None,
     description: str = "test",
     version: int = 0,
 ) -> dict[str, Any]:
-    """A document extending another, with these fixed and variable parameters (by dotted
-    path, or as categories); an empty section is written as None."""
-    sections: dict[str, Any] = {}
-    for section, values in (("fixed_parameters", fixed), ("variable_parameters", variable)):
-        tree: dict[str, Any] = {}
+    """A document extending another, with these parameters (by dotted path, or as
+    categories): fixed ones tagged !fix, variable ones !var, and untagged ones keeping the
+    status they inherit. With none, its parameters are None."""
+    tree: dict[str, Any] = {}
+    for tag, values in ((fix, fixed), (var, variable), (None, untagged)):
         for path, value in (values or {}).items():
-            tree_set(tree, path, value)
-        sections[section] = tree or NONE
+            tree_set(tree, path, value if tag is None else tag(value))
     return {
         "name": name,
         "version": version,
         "description": description,
         "extends": extends,
-        **sections,
+        PARAMETERS: tree or NONE,
     }
 
 
 def child(kind: str, parent: str, values: dict[str, Any], **header: Any) -> dict[str, Any]:
-    """A document extending parent that sets these values (by dotted path), each in the
-    section its definition has it in. header: doc()'s name, description and version."""
-    defs = definitions(kind)
-    fixed = {path: value for path, value in values.items() if defs[path].fixed}
-    variable = {path: value for path, value in values.items() if not defs[path].fixed}
-    return doc(parent, fixed=fixed, variable=variable, **header)
+    """A document extending parent that sets these values (by dotted path), each keeping the
+    status it inherits. header: doc()'s name, description and version."""
+    return doc(parent, untagged=values, **header)
 
 
 def graphspec_file(

@@ -81,10 +81,12 @@ def current(path: Path, pack: Pack | None = None) -> bool:
 # How the catalog's Allowed values column writes each type word; a list is in [].
 TYPES = {
     "text": "text",
-    "int": "int ≥ 0",
-    "positive int": "int > 0",
+    "int ≥ 0": "int ≥ 0",
+    "int > 0": "int > 0",
     "float": "float",
-    "positive float": "float > 0",
+    "float ≥ 0": "float ≥ 0",
+    "float > 0": "float > 0",
+    "floats > 0": "[floats > 0]",
     "date": "date",
     "hex color": "hex color code",
     "hex colors": "[hex color codes]",

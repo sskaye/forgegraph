@@ -2,8 +2,7 @@ name: lost_runs
 version: 0
 description: The share of each instrument's runs that failed or were aborted.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

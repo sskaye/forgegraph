@@ -50,6 +50,7 @@ from forgegraph.spec.loaded import Loaded, load_document, placed
 from forgegraph.spec.provenance import DataRecord, TileRecord, graph_fields, record
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, Values, resolve
+from forgegraph.spec.tags import to_json
 from forgegraph.spec.validate import named_problems, validate
 
 SUFFIX = ".layout.yaml"
@@ -229,7 +230,7 @@ class Layout(Saved):
             specs=self.specs,
             nonstandard=nonstandard,
             nonstandard_packs=packs or None,
-            layout=self.spec,
+            layout=to_json(self.spec),
             tabs={
                 t.name: {n: tile.record(full, fmt) for n, tile in t.tiles.items()} for t in shown
             },

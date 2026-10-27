@@ -3,13 +3,11 @@
 This page mirrors examples/packs/acme/graphspecs/polarization-curve.yaml, which is the specification. A test fails if they ever differ.
 
 name: polarization-curve          *# \[text\]; The name of the GraphSpec.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Acme's polarization curve, cell voltage against current density, one line per cell.          *# \[text\]; The description of the GraphSpec.*\
 extends: None          *# \[None, graphspec\]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.*\
  \
-fixed_parameters: None          *# List of fixed parameters for the GraphSpec, None if none.*\
- \
-variable_parameters:          *# List of variable parameters for the GraphSpec, None if none.*\
+parameters: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
         graph_type: xy          *# \[graph type\]; The graph type.*\
         theme: acme/acme          *# \[theme\]; The theme.*\

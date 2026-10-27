@@ -65,7 +65,7 @@ SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # ea
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
 SAMPLE_TEXT = "Sample text"
 SAMPLE_COLOR = "#D55E00"
-NUMBERS = ("int", "positive int", "float", "positive float")
+NUMBERS = ("int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0")
 
 
 @dataclass(frozen=True)
@@ -143,7 +143,7 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
     if "hex color" in rng.types:
         out.append(SAMPLE_COLOR)
     if rng.intervals or set(NUMBERS) & set(rng.types):
-        whole = not rng.intervals and not {"float", "positive float"} & set(rng.types)
+        whole = not rng.intervals and not {"float", "float ≥ 0", "float > 0"} & set(rng.types)
         if isinstance(d, int | float) and not isinstance(d, bool):
             out += _within(p, d, [1] if d == 0 else [2 * d, d // 2 if whole else d / 2])
         elif is_none(d):

@@ -25,15 +25,16 @@ from forgegraph.drawing.layout import visible_extent
 from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.layout import slug
 from forgegraph.spec.registry import builtin
+from forgegraph.spec.tags import fix
 from forgegraph.spec.validate import validate
 
 runner = CliRunner()
 FORMAT = {"width": 200, "height": "auto", "base_size": 10}
 
 
-def _format(name: str, **figure: Any) -> dict[str, Any]:
+def _format(name: str, file_types: tuple[str, ...] = ("png",), **figure: Any) -> dict[str, Any]:
     fixed = {"figure": {**FORMAT, **figure}}
-    variable = {"output.file_types": ["png"]}
+    variable = {"output.file_types": list(file_types)}
     return doc("forgegraph_base/base_format", name, fixed=fixed, variable=variable)
 
 
@@ -68,7 +69,8 @@ def write_layout(
 ) -> Any:
     variable = {"specifications": {"format": fmt}, **variable, "tabs": tabs}
     return dump(
-        doc("forgegraph_base/base_layout", name, variable=variable), folder / f"{name}.layout.yaml"
+        doc("forgegraph_base/layout_example", name, variable=variable),
+        folder / f"{name}.layout.yaml",
     )
 
 
@@ -400,7 +402,8 @@ def test_the_separator_color_fills_the_gaps(project):
 def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     types = {"output": {"file_types": ["png", "pdf", "html"]}}
     dump(
-        {**_format("all"), "variable_parameters": types}, project / "house" / "formats" / "all.yaml"
+        _format("all", tuple(types["output"]["file_types"])),
+        project / "house" / "formats" / "all.yaml",
     )
     path = write_layout(
         project,
@@ -440,16 +443,13 @@ def test_a_layout_sets_its_formats_variable_parameters(project):
 
 def test_a_layout_cant_set_its_formats_fixed_parameters():
     [found] = _check({"figure": {"width": 200}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
-    assert (
-        found
-        == "variable_parameters.figure.width: fixed by format 'forgegraph_base/base_layout_format'"
-    )
+    assert found == "figure.width: fixed by format 'forgegraph_base/base_layout_format'"
 
 
 @pytest.mark.slow
 def test_with_a_border_the_tab_bars_line_is_its_top(project):
     dump(
-        {**_format("page"), "variable_parameters": {"output": {"file_types": ["html"]}}},
+        _format("page", ("html",)),
         project / "house" / "formats" / "page.yaml",
     )
     path = write_layout(
@@ -541,7 +541,7 @@ def test_a_graphspec_saves_as_a_page(project):
 
 
 def _check(variable: dict[str, Any]) -> list[str]:
-    layout = doc("forgegraph_base/base_layout", variable=variable)
+    layout = doc("forgegraph_base/layout_example", variable=variable)
     return validate("layout", layout, builtin().copy())
 
 
@@ -566,9 +566,7 @@ def test_grid_rules(grid, tiles, message):
 def test_sizes_need_one_per_column_or_row():
     grid = {"areas": [["a", "b"]], "column_widths": [1, 2, 3]}
     found = _check({"tabs": {"T": {"grid": grid, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}})
-    assert found == [
-        "variable_parameters.tabs.T.grid.column_widths: 3 sizes, but the grid has 2 columns"
-    ]
+    assert found == ["tabs.T.grid.column_widths: 3 sizes, but the grid has 2 columns"]
 
 
 def test_row_heights_with_height_auto_is_an_error():
@@ -597,12 +595,24 @@ def test_a_layouts_tabs_replace_those_it_inherits(project):
         "specifications.format": "house/auto",
         "tabs": {"Old": tab([["volt"]], volt="volt.yaml")},
     }
-    base = doc("forgegraph_base/base_layout", "base", variable=old)
+    base = doc("forgegraph_base/layout_example", "base", variable=old)
     dump(base, project / "house" / "layouts" / "base.yaml")
     new = {"tabs": {"New": tab([["power"]], power="power.yaml")}}
     dump(doc("house/base", "child", variable=new), project / "child.layout.yaml")
     layout = fg.layout(project / "child.layout.yaml")
     assert [t.name for t in layout.tabs] == ["New"]
+
+
+def test_tabs_tagged_fix_cant_be_replaced_and_tags_go_on_tabs():
+    reg = builtin().copy()
+    base = doc(
+        "forgegraph_base/layout_example", "base", fixed={"tabs": {"Old": tab([["a"]], a="a.yaml")}}
+    )
+    reg.add("layout", base)
+    child = doc("base", "child", untagged={"tabs": {"New": tab([["b"]], b="b.yaml")}})
+    assert validate("layout", child, reg) == ["tabs: fixed by layout 'base'"]
+    inside = {"tabs": {"T": {"grid": fix({"areas": [["a"]]}), "tiles": {"a": "a.yaml"}}}}
+    assert _check(inside) == ["tabs.T.grid: a tag goes on tabs, not inside them"]
 
 
 def test_unset_and_missing_tiles_are_errors(project):

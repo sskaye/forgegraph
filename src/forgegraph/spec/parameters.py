@@ -3,8 +3,8 @@
 Each kind is defined by one file. Graph types and layer types are ForgeGraph's code, each
 defined by its own file (graph_types/xy.yaml, layers/note.yaml); the other kinds by the base
 pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
-formats/base_format.yaml, layouts/base_layout.yaml, schedules/base_schedule.yaml) and its
-reference GraphSpec (graphspecs/polarization.yaml). A layer file has
+formats/base_format.yaml, layouts/layout_example.yaml, schedules/base_schedule.yaml) and its
+reference GraphSpec (graphspecs/graphspec_example.yaml). A layer file has
 only a name, version and description, and its parameters. A GraphSpec's layers and a
 layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
@@ -13,11 +13,11 @@ so they aren't parameters here; a tab's parameters come from the base layout's o
 RANGE lists the alternatives a value may take, separated by commas:
 
 - a number range `min-max`, inclusive;
-- a type word: text, int (a whole number, 0 or more), positive int, float, positive float,
-  date (a date, or a date and time: YAML's own, or ISO 8601 text; see as_date), hex color,
-  hex colors (a list of one or more), two hex colors, column, columns, graph type, theme,
-  format, graphspec, layer type, layer types, layout, schedule, texts (a list of text),
-  positive floats (a list of them), text grid (a list of rows, each a list of text);
+- a type word: text, int ≥ 0 (a whole number, 0 or more), int > 0, float, float ≥ 0,
+  float > 0, date (a date, or a date and time: YAML's own, or ISO 8601 text; see as_date),
+  hex color, hex colors (a list of one or more), two hex colors, column, columns, graph type,
+  theme, format, graphspec, layer type, layer types, layout, schedule, texts (a list of
+  text), floats > 0 (a list of them), text grid (a list of rows, each a list of text);
 - any other word is a literal value (None, true, auto, linear, ...).
 
 A parameter whose value in the definition is a list takes a list of one or more items, each
@@ -36,6 +36,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import TaggedScalar
+
+from forgegraph.spec.tags import FIX, VAR, loader
 
 if TYPE_CHECKING:  # typing.TypeIs is Python 3.13's
     from typing_extensions import TypeIs
@@ -53,25 +56,25 @@ REFERENCE = {
     "theme": "base_theme",
     "format": "base_format",
     "graph_type": "xy",
-    "graphspec": "polarization",
+    "graphspec": "graphspec_example",
     "layer": "reference_line",
-    "layout": "base_layout",
+    "layout": "layout_example",
     "schedule": "base_schedule",
 }
 CORE_KINDS = ("graph_type", "layer")  # ForgeGraph's code; every other kind comes from packs
 BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_KINDS
-HEADER = ("name", "version", "description", "extends", "fixed_parameters", "variable_parameters")
+PARAMETERS = "parameters"  # the tree of a file's parameters, tagged !var or !fix (see tags.py)
+HEADER = ("name", "version", "description", "extends", PARAMETERS)
 LAYER_HEADER = ("name", "version", "description", "parameters")
 COLLECTIONS = {"graphspec": ("layers",), "layout": ("tabs",)}  # categories keyed by chosen names
 NAMES = {"graphspec": ("graph_type", "theme", "format"), "layout": ("format",)}  # specs it names
-SECTIONS = ("fixed_parameters", "variable_parameters")
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
 TYPE_WORDS = (
-    "text", "int", "positive int", "float", "positive float", "date", "hex color",
+    "text", "int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0", "date", "hex color",
     "hex colors", "two hex colors",
     "column", "columns", "graph type", "theme", "format", "graphspec", "layer type",
-    "layer types", "layout", "schedule", "texts", "positive floats", "text grid",
+    "layer types", "layout", "schedule", "texts", "floats > 0", "text grid",
 )  # fmt: skip
 NAME_TYPES = {
     "graph type": "graph_type",
@@ -88,7 +91,7 @@ LIST_TYPES = (
     "two hex colors",
     "layer types",
     "texts",
-    "positive floats",
+    "floats > 0",
     "text grid",
 )  # take a list even where the definition has one value
 WHOLE_LISTS = ("text grid",)  # a list checked as a whole, even where the definition is a list
@@ -101,10 +104,11 @@ _ISO_DATE = re.compile(
 _COMMENT = re.compile(r"^#\s*\[(?P<range>[^\]]*)\];\s*(?P<description>.*)$")
 _TYPE_TEXT = {
     "text": "text",
-    "int": "a whole number, 0 or more",
-    "positive int": "a whole number above 0",
+    "int ≥ 0": "a whole number, 0 or more",
+    "int > 0": "a whole number above 0",
     "float": "a number",
-    "positive float": "a number above 0",
+    "float ≥ 0": "a number, 0 or more",
+    "float > 0": "a number above 0",
     "date": 'a date, e.g. 2025-08-25 or "2025-08-25T06:00"',
     "hex color": "a hex color code such as #4C78A8",
     "hex colors": "a list of hex color codes",
@@ -120,7 +124,7 @@ _TYPE_TEXT = {
     "layout": "the name of a layout",
     "schedule": "the name of a schedule",
     "texts": "a list of text",
-    "positive floats": "a list of numbers above 0",
+    "floats > 0": "a list of numbers above 0",
     "text grid": "a list of rows, each a list of text",
 }
 
@@ -154,7 +158,7 @@ class Parameter:
     default: Any
     range: Range
     description: str
-    fixed: bool  # in fixed_parameters of the definition file
+    fixed: bool  # tagged !fix in the definition file
 
     @property
     def takes_list(self) -> bool:
@@ -245,13 +249,15 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
     match t:
         case "text":
             return isinstance(value, str) and not is_none(value)
-        case "int":
+        case "int ≥ 0":
             return _is_int(value) and value >= 0
-        case "positive int":
+        case "int > 0":
             return _is_int(value) and value > 0
         case "float":
             return _is_number(value)
-        case "positive float":
+        case "float ≥ 0":
+            return _is_number(value) and value >= 0
+        case "float > 0":
             return _is_number(value) and value > 0
         case "date":
             return as_date(value) is not None
@@ -283,11 +289,11 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
                 and bool(value)
                 and all(_type_ok("text", v, names) for v in value)
             )
-        case "positive floats":
+        case "floats > 0":
             return (
                 isinstance(value, list)
                 and bool(value)
-                and all(_type_ok("positive float", v, names) for v in value)
+                and all(_type_ok("float > 0", v, names) for v in value)
             )
         case "text grid":
             return (
@@ -383,6 +389,12 @@ def _comment(node: Any, key: str) -> str | None:
     return None
 
 
+def _tag(node: Any) -> bool | None:
+    """Whether a round-trip YAML node is tagged !fix (True) or !var (False); None if neither."""
+    tag = getattr(getattr(node, "tag", None), "value", None)
+    return {FIX: True, VAR: False}.get(tag) if isinstance(tag, str) else None
+
+
 def _parse(path: str, value: Any, comment: str | None, fixed: bool, where: Path) -> Parameter:
     m = _COMMENT.match(comment or "")
     if not m:
@@ -390,15 +402,19 @@ def _parse(path: str, value: Any, comment: str | None, fixed: bool, where: Path)
     return Parameter(path, _plain(value), parse_range(m["range"]), m["description"], fixed)
 
 
-def _walk(prefix: str, node: Any, fixed: bool, where: Path) -> list[Parameter]:
-    """The parameters in a category and its sub-categories, in file order."""
+def _walk(prefix: str, node: Any, fixed: bool | None, where: Path) -> list[Parameter]:
+    """The parameters in a category and its sub-categories, in file order, each fixed or not
+    by the tag nearest it (fixed: the category's)."""
     out = []
     for key in node:
         value = node[key]
+        status = _tag(value)
+        status = fixed if status is None else status
+        path = f"{prefix}.{key}" if prefix else str(key)
         if hasattr(value, "items"):
-            out += _walk(f"{prefix}.{key}", value, fixed, where)
+            out += _walk(path, value, status, where)
         else:
-            out.append(_parse(f"{prefix}.{key}", value, _comment(node, key), fixed, where))
+            out.append(_parse(path, value, _comment(node, key), bool(status), where))
     return out
 
 
@@ -413,31 +429,21 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
             for k in LAYER_HEADER
             if k != "parameters"
         }
-        tree = data["parameters"]
-        found: list[Parameter] = []
-        for key in tree:
-            if hasattr(tree[key], "items"):
-                found += _walk(str(key), tree[key], False, path)
-            else:
-                found.append(_parse(str(key), tree[key], _comment(tree, key), False, path))
-        return header, {p.path: p for p in found}
+        return header, {p.path: p for p in _walk("", data[PARAMETERS], False, path)}
     header = {
-        k: _parse(k, data[k], _comment(data, k), False, path) for k in HEADER if k not in SECTIONS
+        k: _parse(k, data[k], _comment(data, k), False, path) for k in HEADER if k != PARAMETERS
     }
+    tree = data[PARAMETERS]
+    root = _tag(tree)
     params: dict[str, Parameter] = {}
-    for section in SECTIONS:
-        tree = data.get(section)
-        if is_none(tree):
+    for category, entries in tree.items():
+        if category in COLLECTIONS.get(kind, ()):
             continue
-        for category, entries in tree.items():
-            if category in COLLECTIONS.get(kind, ()):
-                continue
-            if not hasattr(entries, "items"):
-                raise ValueError(f"{path.name}: {section}.{category} must be a category")
-            for p in _walk(str(category), entries, section == SECTIONS[0], path):
-                if p.path in params:
-                    raise ValueError(f"{path.name}: {p.path} is listed twice")
-                params[p.path] = p
+        if not hasattr(entries, "items"):
+            raise ValueError(f"{path.name}: {PARAMETERS}.{category} must be a category")
+        status = _tag(entries)
+        for p in _walk(str(category), entries, root if status is None else status, path):
+            params[p.path] = p
     return header, params
 
 
@@ -447,7 +453,7 @@ def tab_definitions() -> tuple[dict[str, Parameter], Parameter]:
     (grid.areas...), and the one each tile takes, a GraphSpec file."""
     path = definition_file("layout")
     data = YAML().load(path.read_text(encoding="utf-8"))
-    tabs = data[SECTIONS[1]]["tabs"]
+    tabs = data[PARAMETERS]["tabs"]
     tab = tabs[next(iter(tabs))]
     grid = {p.path: p for p in _walk("grid", tab["grid"], False, path)}
     tiles = tab["tiles"]
@@ -493,14 +499,18 @@ def graph_type_files() -> tuple[str, ...]:
     folder = Path(str(files("forgegraph") / KINDS["graph_type"]))
     out = []
     for path in sorted(folder.glob("*.yaml")):
-        data = YAML(typ="safe", pure=True).load(path.read_text(encoding="utf-8"))
+        data = loader().load(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and is_none(data.get("extends")):
             out.append(path.stem)
     return tuple(out)
 
 
 def _plain(value: Any) -> Any:
-    """ruamel's round-trip types -> plain Python values."""
+    """ruamel's round-trip types -> plain Python values. A tagged scalar is read as it would
+    be untagged."""
+    if isinstance(value, TaggedScalar):
+        text = str(value.value)
+        value = YAML(typ="safe", pure=True).load(text) if value.style is None else text
     if isinstance(value, list):
         return [_plain(v) for v in value]
     if isinstance(value, bool) or value is None:

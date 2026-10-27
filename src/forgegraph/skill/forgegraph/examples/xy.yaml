@@ -2,8 +2,7 @@ name: xy
 version: 0
 description: Polarization curves, one line per cell and run.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

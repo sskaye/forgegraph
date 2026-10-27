@@ -2,8 +2,7 @@ name: throughput_weekly
 version: 0
 description: Completed runs per week (Mon–Sun, by finish time) for each instrument.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

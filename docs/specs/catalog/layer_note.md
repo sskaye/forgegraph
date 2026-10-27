@@ -6,7 +6,7 @@ name: note          *# \[layer type\]; The layer type this catalog sho
 version: 0          *# \[int\]; The version number of the specification.*\
 description: Cards for the note layer.          *# \[text\]; The description of the catalog.*\
 extends: None          *# \[None, catalog\]; The catalog this one extends: its baselines come before this file's own, and a header field set to None here is taken from it. None: it extends none.*\
-baseline: forgegraph_base/polarization          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
+baseline: forgegraph_base/graphspec_example          *# \[graphspec\]; The GraphSpec every card changes, without its own layers.*\
 settings: None          *# GraphSpec parameters every card sets so the layer can be drawn. None if none.*\
 layer:          *# The layer every card draws, named after its type: its parameters.*\
     text: "60 °C, 1 atm, H\_{2}/air"          *# \[text\]; The note, in label markup; a line break starts a new line.*\

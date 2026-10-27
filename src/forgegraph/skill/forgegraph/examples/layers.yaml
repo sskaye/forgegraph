@@ -2,8 +2,7 @@ name: layers
 version: 0
 description: Polarization curves, the mean of each cell's runs with ±1 standard deviation, a target line and the test conditions.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

@@ -20,7 +20,7 @@ from forgegraph.drawing.style import isolated
 from forgegraph.graph import Graph, SpecError, render
 from forgegraph.spec.layers import resolve_layers
 from forgegraph.spec.loaded import Loaded
-from forgegraph.spec.parameters import NONE, definitions, is_none, tree_has, tree_set
+from forgegraph.spec.parameters import NONE, PARAMETERS, definitions, is_none, tree_has, tree_set
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import resolve
 
@@ -38,17 +38,16 @@ def _flat(changes: tuple[Change, ...]) -> list[Change]:
 
 
 def _child(kind: str, parent: str, changes: dict[str, Any]) -> dict[str, Any]:
-    defs = definitions(kind)
-    sections: dict[str, dict] = {"fixed_parameters": {}, "variable_parameters": {}}
+    """A spec extending parent with these changes, each keeping the status it inherits."""
+    tree: dict[str, Any] = {}
     for path, value in changes.items():
-        section = "fixed_parameters" if defs[path].fixed else "variable_parameters"
-        tree_set(sections[section], path, value)
+        tree_set(tree, path, value)
     return {
         "name": "catalog",
         "version": 0,
         "description": "",
         "extends": parent,
-        **{k: (v or NONE) for k, v in sections.items()},
+        PARAMETERS: tree or NONE,
     }
 
 
@@ -67,7 +66,7 @@ def draw(
     doc = copy.deepcopy(reg.docs["graphspec"][spec])
     inherited = list(resolve_layers(doc, reg)) if not is_none(doc.get("extends")) else []
     in_chain = set(resolve("graphspec", doc, reg))  # set by the GraphSpec or one it extends
-    listed = doc["variable_parameters"]
+    listed = doc[PARAMETERS]
     listed.pop("layers", None)  # a card shows one change; layers are shown on their own cards
     if inherited:  # and those it inherits are removed by name
         listed["layers"] = {name: NONE for name in inherited}

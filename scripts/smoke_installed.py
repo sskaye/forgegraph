@@ -21,8 +21,7 @@ GRAPHSPEC = """name: voltage
 version: 0
 description: Cell voltage over a test, one line per cell.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: {theme}

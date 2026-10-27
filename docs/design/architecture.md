@@ -32,7 +32,7 @@ Also:
 | --- | --- |
 | Renderer (D1) | matplotlib only; no interactivity in the MVP |
 | Core API (D2) | Spec-first: `render(spec)`; Python functions build specs. The definition files are the source; `forgegraph schema`, the catalog pages and the docs/specs mirrors are generated from them |
-| Style (D3) | Theme × format, layered and explainable; themes hold fixed parameters (graphs can't change them) and variable parameters with defaults (graphs can change them) |
+| Style (D3) | Theme × format, layered and explainable; themes tag parameters !fix (graphs can't change them) or !var, with defaults (graphs can change them) |
 | Extension (D4) | Packs, data only, are the only source of named specs; the main and folder configs say which may be used, and a pack only a folder config lists is non-standard; graph types and layers stay in the core |
 | Graph types (D5) | Each graph type's and layer type's definition file (graph_types/xy.yaml, layers/<type>.yaml) is the source of truth |
 | Review (D6) | Tabbed HTML catalog with Forgemark comments |
@@ -106,15 +106,14 @@ Also:
 
 ### 3.1 What it looks like to use
 
-**GraphSpec** (docs/specs/graphspec/polarization.md lists every parameter):
+**GraphSpec** (docs/specs/graphspec/graphspec_example.md lists every parameter):
 
 ```yaml
 name: voltage
 version: 0
 description: Cell voltage over a test, one line per cell.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme      # from a pack the configs allow
@@ -190,11 +189,12 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 
 ### D3. Style resolution: theme × format, layered, explainable
 
-**One structure for every specification.** Themes, formats, graph types and GraphSpecs are written the same way, and each kind is defined by one file: the base pack's `themes/base_theme.yaml` and `formats/base_format.yaml` (in `src/forgegraph/packs/forgegraph_base/`), each graph type's own file (`graph_types/xy.yaml`) and an example GraphSpec that sets every parameter (the base pack's `graphspecs/polarization.yaml`). Every file has a header (`name`, `version`, `description`, `extends`) and two sections, `fixed_parameters` and `variable_parameters`, each holding categories of parameters. In a definition file every line, header included, gives its value and a comment `[RANGE]; DESCRIPTION`, and the code reads every definition, range included, from those files.
+**One structure for every specification.** Themes, formats, graph types and GraphSpecs are written the same way, and each kind is defined by one file: the base pack's `themes/base_theme.yaml` and `formats/base_format.yaml` (in `src/forgegraph/packs/forgegraph_base/`), each graph type's own file (`graph_types/xy.yaml`) and an example GraphSpec that sets every parameter (the base pack's `graphspecs/graphspec_example.yaml`). Every file has a header (`name`, `version`, `description`, `extends`) and `parameters`, one tree of categories of parameters. In a definition file every line, header included, gives its value and a comment `[RANGE]; DESCRIPTION`, and the code reads every definition, range included, from those files.
 
-- **Fixed:** a GraphSpec can't change it (principle 2). A different look needs a different theme, typically one that extends the house theme.
-- **Variable:** a GraphSpec may change it, under the same category; the file gives the value it has otherwise.
-- **extends:** every parameter a file doesn't list is inherited, fixed or variable as it was. With `extends: None` the file lists every parameter.
+- **!fix:** a GraphSpec can't change it (principle 2). A different look needs a different theme, typically one that extends the house theme.
+- **!var:** a GraphSpec may change it, under the same category; the file gives the value it has otherwise.
+- A tag goes before a value (`width: !var 0.15`) or on a category (`output: !var`), where it applies to everything inside unless a tag further in says otherwise. A tag with no value (`width: !var`) changes only the status.
+- **extends:** every parameter a file doesn't list is inherited, with its status. The nearest file that tags a parameter, or a category above it, decides its status. With `extends: None` the file lists every parameter and tags each, itself or through a category.
 - In a theme or format, a graph type's name used as a heading holds parameters for that graph type only.
 
 Every size in a theme is a multiple of the format's base font ("tick labels = 0.9 × base"), so a theme renders correctly in any format. That matters because graphs go to many destinations, not mainly slides (so no `.pptx` export: the examples were collected on slides only for convenience).
@@ -322,9 +322,8 @@ When a request isn't in the catalog, the agent says so plainly, then:
 name: lab_throughput
 version: 0
 description: Daily operations view of lab throughput.
-extends: forgegraph_base/base_layout
-fixed_parameters: None
-variable_parameters:
+extends: forgegraph_base/layout_example
+parameters:
     specifications:
         format: ops/dashboard
     separators:
@@ -352,7 +351,7 @@ variable_parameters:
                 icp_oes_01: runs_icp_oes_01.yaml
 ```
 
-**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specs/layout/base_layout.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
+**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specs/layout/layout_example.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
 
 - **Format, no theme.** The layout's format (by default the base pack's base_layout_format: the base format at 300 mm) sets the size and output of the whole figure, and replaces each tile's own format, so every tile is drawn at one base size. The layout can set the format's variable parameters, such as its file types. Each tile keeps its own theme.
 - **The grid.** grid.areas draws the grid as rows of tile names, as CSS `grid-template-areas`, matplotlib's `subplot_mosaic` and patchwork do: a name repeated over a rectangle of cells spans it, and `.` is a blank cell. column_widths and row_heights are ratios of plot boxes.
@@ -501,9 +500,9 @@ Each kind of document is specified by its definition file: every parameter with 
 | **Theme** | src/forgegraph/packs/forgegraph_base/themes/base_theme.yaml |
 | **Format** | src/forgegraph/packs/forgegraph_base/formats/base_format.yaml |
 | **Graph type** | src/forgegraph/graph_types/xy.yaml |
-| **GraphSpec** | src/forgegraph/packs/forgegraph_base/graphspecs/polarization.yaml |
+| **GraphSpec** | src/forgegraph/packs/forgegraph_base/graphspecs/graphspec_example.yaml |
 | **Layer type** | src/forgegraph/layers/, a file per type |
-| **Layout** | src/forgegraph/packs/forgegraph_base/layouts/base_layout.yaml |
+| **Layout** | src/forgegraph/packs/forgegraph_base/layouts/layout_example.yaml |
 | **Schedule** | src/forgegraph/packs/forgegraph_base/schedules/base_schedule.yaml |
 | **Pack and config** | src/forgegraph/packs/forgegraph_base/pack.yaml, src/forgegraph/packs/config.toml |
 | **Provenance record** | src/forgegraph/spec/provenance.yaml |

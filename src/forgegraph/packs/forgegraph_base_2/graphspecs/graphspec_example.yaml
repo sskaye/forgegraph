@@ -1,11 +1,9 @@
-name: example          # [text]; The name of the GraphSpec.
-version: 0          # [int]; The version number of the specification.
+name: graphspec_example          # [text]; The name of the GraphSpec.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: The base pack's example GraphSpec in this pack's theme and format, for its catalog.          # [text]; The description of the GraphSpec.
-extends: forgegraph_base/polarization          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
+extends: forgegraph_base/graphspec_example          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
 
-fixed_parameters: None          # List of fixed parameters for the GraphSpec, None if none.
-
-variable_parameters:          # List of variable parameters for the GraphSpec, None if none.
+parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     specifications:
         theme: forgegraph_base_2/base_theme          # [theme];
         format: forgegraph_base_2/compact_format          # [format];

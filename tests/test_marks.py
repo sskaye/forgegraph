@@ -15,6 +15,7 @@ from ruamel.yaml import YAML
 import forgegraph as fg
 from forgegraph.drawing.key import KEY
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
+from forgegraph.spec.tags import with_tags
 
 COUNTS = pd.DataFrame(
     {
@@ -250,8 +251,7 @@ def test_bars_too_wide_for_a_theme_that_fixes_their_width(tmp_path):
     (house / "themes").mkdir()
     (house / "themes" / "wide.yaml").write_text(
         "name: wide\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters:\n    series:\n        bar:\n            width: 2.5\n"
-        "variable_parameters: None\n"
+        "parameters:\n    series:\n        bar:\n            width: !fix 2.5\n"
     )
     allow(tmp_path, "forgegraph_base", "./house")
     df = pd.DataFrame({"x": np.arange(200), "y": np.arange(200.0)})
@@ -260,7 +260,7 @@ def test_bars_too_wide_for_a_theme_that_fixes_their_width(tmp_path):
                        settings={"axis.x.data.column": "x", "axis.y.data.column": "y", **BARS,
                                  "axis.x.tick.algorithm": "auto"})  # fmt: skip
     with (tmp_path / "g.yaml").open("w") as f:
-        YAML().dump(doc, f)
+        with_tags(YAML()).dump(doc, f)
     with pytest.raises(fg.SpecError, match="narrow the bars in the theme"):
         fg.render(tmp_path / "g.yaml")
 

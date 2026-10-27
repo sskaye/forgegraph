@@ -188,8 +188,9 @@ def _specs(ws: Path) -> list[tuple[Path, str, dict[str, Any]]]:
     theme or format by its pack folder; GraphSpec if it names a graph type or extends a
     GraphSpec; otherwise "style", a theme or format outside a pack."""
     from forgegraph.spec.registry import registry_for
+    from forgegraph.spec.tags import loader, untag
 
-    yaml = YAML(typ="safe")
+    yaml = loader()
     given, out = _given(ws), []
     for p in _project_files(ws):
         if p.suffix not in (".yaml", ".yml") or str(p.relative_to(ws)) in given:
@@ -198,10 +199,10 @@ def _specs(ws: Path) -> list[tuple[Path, str, dict[str, Any]]]:
             doc = yaml.load(p.read_text(encoding="utf-8"))
         except Exception:
             continue
-        if not isinstance(doc, dict) or "fixed_parameters" not in doc or "name" not in doc:
+        if not isinstance(doc, dict) or "parameters" not in doc or "name" not in doc:
             continue
-        variable = doc.get("variable_parameters")
-        chosen = variable.get("specifications") if isinstance(variable, dict) else None
+        listed = untag(doc.get("parameters"))
+        chosen = listed.get("specifications") if isinstance(listed, dict) else None
         if p.name.endswith(".layout.yaml"):
             kind = "layout"
         elif p.name.endswith(".schedule.yaml"):

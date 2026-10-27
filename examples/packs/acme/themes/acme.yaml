@@ -1,9 +1,9 @@
 name: acme          # [text]; The name of the theme.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: Acme's house style, a serif look with a light grid and no box.          # [text]; The description of the theme.
 extends: forgegraph_base/base_theme          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
 
-fixed_parameters:          # List of fixed parameters for the theme.
+parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     font:
         family: IBM Plex Serif          # [text]; Typeface for all text.
     title:
@@ -13,12 +13,9 @@ fixed_parameters:          # List of fixed parameters for the theme.
             weight: regular          # [light, regular, medium, semibold, bold]; Axis title weight.
     plot_area:
         sides: [left, bottom]          # [left, right, top, bottom, None]; Sides with a border line. None: none.
-        aspect: 1.6          # [positive float]; Plot area width ÷ height.
+        aspect: 1.6          # [float > 0]; Plot area width ÷ height.
     grid:
         color: "#DDDDDD"          # [hex color]; Grid color.
+        show: true          # [true, false]; Draw a grid.
     series:
         colors: tol_muted          # [okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.
-
-variable_parameters:          # List of variable parameters for the theme, None if none.
-    grid:
-        show: true          # [true, false]; Draw a grid.

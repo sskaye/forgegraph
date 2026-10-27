@@ -3,46 +3,47 @@
 This page mirrors src/forgegraph/packs/forgegraph_base_2/themes/base_theme.yaml, which is the specification. A test fails if they ever differ.
 
 name: base_theme          *# \[text\]; The name of the theme.*\
-version: 2          *# \[int\]; The version number of the specification.*\
+version: 2          *# \[int ≥ 0\]; The version number of the specification.*\
 description: Source Sans 3 at report sizes, the Tableau 10 palette, a dark full box, short outward ticks, a key before direct labels.          *# \[text\]; The description of the theme.*\
 extends: forgegraph_base/base_theme          *# \[None, theme\]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.*\
  \
-fixed_parameters:          *# List of fixed parameters for the theme.*\
+parameters:          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     font:\
         family: Source Sans 3          *# \[text\]; Typeface for all text.*\
         weight: light          *# \[light, regular, medium, semibold, bold\]; Weight of text without its own: tick labels, value labels, notes, key names, footnotes.*\
     background:\
         color: None          *# \[None, hex color\]; Figure and plot background. None: transparent.*\
     title:\
-        size: 1.45          *# \[positive float\]; Title size, × base size.*\
+        size: 1.45          *# \[float > 0\]; Title size, × base size.*\
         weight: medium          *# \[light, regular, medium, semibold, bold\]; Title weight.*\
-        gap: 1.1          *# \[positive float\]; Gap below the title's letters, × base size.*\
+        gap: 1.1          *# \[float > 0\]; Gap below the title's letters, × base size.*\
     axis:\
         title:\
-            size: 1.27          *# \[positive float\]; Axis title size, × base size.*\
+            size: 1.27          *# \[float > 0\]; Axis title size, × base size.*\
             weight: medium          *# \[light, regular, medium, semibold, bold\]; Axis title weight.*\
-            gap: 1.0          *# \[positive float\]; Gap from tick labels to the title's letters, × base size.*\
+            gap: 1.0          *# \[float > 0\]; Gap from tick labels to the title's letters, × base size.*\
         tick:\
-            length: 0.18          *# \[positive float\]; Tick length, × base size.*\
-            width: 0.073          *# \[positive float\]; Tick width, × base size.*\
+            length: 0.18          *# \[float > 0\]; Tick length, × base size.*\
+            width: 0.073          *# \[float > 0\]; Tick width, × base size.*\
             algorithm: matplotlib          *# \[extended_wilkinson, wilkinson, heckbert, nelder, r_pretty, matplotlib\]; Published algorithm placing major ticks on linear axes.*\
             log_algorithm: matplotlib          *# \[breaks_log, matplotlib\]; Published algorithm placing major ticks on log axes. breaks_log: R's scales::breaks_log, as many labels as axis.tick.algorithm gives an axis of the same length. matplotlib: powers of ten only.*\
             label:\
-                size: 1.27          *# \[positive float\]; Tick label size, × base size.*\
-                gap: 0.55          *# \[positive float\]; Gap from tick to label, × base size.*\
+                size: 1.27          *# \[float > 0\]; Tick label size, × base size.*\
+                gap: 0.55          *# \[float > 0\]; Gap from tick to label, × base size.*\
     plot_area:\
         line:\
-            width: 0.091          *# \[positive float\]; Border line width, × base size.*\
+            width: 0.091          *# \[float > 0\]; Border line width, × base size.*\
             color: "#262626"          *# \[hex color\]; Border line color.*\
-        aspect: 1.11          *# \[positive float\]; Plot area width ÷ height.*\
+        aspect: 1.11          *# \[float > 0\]; Plot area width ÷ height.*\
     grid:\
         color: "#F2F2F2"          *# \[hex color\]; Grid color.*\
         line:\
-            width: 0.064          *# \[positive float\]; Grid line width, × base size.*\
+            width: 0.064          *# \[float > 0\]; Grid line width, × base size.*\
     series:\
         colors: tableau_10          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.*\
         line:\
             cap: round          *# \[butt, round, projecting\]; Shape of a line's ends.*\
+            width: 0.18          *# \[float > 0\]; Line width, × base size.*\
         bar:\
             edge:\
                 color: None          *# \[None, hex color\]; Bar outline color. None: none.*\
@@ -53,27 +54,22 @@ fixed_parameters:          *# List of fixed parameters for the theme.*
             bar:\
                 edge:\
                     color: None          *# \[None, hex color\]; Benchmark bar outline color. None: none.*\
+        marker:\
+            size: 0.64          *# \[float > 0\]; Marker size, × base size.*\
+            edge:\
+                width: 0.082          *# \[float > 0\]; Marker outline width, × base size.*\
     legend:\
         methods: \[auto, key, direct\]          *# \[auto, direct, key, none\]; Methods graphs may use to name series; auto tries direct and key, in this list's order, never none. direct: names beside the lines. key: a list of names, each with its line or marker.*\
         label:\
-            size: 0.91          *# \[positive float\]; Series name size, × base size.*\
+            size: 0.91          *# \[float > 0\]; Series name size, × base size.*\
             weight: light          *# \[light, regular, medium, semibold, bold\]; Direct label weight; key names use font.weight.*\
         key:\
             background: "#FFFFFFCC"          *# \[None, hex color\]; Fill behind the key. None: none.*\
-            padding: 0.36          *# \[positive float\]; Gap inside the frame, every side, × base size.*\
-            inset: 0.45          *# \[positive float\]; Gap from the plot area to the key, × base size.*\
-            row_gap: 1.0          *# \[positive float\]; Gap between entries, × base size.*\
+            padding: 0.36          *# \[float > 0\]; Gap inside the frame, every side, × base size.*\
+            inset: 0.45          *# \[float > 0\]; Gap from the plot area to the key, × base size.*\
+            row_gap: 1.0          *# \[float > 0\]; Gap between entries, × base size.*\
             title:\
                 weight: light          *# \[light, regular, medium, semibold, bold\]; Key title weight.*\
             sample:\
-                length: 2.27          *# \[positive float\]; Line sample length, × base size.*\
-                gap: 0.9          *# \[positive float\]; Gap from the line sample to the name, × base size.*\
- \
-variable_parameters:          *# List of variable parameters for the theme, None if none.*\
-    series:\
-        line:\
-            width: 0.18          *# \[positive float\]; Line width, × base size.*\
-        marker:\
-            size: 0.64          *# \[positive float\]; Marker size, × base size.*\
-            edge:\
-                width: 0.082          *# \[positive float\]; Marker outline width, × base size.*
+                length: 2.27          *# \[float > 0\]; Line sample length, × base size.*\
+                gap: 0.9          *# \[float > 0\]; Gap from the line sample to the name, × base size.*

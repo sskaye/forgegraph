@@ -1,11 +1,9 @@
-name: polarization          # [text]; The name of the GraphSpec.
-version: 0          # [int]; The version number of the specification.
+name: graphspec_example          # [text]; The name of the GraphSpec.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: Polarization curves for cells A–C against the benchmark.          # [text]; The description of the GraphSpec.
 extends: None          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
 
-fixed_parameters: None          # List of fixed parameters for the GraphSpec, None if none.
-
-variable_parameters:          # List of variable parameters for the GraphSpec, None if none.
+parameters: !var          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     specifications:
         graph_type: xy          # [graph type];
         theme: forgegraph_base/base_theme          # [theme];
@@ -30,7 +28,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
             max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
-                step: None          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
+                step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
                 label:
                     format: auto          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
         y:
@@ -47,7 +45,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
             max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
-                step: None          # [None, positive float, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
+                step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
                 label:
                     format: auto          # [auto, text]; Number format, e.g. ",.0f", or date format, e.g. "%b %-d". auto: from the values; dates, by their tick unit.
     encoding:
@@ -81,7 +79,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
     legend:
         method: auto          # [auto, direct, key, none]; This graph's method: one of the theme's legend.methods.
         direct:
-            clearance: 0.2          # [positive float]; Minimum gap around a direct label, × base size.
+            clearance: 0.2          # [float > 0]; Minimum gap around a direct label, × base size.
             max_relative_distance: 0.8          # [0-1]; Most a label's distance to its series may be, ÷ its distance to the next nearest.
             max_axis_extension: 0.15          # [0-1]; Most the x-axis may grow to fit labels, × its range.
         key:
@@ -89,7 +87,7 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
             inside: true          # [true, false]; Inside the plot area, or outside it: top_* above it, bottom_* below the x-axis title, right_* to its right.
             sample:
                 marker:
-                    size: 0.5          # [positive float]; Marker size in key samples, × base size; series.marker.size sets the plot's.
+                    size: 0.5          # [float > 0]; Marker size in key samples, × base size; series.marker.size sets the plot's.
             title:
                 text: column_name          # [None, column_name, text]; Every key's title. column_name: each key's own column's name. None: none. A text: one key only.
         color_bar:
@@ -107,29 +105,29 @@ variable_parameters:          # List of variable parameters for the GraphSpec, N
             total:
                 show: false          # [true, false]; With aggregation sum, also write each stack's total.
         line:
-            width: 0.15          # [positive float]; Line width, × base size.
+            width: 0.15          # [float > 0]; Line width, × base size.
         marker:
-            size: 0.5          # [positive float]; Marker size, × base size.
+            size: 0.5          # [float > 0]; Marker size, × base size.
             edge:
-                width: 0.05          # [positive float]; Marker outline width, × base size.
+                width: 0.05          # [float > 0]; Marker outline width, × base size.
         bar:
-            width: 2.5          # [positive float]; Bar width, × base size. Bars that would overlap are an error.
+            width: 2.5          # [float > 0]; Bar width, × base size. Bars that would overlap are an error.
             gap: 0.15          # [0-2]; Gap between side-by-side bars, × base size.
             edge:
-                width: 0.05          # [positive float]; Bar outline width, × base size.
+                width: 0.05          # [float > 0]; Bar outline width, × base size.
         benchmark:
             line:
                 style: solid          # [solid, dashed, dotted, dashdot]; Benchmark line style.
-                width: 0.15          # [positive float]; Benchmark line width, × base size.
+                width: 0.15          # [float > 0]; Benchmark line width, × base size.
             marker:
                 shape: circle          # [circle, square, triangle_up, triangle_down, diamond, cross, plus]; Benchmark marker shape.
-                size: 0.5          # [positive float]; Benchmark marker size, × base size.
+                size: 0.5          # [float > 0]; Benchmark marker size, × base size.
                 edge:
-                    width: 0.05          # [positive float]; Benchmark marker outline width, × base size.
+                    width: 0.05          # [float > 0]; Benchmark marker outline width, × base size.
             bar:
-                width: 2.5          # [positive float]; Benchmark bar width, × base size.
+                width: 2.5          # [float > 0]; Benchmark bar width, × base size.
                 edge:
-                    width: 0.05          # [positive float]; Benchmark bar outline width, × base size.
+                    width: 0.05          # [float > 0]; Benchmark bar outline width, × base size.
     grid:
         show: false          # [true, false]; Draw a grid.
     output:

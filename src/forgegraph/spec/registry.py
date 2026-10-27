@@ -14,13 +14,12 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from ruamel.yaml import YAML
-
 from forgegraph.packs import FOLDERS as PACK_FOLDERS
 from forgegraph.packs import Config, Pack, pip_packs, read_pack, setup
-from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, NAMES, SECTIONS, base_folder
+from forgegraph.spec.parameters import BASE, CORE_KINDS, KINDS, NAMES, PARAMETERS, base_folder
+from forgegraph.spec.tags import loader, untag
 
-_yaml = YAML(typ="safe", pure=True)
+_yaml = loader()
 
 
 def load_yaml(path: Path) -> Any:
@@ -179,9 +178,8 @@ def _specs_named(kind: str, doc: dict[str, Any]) -> list[Any]:
     """The specs a pack's spec builds on: what it extends, and the packs' specs a GraphSpec
     or layout names (see NAMES)."""
     named = [doc.get("extends")]
-    for section in SECTIONS:
-        chosen = doc.get(section)
-        chosen = chosen.get("specifications") if isinstance(chosen, dict) else None
-        if isinstance(chosen, dict):
-            named += [chosen.get(k) for k in NAMES.get(kind, ()) if k not in CORE_KINDS]
+    tree = untag(doc.get(PARAMETERS))
+    chosen = untag(tree.get("specifications")) if isinstance(tree, dict) else None
+    if isinstance(chosen, dict):
+        named += [untag(chosen.get(k)) for k in NAMES.get(kind, ()) if k not in CORE_KINDS]
     return named

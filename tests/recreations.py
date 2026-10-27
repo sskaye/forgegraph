@@ -357,7 +357,7 @@ class LayoutRecreation:
             dump(r.graphspec(), folder / f"{name}.yaml")
         tiles = {name: f"{name}.yaml" for name in self.tiles}
         layout = doc(
-            "forgegraph_base/base_layout",
+            "forgegraph_base/layout_example",
             self.name,
             variable={
                 "specifications.format": "house/slide",

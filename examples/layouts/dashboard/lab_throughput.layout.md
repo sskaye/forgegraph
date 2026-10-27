@@ -5,9 +5,8 @@ This page mirrors examples/layouts/dashboard/lab_throughput.layout.yaml, which i
 name: lab_throughput\
 version: 0\
 description: Daily operations view of lab throughput.\
-extends: forgegraph_base/base_layout\
-fixed_parameters: None\
-variable_parameters:\
+extends: forgegraph_base/layout_example\
+parameters:\
     specifications:\
         format: ops/dashboard\
     separators:\

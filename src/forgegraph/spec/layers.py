@@ -3,7 +3,8 @@
 A GraphSpec's layers are keyed by names it chooses; each has a type, one of its graph type's
 layer.types, and that layer type's parameters. Through extends, layers merge by name: a
 GraphSpec changes an inherited layer's parameters by naming it, replaces it by giving another
-type, and removes it with None; it can't change a layer listed as fixed.
+type, and removes it with None; it can't change a layer tagged !fix, itself or through the
+layers category. A tag goes on a layer or on layers, never inside a layer.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from typing import Any
 
 from forgegraph.spec.common import suggest
 from forgegraph.spec.parameters import (
-    SECTIONS,
+    PARAMETERS,
     check_parameter,
     definitions,
     flatten,
@@ -20,19 +21,30 @@ from forgegraph.spec.parameters import (
 )
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
+from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
 
 
-def _layers_in(d: dict[str, Any]) -> list[tuple[str, str, Any]]:
-    """(section, name, entry) for each layer a file lists, in order."""
-    out = []
-    for section in SECTIONS:
-        tree = d.get(section)
-        layers = tree.get("layers") if isinstance(tree, dict) else None
-        if isinstance(layers, dict):
-            out += [(section, str(name), entry) for name, entry in layers.items()]
-        elif layers is not None:
-            out.append((section, "", layers))
-    return out
+def _layers_in(d: dict[str, Any]) -> list[tuple[bool, str, Any]]:
+    """(fixed, name, entry) for each layer a file lists, in order: fixed if the file tags the
+    layer, or layers, !fix. The entry is without its own tag."""
+    tree = untag(d.get(PARAMETERS))
+    layers = untag(tree.get("layers")) if isinstance(tree, dict) else None
+    if isinstance(layers, dict):
+        return [
+            (bool(status_at(d[PARAMETERS], f"layers.{name}")), str(name), untag(entry))
+            for name, entry in layers.items()
+        ]
+    return [] if layers is None else [(False, "", layers)]
+
+
+def _tag_inside(entry: dict[str, Any], prefix: str = "") -> str | None:
+    """The path of the first tag inside a layer's entry, or None."""
+    for key, value in entry.items():
+        if isinstance(value, Tagged | TaggedMap):
+            return f"{prefix}{key}"
+        if isinstance(value, dict) and (found := _tag_inside(value, f"{prefix}{key}.")):
+            return found
+    return None
 
 
 def _merge(base: dict[str, Any], change: dict[str, Any]) -> dict[str, Any]:
@@ -52,7 +64,7 @@ def resolve_layers(doc: dict[str, Any], reg: Registry) -> dict[str, Resolved]:
     out: dict[str, Resolved] = {}
     for d in reversed(chain("graphspec", doc, reg)):
         label = f"GraphSpec '{d.get('name')}'"
-        for section, name, entry in _layers_in(d):
+        for fixed, name, entry in _layers_in(d):
             if is_none(entry):
                 out.pop(name, None)
                 continue
@@ -63,7 +75,7 @@ def resolve_layers(doc: dict[str, Any], reg: Registry) -> dict[str, Resolved]:
                 "type"
             )
             value = _merge(old.value, entry) if same and old is not None else dict(entry)
-            out[name] = Resolved(value, section == SECTIONS[0], label)
+            out[name] = Resolved(value, fixed, label)
     return out
 
 
@@ -93,8 +105,8 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         else {}
     )
     names = reg.names()
-    for section, name, entry in _layers_in(doc):
-        where = f"{section}.layers"
+    for _, name, entry in _layers_in(doc):
+        where = "layers"
         if name == "":
             errors.append(f"{where}: must be layers keyed by name, or None")
             continue
@@ -106,6 +118,9 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
             continue
         if not isinstance(entry, dict):
             errors.append(f"{where}: must be a layer: its type, then its parameters")
+            continue
+        if inside := _tag_inside(entry):
+            errors.append(f"{where}.{inside}: a tag goes on the layer or on layers, not inside")
             continue
         kind = entry.get("type", inherited[name].value.get("type") if name in inherited else None)
         if is_none(kind):

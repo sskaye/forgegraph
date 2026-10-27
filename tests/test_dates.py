@@ -14,7 +14,6 @@ import pytest
 from matplotlib.dates import date2num
 
 import forgegraph as fg
-from forgegraph.drawing import export
 from forgegraph.drawing.axes import numbers
 from forgegraph.drawing.layers import ERROR_BAR, REFERENCE
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
@@ -36,7 +35,7 @@ def graph(
         columns = {"axis.x.data.column": "n", "axis.y.data.column": "t"}
     d = fg.graphspec("t", "xy", settings={**columns, "encoding.color.column": None, **settings})
     if layers:
-        d["variable_parameters"]["layers"] = layers
+        d["parameters"]["layers"] = layers
     return fg.render(d, df)
 
 
@@ -442,8 +441,8 @@ def test_a_benchmark_keeps_its_side_on_a_categorical_date_axis():
 
 def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
     (tmp_path / "dated.yaml").write_text(
-        "name: dated\nversion: 0\ndescription: d\nextends: None\nfixed_parameters: None\n"
-        "variable_parameters:\n"
+        "name: dated\nversion: 0\ndescription: d\nextends: None\n"
+        "parameters: !var\n"
         "    specifications: {graph_type: xy, theme: forgegraph_base/base_theme, "
         "format: forgegraph_base/base_format}\n"
         "    text: {title: None}\n"
@@ -459,6 +458,6 @@ def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
     assert g.axes.get_xlim() == (_day("2000-01-01T20:30"), _day("2000-01-01T22:30"))
     assert _line_at(g, "x") == pytest.approx(_day("2000-01-01T21:10"))
     [saved] = g.save(tmp_path / "dated.png")
-    written = cast(dict[str, Any], export.read(saved))  # its full provenance record
-    assert written["graphspec"]["variable_parameters"]["axis"]["x"]["min"] == "2000-01-01T20:30:00"
+    written = cast(dict[str, Any], fg.load(saved))  # its full provenance record
+    assert written["graphspec"]["parameters"]["axis"]["x"]["min"] == "2000-01-01T20:30:00"
     assert written["resolved"]["graph_type"]["axis.x.max"] == "2000-01-01T22:30"

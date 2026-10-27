@@ -36,6 +36,8 @@ def test_render_load_and_recover(project):
     assert report["style_keys"] == []
     result = runner.invoke(app, ["load", "out/p.png", "--graphspec", "graphspecs/again.yaml"])
     assert result.exit_code == 0 and "data: ../data/p.parquet" in result.output
+    recovered = (project / "graphspecs" / "again.yaml").read_text()
+    assert "\nparameters: !var\n" in recovered  # its tags, as written
     again = runner.invoke(app, ["render", "graphspecs/again.yaml", "-o", "out/again.png"])
     assert again.exit_code == 0, again.output
 
@@ -82,7 +84,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     (house / "themes").mkdir()
     (house / "themes" / "plain.yaml").write_text(
         "name: plain\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        show: true\n"
     )
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n\nUse plain.\n")
@@ -290,7 +292,7 @@ def test_schema_lists_what_a_graphspec_can_set(project):
     (house / "themes").mkdir()
     (house / "themes" / "grid.yaml").write_text(
         "name: grid\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "fixed_parameters: None\nvariable_parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        show: true\n"
     )
     allow(project, "forgegraph_base", "./house")
     listed = cli("schema", "graphspec", *BASE_NAMES, "--theme", "house/grid")["graphspec"]
@@ -454,10 +456,10 @@ def test_load_of_a_file_it_cant_read_is_an_error(project):
 
 def test_explain_reports_a_graphspec_that_fails_validation(project):
     doc = fg.graphspec("bad", "xy", data_file="../data/p.parquet", settings=BASE)
-    doc["variable_parameters"]["text"]["colour"] = "red"
+    doc["parameters"]["text"]["colour"] = "red"
     dump(doc, project / "graphspecs" / "bad.yaml")
     [problem] = cli_problems("explain", "graphspecs/bad.yaml")
-    assert problem.startswith("variable_parameters.text.colour: unknown parameter")
+    assert problem.startswith("text.colour: unknown parameter")
     result = runner.invoke(app, ["explain", "graphspecs/bad.yaml"])
     assert result.exit_code == 1 and f"error: {problem}" in result.output
 

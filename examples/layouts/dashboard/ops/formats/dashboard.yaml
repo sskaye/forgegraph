@@ -1,16 +1,13 @@
 name: dashboard          # [text]; The name of the format.
-version: 0          # [int]; The version number of the specification.
+version: 0          # [int ≥ 0]; The version number of the specification.
 description: A 16:9 dashboard page, 420 × 236 mm, with 14 pt text.          # [text]; The description of the format.
 extends: forgegraph_base/base_format          # [None, format]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.
 
-fixed_parameters:          # List of fixed parameters for the format.
+parameters:          # !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     figure:
-        width: 420          # [auto, positive float]; Width, mm. auto: from height and plot_area.aspect. Not both auto.
-        height: 236          # [auto, positive float]; Height, mm. auto: from width and plot_area.aspect.
-        base_size: 14          # [positive float]; Base size, pt. Text, lines, ticks and gaps are multiples of it.
+        width: 420          # [auto, float > 0]; Width, mm. auto: from height and plot_area.aspect. Not both auto.
+        height: 236          # [auto, float > 0]; Height, mm. auto: from width and plot_area.aspect.
+        base_size: 14          # [float > 0]; Base size, pt. Text, lines, ticks and gaps are multiples of it.
     output:
-        dpi: 300          # [positive int]; Resolution of png, jpg and tiff, dots per inch.
-
-variable_parameters:          # List of variable parameters for the format, None if none.
-    output:
+        dpi: 300          # [int > 0]; Resolution of png, jpg and tiff, dots per inch.
         file_types: [png, html]          # [png, jpg, tiff, svg, pdf, html]; File types saved.

@@ -1,31 +1,29 @@
-# Layout specification: base_layout
+# Layout specification: layout_example
 
-This page mirrors src/forgegraph/packs/forgegraph_base/layouts/base_layout.yaml, which is the specification. A test fails if they ever differ.
+This page mirrors src/forgegraph/packs/forgegraph_base/layouts/layout_example.yaml, which is the specification. A test fails if they ever differ.
 
-name: base_layout          *# \[text\]; The name of the layout.*\
-version: 0          *# \[int\]; The version number of the specification.*\
+name: layout_example          *# \[text\]; The name of the layout.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: The base layout that others can inherit from.          *# \[text\]; The description of the layout.*\
 extends: None          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
  \
-fixed_parameters: None          *# List of fixed parameters for the layout, None if none.*\
- \
-variable_parameters:          *# List of variable parameters for the layout, None if none.*\
+parameters: !var          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
         format: forgegraph_base/base_layout_format          *# \[format\]; Size and output of the layout, replacing its tiles' formats. A layout can set the format's variable parameters.*\
     separators:\
-        gap: 1.5          *# \[positive float\]; Space between neighboring tiles, from one's outermost text or line to the next's, × base size.*\
+        gap: 1.5          *# \[float > 0\]; Space between neighboring tiles, from one's outermost text or line to the next's, × base size.*\
         color: "#FFFFFF"          *# \[None, hex color\]; Color of the gaps, blank cells and figure edges. None: transparent.*\
         line:\
             show: false          *# \[true, false\]; Draw a line along the middle of each gap between tiles. A blank cell counts as a tile.*\
             color: "#D9D9D9"          *# \[hex color\]; Line color.*\
-            width: 0.05          *# \[positive float\]; Line width, × base size.*\
+            width: 0.05          *# \[float > 0\]; Line width, × base size.*\
         border:\
             show: false          *# \[true, false\]; Draw a line around the outside, a gap's room from the edge, through its middle.*\
     tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A layout's tabs replace those it inherits.*\
         main:\
             grid:\
                 areas: \[\[a\]\]          *# \[text grid\]; A list of tiles per row. . is blank. A name repeated over a rectangle of cells spans them (e.g. \[a, a\]: tile a spans two columns).*\
-                column_widths: None          *# \[None, positive floats\]; Relative widths of each column's plot boxes. None: equal.*\
-                row_heights: None          *# \[None, positive floats\]; Relative heights of each row's plot boxes. None: equal, or as the tiles need.*\
+                column_widths: None          *# \[None, floats > 0\]; Relative widths of each column's plot boxes. None: equal.*\
+                row_heights: None          *# \[None, floats > 0\]; Relative heights of each row's plot boxes. None: equal, or as the tiles need.*\
             tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
                 a: None          *# \[text\]; GraphSpec file: absolute, starting with ~, or relative to this file. A layout must set it.*

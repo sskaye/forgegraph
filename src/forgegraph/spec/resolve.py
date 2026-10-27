@@ -1,9 +1,10 @@
 """Resolving a file of any kind: the files it extends, what each lists, and the value each
 parameter ends up with, whether it's fixed, and which file set it.
 
-The nearest file in the extends chain that lists a parameter decides it. In a theme or
-format, a graph type's name may be used as a heading; parameters under it apply to that
-graph type only and beat the general ones in the same file.
+The nearest file in the extends chain that lists a parameter's value decides it, and the
+nearest file that tags it, or a category above it, decides whether it's fixed (see tags.py).
+In a theme or format, a graph type's name may be used as a heading; parameters under it
+apply to that graph type only and beat the general ones in the same file.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from forgegraph.spec.common import kind_label, suggest
 from forgegraph.spec.parameters import (
     COLLECTIONS,
     NAMES,
-    SECTIONS,
+    PARAMETERS,
     Parameter,
     definitions,
     flatten,
@@ -23,40 +24,53 @@ from forgegraph.spec.parameters import (
     is_none,
 )
 from forgegraph.spec.registry import Registry
+from forgegraph.spec.tags import UNSET, status_at, untag
 
 HEADINGS = ("theme", "format")  # kinds that may use graph-type headings
 
 
-def entries(
-    kind: str, doc: dict[str, Any], reg: Registry
-) -> list[tuple[str, str | None, str, Any]]:
-    """(section, graph-type heading or None, parameter path, value) for every listed value.
-    Anything not shaped as category.parameter is kept as written, to be reported."""
-    out: list[tuple[str, str | None, str, Any]] = []
-    for section in SECTIONS:
-        tree = doc.get(section)
-        if is_none(tree):
-            continue
-        if not isinstance(tree, dict):
-            out.append((section, None, "", tree))
-            continue
-        for category, params in tree.items():
-            if category in COLLECTIONS.get(kind, ()):
-                continue  # layers and tabs: see layer_problems and spec/layout.py
-            if kind in HEADINGS and category in reg.docs["graph_type"] and isinstance(params, dict):
-                for sub, sub_params in params.items():
-                    out += _category(section, str(category), str(sub), sub_params)
-            else:
-                out += _category(section, None, str(category), params)
+def entries(kind: str, doc: dict[str, Any], reg: Registry) -> list[tuple[str | None, str, Any]]:
+    """(graph-type heading or None, parameter path, value) for every listed value, without its
+    tag; a tag with no value is listed as UNSET. Anything not shaped as category.parameter is
+    kept as written, to be reported."""
+    out: list[tuple[str | None, str, Any]] = []
+    tree = untag(doc.get(PARAMETERS))
+    if is_none(tree):
+        return out
+    if not isinstance(tree, dict):
+        return [(None, "", tree)]
+    for category, params in tree.items():
+        if category in COLLECTIONS.get(kind, ()):
+            continue  # layers and tabs: see layer_problems and spec/layout.py
+        if kind in HEADINGS and category in reg.docs["graph_type"] and isinstance(params, dict):
+            for sub, sub_params in params.items():
+                out += _category(str(category), str(sub), sub_params)
+        else:
+            out += _category(None, str(category), params)
     return out
 
 
-def _category(section: str, heading: str | None, category: str, params: Any) -> list:
+def _category(heading: str | None, category: str, params: Any) -> list:
     if not isinstance(params, dict):
-        return [(section, heading, category, params)]
+        return [(heading, category, untag(params))]
     return [
-        (section, heading, path, value) for path, value in flatten(params, f"{category}.").items()
+        (heading, path, untag(value)) for path, value in flatten(params, f"{category}.").items()
     ]
+
+
+def tag_status(
+    kind: str, doc: dict[str, Any], path: str, graph_type: str | None = None
+) -> bool | None:
+    """Whether one file's tags make a parameter fixed: the tag nearest it, under the graph
+    type's heading first; None if the file doesn't tag it."""
+    tree = doc.get(PARAMETERS)
+    if not isinstance(untag(tree), dict):
+        return None
+    if kind in HEADINGS and graph_type is not None:
+        under = untag(tree).get(graph_type)
+        if isinstance(under, dict) and (s := status_at(under, path)) is not None:
+            return s
+    return status_at(tree, path)
 
 
 def chain(kind: str, doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
@@ -126,21 +140,28 @@ class Values(dict[str, Resolved]):
 
 def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | None = None) -> Values:
     """Every listed parameter's value, whether it's fixed, and which file set it. The nearest
-    file that lists a parameter decides it; within one file, an entry under the graph type's
-    heading beats the general one."""
-    out = Values()
-    for d in chain(kind, doc, reg):
-        own: dict[str, tuple[int, Resolved]] = {}
+    file that lists a value decides it, and the nearest that tags it whether it's fixed;
+    within one file, an entry under the graph type's heading beats the general one."""
+    docs = chain(kind, doc, reg)
+    values: dict[str, tuple[Any, str]] = {}
+    for d in docs:
+        own: dict[str, tuple[int, Any, str]] = {}
         label = f"{kind_label(kind)} '{d.get('name')}'"
-        for section, heading, path, value in entries(kind, d, reg):
-            if heading not in (None, graph_type):
+        for heading, path, value in entries(kind, d, reg):
+            if heading not in (None, graph_type) or value is UNSET:
                 continue
             rank = 0 if heading else 1
             origin = f"{label}, under {heading}" if heading else label
             if path not in own or rank < own[path][0]:
-                own[path] = (rank, Resolved(value, section == SECTIONS[0], origin))
-        for path, (_, r) in own.items():
-            out.setdefault(path, r)
+                own[path] = (rank, value, origin)
+        for path, (_, value, origin) in own.items():
+            values.setdefault(path, (value, origin))
+    out = Values()
+    for path, (value, origin) in values.items():
+        fixed = next(
+            (s for d in docs if (s := tag_status(kind, d, path, graph_type)) is not None), False
+        )
+        out[path] = Resolved(value, fixed, origin)
     return out
 
 
@@ -148,7 +169,7 @@ def setter(kind: str, doc: dict[str, Any], reg: Registry, path: str) -> dict[str
     """The file in doc's extends chain that sets a parameter, nearest first; None if none of
     them lists it."""
     for d in chain(kind, doc, reg):
-        if any(p == path for _, _, p, _ in entries(kind, d, reg)):
+        if any(p == path and v is not UNSET for _, p, v in entries(kind, d, reg)):
             return d
     return None
 

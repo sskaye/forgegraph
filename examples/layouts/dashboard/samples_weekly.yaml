@@ -2,8 +2,7 @@ name: samples_weekly
 version: 0
 description: Samples in completed runs per week, all instruments.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

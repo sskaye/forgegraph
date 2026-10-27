@@ -2,8 +2,7 @@ name: voltage_time
 version: 0
 description: Cell voltage at 1 A/cm² over the 200-hour durability test.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

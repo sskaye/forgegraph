@@ -460,11 +460,11 @@ def test_provenance_levels(tmp_path):
     record = fg.load(path)
     assert record is not None and record["preprocessing"] == reference
     minimal = render({"data.preprocessing": reference}, format={"provenance.level": "minimal"})
-    minimal.spec["variable_parameters"]["data"]["file"] = "secret/p.parquet"
+    minimal.spec["parameters"]["data"]["file"] = "secret/p.parquet"
     [path] = minimal.save(tmp_path / "m.png")
     record = fg.load(path)
     assert record is not None and "data" not in record and "preprocessing" not in record
-    assert "data" not in record["graphspec"]["variable_parameters"]  # no file, no preprocessing
+    assert "data" not in record["graphspec"]["parameters"]  # no file, no preprocessing
     [path] = render(format={"provenance.level": "off"}).save(tmp_path / "o.png")
     assert fg.load(path) is None
 
@@ -728,7 +728,7 @@ def test_inherited_data_file_is_found_from_the_file_that_sets_it(tmp_path):
     child = tmp_path / "elsewhere" / "child.yaml"
     child.write_text(
         "name: child\nversion: 0\ndescription: test\nextends: house/base\n"
-        "fixed_parameters: None\nvariable_parameters:\n    text:\n        title: Child\n"
+        "parameters:\n    text:\n        title: Child\n"
     )
     g = fg.render(child)
     assert g.data.rows_read == 96
@@ -965,7 +965,9 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
 
     fanned = Change("data.file", "fanned.parquet")  # long names: they need room
     g = draw(
-        fanned, Change("legend.direct.max_axis_extension", 0.4), spec="forgegraph_base/polarization"
+        fanned,
+        Change("legend.direct.max_axis_extension", 0.4),
+        spec="forgegraph_base/graphspec_example",
     )
     assert g.labelling == "direct"
     ticks = [t for t in g.axes.get_xticks() if t <= g.axes.get_xlim()[1]]

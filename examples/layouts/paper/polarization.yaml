@@ -2,8 +2,7 @@ name: polarization
 version: 0
 description: Polarization curves after the durability test.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

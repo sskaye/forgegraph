@@ -15,6 +15,7 @@ import forgegraph as fg
 from forgegraph.drawing.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
 from forgegraph.spec.explain import explain
 from forgegraph.spec.registry import builtin
+from forgegraph.spec.tags import fix
 from forgegraph.spec.validate import drawing_problems, validate
 
 RATES = pd.DataFrame(
@@ -32,7 +33,7 @@ def doc(listed: dict[str, Any], **settings: Any) -> dict[str, Any]:
         "xy",
         settings={"axis.x.data.column": "conc", "axis.y.data.column": "rate", **settings},
     )
-    d["variable_parameters"]["layers"] = listed
+    d["parameters"]["layers"] = listed
     return d
 
 
@@ -53,30 +54,27 @@ def layer_texts(g: fg.Graph, gid: str) -> list[str]:
 
 def test_layers_are_checked_against_their_type():
     assert validate("graphspec", doc({"t": {"type": "pie"}})) == [
-        "variable_parameters.layers.t.type: unknown layer type 'pie'"
+        "layers.t.type: unknown layer type 'pie'"
     ]
     assert validate("graphspec", doc({"t": {"type": "note", "txt": "x"}})) == [
-        "variable_parameters.layers.t.txt: unknown parameter of note; did you mean 'text'?"
+        "layers.t.txt: unknown parameter of note; did you mean 'text'?"
     ]
     assert validate("graphspec", doc({"t": {"axis": "y"}})) == [
-        "variable_parameters.layers.t.type: required: one of reference_line, note, error_bar"
+        "layers.t.type: required: one of reference_line, note, error_bar"
     ]
     assert validate("graphspec", doc({"t": {"type": "note", "position": "middle"}}))[0].startswith(
-        "variable_parameters.layers.t.position: must be one of: auto, top_left"
+        "layers.t.position: must be one of: auto, top_left"
     )
 
 
 def test_a_layer_type_the_graph_type_doesnt_take_is_an_error():
     reg = builtin().copy()
     narrow = copy.deepcopy(reg.docs["graph_type"]["xy"])
-    narrow.update(name="narrow", extends="xy", variable_parameters="None")
-    narrow["fixed_parameters"] = {"layer": {"types": ["note"]}}
+    narrow.update(name="narrow", extends="xy", parameters={"layer": {"types": fix(["note"])}})
     reg.add("graph_type", narrow)
     d = doc({"t": {"type": "reference_line", "axis": "y", "value": 1}})
-    d["variable_parameters"]["specifications"]["graph_type"] = "narrow"
-    assert validate("graphspec", d, reg) == [
-        "variable_parameters.layers.t.type: graph type 'narrow' takes only note"
-    ]
+    d["parameters"]["specifications"]["graph_type"] = "narrow"
+    assert validate("graphspec", d, reg) == ["layers.t.type: graph type 'narrow' takes only note"]
 
 
 def test_required_layer_parameters_are_drawing_problems():
@@ -113,20 +111,15 @@ def test_layers_merge_by_name_through_extends():
 def test_a_fixed_layer_cant_be_changed():
     reg = builtin().copy()
     parent = doc({})
-    parent["variable_parameters"].pop("layers")
-    parent.update(
-        name="parent",
-        fixed_parameters={
-            "layers": {"target": {"type": "reference_line", "axis": "y", "value": 1.0}}
-        },
+    parent["parameters"]["layers"] = fix(
+        {"target": {"type": "reference_line", "axis": "y", "value": 1.0}}
     )
+    parent.update(name="parent")
     reg.add("graphspec", parent)
     child = doc({"target": {"value": 2.0}})
     child.update(name="child", extends="parent")
     reg.add("graphspec", child)
-    assert validate("graphspec", child, reg) == [
-        "variable_parameters.layers.target: fixed by GraphSpec 'parent'"
-    ]
+    assert validate("graphspec", child, reg) == ["layers.target: fixed by GraphSpec 'parent'"]
 
 
 # --- reference lines -------------------------------------------------------------------------

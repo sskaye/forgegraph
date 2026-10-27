@@ -2,8 +2,7 @@ name: runs_icp_oes_01
 version: 0
 description: Completed runs per week on ICP-OES-01.
 extends: None
-fixed_parameters: None
-variable_parameters:
+parameters: !var
     specifications:
         graph_type: xy
         theme: forgegraph_base/base_theme

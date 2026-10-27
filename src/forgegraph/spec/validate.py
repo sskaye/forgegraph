@@ -1,13 +1,12 @@
 """Check theme, format, graph type, GraphSpec, layout and schedule files against their
 definitions (see parameters.py).
 
-- Every file has exactly the header fields name, version, description, extends,
-  fixed_parameters and variable_parameters; the header's ranges come from the definition
-  file like any parameter's.
+- Every file has exactly the header fields name, version, description, extends and
+  parameters; the header's ranges come from the definition file like any parameter's.
 - extends names another file of the same kind, or is None; with None the file must list
-  every parameter of its kind.
-- A file lists each parameter once, under fixed_parameters or variable_parameters, by
-  category. A file that extends another may change any parameter, fixed or variable.
+  every parameter of its kind, and tag each !var or !fix, itself or a category above it.
+- A file lists its parameters by category, under parameters. A file that extends another
+  may change any parameter, fixed or variable, and tags only the statuses it changes.
 - In a theme or format, a graph type's name may be used as a heading (see resolve.py).
 - A GraphSpec may also set any parameter its graph type, theme or format lists
   as variable, under the same category. It may not change a parameter that a GraphSpec it
@@ -33,7 +32,7 @@ from forgegraph.spec.layers import layer_problems, resolve_layers, with_defaults
 from forgegraph.spec.layout import layout_problems
 from forgegraph.spec.parameters import (
     HEADER,
-    SECTIONS,
+    PARAMETERS,
     STEP,
     Parameter,
     as_date,
@@ -54,6 +53,7 @@ from forgegraph.spec.resolve import (
     resolve,
 )
 from forgegraph.spec.schedule import Cadence, CadenceError
+from forgegraph.spec.tags import UNSET, status_at
 
 # Graph-type parameters set together or not at all; the catalog's cards keep them so too.
 TIES = (("benchmark.data_column", "benchmark.value"),)
@@ -83,6 +83,13 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
             return [
                 "extends: None, so every parameter must be listed; missing: " + ", ".join(missing)
             ]
+        tree = doc[PARAMETERS]
+        untagged = [path for path in defs if status_at(tree, path) is None]
+        if untagged:
+            return [
+                "extends: None, so every parameter needs a !var or !fix tag, on it or a "
+                "category above it; untagged: " + ", ".join(untagged)
+            ]
     rules = _RULES.get(kind)
     errors = rules(doc, reg) if rules else []
     if kind == "graphspec" and errors:  # its layers or values can't be resolved: stop here
@@ -96,22 +103,22 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
 def _entry_problems(
     kind: str, doc: dict[str, Any], reg: Registry, defs: dict[str, Parameter]
 ) -> tuple[list[str], set[str]]:
-    """Each listed parameter's problems (unknown, fixed elsewhere, out of range, listed
-    twice), and the paths listed without a graph-type heading."""
+    """Each listed parameter's problems (unknown, fixed elsewhere, out of range), and the
+    paths given a value without a graph-type heading."""
     errors: list[str] = []
     names = reg.names()
     others = _settable(kind, doc, reg)
-    seen: dict[tuple[str | None, str], str] = {}
-    for section, heading, path, value in entries(kind, doc, reg):
-        where = f"{section}." + (f"{heading}." if heading else "")
+    listed: set[str] = set()
+    for heading, path, value in entries(kind, doc, reg):
+        where = f"{heading}." if heading else ""
         if path == "":
-            errors.append(f"{section}: must be categories of parameters, or None")
+            errors.append(f"{PARAMETERS}: must be categories of parameters, or None")
             continue
-        if (heading, path) in seen:
-            errors.append(f"{where}{path}: also listed in {seen[heading, path]}")
-            continue
-        seen[heading, path] = section
+        if heading is None and value is not UNSET:
+            listed.add(path)
         p = defs.get(path)
+        if p is None and value is UNSET and _is_category(path, defs, others):
+            continue  # a tag alone on a category: everything in it takes that status
         if p is None and path in others:
             p, owner, fixed = others[path]
             if fixed:
@@ -125,6 +132,8 @@ def _entry_problems(
                 tops = {k.split(".")[0] for k in known}
                 errors.append(f"{where}{path}: unknown category{suggest(path, tops)}")
             continue
+        if value is UNSET:
+            continue  # a tag alone: the status changes, the value is inherited
         unloaded = (
             reg.unloaded(value, bool(reg.owner(kind, doc)))
             if PACK_TYPES.intersection(p.range.types)
@@ -135,13 +144,17 @@ def _entry_problems(
             continue
         for suffix, message in check_parameter(p, value, names):
             errors.append(f"{where}{path}{suffix}: {message}")
-    return errors, {path for (heading, path) in seen if heading is None}
+    return errors, listed
+
+
+def _is_category(path: str, *known: dict[str, Any]) -> bool:
+    return any(other.startswith(f"{path}.") for k in known for other in k)
 
 
 def _header(kind: str, doc: dict[str, Any], reg: Registry) -> list[str]:
     errors = [f"{k}: required" for k in HEADER if k not in doc]
     errors += [
-        f"{k}: a category of parameters; it goes under {SECTIONS[1]} or {SECTIONS[0]}"
+        f"{k}: a category of parameters; it goes under {PARAMETERS}"
         if k in categories("graphspec", "theme", "format", "graph_type")
         else f"{k}: unknown field; a file has only {', '.join(HEADER)}"
         for k in doc
@@ -217,9 +230,9 @@ def _inherited_fixed(doc: dict[str, Any], reg: Registry) -> list[str]:
         return []
     inherited = resolve("graphspec", reg.docs["graphspec"][parent], reg)
     return [
-        f"{section}.{path}: fixed by GraphSpec '{parent}'"
-        for section, _, path, _ in entries("graphspec", doc, reg)
-        if inherited.fixed(path)
+        f"{path}: fixed by GraphSpec '{parent}'"
+        for _, path, value in entries("graphspec", doc, reg)
+        if value is not UNSET and inherited.fixed(path)
     ]
 
 
@@ -300,13 +313,13 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
     family has, and its watermark text draws something."""
     use_fonts("theme", doc, reg)
     errors = []
-    for section, heading, path, value in entries("theme", doc, reg):
+    for heading, path, value in entries("theme", doc, reg):
         if path == "font.family" and isinstance(value, str) and not font_available(value):
-            where = f"{section}." + (f"{heading}." if heading else "")
+            where = f"{heading}." if heading else ""
             errors.append(f"{where}font.family: no font '{value}' is bundled or installed")
     if errors:
         return errors
-    headings = {h for d in chain("theme", doc, reg) for _, h, _, _ in entries("theme", d, reg)}
+    headings = {h for d in chain("theme", doc, reg) for h, _, _ in entries("theme", d, reg)}
     for heading in sorted(headings, key=lambda h: h or ""):
         values = resolve("theme", doc, reg, heading)
         where = f" under {heading}" if heading else ""

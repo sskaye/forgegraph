@@ -2,8 +2,7 @@ name: figure
 version: 0
 description: The example layout, rendered every weekday at 06:00.
 extends: forgegraph_base/base_schedule
-fixed_parameters: None
-variable_parameters:
+parameters:
     targets:
         files: [figure.layout.yaml]
     cadence:

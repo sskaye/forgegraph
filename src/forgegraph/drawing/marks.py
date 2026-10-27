@@ -1,4 +1,4 @@
-"""How series at the same place combine, bars, and value labels (graph_types/xy.yaml
+"""How series at the same place combine, bars, and value labels (graphtype_xy.yaml
 arrangement.*, and each series' bar and value_label; themes series.bar, series.value_label).
 
 - **Stacking** (arrangement.stacking): none draws each series as it is; sum stacks the series

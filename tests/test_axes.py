@@ -1,6 +1,6 @@
 """Each axis's data and ticks: data types, categories and their order, the tick algorithm per
 axis (auto, all, manual with a step), label formats, the theme's label rotation and wrapping,
-which axis series are drawn along, and data aggregation (graph_types/xy.yaml axis.*, series.*;
+which axis series are drawn along, and data aggregation (graphtype_xy.yaml axis.*, series.*;
 themes axis.tick.label.*)."""
 
 from __future__ import annotations

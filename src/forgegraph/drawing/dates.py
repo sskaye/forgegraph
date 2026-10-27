@@ -1,4 +1,4 @@
-"""A date axis's ticks and labels (axis.*.tick in graph_types/xy.yaml; the theme's date_order).
+"""A date axis's ticks and labels (axis.*.tick in graphtype_xy.yaml; the theme's date_order).
 
 - **Date ticks** are on one calendar unit's boundaries (CalendarTicks): auto takes the finest
   step of CALENDAR_STEPS (d3's list, with 2 weeks, 6 months and longer runs of years) whose

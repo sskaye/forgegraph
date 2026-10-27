@@ -1,4 +1,4 @@
-"""The series a GraphSpec lists (graph_types/xy.yaml series): each drawn from its own column,
+"""The series a GraphSpec lists (graphtype_xy.yaml series): each drawn from its own column,
 with its own settings, and its own look, the theme with what it sets for itself."""
 
 from __future__ import annotations

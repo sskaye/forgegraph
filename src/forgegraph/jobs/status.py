@@ -1,4 +1,4 @@
-"""A scheduled job's status file: what its last run did (docs/specs/schedule/base_schedule.md).
+"""A scheduled job's status file: what its last run did (docs/specifications/schedule.md).
 
 The file is written whole at the end of every run, to a temporary file that's then renamed
 over the old one, so a reader never sees half of one. Times are ISO 8601 with their UTC

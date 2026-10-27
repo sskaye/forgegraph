@@ -31,10 +31,10 @@ Also:
 | Area | Decision |
 | --- | --- |
 | Renderer (D1) | matplotlib only; no interactivity in the MVP |
-| Core API (D2) | Spec-first: `render(spec)`; Python functions build specs. The definition files are the source; `forgegraph schema`, the catalog pages and the docs/specs mirrors are generated from them |
+| Core API (D2) | Spec-first: `render(spec)`; Python functions build specs. The definition files are the source; `forgegraph schema`, the catalog pages and the docs/specifications mirrors are generated from them |
 | Style (D3) | Theme × format, layered and explainable; themes tag parameters !fix (graphs can't change them) or !var, with defaults (graphs can change them) |
 | Extension (D4) | Packs, data only, are the only source of named specs; the main and folder configs say which may be used, and a pack only a folder config lists is non-standard; graph types and layers stay in the core |
-| Graph types (D5) | Each graph type's and layer type's definition file (graph_types/xy.yaml, layers/<type>.yaml) is the source of truth |
+| Graph types (D5) | Each graph type's and layer type's definition file (specifications/graphtype_xy.yaml, specifications/layer_<type>.yaml) is the source of truth |
 | Review (D6) | Tabbed HTML catalog with Forgemark comments |
 | Input (D7) | A pandas DataFrame, from the Python API or a Parquet file named by the GraphSpec; an optional reference to the code that made it |
 | Labels (D8) | Lightweight sub/superscript markup, applied to explicit labels only |
@@ -70,8 +70,8 @@ Also:
 | Term | What it is | Where it lives |
 | --- | --- | --- |
 | **GraphSpec** | One specific graph: data, graph type, column mappings, parameters, layers | a YAML file, embedded in the saved graph |
-| **Graph type** | A kind of graph (`xy`): the parameters a GraphSpec chooses, in its definition file, drawn by its module in drawing/ | `src/forgegraph/graph_types/<type>.yaml` (core only) |
-| **Layer** | An addition drawn on a graph (`reference`, `note`, `error_bar`), defined by its own file | `src/forgegraph/layers/<type>.yaml` (core only) |
+| **Graph type** | A kind of graph (`xy`): the parameters a GraphSpec chooses, in its definition file, drawn by its module in drawing/ | `src/forgegraph/specifications/graphtype_<type>.yaml` (core only) |
+| **Layer** | An addition drawn on a graph (`reference`, `note`, `error_bar`), defined by its own file | `src/forgegraph/specifications/layer_<type>.yaml` (core only) |
 | **GraphSpec to extend** | A GraphSpec without data, reused by others through `extends:`. E.g. "polarization curve" = `xy` + its columns + axis titles | a pack's `graphspecs/` |
 | **Theme** | The look: fixed style (fonts, palettes, spines, ticks, legend style), plus defaults for options | a pack's `themes/` |
 | **Format** | The destination: figure size, base font size, file types, dpi, provenance level | a pack's `formats/` |
@@ -106,7 +106,7 @@ Also:
 
 ### 3.1 What it looks like to use
 
-**GraphSpec** (docs/specs/graphspec/graphspec_example.md lists every parameter):
+**GraphSpec** (docs/specifications/graphspec_example.md lists every parameter):
 
 ```yaml
 name: voltage
@@ -116,8 +116,8 @@ extends: None
 parameters: !var
     specifications:
         graph_type: xy
-        theme: forgegraph_base/base_theme      # from a pack the configs allow
-        format: forgegraph_base/base_format
+        theme: forgegraph_default/light_theme      # from a pack the configs allow
+        format: forgegraph_default/compact_format
     text:
         title: Cell voltage
     data:
@@ -188,7 +188,7 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 
 ### D3. Style resolution: theme × format, layered, explainable
 
-**One structure for every specification.** Themes, formats, graph types and GraphSpecs are written the same way, and each kind is defined by one file: the base pack's `themes/base_theme.yaml` and `formats/base_format.yaml` (in `src/forgegraph/packs/forgegraph_base/`), each graph type's own file (`graph_types/xy.yaml`) and an example GraphSpec that sets every parameter (the base pack's `graphspecs/graphspec_example.yaml`). Every file has a header (`name`, `version`, `description`, `extends`) and `parameters`, one tree of categories of parameters. In a definition file every line, header included, gives its value and a comment `[RANGE]; DESCRIPTION`, and the code reads every definition, range included, from those files.
+**One structure for every specification.** Themes, formats, graph types and GraphSpecs are written the same way, and each kind is defined by one file in `src/forgegraph/specifications/`: `theme.yaml`, `format.yaml`, each graph type's own file (`graphtype_xy.yaml`) and an example GraphSpec (`graphspec_example.yaml`). A specification file only defines its kind: no spec can name or extend it, so it lists every parameter without having to be a usable look; the built-in pack, forgegraph_default, holds the specs graphs are drawn with. Every file has a header (`name`, `version`, `description`, `extends`) and `parameters`, one tree of categories of parameters. In a definition file every line, header included, gives its value and a comment `[RANGE]; DESCRIPTION`, and the code reads every definition, range included, from those files.
 
 - **!fix:** a GraphSpec can't change it (principle 2). A different look needs a different theme, typically one that extends the house theme.
 - **!var:** a GraphSpec may change it, under the same category; the file gives the value it has otherwise.
@@ -199,7 +199,7 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 
 Every size in a theme is a multiple of the format's base font ("tick labels = 0.9 × base"), so a theme renders correctly in any format. That matters because graphs go to many destinations, not mainly slides (so no `.pptx` export: the examples were collected on slides only for convenience).
 
-**The base theme** (forgegraph_base/base_theme): Roboto, a full box, outward ticks, the Okabe–Ito palette, a frameless key, direct labels where they fit. The `acme` example pack has a *deliberately different* house style (IBM Plex Serif, two sides of the box, a grid, Paul Tol's muted palette), so it shows that a pack can change the look completely.
+**The default theme** (forgegraph_default/light_theme): Roboto, semibold titles, a full box, outward ticks, the Okabe–Ito palette with a grey benchmark, a frameless key, direct labels where they fit. It fixes the font, the palette and its lists, the ticks' direction and algorithms, the grid and the series' lines. The `acme` example pack has a *deliberately different* house style (IBM Plex Serif, two sides of the box, a grid, Paul Tol's muted palette), so it shows that a pack can change the look completely.
 
 **Fonts and PDFs:**
 
@@ -223,7 +223,7 @@ acme-forgegraph/
 └── fonts/
 ```
 
-- **Packs are the only source of named specs.** Every theme, format, GraphSpec, layout or schedule that a file names, under specifications or in extends, comes from a pack and is named `pack/name`. ForgeGraph's own specs are the pack `forgegraph_base`: `base_theme`, `base_format`, `base_layout_format`, `base_layout`, `base_schedule` and example GraphSpecs. Specs of your own are a folder pack. The files you draw (GraphSpecs, layouts and schedules, a layout's tiles and a schedule's targets) are given by path.
+- **Packs are the only source of named specs.** Every theme, format, GraphSpec, layout or schedule that a file names, under specifications or in extends, comes from a pack and is named `pack/name`. ForgeGraph's own specs are the pack `forgegraph_default`: `light_theme`, `compact_format`, `wide_format`, `layout`, `schedule` and an example GraphSpec. Specs of your own are a folder pack. The files you draw (GraphSpecs, layouts and schedules, a layout's tiles and a schedule's targets) are given by path.
 - **Graph types and layer types** are ForgeGraph's code, not pack data, so they're named without a prefix (`xy`) and can always be used.
 - **The config says which packs may be used** (packs/__init__.py has the rules): the main config for all work, and a folder config, `forgegraph.toml`, for the files below it.
   - A pack only a folder config lists is non-standard: it works, but whatever is drawn with it is watermarked and its record names the pack. That way someone who can't change an organization's main config can still make and try a pack, and nothing drawn with it passes as standard.
@@ -241,7 +241,7 @@ acme-forgegraph/
 
 ### D5. Graph types and layer types: one definition file each
 
-A graph type is defined by its own file in `src/forgegraph/graph_types/`, starting with `xy.yaml`, and drawn by drawing/xy.py; a layer type by its file in `src/forgegraph/layers/`, drawn by drawing/layers.py. Its parameters are what a GraphSpec chooses for one graph: the data column for each axis, the encodings, the marks and the legend. Things drawn on top of the graph, including those computed from its data (error bars, a reference line at the mean, a fitted curve), are layers. A parameter defined as None with no None in its range is required: a GraphSpec must set it. Style values never live in a graph type: the renderer reads them from the theme, so the theme stays the single place where style values live. The graph code receives a DataFrame; loading and preparing data happens before it.
+A graph type is defined by its own file in `src/forgegraph/specifications/`, starting with `graphtype_xy.yaml`, and drawn by drawing/xy.py; a layer type by its file there (`layer_<type>.yaml`), drawn by drawing/layers.py. A category's brackets say what the code needs to know about it, from a fixed set: its style, `same as <sibling>` for a category with a sibling's parameters, and `look from <theme category>` for a layer category whose look comes from the theme. Descriptions are for people, and no code reads them. Its parameters are what a GraphSpec chooses for one graph: the data column for each axis, the encodings, the marks and the legend. Things drawn on top of the graph, including those computed from its data (error bars, a reference line at the mean, a fitted curve), are layers. A parameter defined as None with no None in its range is required: a GraphSpec must set it. Style values never live in a graph type: the renderer reads them from the theme, so the theme stays the single place where style values live. The graph code receives a DataFrame; loading and preparing data happens before it.
 
 **Series labels come from a set of labelling methods.** Each method either places every label cleanly or reports that it can't. The theme lists the methods it allows, in order of preference, and a graph's `legend.method: auto` uses the first that fits. A method chosen by name that doesn't fit, or `auto` with nothing that fits, is an error that says what to change: ForgeGraph never draws labels over data as a fallback. The first methods are:
 
@@ -322,7 +322,7 @@ When a request isn't in the catalog, the agent says so plainly, then:
 name: lab_throughput
 version: 0
 description: Daily operations view of lab throughput.
-extends: forgegraph_base/layout_example
+extends: forgegraph_default/layout
 parameters:
     specifications:
         format: ops/dashboard
@@ -351,9 +351,9 @@ parameters:
                 icp_oes_01: runs_icp_oes_01.yaml
 ```
 
-**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specs/layout/layout_example.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
+**A layout arranges GraphSpecs.** A layout file (`*.layout.yaml`, docs/specifications/layout_example.md) holds only what's particular to several graphs together: the arrangement, and what separates the graphs. Text, colors, fonts and the look of each graph stay in each tile's GraphSpec and its theme, so a tile drawn alone and in a layout is the same graph. A layout has no per-tile settings and no text of its own.
 
-- **Format, no theme.** The layout's format (by default the base pack's base_layout_format: the base format at 300 mm) sets the size and output of the whole figure, and replaces each tile's own format, so every tile is drawn at one base size. The layout can set the format's variable parameters, such as its file types. Each tile keeps its own theme.
+- **Format, no theme.** The layout's format (by default the default pack's wide_format: the compact format at 300 mm) sets the size and output of the whole figure, and replaces each tile's own format, so every tile is drawn at one base size. The layout can set the format's variable parameters, such as its file types. Each tile keeps its own theme.
 - **The grid.** grid.areas draws the grid as rows of tile names, as CSS `grid-template-areas`, matplotlib's `subplot_mosaic` and patchwork do: a name repeated over a rectangle of cells spans it, and `.` is a blank cell. column_widths and row_heights are ratios of plot boxes.
 - **Aligned plot boxes.** A tab's tiles are laid out together, as patchwork, egg and cowplot do: each column's and row's margins are the most room any of its tiles needs around its plot box, measured to the letters, so plot boxes line up across tiles whatever their tick labels. A spanning tile's plot box runs across the margins and gaps inside it. With the format's height auto, each row is as tall as its tiles' aspects need. Tiles are never shrunk to fit; a figure too small for them is an error naming them.
 - **Separators.** The gap between tiles, its color, and optionally a line along the middle of each gap between two tiles.
@@ -367,7 +367,7 @@ Paper figures and ops dashboards differ only in their format and defaults; examp
 
 ### D12. Scheduled graphs and dashboards
 
-A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/base_schedule.md): the GraphSpec and layout files to render, where to save them, and when. It extends the base schedule like any other spec, so it can be reviewed, kept in version control and checked like any parameter.
+A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specifications/schedule.md): the GraphSpec and layout files to render, where to save them, and when. It extends the default pack's schedule like any other spec, so it can be reviewed, kept in version control and checked like any parameter.
 
 - **Cadence.** `interval.count` counts `interval.unit` (minute, hour, day, week, month or year), and `at` says when in each unit, one time or a list: ":30", "06:00", "mon 06:00", "1 06:00", "Jan 1 06:00". `interval.count` divides 60, 24 and 12 for minutes, hours and months, and is 1 otherwise, so every form maps exactly onto every scheduler. Times are the machine's local time.
 - **`forgegraph job run lab.schedule.yaml`** runs a schedule once. Whatever the environment offers schedules that command: the machine's scheduler (launchd, systemd, cron, Task Scheduler), a GitHub Actions workflow, a Claude scheduled task. ForgeGraph writes no scheduler entries itself, so every user's path is the same.
@@ -381,7 +381,7 @@ A scheduled job is a **schedule file** (`*.schedule.yaml`, docs/specs/schedule/b
 
 ### D13. Provenance and reproducibility
 
-Every output embeds a provenance record, at its format's provenance.level (full, minimal or off), so a graph can be traced and redrawn; docs/specs/provenance/provenance.md lists what each level records.
+Every output embeds a provenance record, at its format's provenance.level (full, minimal or off), so a graph can be traced and redrawn; docs/specifications/provenance.md lists what each level records.
 
 - **Carriers.** Provenance is one JSON record written through matplotlib's own metadata support: a PNG text chunk, a JPEG comment, the TIFF image description, the SVG Dublin Core `Description` field, and the PDF Info dictionary. HTML pages carry it in `<script type="application/json">`. drawing/export.py writes it.
 - **Layouts.** A layout's files record the layout as written and, for each tab they show, each tile's GraphSpec file and the same entries as a GraphSpec's.
@@ -493,20 +493,21 @@ Repo `sskaye/forgegraph`; distribution, import and CLI `forgegraph`. The README'
 
 ## 8. Specifications
 
-Each kind of document is specified by its definition file: every parameter with its default, range and description. The code reads it, and tests check the code against it, including the edges of every range. docs/specs/ mirrors each file for review.
+Each kind of document is specified by its definition file: every parameter with its default, range and description. The code reads it, and tests check the code against it, including the edges of every range. docs/specifications/ mirrors each file for review, and docs/packs/ each built-in pack's.
 
 | Specification | Definition file |
 | --- | --- |
-| **Theme** | src/forgegraph/packs/forgegraph_base/themes/base_theme.yaml |
-| **Format** | src/forgegraph/packs/forgegraph_base/formats/base_format.yaml |
-| **Graph type** | src/forgegraph/graph_types/xy.yaml |
-| **GraphSpec** | src/forgegraph/packs/forgegraph_base/graphspecs/graphspec_example.yaml |
-| **Layer type** | src/forgegraph/layers/, a file per type |
-| **Layout** | src/forgegraph/packs/forgegraph_base/layouts/layout_example.yaml |
-| **Schedule** | src/forgegraph/packs/forgegraph_base/schedules/base_schedule.yaml |
-| **Pack and config** | src/forgegraph/packs/forgegraph_base/pack.yaml, src/forgegraph/packs/config.toml |
-| **Provenance record** | src/forgegraph/spec/provenance.yaml |
-| **Catalog** | src/forgegraph/catalogs/, and each pack's catalogs/ |
+| **Theme** | src/forgegraph/specifications/theme.yaml |
+| **Format** | src/forgegraph/specifications/format.yaml |
+| **Graph type** | src/forgegraph/specifications/graphtype_xy.yaml |
+| **GraphSpec** | src/forgegraph/specifications/graphspec_example.yaml |
+| **Layer type** | src/forgegraph/specifications/layer_<type>.yaml, a file per type |
+| **Layout** | src/forgegraph/specifications/layout_example.yaml |
+| **Schedule** | src/forgegraph/specifications/schedule.yaml |
+| **Pack and config** | src/forgegraph/specifications/pack.yaml, src/forgegraph/specifications/config.toml |
+| **Provenance record** | src/forgegraph/specifications/provenance.yaml |
+| **Styles** | src/forgegraph/specifications/styles.yaml |
+| **Catalog** | src/forgegraph/specifications/catalogs/, and each pack's catalogs/ |
 
 ---
 
@@ -573,8 +574,7 @@ Decisions made while building whose reasons aren't given above.
 - **The layout always fits its tick labels.** Tick labels can keep a layout from settling: a taller plot box gets more, wider labels, which make it shorter again. After 6 unsettled passes it lays out once more with, on each side, the most room either of the last two passes needed, so whichever labels the final draw has fit.
 - **Date axes use one calendar unit per axis.** matplotlib's automatic date ticks mix units (the 1st and 15th, labelled "Aug" and "15") and name the shared context in a corner. As in d3 and Vega-Lite, ticks are a calendar unit's boundaries, never finer than the data's spacing, with the next unit up on a second line where it changes, as Plotly and Datawrapper do. Weekly ticks fall on Mondays even when the data starts on another day, which reads more naturally than counting from the data's first day. ForgeGraph writes %-d, %-m and %-H itself, since strftime's differ by platform.
 - **The default palette is Okabe–Ito.** With 4 or more groups, color_blind's colors ran together in the skill evals: two blues and two greys. Okabe and Ito's palette keeps its first four colors distinct for color-blind readers.
-- **The base theme leaves line widths and marker sizes to the GraphSpec.** Agents in the skill evals needed smaller markers and thinner lines for dense data. Key samples have their own marker size, so shrinking the plot's markers leaves the key readable.
-- **forgegraph_base_2 follows matplotlib's output, not its style sheet's numbers.** matplotlib draws the style's font weight 350 with Source Sans 3 Light, so the theme uses light. Its gaps were measured from matplotlib's output and set to match, since matplotlib measures from text boxes and ForgeGraph from letters.
+- **The default theme leaves marker sizes and opacity to the GraphSpec.** Agents in the skill evals needed smaller markers for dense data. Key samples have their own marker size, so shrinking the plot's markers leaves the key readable.
 
 ### Names
 

@@ -692,7 +692,7 @@ cases:
     data: [iris.csv]
     packs: [acme]
     config: ["./acme"]
-    turns: ["Make a scatter plot of sepal length vs. sepal width from iris.csv, colored by species, using ForgeGraph's base theme."]
+    turns: ["Make a scatter plot of sepal length vs. sepal width from iris.csv, colored by species, using ForgeGraph's default theme."]
     expect:
       no_other_tool: true
       says: [["forgegraph.toml", "config"]]
@@ -708,16 +708,6 @@ cases:
       themes: [lab]
       values:
         theme:series.colors: tol_muted
-
-  - id: forgegraph-base-2-style
-    data: [co2_monthly.csv]
-    config: ["forgegraph_default", "forgegraph_base_2"]
-    turns: ["Please draw the monthly CO₂ record in co2_monthly.csv as a line chart, using a theme from the forgegraph_base_2 pack."]
-    expect:
-      graph: true
-      lint: [dropped-rows]
-      values:
-        graphspec:specifications.theme: {matches: "^forgegraph_base_2/"}
 
   - id: violin-anyway
     data: [tips.csv]

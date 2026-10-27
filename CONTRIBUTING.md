@@ -19,13 +19,12 @@ Mark a new test `@pytest.mark.slow` if it takes over a second (`uv run pytest --
 
 ## After changing a definition or how graphs are drawn
 
-Every parameter gets one catalog card, its value and baseline chosen by a rule (`src/forgegraph/catalog_build/cards.py`), so a new parameter needs no card of its own; the page shows the variable parameters' cards, and the perturbation test draws them all. It needs a baseline that shows it only if none does: the build (for a variable parameter) or the perturbation test (for any) names a parameter that changes no baseline's drawing, and the fix is a generic scenario added to the baselines in the matching catalog file under `src/forgegraph/catalogs/` (or a pack's `catalogs/`).
+Every parameter gets one catalog card, its value and baseline chosen by a rule (`src/forgegraph/catalog_build/cards.py`), so a new parameter needs no card of its own; the page shows the variable parameters' cards, and the perturbation test draws them all. It needs a baseline that shows it only if none does: the build (for a variable parameter) or the perturbation test (for any) names a parameter that changes no baseline's drawing, and the fix is a generic scenario added to the baselines in the matching catalog file under `src/forgegraph/specifications/catalogs/` (or the pack's `catalogs/`).
 
-Rebuild the catalogs (it keeps its review comments; Node 18+ is needed once it has some), and the image baselines if graphs look different on purpose:
+Rebuild the catalog (it keeps its review comments; Node 18+ is needed once it has some), the mirrors, and the image baselines if graphs look different on purpose:
 
 ```bash
 uv run forgegraph catalog build
-uv run forgegraph catalog build --pack forgegraph_base_2
 uv run python scripts/mirror_specs.py
 uv run python scripts/build_recreations.py --baselines
 ```
@@ -38,8 +37,8 @@ Open a GitHub issue describing the graph you need, ideally with an example image
 
 ## Releasing
 
-1. Set the new version in pyproject.toml and in each built-in pack's pack.yaml.
-2. Rebuild the catalogs and mirrors (above).
+1. Set the new version in pyproject.toml and in the built-in pack's pack.yaml, and for a new minor version, its `requires` (`">=0.4, <0.5"` for 0.4).
+2. Rebuild the catalog and mirrors (above).
 3. Write the visual changelog, `uv run python scripts/visual_changelog.py v<last version>`, and the CHANGELOG entry, linking it.
 4. Merge with CI green, and tag the merge commit `v<version>`.
 5. Run the Publish workflow.

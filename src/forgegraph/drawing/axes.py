@@ -1,4 +1,4 @@
-"""Each axis's data and ticks (graph_types/xy.yaml axis.x.*, axis.y.*; themes axis.tick.*).
+"""Each axis's data and ticks (graphtype_xy.yaml axis.x.*, axis.y.*; themes axis.tick.*).
 
 - **Type** (data.type): decimal, integer, datetime or categorical. auto takes it from the
   column: dates and times, then numbers (integer for an integer column), otherwise

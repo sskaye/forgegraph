@@ -241,6 +241,8 @@ def _resolved(spec: Path) -> dict[str, dict[str, Any]]:
 
 def _matches(actual: Any, expected: Any) -> bool:
     def norm(v: Any) -> Any:
+        if v is None:
+            return "None"  # YAML's null and the word None are both None
         if isinstance(v, float) and v.is_integer():
             return int(v)
         if isinstance(v, list):

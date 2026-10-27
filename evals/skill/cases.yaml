@@ -310,7 +310,7 @@ cases:
         series:bar.show: true
         graph_type:arrangement.offset: side_by_side
         graph_type:axis.x.data.column: {matches: "island"}
-        series:color: {matches: "species"}
+        series:color: {matches: "^(species|series)$"}  # colored by species, or a series per species
 
   - id: tips-stacked
     data: [tips.csv]
@@ -333,7 +333,7 @@ cases:
       values:
         series:bar.show: true
         graph_type:arrangement.stacking: percent
-        series:color: {matches: "cut"}
+        series:color: {matches: "^(cut|series)$"}  # colored by cut, or a series per cut
         graph_type:axis.*.data.column: {matches: "color"}  # vertical or horizontal bars
 
   - id: americas-horizontal
@@ -347,7 +347,7 @@ cases:
         series:bar.show: true
         graph_type:arrangement.base_axis: y
         graph_type:axis.y.data.column: {matches: "country"}
-        graph_type:axis.x.data.column: {matches: "life"}
+        series:column: {matches: "life"}
         graph_type:axis.y.data.order.method: value
         graph_type:axis.y.data.order.direction: ascending
         series:value_label.show: true

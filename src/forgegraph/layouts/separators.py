@@ -1,25 +1,53 @@
 """A tab's backgrounds and separators, once its tiles are laid out on its grid
-(drawing.layout.arrange): each tile's theme background behind its part of the grid, the
-layout's color in the gaps, and lines between the tiles and around them.
+(drawing.layout.arrange): each tile's theme background behind its part of the grid, with its
+corners rounded by separators.corner_radius; the first tile's theme background in the gaps;
+and lines between the tiles and around them, in the separators' line style, whose members
+the layout doesn't set are its first tile's theme's general line.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from matplotlib.patches import FancyBboxPatch, Rectangle
 
 from forgegraph.drawing.layout import Grid, Placed
-from forgegraph.drawing.style import unset
+from forgegraph.drawing.style import LINE_STYLES, LineStyle, Style, unset
 from forgegraph.spec.layout import BLANK
 
+LINE = ("style", "width", "color", "cap", "join")  # a line style's members
 
-def backgrounds(fig: Figure, grid: Grid, placed: Sequence[Placed]) -> None:
+
+def line_style(values: dict[str, Any], first: Style, base: float) -> LineStyle:
+    """The separators' line: each member the layout sets, else its first tile's theme's
+    general line; its width times the layout's base size."""
+
+    def member(name: str) -> Any:
+        path = f"separators.line.{name}"
+        return values[path] if path in values else first.theme[f"line.{name}"]
+
+    style = member("style")
+    return LineStyle(
+        "none" if unset(style) else LINE_STYLES[style],
+        float(member("width")) * base,
+        str(member("color")),
+        str(member("cap")),
+        str(member("join")),
+    )
+
+
+def gap_color(first: Style) -> str:
+    """The gaps' color: the first tile's theme background ("none": transparent)."""
+    color = first.theme["background.color"]
+    return "none" if unset(color) else str(color)
+
+
+def backgrounds(fig: Figure, grid: Grid, placed: Sequence[Placed], radius: float = 0.0) -> None:
     """Put each tile's theme background behind its part of the grid: its plot box and the
-    margins around it."""
+    margins around it, its corners rounded radius points."""
     w, h = grid.size
     for p in placed:
         color = p.style.theme["background.color"]
@@ -27,8 +55,23 @@ def backgrounds(fig: Figure, grid: Grid, placed: Sequence[Placed]) -> None:
             continue
         x0, x1 = grid.column_span(p.area.column, p.area.last_column)
         y0, y1 = grid.row_span(p.area.row, p.area.last_row)
+        if radius > 0:  # in inches, so the corners stay round
+            if p.background is not None:
+                p.background.remove()
+            p.background = FancyBboxPatch(
+                (x0, h - y1),
+                x1 - x0,
+                y1 - y0,
+                boxstyle=f"round,pad=0,rounding_size={radius / 72}",
+                transform=fig.dpi_scale_trans,
+                facecolor=str(color),
+                edgecolor="none",
+                zorder=-10,
+            )
+            fig.add_artist(p.background)
+            continue
         bounds = (x0 / w, 1 - y1 / h, (x1 - x0) / w, (y1 - y0) / h)
-        if p.background is None:
+        if not isinstance(p.background, Rectangle):
             p.background = Rectangle(
                 bounds[:2],
                 *bounds[2:],
@@ -43,7 +86,7 @@ def backgrounds(fig: Figure, grid: Grid, placed: Sequence[Placed]) -> None:
 
 
 def separator_lines(
-    fig: Figure, grid: Grid, color: str, width_pt: float, between: bool, border: bool
+    fig: Figure, grid: Grid, look: LineStyle, between: bool, border: bool
 ) -> list[Line2D]:
     """Lines through the middle of the gaps. With between, a line runs beside each pair of
     neighbouring cells that aren't one tile (a blank cell counts as a tile of its own), joins
@@ -101,9 +144,11 @@ def separator_lines(
             [x / w for x in xs],
             [1 - y / h for y in ys],
             transform=fig.transFigure,
-            color=color,
-            linewidth=width_pt,
-            solid_capstyle="butt",
+            color=look.color,
+            linewidth=look.width,
+            linestyle=cast(Any, look.style),
+            solid_capstyle=cast(Any, look.cap),
+            dash_capstyle=cast(Any, look.cap),
             zorder=-5,
         )
         fig.add_artist(line)
@@ -115,9 +160,11 @@ def separator_lines(
             [x / w for x in xs],
             [1 - y / h for y in ys],
             transform=fig.transFigure,
-            color=color,
-            linewidth=width_pt,
-            solid_joinstyle="miter",
+            color=look.color,
+            linewidth=look.width,
+            linestyle=cast(Any, look.style),
+            solid_joinstyle=cast(Any, look.join),
+            dash_joinstyle=cast(Any, look.join),
             zorder=-5,
         )
         fig.add_artist(line)
@@ -126,14 +173,12 @@ def separator_lines(
     return lines
 
 
-def apply_separators(fig: Figure, grid: Grid, layout_values: dict[str, Any], base: float) -> None:
-    """The figure's color in the gaps, blank cells and edges, and the lines between tiles
-    and around them."""
-    color = layout_values["separators.color"]
-    fig.set_facecolor("none" if unset(color) else str(color))
-    between = bool(layout_values["separators.line.show"])
-    border = bool(layout_values["separators.border.show"])
-    if between or border:
-        width = float(layout_values["separators.line.width"]) * base
-        line_color = str(layout_values["separators.line.color"])
-        separator_lines(fig, grid, line_color, width, between, border)
+def apply_separators(
+    fig: Figure, grid: Grid, layout_values: dict[str, Any], base: float, first: Style
+) -> None:
+    """The first tile's theme background in the gaps, blank cells and edges, and the lines
+    between tiles and, with border.show, around them, when the line style draws a line."""
+    fig.set_facecolor(gap_color(first))
+    look = line_style(layout_values, first, base)
+    if look.visible:
+        separator_lines(fig, grid, look, True, bool(layout_values["separators.border.show"]))

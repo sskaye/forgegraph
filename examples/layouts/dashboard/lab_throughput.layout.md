@@ -6,12 +6,13 @@ name: lab_throughput\
 version: 0\
 description: Daily operations view of lab throughput.\
 extends: forgegraph_base/layout_example\
-parameters:\
+ \
+parameters:          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
         format: ops/dashboard\
     separators:\
         line:\
-            show: true\
+            width: 0.05\
         border:\
             show: true\
     tabs:\

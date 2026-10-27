@@ -519,7 +519,12 @@ def _expand(
         general = STYLES[style.word]
         own: list[Parameter] = []
         excluded = EXCLUDED.get(style.path, ())
-        for g in list(params.values()):
+        generals = [g for g in params.values() if g.path.startswith(f"{general}.")]
+        if not generals:  # a layout's: the theme's, which its first tile's theme sets
+            generals = [
+                g for g in definitions("theme").values() if g.path.startswith(f"{general}.")
+            ]
+        for g in generals:
             if not g.path.startswith(f"{general}.") or g.path.startswith(f"{style.path}."):
                 continue
             rel = g.path[len(general) + 1 :]

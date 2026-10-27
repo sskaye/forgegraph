@@ -112,9 +112,10 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         y:
             show: false          # [true, false]; Whether to draw horizontal grid lines at the y ticks.
     output:
-        file_types: [png]          # [png, jpg, tiff, svg, pdf, html]; File types saved.
+        dpi: 600          # [int > 0]; The resolution of png, jpg and tiff files, in dots per inch.
+        file_types: [png]          # [png, jpg, tiff, svg, pdf, html]; The file types to save.
     provenance:
-        level: full          # [full, minimal, off]; What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.
+        level: full          # [full, minimal, off]; How much each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs, without those. off records nothing.
     layers:          # Layers drawn on the graph, each under a name of the GraphSpec's choosing, drawn in this order.
         target:
             type: reference_line          # [layer type]; The layer's type: one of the graph type's layer.types.

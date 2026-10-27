@@ -6,7 +6,7 @@ extends: forgegraph_base/base_schedule          # [None, schedule]; Each paramet
 parameters:          # !var/!fix sets whether a schedule may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     cadence:
         interval:
-            unit: week          # [minute, hour, day, week, month, year]; The unit interval.count counts in.
-        at: [mon 06:00, tue 06:00, wed 06:00, thu 06:00, fri 06:00]          # [None, text, texts]; When in each unit it runs.
+            unit: week          # [minute, hour, day, week, month, year]; The unit that interval.count counts.
+        at: [mon 06:00, tue 06:00, wed 06:00, thu 06:00, fri 06:00]          # [None, text, texts]; When in each unit the job runs.
     on_failure:
-        command: [acme-alert, --channel, lab-dashboards]          # [None, texts]; Program and arguments run, without a shell, when a run fails.
+        command: [acme-alert, --channel, lab-dashboards]          # [None, texts]; The program and arguments run, without a shell, when a run fails.

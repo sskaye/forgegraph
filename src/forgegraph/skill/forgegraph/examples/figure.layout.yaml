@@ -2,7 +2,8 @@ name: figure
 version: 0
 description: The polarization curves, then each cell's peak power, one above the other.
 extends: forgegraph_base/layout_example
-parameters:
+
+parameters:          # !var: a layout that extends it may change it; !fix: it may not; on a category, all in it. Each parameter is tagged here or in the layout it extends.
     specifications:
         format: forgegraph_base/base_format
     tabs:

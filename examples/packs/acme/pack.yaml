@@ -2,4 +2,4 @@ name: acme          # [text]; The pack's name, either a folder where the pack is
 version: 1.2.0          # [text]; The pack's release version.
 description: Example pack with a deliberately different house style.          # [text]; One line, describing what the pack is.
 issues: https://github.com/acme/forgegraph-pack/issues          # [text]; Where to file feature requests and bug reports about the pack's specs.
-requires: ">=0.0.1, <1"          # [None, version specifier]; The ForgeGraph versions the pack works with, as pip writes them, e.g. ">=0.6, <1". None: any.
+requires: ">=0.0.1, <1"          # [None, version specifier]; The ForgeGraph versions the pack works with, as pip writes them, e.g. ">=0.6, <1". If None, it works with any version.

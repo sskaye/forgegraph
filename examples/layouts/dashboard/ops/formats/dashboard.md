@@ -9,9 +9,9 @@ extends: forgegraph_base/base_format          *# \[None, format\]; Eac
  \
 parameters:          *# !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     figure:\
-        width: 420          *# \[auto, float > 0\]; Width, mm. auto: from height and plot_area.aspect_ratio. Not both auto.*\
-        height: 236          *# \[auto, float > 0\]; Height, mm. auto: from width and plot_area.aspect_ratio.*\
-        base_size: 14          *# \[float > 0\]; Base size, pt. Text, lines, ticks and gaps are multiples of it.*\
+        width: 420          *# \[auto, float > 0\]; The figure's width in mm. auto calculates it from the height and plot_area.aspect_ratio. Width and height can't both be auto.*\
+        height: 236          *# \[auto, float > 0\]; The figure's height in mm. auto calculates it from the width and plot_area.aspect_ratio.*\
+        base_size: 14          *# \[float > 0\]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.*\
     output:\
-        dpi: 300          *# \[int > 0\]; Resolution of png, jpg and tiff, dots per inch.*\
-        file_types: \[png, html\]          *# \[png, jpg, tiff, svg, pdf, html\]; File types saved.*
+        dpi: 300          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
+        file_types: \[png, html\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*

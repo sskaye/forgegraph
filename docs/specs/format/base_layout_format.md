@@ -9,4 +9,4 @@ extends: forgegraph_base/base_format          *# \[None, format\]; Eac
  \
 parameters:          *# !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     figure:\
-        width: 300          *# \[auto, float > 0\]; Width, mm. auto: from height and plot_area.aspect_ratio. Not both auto.*
+        width: 300          *# \[auto, float > 0\]; The figure's width in mm. auto calculates it from the height and plot_area.aspect_ratio. Width and height can't both be auto.*

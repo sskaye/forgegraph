@@ -29,7 +29,6 @@ from forgegraph.drawing import export, lint, page
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import GraphFigure, TileAxes, canvas_figure, inches, watermark
 from forgegraph.drawing.layout import (
-    MARGIN_IN,
     Grid,
     Placed,
     Plot,
@@ -39,10 +38,10 @@ from forgegraph.drawing.layout import (
     footnote_room,
     place_footnote,
 )
-from forgegraph.drawing.style import Style, isolated, unset
+from forgegraph.drawing.style import Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.graph import Graph, Prepared, prepare, render
-from forgegraph.layouts.separators import apply_separators, backgrounds
+from forgegraph.layouts.separators import apply_separators, backgrounds, gap_color, line_style
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
@@ -136,7 +135,7 @@ class TabFigure(Inspected):
         return next(iter(self.tiles.values())).style
 
     def saving(self) -> AbstractContextManager[None]:
-        return _saving(self.style, self.layout.values)
+        return _saving(self.style, self.style)
 
     def _shown(self) -> tuple[Figure, Style]:
         return self.figure, self.style
@@ -257,10 +256,10 @@ class Layout(Saved):
         out = []
         path = stem.with_name(f"{stem.name}.{kind}")
         if kind == "html":
-            rule = float(self.values["separators.line.width"]) * float(
-                self.format["figure.base_size"]
-            )
-            framed = not one and bool(self.values["separators.border.show"])
+            first = self.tabs[0].style
+            look = line_style(self.values, first, float(self.format["figure.base_size"]))
+            rule = look.width if look.visible else 0.0
+            framed = not one and look.visible and bool(self.values["separators.border.show"])
             with self.tabs[0].saving():
                 shown = [
                     page.Shown(
@@ -272,15 +271,15 @@ class Layout(Saved):
                     )
                     for t in self.tabs
                 ]
-            color = self.values["separators.color"]
+            color = gap_color(first)
             out.append(
                 page.write(
                     path,
                     str(self.spec.get("name", stem.name)),
                     shown,
                     self.record(),
-                    "transparent" if unset(color) else str(color),
-                    str(self.values["separators.line.color"]),
+                    "transparent" if color == "none" else color,
+                    look.color,
                     rule,
                     framed,
                     self.freshness,
@@ -314,11 +313,11 @@ def _framed(tab: TabFigure, svg: bytes, rule: float) -> bytes:
 
 
 @contextmanager
-def _saving(style: Style, values: dict[str, Any]) -> Iterator[None]:
-    """A tile's settings, with the layout's color behind everything."""
-    color = values["separators.color"]
+def _saving(style: Style, first: Style) -> Iterator[None]:
+    """A tile's settings, with the gaps' color (the first tile's theme background) behind
+    everything."""
     with isolated(style):
-        background = "none" if unset(color) else str(color)
+        background = gap_color(first)
         matplotlib.rcParams["savefig.facecolor"] = background
         matplotlib.rcParams["savefig.transparent"] = background == "none"
         yield
@@ -504,8 +503,9 @@ def _draw_tab(
                 except SpecError as e:
                     raise SpecError([f"{_where(tab, name)}: {m}" for m in e.problems]) from None
             placed.append(Placed(name, places[name], ax, p.style))
-        gap = float(layout.values["separators.gap"]) * float(fmt["figure.base_size"]) / 72
-        edge = gap if layout.values["separators.border.show"] else MARGIN_IN  # room for it
+        base = float(fmt["figure.base_size"])
+        gap = float(layout.values["separators.gap.outer"]) * base / 72  # between tiles
+        edge = float(layout.values["separators.gap.inner"]) * base / 72  # at the figure's edges
         if footnote:
             add_footnote(fig, footnote, first.style)
         foot = footnote_room(fig)
@@ -525,9 +525,9 @@ def _draw_tab(
             grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes))
         except LayoutError as e:
             raise SpecError([f"tabs.{tab.name}: {e}"]) from None
-        backgrounds(fig, grid, placed)
+        backgrounds(fig, grid, placed, float(layout.values["separators.corner_radius"]) * base)
         place_footnote(fig, edge, edge)
-        apply_separators(fig, grid, layout.values, float(fmt["figure.base_size"]))
+        apply_separators(fig, grid, layout.values, base, first.style)
     tiles = {}
     for p in placed:
         prepared[p.name].finish(drawn[p.name])

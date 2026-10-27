@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="forgegraph-inputs" content="caaf27e97097b15e991d2a81dcb4c0e1cfaa1e57e7b8c6cd8ff3572efa0c0f90">
+<meta name="forgegraph-inputs" content="1a716a6513d5dd07fff130911e0245cc74f6c3907f722af02c98770c579006ee">
 <title>forgegraph_base_2 Catalog</title>
 <style>
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
@@ -521,20 +521,20 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <details class="category" id="format-forgegraph_base_2-compact_format-category-figure"><summary style="padding-left:0.5rem" title="figure">figure</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="format-forgegraph_base_2-compact_format-param-figure-width"><td class="path" style="padding-left:1.6rem" title="figure.width">width</td><td>106</td><td>float &gt; 0 | auto</td><td>fixed</td><td>Width, mm. auto: from height and plot_area.aspect_ratio. Not both auto.</td></tr>
-<tr id="format-forgegraph_base_2-compact_format-param-figure-height"><td class="path" style="padding-left:1.6rem" title="figure.height">height</td><td>auto</td><td>float &gt; 0 | auto</td><td>fixed</td><td>Height, mm. auto: from width and plot_area.aspect_ratio.</td></tr>
-<tr id="format-forgegraph_base_2-compact_format-param-figure-base_size"><td class="path" style="padding-left:1.6rem" title="figure.base_size">base_size</td><td>11</td><td>float &gt; 0</td><td>fixed</td><td>Base size, pt. Text, lines, ticks and gaps are multiples of it.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-figure-width"><td class="path" style="padding-left:1.6rem" title="figure.width">width</td><td>106</td><td>float &gt; 0 | auto</td><td>fixed</td><td>The figure&#x27;s width in mm. auto calculates it from the height and plot_area.aspect_ratio. Width and height can&#x27;t both be auto.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-figure-height"><td class="path" style="padding-left:1.6rem" title="figure.height">height</td><td>auto</td><td>float &gt; 0 | auto</td><td>fixed</td><td>The figure&#x27;s height in mm. auto calculates it from the width and plot_area.aspect_ratio.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-figure-base_size"><td class="path" style="padding-left:1.6rem" title="figure.base_size">base_size</td><td>11</td><td>float &gt; 0</td><td>fixed</td><td>The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.</td></tr>
 </table>
 </details>
 <details class="category" id="format-forgegraph_base_2-compact_format-category-output"><summary style="padding-left:0.5rem" title="output">output</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="format-forgegraph_base_2-compact_format-param-output-dpi"><td class="path" style="padding-left:1.6rem" title="output.dpi">dpi</td><td>200</td><td>int &gt; 0</td><td>fixed</td><td>Resolution of png, jpg and tiff, dots per inch.</td></tr>
-<tr id="format-forgegraph_base_2-compact_format-param-output-file_types"><td class="path" style="padding-left:1.6rem" title="output.file_types">file_types</td><td>[png]</td><td>[png | jpg | tiff | svg | pdf | html]</td><td>variable</td><td>File types saved.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-output-dpi"><td class="path" style="padding-left:1.6rem" title="output.dpi">dpi</td><td>200</td><td>int &gt; 0</td><td>variable</td><td>The resolution of png, jpg and tiff files, in dots per inch.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-output-file_types"><td class="path" style="padding-left:1.6rem" title="output.file_types">file_types</td><td>[png]</td><td>[png | jpg | tiff | svg | pdf | html]</td><td>variable</td><td>The file types to save.</td></tr>
 </table>
 </details>
 <details class="category" id="format-forgegraph_base_2-compact_format-category-provenance"><summary style="padding-left:0.5rem" title="provenance">provenance</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="format-forgegraph_base_2-compact_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>What each saved file records of how it was made. full: every value and the data file. minimal: the GraphSpec and specs, without them. off: nothing.</td></tr>
+<tr id="format-forgegraph_base_2-compact_format-param-provenance-level"><td class="path" style="padding-left:1.6rem" title="provenance.level">level</td><td>full</td><td>full | minimal | off</td><td>variable</td><td>How much each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs, without those. off records nothing.</td></tr>
 </table>
 </details>
 </div>

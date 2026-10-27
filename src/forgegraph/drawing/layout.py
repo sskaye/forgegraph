@@ -33,7 +33,7 @@ from typing import Any, cast
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Patch
 from matplotlib.text import Text
 from matplotlib.transforms import Bbox
 
@@ -168,7 +168,7 @@ class Placed:
     area: Area
     ax: Axes
     style: Style
-    background: Rectangle | None = None
+    background: Patch | None = None  # a Rectangle, or a FancyBboxPatch with rounded corners
 
     @property
     def aspect(self) -> float:

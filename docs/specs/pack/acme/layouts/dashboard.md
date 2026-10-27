@@ -9,8 +9,9 @@ extends: forgegraph_base/layout_example          *# \[None, layout\]; 
  \
 parameters:          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\
-        format: acme/slide          *# \[format\]; Size and output of the whole layout.*\
+        format: acme/slide          *# \[format\]; The format that sets the size and output of the whole layout.*\
     separators:\
-        gap: 2          *# \[float > 0\]; Space between neighbouring tiles, × base size.*\
+        gap:\
+            outer: 2          *# \[float ≥ 0\]; The space between neighboring tiles, from the outermost text or line of one to that of the next, × base size.*\
         line:\
-            show: true          *# \[true, false\]; Draw a line along the middle of each gap between tiles.*
+            width: 0.05          *# \[float ≥ 0\]; The width of the line along the middle of each gap between tiles, × base size. If 0, no line is drawn.*

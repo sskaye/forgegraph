@@ -552,3 +552,16 @@ def test_a_minor_tick_at_an_end_but_for_float_noise_is_kept():
     between = _Between(1)
     ax.yaxis.set_minor_locator(between)
     assert between() == pytest.approx([0.05, 0.15])  # 0.15000000000000002
+
+
+def test_a_tick_length_of_0_draws_labels_without_marks():
+    from render_helpers import render
+
+    g = render(theme={"axis.tick.length": 0})
+    g.figure.canvas.draw()
+    tick = g.axes.xaxis.get_major_ticks()[0]
+    assert tick.tick1line.get_markersize() == 0
+    label = g.axes.xaxis.get_ticklabels()[1].get_window_extent()
+    gap = g.style.pt("axis.tick.label.gap") * g.figure.dpi / 72
+    letters = label.y1  # the label's box top; its letters sit a little lower
+    assert g.axes.bbox.y0 - letters <= gap + 1  # no room kept for a mark

@@ -306,12 +306,17 @@ def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style
     with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     gap = style.pt("layer.reference_line.label.gap") * ax.figure.dpi / 72  # type: ignore[union-attr]
     widened = False
+    most = float(style.theme["axis.max_extension"])
     for line in lines:
         if not (line.label or line.with_value):
             continue
         words = line.label + (_line_text(ax, gt, line) if line.with_value else "")
         auto = line.position == "auto"
-        for position in LABEL_ORDER if auto else [line.position]:
+
+        def attempt(
+            position: str, keep: bool, line: RefLine = line, words: str = words, auto: bool = auto
+        ) -> str:
+            """Place the label: "clear" inside the plot area, "outside" it, or "covers"."""
             a = _label_line(ax, line.axis, line.at, words, position, line.color, style)
             measure(ax.figure)
             box, plot = a.get_window_extent(), ax.get_window_extent()
@@ -321,24 +326,46 @@ def label_lines(ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style
                 and box.y0 >= plot.y0 - 0.5
                 and box.y1 <= plot.y1 + 0.5
             )
-            if inside and labels.box_clear(ax, box, with_lines):
-                break
-            if not auto and not inside:  # past the plot's edge: widen, then place again
+            found = (
+                "clear" if inside and labels.box_clear(ax, box, with_lines) else
+                "covers" if inside else "outside"
+            )  # fmt: skip
+            if found == "outside" and not auto and keep:  # past the plot's edge: widen to it
+                nonlocal widened
                 what = f"layers.{line.name}: its label"
                 widened |= marks.grow_to_fit(ax, [box], gt, line.axis, gap, what)
-                break
-            a.remove()
-            if not auto:
-                others = ", ".join(p for p in LABEL_ORDER if p != position)
-                raise DrawError(
-                    f"layers.{line.name}.label.position: {position}, but the label covers "
-                    f"what's drawn; use auto, or one of {others}"
-                )
+            elif not (keep and found == "clear"):
+                a.remove()
+            return found
+
+        def room(position: str, line: RefLine = line) -> bool:
+            """Grow the axis along the line at its start or end until the label is clear."""
+            along = position.split("_")[0]
+            other, end = ("x" if line.axis == "y" else "y"), ("max" if along == "end" else "min")
+            if along == "center" or not unset(gt[f"axis.{other}.{end}"]):
+                return False
+            return labels.grow_until(
+                ax, other, end, lambda: attempt(position, False) == "clear", most
+            )
+
+        tries = LABEL_ORDER if auto else [line.position]
+        if auto:  # the first clear position; past the edge counts as not clear
+            found = next((f for p in tries if (f := attempt(p, keep=True)) == "clear"), "covers")
         else:
+            found = attempt(line.position, keep=True)
+        if found == "covers" and any(room(p) and attempt(p, keep=True) == "clear" for p in tries):
+            continue
+        if found == "covers" and auto:
             raise DrawError(
                 f"layers.{line.name}.label.position: auto, but no position beside the line is "
                 "clear of what's drawn; choose one and widen the axis, shorten the label, or "
                 "widen the format"
+            )
+        if found == "covers":
+            others = ", ".join(p for p in LABEL_ORDER if p != line.position)
+            raise DrawError(
+                f"layers.{line.name}.label.position: {line.position}, but the label covers "
+                f"what's drawn; use auto, or one of {others}"
             )
     return widened
 
@@ -590,36 +617,61 @@ def notes_inside(
     ax: Axes, layers: dict[str, dict[str, Any]], gt: dict[str, Any], style: Style
 ) -> list[Bbox]:
     """Notes inside the plot area, after layout and keys, each clear of everything drawn,
-    the keys and the other notes; return their boxes."""
+    the keys and the other notes; return their boxes. When no position is clear, an automatic
+    y-axis grows at the note's top or bottom, by up to axis.max_extension, to make room."""
     with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     placed: list[Bbox] = []
     inset = style.pt("layer.note.gap")
+    most = float(style.theme["axis.max_extension"])
+
+    def attempt(layer: dict[str, Any], position: str, keep: bool) -> Bbox | None:
+        """The note's box at a position if it's clear there (kept, with keep), else None."""
+        vertical, horizontal = position.split("_")
+        fraction = {"left": 0.0, "center": 0.5, "right": 1.0}[horizontal]
+        dx = {"left": inset, "center": 0.0, "right": -inset}[horizontal]
+        top = vertical == "top"
+        a = _note(
+            ax,
+            layer["text"],
+            (fraction, 1.0 if top else 0.0),
+            "axes fraction",
+            (dx, -inset if top else inset),
+            horizontal,
+            "top" if top else "bottom",
+            style,
+        )
+        measure(ax.figure)
+        box, plot = a.get_window_extent(), ax.get_window_extent()
+        inside = box.x0 >= plot.x0 - 0.5 and box.x1 <= plot.x1 + 0.5
+        if (
+            inside
+            and labels.box_clear(ax, box, with_lines, keys=True)
+            and not any(box.overlaps(p) for p in placed)
+        ):
+            if not keep:
+                a.remove()
+            return box
+        a.remove()
+        return None
+
     for name, layer in layers.items():
         if layer["type"] != "note" or not layer["inside"]:
             continue
         tries = POSITIONS if layer["position"] == "auto" else [layer["position"]]
-        for position in tries:
-            vertical, horizontal = position.split("_")
-            fraction = {"left": 0.0, "center": 0.5, "right": 1.0}[horizontal]
-            dx = {"left": inset, "center": 0.0, "right": -inset}[horizontal]
-            top = vertical == "top"
-            a = _note(
-                ax,
-                layer["text"],
-                (fraction, 1.0 if top else 0.0),
-                "axes fraction",
-                (dx, -inset if top else inset),
-                horizontal,
-                "top" if top else "bottom",
-                style,
-            )
-            measure(ax.figure)
-            box = a.get_window_extent()
-            clear = labels.box_clear(ax, box, with_lines, keys=True)
-            if clear and not any(box.overlaps(p) for p in placed):
-                placed.append(box)
+        box = next((b for p in tries if (b := attempt(layer, p, keep=True)) is not None), None)
+        for position in tries if box is None else []:  # make room at the top or bottom
+            end = "max" if position.startswith("top") else "min"
+            if not unset(gt[f"axis.y.{end}"]):
+                continue  # a set limit stays where it is
+
+            def fits(layer: dict[str, Any] = layer, position: str = position) -> bool:
+                return attempt(layer, position, keep=False) is not None
+
+            if labels.grow_until(ax, "y", end, fits, most):
+                box = attempt(layer, position, keep=True)
                 break
-            a.remove()
+        if box is not None:
+            placed.append(box)
         else:
             what = "any position" if layer["position"] == "auto" else layer["position"]
             raise DrawError(

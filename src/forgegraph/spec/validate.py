@@ -332,6 +332,12 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
             if WEIGHTS.get(value) not in has and values[path].via is None:
                 names = ", ".join(n for n, w in WEIGHTS.items() if w in has)
                 errors.append(f"{path}{where}: {family} has no {value} weight; it has {names}")
+        bar, title = (values.value(f"legend.color_bar.{k}") for k in ("position", "title.position"))
+        if bar == "below" and title == "beside":
+            errors.append(
+                f"legend.color_bar.title.position{where}: beside, but the bar is below the plot "
+                "(legend.color_bar.position); a title beside a horizontal bar isn't drawn"
+            )
         if "watermark.text" in values and not _visible(str(values["watermark.text"].value)):
             errors.append(
                 f"watermark.text{where}: has no letters; the watermark is drawn from its "

@@ -21,6 +21,7 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -338,36 +339,49 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
     """Interior labels (rules 1-6), growing the x-axis as little as it takes (rule 5)."""
     if place_interior(ax, groups, style):
         return True
-    x0, x1 = ax.get_xlim()
     most = float(style.theme["axis.max_extension"])
+    if not grow_until(ax, "x", "max", lambda: place_interior(ax, groups, style, draw=False), most):
+        return False
+    return place_interior(ax, groups, style)
+
+
+def grow_until(ax: Axes, axis: str, end: str, fits: Callable[[], bool], most: float) -> bool:
+    """Extend an axis at one end (min or max) by as little as it takes, to 1/64 of most (a
+    fraction of its range), until fits(); keep its ticks, since the extra room is for labels.
+    False, with the axis as it was, if even most doesn't do it."""
     if most <= 0:
         return False
-    # The extra room is for labels: keep the ticks the layout made room for.
-    locator = ax.xaxis.get_major_locator()
-    ticks = np.asarray(ax.get_xticks(), dtype=float)  # a date axis's are a list
-    ax.xaxis.set_major_locator(FixedLocator(list(ticks[limits.in_view(ax.xaxis, ticks)])))
+    which = ax.xaxis if axis == "x" else ax.yaxis
+    get, put = (ax.get_xlim, ax.set_xlim) if axis == "x" else (ax.get_ylim, ax.set_ylim)
+    log = (ax.get_xscale() if axis == "x" else ax.get_yscale()) == "log"
+    lo, hi = get()
+    locator = which.get_major_locator()
+    ticks = np.asarray(which.get_majorticklocs(), dtype=float)  # a date axis's are a list
+    which.set_major_locator(FixedLocator(list(ticks[limits.in_view(which, ticks)])))
 
     def extend(fraction: float) -> None:
-        if ax.get_xscale() == "log":
-            ax.set_xlim(x0, x1 * (x1 / x0) ** fraction)
+        if log:
+            grow = (hi / lo) ** fraction
+            put(lo, hi * grow) if end == "max" else put(lo / grow, hi)
         else:
-            ax.set_xlim(x0, x1 + fraction * (x1 - x0))
+            grow = fraction * (hi - lo)
+            put(lo, hi + grow) if end == "max" else put(lo - grow, hi)
 
     extend(most)
-    if not place_interior(ax, groups, style, draw=False):
-        ax.xaxis.set_major_locator(locator)
-        ax.set_xlim(x0, x1)
+    if not fits():
+        which.set_major_locator(locator)
+        put(lo, hi)
         return False
-    fails, fits = 0.0, most  # the smallest extension that fits, to 1/64 of the most allowed
+    failed, fitted = 0.0, most  # the smallest extension that fits
     for _ in range(6):
-        middle = (fails + fits) / 2
+        middle = (failed + fitted) / 2
         extend(middle)
-        if place_interior(ax, groups, style, draw=False):
-            fits = middle
+        if fits():
+            fitted = middle
         else:
-            fails = middle
-    extend(fits)
-    return place_interior(ax, groups, style)
+            failed = middle
+    extend(fitted)
+    return True
 
 
 def _clear_of_data(ax: Axes, key: Key, lines: bool) -> bool:

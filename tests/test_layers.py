@@ -503,6 +503,23 @@ def test_a_note_that_fits_nowhere_is_an_error():
         graph({"n": {"type": "note", "text": long}})
 
 
+_GRID = np.meshgrid(np.linspace(1, 2, 21), np.linspace(10, 30, 21))
+CROWDED = pd.DataFrame(  # points everywhere: no note fits without room
+    {"conc": _GRID[0].ravel(), "rate": _GRID[1].ravel()}
+)
+
+
+def test_a_note_with_no_clear_place_grows_the_y_axis():
+    note = {"n": {"type": "note", "text": "60 °C, 1 atm"}}
+    with pytest.raises(fg.SpecError, match="the note doesn't fit"):
+        graph(note, CROWDED, **{"axis.max_extension": 0})
+    plain = graph({}, CROWDED)
+    g = graph(note, CROWDED)
+    (lo, hi), (lo0, hi0) = g.axes.get_ylim(), plain.axes.get_ylim()
+    assert hi > hi0 and lo == pytest.approx(lo0)  # room at the top, its first positions
+    assert hi - hi0 <= 0.15 * (hi0 - lo0) + 1e-9
+
+
 def _label_box(g: fg.Graph):
     [label] = [t for t in g.axes.texts if t.get_gid() == REFERENCE]
     return label, label.get_window_extent()
@@ -522,18 +539,35 @@ def test_an_auto_label_is_clear_of_the_data_and_inside_the_plot():
     assert box_clear(g.axes, box, lines=False)
 
 
-def test_a_chosen_label_position_that_covers_the_data_is_an_error():
+LIMIT = {
+    "t": {
+        "type": "reference_line",
+        "axis": "y",
+        "value": 8,
+        "label": {"text": "Limit", "position": "start_above"},
+    }
+}  # the line at conc 1 runs from 5 to 14, through the label
+
+
+def test_a_label_covering_the_data_grows_the_axis_along_its_line():
+    """Before its start (axis.max_extension): the axis grows where the line runs past the
+    data, by as little as it takes."""
+    from forgegraph.drawing.labels import box_clear
+
+    plain = graph({}, **{"axis.max_extension": 0})
+    g = graph(LIMIT)
+    (lo, hi), (lo0, hi0) = g.axes.get_xlim(), plain.axes.get_xlim()
+    assert lo < lo0 and hi == pytest.approx(hi0)
+    assert lo0 - lo <= 0.15 * (hi0 - lo0) + 1e-9
+    _, box = _label_box(g)
+    assert box_clear(g.axes, box, lines=True)
+
+
+def test_a_chosen_label_position_that_covers_the_data_is_an_error_when_it_cant_grow():
     with pytest.raises(fg.SpecError, match=r"label.position: start_above, but the label covers"):
-        graph(  # the line at conc 1 runs from 5 to 14, through the label
-            {
-                "t": {
-                    "type": "reference_line",
-                    "axis": "y",
-                    "value": 8,
-                    "label": {"text": "Limit", "position": "start_above"},
-                }
-            }
-        )
+        graph(LIMIT, **{"axis.max_extension": 0})
+    with pytest.raises(fg.SpecError, match=r"label.position: start_above, but the label covers"):
+        graph(LIMIT, **{"axis.x.min": 1})  # a set limit stays where it is
 
 
 def test_a_chosen_label_past_the_plots_edge_widens_the_axis():

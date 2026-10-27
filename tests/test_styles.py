@@ -204,3 +204,11 @@ def test_the_footnotes_alignment_places_it_across_the_figure(alignment):
         assert box.x1 > width * 0.9
     else:
         assert abs((box.x0 + box.x1) / 2 - width / 2) < width * 0.02
+
+
+def test_a_title_beside_a_color_bar_below_the_plot_is_an_error():
+    d, reg = theme(legend__color_bar__position="below", legend__color_bar__title__position="beside")
+    assert validate("theme", d, reg) == [
+        "legend.color_bar.title.position: beside, but the bar is below the plot "
+        "(legend.color_bar.position); a title beside a horizontal bar isn't drawn"
+    ]

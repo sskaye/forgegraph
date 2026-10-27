@@ -237,23 +237,16 @@ def test_a_date_axis_has_no_offset_text_beside_it():
     assert g.axes.xaxis.get_offset_text().get_text() == ""
 
 
-def test_key_samples_have_their_own_marker_size():
-    small = {"series.marker.size": 0.1, "series.benchmark.marker.size": 0.1}
-    g = render({"legend.method": "key", **small})
+def test_key_samples_have_the_plots_marker_size():
+    big = {"series.marker.size": 0.9, "series.benchmark.marker.size": 0.9}
+    g = render({"legend.method": "key", **big})
     [legend] = keys(g.axes)
     sizes = {
         a.get_markersize()
         for a in legend.artists
         if isinstance(a, Line2D) and a.get_marker() not in ("none", "None")
     }
-    expected = Style(g.values["theme"], g.values["format"]).pt("legend.key.sample.marker.size")
-    assert sizes == {expected}
-    series = {
-        line.get_markersize()
-        for line in g.axes.lines
-        if line not in legend.artists and len(np.asarray(line.get_xdata()))
-    }
-    assert expected not in series  # the plot's markers are smaller
+    assert sizes == {Style(g.values["theme"], g.values["format"]).pt("series.marker.size")}
 
 
 def test_a_style_key_explains_line_styles():
@@ -299,7 +292,7 @@ def test_numeric_color_by_draws_a_color_bar():
         }
     )
     [bar] = g.axes.child_axes
-    [title] = bar.texts  # legend.color_bar.layout: title_above
+    [title] = bar.texts  # legend.color_bar.position right, title.position above
     assert title.get_text() == "Temperature (°C)"
     renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]
     letters, box, px = footprint(title, renderer), g.axes.bbox, g.figure.dpi / 72
@@ -318,7 +311,7 @@ def test_a_color_bar_title_can_read_down_its_side():
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
         },
-        theme={"legend.color_bar.layout": "title_along"},
+        theme={"legend.color_bar.title.position": "beside"},
     )
     [bar] = g.axes.child_axes
     assert bar.get_ylabel() == "Temperature (°C)"
@@ -334,7 +327,7 @@ def test_a_color_bar_can_go_below_the_plot():
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
         },
-        theme={"legend.color_bar.layout": "below"},
+        theme={"legend.color_bar.position": "below"},
     )
     [bar] = g.axes.child_axes
     [title] = bar.texts
@@ -449,7 +442,7 @@ def test_provenance_round_trip(tmp_path, kind):
     record = fg.load(path)
     assert record is not None and record["provenance_level"] == "full"
     assert record["graphspec"] == g.spec
-    assert record["resolved"]["theme"]["font.family"] == "Roboto"
+    assert record["resolved"]["theme"]["text.font"] == "Roboto"
 
 
 @pytest.mark.slow
@@ -787,7 +780,7 @@ def test_impossible_drawings_are_errors_not_fallbacks():
             "run": 1,
         }
     )
-    no_margin = {"plot_area.margin": 0.0}  # no room beside the outer rows either
+    no_margin = {"plot_area.gap": 0.0}  # no room beside the outer rows either
     scatter = {
         "mark.line.show": False,
         "benchmark.data_column": NONE,
@@ -868,7 +861,7 @@ def test_style_samples_take_the_series_color_with_no_color_encoding():
     drawn = {to_hex(ln.get_color()) for ln in g.axes.get_lines() if ln.get_gid() != KEY}
     assert colors == drawn == {to_hex(g.style.series_colors()[0])}
     colors, g = samples(**{"encoding.color.column": "edge", "encoding.detail.column": NONE})
-    assert colors == {to_hex(g.style.color("font.color"))}  # neutral among the colors
+    assert colors == {to_hex(g.style.color("text.color"))}  # neutral among the colors
 
 
 def test_the_style_keys_drawn_are_reported():
@@ -915,7 +908,7 @@ def test_a_style_key_matches_the_drawing_and_leaves_the_benchmark_to_the_labelli
         if ln.get_gid() != KEY and np.size(ln.get_xdata()) > 1
     }
     assert {name: drawn[name] for name in sampled} == sampled
-    assert drawn["Programmed"] == LINE_STYLES[g.style.theme["series.benchmark.line.style"]]
+    assert drawn["Programmed"] == LINE_STYLES[g.style.theme["series.benchmark.line.styles"][0]]
     assert g.labelling == "direct"  # names the benchmark, once
     assert [t.get_text() for t in g.axes.texts if t.get_text() == "Programmed"] == ["Programmed"]
 
@@ -966,7 +959,7 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     fanned = Change("data.file", "fanned.parquet")  # long names: they need room
     g = draw(
         fanned,
-        Change("legend.direct.max_axis_extension", 0.4),
+        Change("axis.max_extension", 0.4),
         spec="forgegraph_base/graphspec_example",
     )
     assert g.labelling == "direct"

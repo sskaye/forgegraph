@@ -138,10 +138,10 @@ def test_every_parameter_gets_a_card_and_the_page_shows_the_variable_ones():
     catalog = read("theme", "forgegraph_base/base_theme", builtin())
     carded = {p.path for p, _ in catalog.cards}
     assert carded == {p.path for p in catalog.parameters}
-    assert "grid.show" in catalog.variable and "font.family" not in catalog.variable
+    assert "grid.x.show" in catalog.variable and "text.font" not in catalog.variable
     shown = [c.changes[-1].path for c in place(catalog, lambda s, c: True)[1:]]
     assert set(shown) == catalog.variable
-    fixed = card(catalog, "font.family", lambda s, c: True)  # placed alone, as any card
+    fixed = card(catalog, "text.font", lambda s, c: True)  # placed alone, as any card
     assert fixed.change.value == "IBM Plex Serif" and fixed.base is None
 
 
@@ -149,7 +149,7 @@ def test_a_formats_output_and_provenance_get_no_card():
     assert not gets_card("format", definitions("format")["output.file_types"])
     assert not gets_card("format", definitions("format")["provenance.level"])
     assert not gets_card("graph_type", XY["layer.types"])  # it permits; it never draws
-    assert gets_card("theme", THEME["grid.show"])
+    assert gets_card("theme", THEME["grid.x.show"])
     assert gets_card("format", definitions("format")["figure.width"])
     paths = [p.path for p, _ in read("format", "forgegraph_base/base_format", builtin()).cards]
     assert paths == ["figure.width", "figure.height", "figure.base_size"]
@@ -187,8 +187,8 @@ def test_other_text_is_the_sample_then_the_words():
 
 
 def test_a_hex_color_is_the_sample_color():
-    p = THEME["layer.error_bar.color"]
-    assert candidates(p, "#000000", SCENE) == [SAMPLE_COLOR, "series", "#000000"]
+    p = THEME["legend.key.background"]
+    assert candidates(p, "None", SCENE) == [SAMPLE_COLOR, "None"]
 
 
 def test_a_number_is_doubled_then_halved_within_its_interval():
@@ -205,7 +205,7 @@ def test_a_figure_size_defaulting_to_auto_is_the_other_size():
 
 
 def test_a_font_is_each_bundled_family_but_its_own():
-    found = candidates(THEME["font.family"], "Roboto", SCENE)
+    found = candidates(THEME["text.font"], "Roboto", SCENE)
     assert found == ["IBM Plex Serif", "Source Sans 3", SAMPLE_TEXT, "Roboto"]
 
 
@@ -250,7 +250,7 @@ def test_setting_one_of_a_tie_to_none_sets_the_other_too():
 
 # --- placing the cards -----------------------------------------------------------------------
 
-B2, B3 = Change("legend.method", "key"), Change("grid.show", True)
+B2, B3 = Change("legend.method", "key"), Change("grid.y.show", True)
 ONE, TWO = (Change("series.line.width", 1),), (Change("series.line.width", 2),)
 P = THEME["series.line.width"]
 

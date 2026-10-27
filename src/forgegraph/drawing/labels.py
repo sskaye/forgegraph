@@ -13,7 +13,7 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
    from every other label;
 4. in open space: prefer positions close to its own series and far from the others, with a
    slight preference for either end of the line;
-5. if nothing passes, the x-axis grows by as little as it takes, up to max_axis_extension of
+5. if nothing passes, the x-axis grows by as little as it takes, up to axis.max_extension of
    its range;
 6. otherwise direct doesn't fit.
 """
@@ -230,9 +230,9 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
     fig = ax.figure
     renderer = fig.canvas.get_renderer()  # type: ignore[attr-defined]
     px = fig.dpi / 72.0
-    clearance = style.pt("legend.direct.clearance") * px
+    clearance = style.pt("legend.label.gap") * px
     association = float(style.theme["legend.direct.max_relative_distance"])
-    prop = style.font("legend.label.size", "legend.label.weight")
+    prop = style.font("legend.label")
     label_edges = [text.edges(g.name, prop) for g in groups]
     sizes = [(e.width * px, e.height * px) for e in label_edges]  # each label's letters
 
@@ -339,7 +339,7 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
     if place_interior(ax, groups, style):
         return True
     x0, x1 = ax.get_xlim()
-    most = float(style.theme["legend.direct.max_axis_extension"])
+    most = float(style.theme["axis.max_extension"])
     if most <= 0:
         return False
     # The extra room is for labels: keep the ticks the layout made room for.

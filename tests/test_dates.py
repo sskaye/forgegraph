@@ -409,7 +409,7 @@ def test_a_reference_line_at_a_date_on_a_number_axis_is_an_error():
 @pytest.mark.parametrize("value", [TIMES[2], "2000-01-01T21:40", float(DAYS[2])])
 def test_a_benchmark_in_a_date_column(value):
     g = graph("x", **{"benchmark.data_column": "t", "benchmark.value": value})
-    ink = g.style.color("series.benchmark.color")
+    ink = g.style.palette("series.benchmark.colors")[0]
     [mark] = [ln for ln in lines(g) if ln.get_color() == ink]
     assert along("x", mark.get_xydata()) == pytest.approx([DAYS[2]])
 

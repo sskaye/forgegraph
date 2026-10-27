@@ -362,6 +362,8 @@ def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
         look.bar_edge_width,
         look.bar_z,
     )
+    collection.set_linestyle(look.bar_edge_style)
+    collection.set_joinstyle(look.bar_join)
     ax.add_collection(collection, autolim=False)
     ends = [
         (p, v) if base_axis == "x" else (v, p)
@@ -431,9 +433,8 @@ def value_labels(
     axis = ax.yaxis if value_axis == "y" else ax.xaxis
     text_of = number_text(gt, value_axis, axis, fmt, "series.value_label.format", kind=kind)
     fig = ax.figure
-    size = style.pt("series.value_label.size")
+    looks = {b: style.text(f"series.{'benchmark.' if b else ''}value_label") for b in (False, True)}
     gap = style.pt("series.value_label.gap")
-    ink = style.color("font.color")
     paper = style.color("background.color")
     paper = "#FFFFFF" if paper == "none" else paper
     how = gt["series.aggregation"]
@@ -443,11 +444,21 @@ def value_labels(
     made: list[Annotation] = []
 
     def put(
-        place: float, at: float, text: str, offset: float, where: str, color: str, sign: float
+        place: float,
+        at: float,
+        text: str,
+        offset: float,
+        where: str,
+        color: str,
+        sign: float,
+        benchmark: bool = False,
     ) -> Annotation:
-        """where: beyond (past at, away from 0), inside (back from at), centre."""
+        """where: beyond (past at, away from 0), inside (back from at), centre. benchmark:
+        in the benchmark's value label style."""
+        look = looks[benchmark]
+        space = look.gap or 0.0
         xy = (place, at) if vertical else (at, place)
-        push = {"beyond": gap, "inside": -gap, "centre": 0.0}[where] * (1 if sign >= 0 else -1)
+        push = {"beyond": space, "inside": -space, "centre": 0.0}[where] * (1 if sign >= 0 else -1)
         dx, dy = (offset, push) if vertical else (push, offset)
         if vertical:
             va = {"beyond": "bottom", "inside": "top", "centre": "center"}[where]
@@ -466,7 +477,7 @@ def value_labels(
             textcoords="offset points",
             ha=ha,
             va=va,
-            fontsize=size,
+            fontproperties=look.font,
             color=color,
             gid=VALUE_LABEL,
             annotation_clip=False,
@@ -480,6 +491,8 @@ def value_labels(
             break
         st, shifts = s.stack, s.shifts
         width = widths(s, gt)
+        b = bool(s.benchmark)
+        ink = str(looks[b].color)
         for place, bottom, top, value in zip(
             numbers(s.x), st.bottom, st.top, st.value, strict=True
         ):
@@ -497,11 +510,12 @@ def value_labels(
                     "centre",
                     _inside_ink(s.color, ink, paper) if has_bars else ink,
                     sign,
+                    b,
                 )
                 continue
             inside = has_bars and position in ("inside", "auto")
             if inside:
-                a = put(place, top, text, off, "inside", _inside_ink(s.color, ink, paper), sign)
+                a = put(place, top, text, off, "inside", _inside_ink(s.color, ink, paper), sign, b)
                 if _fits_bar(ax, a, place, bottom, top, style, vertical, width):
                     continue
                 a.remove()
@@ -511,8 +525,9 @@ def value_labels(
                         f"series.value_label.position: inside, but {text} doesn't fit inside "
                         "its bar; use auto or outside, or widen the bars in the theme"
                     )
-            put(place, top, text, off, "beyond", ink, sign)
+            put(place, top, text, off, "beyond", ink, sign, b)
     if total:
+        ink = str(looks[False].color)
         ends: dict[tuple[bool, float], tuple[float, float]] = {}
         sums: dict[tuple[bool, float], float] = {}
         for s in series:

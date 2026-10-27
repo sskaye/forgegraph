@@ -17,8 +17,8 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                     direction: ascending          # [ascending, descending]; The category order's direction.
             title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name. None: none.
             scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.margin × the data's range.
-            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.
+            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.gap × the data's range.
+            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.gap × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                 step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.
@@ -34,8 +34,8 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                     direction: ascending          # [ascending, descending]; The category order's direction.
             title: column_name          # [None, column_name, text]; Axis title. column_name: the column's name; with several columns, use text or None. None: none.
             scale: linear          # [linear, log]; Axis scale.
-            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.margin × the data's range.
-            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.margin × the data's range.
+            min: None          # [None, float, date]; Axis minimum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the lowest value, less plot_area.gap × the data's range.
+            max: None          # [None, float, date]; Axis maximum. On a datetime axis, a date, e.g. 2025-08-25 or "2025-08-25T06:00". None: the highest value, plus plot_area.gap × the data's range.
             tick:
                 algorithm: auto          # [auto, all, manual]; auto: the theme's algorithm; on dates, one calendar unit's boundaries. all: one per value. manual: every tick.step.
                 step: None          # [None, float > 0, text]; With manual: distance between ticks, e.g. 5 or "2 week"; on log, a factor.

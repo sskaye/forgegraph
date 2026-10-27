@@ -117,6 +117,7 @@ class Resolved:
     value: Any
     fixed: bool
     origin: str  # e.g. "theme 'journal'", or "theme 'journal', under xy"
+    via: str | None = None  # a style's member no file sets: the parameter its value is from
 
 
 class Values(dict[str, Resolved]):
@@ -156,13 +157,38 @@ def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | Non
                 own[path] = (rank, value, origin)
         for path, (_, value, origin) in own.items():
             values.setdefault(path, (value, origin))
-    out = Values()
-    for path, (value, origin) in values.items():
-        fixed = next(
+
+    def status(path: str) -> bool:
+        return next(
             (s for d in docs if (s := tag_status(kind, d, path, graph_type)) is not None), False
         )
-        out[path] = Resolved(value, fixed, origin)
+
+    out = Values()
+    for path, (value, origin) in values.items():
+        out[path] = Resolved(value, status(path), origin)
+    for p in _members(kind, doc, reg):
+        if p.path not in out and p.inherits is not None and p.inherits in out:
+            source = out[p.inherits]
+            out[p.path] = Resolved(source.value, status(p.path), source.origin, p.inherits)
     return out
+
+
+def _members(kind: str, doc: dict[str, Any], reg: Registry) -> list[Parameter]:
+    """A kind's styles' members, in definition order: each after the parameter it takes its
+    value from."""
+    if kind not in ("theme",):
+        return []
+    return [p for p in definitions_for(kind, doc, reg).values() if p.inherits is not None]
+
+
+def inherit(values: Values, defs: dict[str, Parameter]) -> None:
+    """After a GraphSpec's settings are put in values: each member no file set takes the
+    value of the parameter it inherits from again, in case a setting changed it."""
+    for p in defs.values():
+        r = values.get(p.path)
+        if p.inherits is not None and r is not None and r.via is not None and p.inherits in values:
+            source = values[p.inherits]
+            values[p.path] = Resolved(source.value, r.fixed, source.origin, p.inherits)
 
 
 def setter(kind: str, doc: dict[str, Any], reg: Registry, path: str) -> dict[str, Any] | None:

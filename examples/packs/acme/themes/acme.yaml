@@ -3,19 +3,24 @@ version: 0          # [int ≥ 0]; The version number of the specification.
 description: Acme's house style, a serif look with a light grid and no box.          # [text]; The description of the theme.
 extends: forgegraph_base/base_theme          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
 
+
 parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
-    font:
-        family: IBM Plex Serif          # [text]; Typeface for all text.
+    text:
+        font: IBM Plex Serif          # [text]; The typeface.
     title:
-        weight: medium          # [light, regular, medium, semibold, bold]; Title weight.
+        weight: medium          # [light, regular, medium, semibold, bold]; The weight.
     axis:
         title:
-            weight: regular          # [light, regular, medium, semibold, bold]; Axis title weight.
+            weight: regular          # [light, regular, medium, semibold, bold]; The weight.
     plot_area:
-        sides: [left, bottom]          # [left, right, top, bottom, None]; Sides with a border line. None: none.
-        aspect: 1.6          # [float > 0]; Plot area width ÷ height.
+        border:
+            sides: [left, bottom]          # [left, right, top, bottom, None]; The sides that have a border. If None, there is no border.
+        aspect_ratio: 1.6          # [float > 0]; The plot area's width ÷ its height.
     grid:
-        color: "#DDDDDD"          # [hex color]; Grid color.
-        show: true          # [true, false]; Draw a grid.
+        color: "#DDDDDD"          # [hex color]; The color.
+        x:
+            show: true          # [true, false]; Whether to draw vertical grid lines at the x ticks.
+        y:
+            show: true          # [true, false]; Whether to draw horizontal grid lines at the y ticks.
     series:
-        colors: tol_muted          # [okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors]; Colors for encoding.color.column groups, in order, then repeating: a named palette, or a list of colors.
+        colors: tol_muted          # [okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.

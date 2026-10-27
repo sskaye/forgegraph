@@ -22,7 +22,7 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, limits, marks, ticks
+from forgegraph.drawing import colorbar, layers, limits, marks, spacing, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
@@ -55,23 +55,23 @@ COLOR = Dimension(
 LINE_STYLE = Dimension(
     "line_style_by",
     "encoding.line.style.column",
-    "series.line.style",
+    "series.line.styles",
     "line styles",
-    lambda s: [LINE_STYLES[v] for v in s.theme["series.line.style"]],
+    lambda s: [LINE_STYLES[v] for v in s.theme["series.line.styles"]],
 )
 MARKER_SHAPE = Dimension(
     "marker_shape_by",
     "encoding.marker.shape.column",
-    "series.marker.shape",
+    "series.marker.shapes",
     "marker shapes",
-    lambda s: [MARKERS[v] for v in s.theme["series.marker.shape"]],
+    lambda s: [MARKERS[v] for v in s.theme["series.marker.shapes"]],
 )
 MARKER_FILL = Dimension(
     "marker_fill_by",
     "encoding.marker.fill.column",
-    "series.marker.fill",
+    "series.marker.fills",
     "marker fills",
-    lambda s: list(s.theme["series.marker.fill"]),
+    lambda s: list(s.theme["series.marker.fills"]),
 )
 DIMENSIONS = (COLOR, LINE_STYLE, MARKER_SHAPE, MARKER_FILL)  # in Series' order
 
@@ -95,26 +95,36 @@ class Look:
     benchmark's (series.benchmark.*): sizes in points."""
 
     line_width: float
+    line_cap: str
+    line_join: str
     marker_size: float
     edge: str  # a filled marker's outline color, or "none"
     edge_width: float
     bar_width: float
     bar_edge: str
     bar_edge_width: float
+    bar_edge_style: str
+    bar_join: str
     line_z: float
     bar_z: float
 
 
 def _look(style: Style, benchmark: bool) -> Look:
-    b = "benchmark." if benchmark else ""
+    b = "series.benchmark" if benchmark else "series"
+    line = style.line(f"{b}.line")
+    edge, bar_edge = style.line(f"{b}.marker.edge"), style.line(f"{b}.bar.edge")
     return Look(
-        style.pt(f"series.{b}line.width"),
-        style.pt(f"series.{b}marker.size"),
-        style.color(f"series.{b}marker.edge.color"),
-        style.pt(f"series.{b}marker.edge.width"),
-        style.pt(f"series.{b}bar.width"),
-        style.color(f"series.{b}bar.edge.color"),
-        style.pt(f"series.{b}bar.edge.width"),
+        line.width,
+        line.cap,
+        line.join,
+        style.pt(f"{b}.marker.size"),
+        edge.color if edge.visible else "none",
+        edge.width,
+        style.pt(f"{b}.bar.width"),
+        bar_edge.color if bar_edge.visible else "none",
+        bar_edge.width,
+        bar_edge.style if bar_edge.visible else "solid",
+        bar_edge.join,
         3 if benchmark else 2,
         2.8 if benchmark else 1.8,
     )
@@ -521,10 +531,10 @@ def _series(
             s = Series(
                 xs,
                 ys_,
-                style.color("series.benchmark.color"),
-                LINE_STYLES[b["series.benchmark.line.style"]],
-                MARKERS[b["series.benchmark.marker.shape"]],
-                b["series.benchmark.marker.fill"],
+                style.palette("series.benchmark.colors")[0],  # each list's first item
+                LINE_STYLES[b["series.benchmark.line.styles"][0]],
+                MARKERS[b["series.benchmark.marker.shapes"][0]],
+                b["series.benchmark.marker.fills"][0],
                 None if bench_col == x else str(bench_value),  # named on its axis already
                 _look(style, True),
                 benchmark=True,
@@ -643,6 +653,9 @@ def _draw_marks(
             color=line_color,
             linestyle=s.linestyle if lines_shown else "none",
             linewidth=look.line_width,
+            solid_capstyle=cast(Any, look.line_cap),
+            solid_joinstyle=cast(Any, look.line_join),
+            dash_joinstyle=cast(Any, look.line_join),
             marker=s.marker if markers_shown and s.values is None else "none",
             markersize=look.marker_size,
             markerfacecolor="none" if open_marker else line_color,
@@ -735,15 +748,18 @@ def _decorate(
     columns = {r.base: [r.base_column], r.value: r.value_columns}
     xt = _title(gt["axis.x.title"], columns["x"][0] if len(columns["x"]) == 1 else None)
     yt = _title(gt["axis.y.title"], columns["y"][0] if len(columns["y"]) == 1 else None)
+    titled = style.font("axis.title")
     if xt:
-        ax.set_xlabel(xt)
+        ax.set_xlabel(xt, fontproperties=titled)
     if yt:
-        ax.set_ylabel(yt)
+        ax.set_ylabel(yt, fontproperties=titled)
     if title:
         ax.set_title(markup(title))
+        spacing.align_title(ax, style)
     _box_and_ticks(ax, style)
-    if bool(style.theme["grid.show"]):
-        ax.grid(True)
+    shown = [a for a in ("x", "y") if bool(style.theme[f"grid.{a}.show"])]
+    if shown:
+        ax.grid(True, axis=cast(Any, "both" if len(shown) == 2 else shown[0]))
         ax.set_axisbelow(True)
     if norm is not None:
         color_col = gt["encoding.color.column"]
@@ -876,7 +892,7 @@ def _style_keys(gt: dict[str, Any], enc: _Encodings, style: Style) -> list[Style
     encoding.color.column: one per styling column, titled by legend.key.title.text. Their
     entries are the groups the series were styled by (enc.orders), so not the benchmark,
     which has its own style and is named by legend.method. Their samples are in the one
-    series color, or with a color encoding in font.color, neutral among the colors."""
+    series color, or with a color encoding in text.color, neutral among the colors."""
     styled = {
         d.by: gt[d.encoding_path]
         for d in DIMENSIONS
@@ -886,7 +902,7 @@ def _style_keys(gt: dict[str, Any], enc: _Encodings, style: Style) -> list[Style
     }
     choices = {d.by: d.choices(style) for d in (LINE_STYLE, MARKER_SHAPE, MARKER_FILL)}
     colored = not unset(gt[COLOR.encoding_path])
-    ink = style.color("font.color") if colored else _cycle(COLOR.choices(style), 0)
+    ink = style.color("text.color") if colored else _cycle(COLOR.choices(style), 0)
     found = []
     for column in dict.fromkeys(styled.values()):
         bys = [b for b, c in styled.items() if c == column]
@@ -926,10 +942,14 @@ def _limits(ax: Axes, gt: dict[str, Any], kinds: dict[str, str]) -> None:
 
 
 def _box_and_ticks(ax: Axes, style: Style) -> None:
-    sides = style.theme["plot_area.sides"]
+    sides = style.theme["plot_area.border.sides"]
     sides = [] if unset(sides) else list(sides)
+    border = style.line("plot_area.border")
     for side in ("left", "bottom", "top", "right"):
-        ax.spines[side].set_visible(side in sides)
+        spine = ax.spines[side]
+        spine.set_visible(side in sides and border.visible)
+        spine.set_linestyle(cast(Any, border.style if border.visible else "solid"))
+        spine.set_capstyle(cast(Any, border.cap))
     ticks = style.theme["axis.tick.sides"]
     ticks = [] if unset(ticks) else list(ticks)
     ax.tick_params(

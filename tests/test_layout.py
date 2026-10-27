@@ -207,7 +207,7 @@ def test_with_height_auto_each_plot_keeps_its_aspect_or_more(project):
         project, {"T": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")}
     )
     layout = fg.layout(path)
-    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect_ratio"])
     for box in boxes(layout).values():
         assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
 
@@ -220,7 +220,7 @@ def test_with_width_auto_each_plot_keeps_its_aspect_too(project):
         fmt="house/tall",
     )
     layout = fg.layout(path)
-    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect"])
+    aspect = float(layout.tabs[0].tiles["volt"].style.theme["plot_area.aspect_ratio"])
     for box in boxes(layout).values():
         assert box.width / box.height == pytest.approx(aspect, rel=1e-3)
     height = layout.tabs[0].figure.get_size_inches()[1] * 25.4

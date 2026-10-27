@@ -22,4 +22,7 @@ parameters: !var
                 column: Completed runs
             min: 0
     grid:
-        show: true
+        x:
+            show: true
+        y:
+            show: true

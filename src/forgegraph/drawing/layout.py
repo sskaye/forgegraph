@@ -13,7 +13,7 @@ separated by the layout's gap. What's left of the format's width, after the marg
 is shared among the columns' plot boxes by column_widths, and likewise for heights; a tile
 spanning several columns or rows runs across the margins and gaps inside it, so its plot box
 lines up with the ones beside it. With the format's height auto, each row is as tall as the
-tallest plot box its tiles' plot_area.aspect needs at their widths (a tile spanning rows
+tallest plot box its tiles' plot_area.aspect_ratio needs at their widths (a tile spanning rows
 shares what it lacks among them); width auto works the same way across columns. Tick labels
 change with the plot boxes' sizes, so the passes repeat until nothing moves (arrange). Tiles
 are never scaled: a figure too small for them is an error naming the tiles that don't fit.
@@ -121,13 +121,14 @@ def add_footnote(fig: Figure, words: str, style: Style) -> Text:
         0,
         0,
         literal(words),
-        fontproperties=style.font("footnote.size", "font.weight"),
+        fontproperties=style.font("footnote"),
         color=style.color("footnote.color"),
-        ha="right",
+        ha="left",
         va="baseline",
         gid=FOOTNOTE,
     )
     note.gap = style.pt("footnote.gap")  # type: ignore[attr-defined]
+    note.alignment = str(style.theme["footnote.alignment"])  # type: ignore[attr-defined]
     fig.footnote = note  # type: ignore[attr-defined]
     return note
 
@@ -142,15 +143,20 @@ def footnote_room(fig: Figure) -> float:
     return (float(note.gap) + e.top + e.bottom) / 72
 
 
-def place_footnote(fig: Figure, right: float, bottom: float) -> None:
-    """Put the footnote's letters `right` and `bottom` inches from the figure's bottom right."""
+def place_footnote(fig: Figure, side: float, bottom: float) -> None:
+    """Put the footnote's letters `bottom` inches from the figure's bottom, by its alignment:
+    `side` inches from its left or right edge, or centred across it."""
     note = getattr(fig, "footnote", None)
     if note is None:
         return
     w, h = fig.get_size_inches()
     e = text.edges(note.get_text(), note.get_fontproperties())
-    cut = (e.advance - e.right) / 72  # its box reaches past its last letter by this much
-    note.set_position((1 - (right - cut) / w, (bottom + e.bottom / 72) / h))
+    start = {  # where the box starts, in inches from the left: its letters inset by e.left
+        "left": side - e.left / 72,
+        "center": w / 2 - (e.left + e.right) / 2 / 72,
+        "right": w - side - e.right / 72,
+    }[getattr(note, "alignment", "right")]
+    note.set_position((start / w, (bottom + e.bottom / 72) / h))
 
 
 @dataclass
@@ -166,7 +172,7 @@ class Placed:
 
     @property
     def aspect(self) -> float:
-        return float(self.style.theme["plot_area.aspect"])
+        return float(self.style.theme["plot_area.aspect_ratio"])
 
 
 @dataclass
@@ -399,7 +405,7 @@ def layout(fig: Figure, ax: Axes, style: Style) -> Grid:
     """Size the figure and place one graph's plot box from what's drawn around it, as a grid
     of one tile MARGIN_IN from the figure's edges, with room for its footnote below: with
     both of the format's sizes given, the plot box takes the space left; with one auto, it
-    keeps the theme's plot_area.aspect and the figure is fitted around it."""
+    keeps the theme's plot_area.aspect_ratio and the figure is fitted around it."""
     width = inches(style.format["figure.width"])
     height = inches(style.format["figure.height"])
     placed = [Placed("graph", Area(0, 0), ax, style)]

@@ -121,7 +121,7 @@ def test_y_tick_labels_are_centred_on_their_ticks():
 def test_a_framed_key_has_the_same_padding_on_every_side():
     g = render(
         {"legend.method": "key", "legend.key.title.text": "Cells"},
-        theme={"legend.key.frame.show": True},
+        theme={"legend.key.border.style": "solid"},
     )
     [key] = keys(g.axes)
     frame = key.bbox()
@@ -133,10 +133,10 @@ def test_a_framed_key_has_the_same_padding_on_every_side():
     y0, y1 = int(h - frame.y1 * scale + inset), int(h - frame.y0 * scale - inset)
     region = ink[y0:y1, x0:x1]
     rows, cols = np.where(region.any(axis=1))[0], np.where(region.any(axis=0))[0]
-    line = key.style.pt("legend.key.frame.width") * PT / 2
+    line = key.style.pt("legend.key.border.width") * PT / 2
     pads = [rows[0], (y1 - y0 - 1) - rows[-1], cols[0], (x1 - x0 - 1) - cols[-1]]
     pads = [p + inset - line for p in pads]
-    expected = key.style.pt("legend.key.padding") * PT
+    expected = key.style.pt("legend.key.gap.inner") * PT
     for pad in pads:
         assert pad == pytest.approx(expected, abs=0.6 * PT)
 

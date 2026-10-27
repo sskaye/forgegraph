@@ -39,7 +39,7 @@ from forgegraph.drawing import labels, limits, marks
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.markup import markup
-from forgegraph.drawing.style import LINE_STYLES, Style, unset
+from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
 from forgegraph.spec.parameters import as_date
 
@@ -169,7 +169,6 @@ def reference_lines(
     kinds: dict[str, str],
 ) -> list[RefLine]:
     """Draw each reference_line; return each line drawn, its label to place after layout."""
-    t = style.theme
     drawn = []
     for name, layer in layers.items():
         if layer["type"] != "reference_line":
@@ -208,15 +207,15 @@ def reference_lines(
                     f"{where}.aggregation.function: applies only when value is a column"
                 )
             groups.append((on_axis(value, axis, kinds[axis], f"{where}.value"), ""))
-        ink = style.color("layer.reference_line.color")
+        look = style.line("layer.reference_line.line")
         for at, color in groups:
-            line_color = color or ink
+            line_color = color or look.color
             draw_line = ax.axhline if axis == "y" else ax.axvline
             draw_line(
                 at,
                 color=line_color,
-                linewidth=style.pt("layer.reference_line.line.width"),
-                linestyle=LINE_STYLES[t["layer.reference_line.line.style"]],
+                linewidth=look.width,
+                linestyle=look.style,
                 zorder=1.5,
                 gid=REFERENCE,
             )
@@ -258,7 +257,8 @@ def _label_line(
 ) -> Annotation:
     along, side = position.split("_")
     fraction = {"start": 0.0, "center": 0.5, "end": 1.0}[along]
-    gap = style.pt("layer.reference_line.label.gap")
+    look = style.text("layer.reference_line.label")
+    gap = look.gap or 0.0
     sign = 1 if side == "above" else -1
     inset = {"start": gap, "center": 0.0, "end": -gap}[along]  # clear of the plot's frame
     if axis == "y":  # a horizontal line: the label above or below it
@@ -279,8 +279,8 @@ def _label_line(
         textcoords="offset points",
         ha=ha,
         va=va,
-        fontsize=style.pt("layer.reference_line.label.size"),
-        color=color,
+        fontproperties=look.font,
+        color=color if style.theme["layer.reference_line.label.color"] == "line" else look.color,
         annotation_clip=False,
         gid=REFERENCE,
         zorder=4,
@@ -474,15 +474,23 @@ def _draw_bars(
     transform: Any,
     t: dict[str, Any],
 ) -> None:
-    ink = color if t["layer.error_bar.color"] == "series" else style.color("layer.error_bar.color")
-    width = style.pt("layer.error_bar.line.width")
+    look = style.line("layer.error_bar")
+    ink, width = look.color, look.width
     n = len(places)
     along = np.repeat(places, 3)
     span = np.empty(3 * n)
     span[0::3], span[1::3], span[2::3] = low, high, np.nan
     along[2::3] = np.nan
     xs, ys = (along, span) if axis == "y" else (span, along)
-    (stem,) = ax.plot(xs, ys, color=ink, linewidth=width, zorder=1.9, gid=ERROR_BAR)
+    (stem,) = ax.plot(
+        xs,
+        ys,
+        color=ink,
+        linewidth=width,
+        linestyle=look.style,
+        zorder=1.9,
+        gid=ERROR_BAR,
+    )
     stem.set_transform(transform)
     cap = "_" if axis == "y" else "|"
     ends_x, ends_y = (
@@ -518,7 +526,7 @@ def notes_outside(ax: Axes, layers: dict[str, dict[str, Any]], style: Style) -> 
             )
         vertical, horizontal = position.split("_")
         fraction = {"left": 0.0, "center": 0.5, "right": 1.0}[horizontal]
-        gap = style.pt("layer.note.inset")
+        gap = style.pt("layer.note.gap")
         top = vertical == "top"
         anchor = ax.title if top else ax.xaxis.label
 
@@ -562,7 +570,7 @@ def _note(
         textcoords="offset points",
         ha=ha,
         va=va,
-        fontsize=style.pt("layer.note.size"),
+        fontproperties=style.font("layer.note"),
         color=style.color("layer.note.color"),
         annotation_clip=False,
         gid=NOTE,
@@ -585,7 +593,7 @@ def notes_inside(
     the keys and the other notes; return their boxes."""
     with_lines = bool(gt["mark.line.show"])  # whether lines are obstacles: labels.Obstacles.of
     placed: list[Bbox] = []
-    inset = style.pt("layer.note.inset")
+    inset = style.pt("layer.note.gap")
     for name, layer in layers.items():
         if layer["type"] != "note" or not layer["inside"]:
             continue

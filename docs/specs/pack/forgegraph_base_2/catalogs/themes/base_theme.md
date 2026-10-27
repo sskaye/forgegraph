@@ -20,6 +20,6 @@ baselines:          *# Numbered baselines: generic scenarios, each the
         encoding.detail.column: None\
         mark.bar.show: true\
         mark.line.show: false\
-        series.bar.edge.color: "#000000"\
-        series.benchmark.bar.edge.color: "#000000"\
-        series.benchmark.marker.edge.color: "#000000"
+        series.bar.edge.style: solid\
+        series.benchmark.bar.edge.style: solid\
+        series.benchmark.marker.edge.style: solid

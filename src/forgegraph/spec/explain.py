@@ -14,6 +14,7 @@ from forgegraph.spec.resolve import (
     Resolved,
     Values,
     definitions_for,
+    inherit,
     named,
     resolve,
 )
@@ -65,6 +66,7 @@ def explain(
         heading = chosen["graph_type"] if kind in HEADINGS else None
         values = resolve(kind, other, reg, heading)
         values.update({p: r for p, r in spec.items() if p in defs})
+        inherit(values, defs)
         out[kind] = values
     graphspec = Values({p: r for p, r in spec.items() if p in own})
     return Explained(graphspec, layers, out["graph_type"], out["theme"], out["format"])

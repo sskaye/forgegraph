@@ -136,7 +136,7 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
             for c in frame.columns
             if c not in scene.used and (not numbers or pd.api.types.is_numeric_dtype(frame[c]))
         ]
-    if "text" in rng.types and p.path.endswith("family"):  # a font
+    if "text" in rng.types and p.path.endswith("font"):  # a font
         out += [f for f in bundled_families() if f != d]
     if "text" in rng.types:
         out += FORMATS if p.path.endswith("format") else (SAMPLE_TEXT,)
@@ -188,14 +188,14 @@ def _from_data(p: Parameter, scene: Scene, layer: str) -> list[float]:
 
 
 def _words(p: Parameter, d: Any) -> list[Any]:
-    """The range's words after d (for a list, its first), in the range's order and wrapping
-    round, without it; for a list, each as a one-item list."""
+    """The range's words after d (for a list parameter, its first), in the range's order and
+    wrapping round, without it; for a list parameter, each as a one-item list."""
     words = list(p.range.literals)
-    first = d[0] if isinstance(d, list) and d else d
-    first = NONE if first is None else first
+    first = d[0] if p.takes_list and isinstance(d, list) and d else d
+    first = NONE if first is None or isinstance(first, list) else first
     i = words.index(first) if first in words else len(words) - 1
     after = [w for w in words[i + 1 :] + words[: i + 1] if w != first]
-    return [[w] for w in after] if isinstance(d, list) else after
+    return [[w] for w in after] if p.takes_list else after
 
 
 def tied(path: str, value: Any, prefix: str = "") -> tuple[Change, ...]:

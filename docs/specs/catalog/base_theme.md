@@ -43,9 +43,9 @@ baselines:          *# Numbered baselines: generic scenarios, each the
         layers.spread.value.upper: 0.02\
     log_x: {axis.x.scale: log}          *# \[parameters and their values, or non-standard\]; A log x axis, so the log tick algorithm acts.*\
     minor_ticks: {axis.tick.minor.count: 4}          *# \[parameters and their values, or non-standard\]; Minor tick sizes act only on minor ticks.*\
-    grid_shown: {grid.show: true}          *# \[parameters and their values, or non-standard\]; The grid's parameters act only on a shown grid.*\
+    grid_shown: {grid.x.show: true, grid.y.show: true}          *# \[parameters and their values, or non-standard\]; The grid's parameters act only on a shown grid.*\
     thick_lines: {series.line.width: 1.2}          *# \[parameters and their values, or non-standard\]; Thick lines, so their corners show.*\
-    key_framed: {legend.method: key, legend.key.frame.show: true}          *# \[parameters and their values, or non-standard\]; The key, framed, so the frame's width acts.*\
+    key_framed: {legend.method: key, legend.key.border.style: solid}          *# \[parameters and their values, or non-standard\]; The key, framed, so the frame's width acts.*\
     non_standard: non-standard          *# \[parameters and their values, or non-standard\]; Drawn on after ForgeGraph finished, so the watermark shows.*\
     footnoted: footnoted          *# \[parameters and their values, non-standard, or footnoted\]; With a footnote, as a scheduled run's stamp.*\
     dated: {data.file: dated.parquet, axis.x.data.column: Date, axis.x.title: Day}          *# \[parameters and their values, or non-standard\]; Daily dates on x, so date labels show.*\

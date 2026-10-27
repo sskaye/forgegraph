@@ -78,7 +78,7 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
     if errors:
         return errors
     if is_none(doc["extends"]):
-        missing = [path for path in defs if path not in listed]
+        missing = [path for path, p in defs.items() if path not in listed and p.inherits is None]
         if missing:
             return [
                 "extends: None, so every parameter must be listed; missing: " + ", ".join(missing)
@@ -314,19 +314,22 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
     use_fonts("theme", doc, reg)
     errors = []
     for heading, path, value in entries("theme", doc, reg):
-        if path == "font.family" and isinstance(value, str) and not font_available(value):
+        font = path == "text.font" or path.endswith(".font")
+        if font and isinstance(value, str) and not font_available(value):
             where = f"{heading}." if heading else ""
-            errors.append(f"{where}font.family: no font '{value}' is bundled or installed")
+            errors.append(f"{where}{path}: no font '{value}' is bundled or installed")
     if errors:
         return errors
     headings = {h for d in chain("theme", doc, reg) for h, _, _ in entries("theme", d, reg)}
     for heading in sorted(headings, key=lambda h: h or ""):
         values = resolve("theme", doc, reg, heading)
         where = f" under {heading}" if heading else ""
-        family = str(values["font.family"].value)
-        has = font_weights(family)
         for path, value in values.plain().items():
-            if path.endswith("weight") and WEIGHTS.get(value) not in has:
+            if not path.endswith("weight"):
+                continue
+            family = str(values[path.removesuffix("weight") + "font"].value)  # its own font
+            has = font_weights(family)
+            if WEIGHTS.get(value) not in has and values[path].via is None:
                 names = ", ".join(n for n, w in WEIGHTS.items() if w in has)
                 errors.append(f"{path}{where}: {family} has no {value} weight; it has {names}")
         if "watermark.text" in values and not _visible(str(values["watermark.text"].value)):

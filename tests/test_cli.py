@@ -54,7 +54,7 @@ def test_render_reports_problems(project):
 
 def test_explain_shows_where_values_come_from(project):
     rows = {(r["kind"], r["parameter"]): r for r in cli("explain", "graphspecs/p.yaml")["values"]}
-    assert rows["theme", "font.family"]["set_by"] == "theme 'forgegraph_base/base_theme'"
+    assert rows["theme", "text.font"]["set_by"] == "theme 'forgegraph_base/base_theme'"
     assert rows["graph_type", "axis.x.data.column"]["set_by"] == "GraphSpec 'p'"
     assert rows["graphspec", "data.file"]["value"] == "../data/p.parquet"
 
@@ -67,8 +67,8 @@ def test_schema():
 
 def test_schema_says_which_parameters_are_fixed():
     lines = runner.invoke(app, ["schema", "theme"]).output.splitlines()
-    [font] = [ln for ln in lines if ln.strip().startswith("font.family =")]
-    [grid] = [ln for ln in lines if ln.strip().startswith("grid.show =")]
+    [font] = [ln for ln in lines if ln.strip().startswith("text.font =")]
+    [grid] = [ln for ln in lines if ln.strip().startswith("grid.y.show =")]
     assert font.endswith("Fixed: set by the theme.") and "Fixed" not in grid
 
 
@@ -84,7 +84,7 @@ def test_catalog_lists_the_allowed_packs_specs(project):
     (house / "themes").mkdir()
     (house / "themes" / "plain.yaml").write_text(
         "name: plain\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        y:\n            show: true\n"
     )
     (house / "references").mkdir()
     (house / "references" / "style.md").write_text("# House style\n\nUse plain.\n")
@@ -292,13 +292,14 @@ def test_schema_lists_what_a_graphspec_can_set(project):
     (house / "themes").mkdir()
     (house / "themes" / "grid.yaml").write_text(
         "name: grid\nversion: 0\ndescription: test\nextends: forgegraph_base/base_theme\n"
-        "parameters:\n    grid:\n        show: true\n"
+        "parameters:\n    grid:\n        y:\n            show: true\n"
     )
     allow(project, "forgegraph_base", "./house")
     listed = cli("schema", "graphspec", *BASE_NAMES, "--theme", "house/grid")["graphspec"]
     rows = {r["parameter"]: r for r in listed}
     assert rows["specifications.theme"]["value"] == "house/grid"
-    assert rows["grid.show"]["value"] is True and rows["grid.show"]["from"] == "theme house/grid"
+    grid = rows["grid.y.show"]
+    assert grid["value"] is True and grid["from"] == "theme house/grid"
     assert rows["axis.x.scale"]["from"] == "graph type xy"
     assert "output.file_types" in rows and "series.colors" not in rows  # fixed in the theme
     missing = runner.invoke(app, ["schema", "graphspec", *BASE_NAMES, "--theme", "nope", "--json"])

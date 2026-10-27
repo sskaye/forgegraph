@@ -240,7 +240,7 @@ def test_type_words(kind, p):
         pytest.skip("its values depend on the cadence's other parameters")
     others = set(p.range.types)
     for t in p.range.types:
-        good, bad = FONTS if p.path == "font.family" else SAMPLES[t]
+        good, bad = FONTS if p.path.endswith("font") else SAMPLES[t]
         for value in good:
             assert check(kind, p, wrap(p, value)) == [], value
         for value in bad:
@@ -327,7 +327,7 @@ def test_unknown_parameter_and_category():
 @pytest.mark.parametrize(
     ("kind", "old", "value", "new"),
     [
-        ("theme", "grid.line_width", 0.05, "grid.line.width"),
+        ("theme", "grid.line_width", 0.05, "grid.width"),
         ("theme", "axis.tick.minor.num", 4, "axis.tick.minor.count"),
         ("theme", "series.bar.edge_color", "#000000", "series.bar.edge.color"),
         ("graphspec", "encoding.marker_shape", "Cell", "encoding.marker.shape.column"),
@@ -345,7 +345,12 @@ def test_a_renamed_parameter_suggests_its_new_name(kind, old, value, new):
     [
         ("graphspec", "encoding.color", "Cell", "'encoding.color.column' or 'encoding.color.type'"),
         ("schedule", "cadence.interval", 1, "'cadence.interval.count' or 'cadence.interval.unit'"),
-        ("theme", "legend.key.frame", True, "'legend.key.frame.show' or 'legend.key.frame.width'"),
+        (
+            "theme",
+            "legend.key.gap",
+            0.5,
+            "'legend.key.gap.inner' or 'legend.key.gap.outer' or 'legend.key.gap.row'",
+        ),
         ("layout", "separators.line.border", True, None),
     ],
 )
@@ -398,7 +403,7 @@ def test_extending_none_requires_every_parameter(kind, none):
         pytest.skip("a graph type extending None is its own definition")
     doc["name"] = "copy"
     doc["extends"] = none
-    p = list(definitions(kind).values())[-1]
+    p = [q for q in definitions(kind).values() if q.inherits is None][-1]  # not a member
     *parents, name = p.path.split(".")
     tree = doc["parameters"]
     for key in parents:
@@ -442,7 +447,8 @@ def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
     assert r["axis.tick.direction"] == ("in", True)
     assert r["series.line.width"] == (0.12, False)  # fixed in default, variable here
     assert r["axis.tick.length"] == (0.3, True)  # inherited
-    assert r["grid.show"] == (False, False)
+    assert r["grid.x.show"] == (False, False)
+    assert r["title.font"] == ("Roboto", True)  # a member: the general text's font
 
 
 def test_a_tag_with_no_value_changes_only_the_status():
@@ -482,9 +488,9 @@ def test_a_file_extending_none_tags_every_parameter():
     [err] = validate("theme", base, reg_with(("theme", base)))
     assert err.startswith(
         "extends: None, so every parameter needs a !var or !fix tag, on it or a category above "
-        "it; untagged: font.family, "
+        "it; untagged: text.font, "
     )
-    assert "grid.show" not in err
+    assert "grid.x.show" not in err
 
 
 def test_a_tag_goes_on_a_layer_not_inside_it():
@@ -543,7 +549,7 @@ def test_the_reference_graphspec_sets_every_parameter_with_its_owners_descriptio
 def test_a_graphspec_sets_what_its_graph_type_theme_and_format_leave_variable():
     doc = spec(
         {
-            "grid.show": True,
+            "grid.y.show": True,
             "axis.x.min": 0,
             "mark.line.show": False,
             "provenance.level": "minimal",
@@ -655,12 +661,15 @@ def test_impossible_requests_are_errors():
     assert validate("graphspec", spec({"axis.y.scale": "log", "axis.y.min": 0})) == [
         "axis.y.min: a log axis needs values above 0, not 0"
     ]
-    theme = child("theme", "fix", {"font.family": "Comic Nonexistent"}, name="odd")
+    theme = child("theme", "fix", {"text.font": "Comic Nonexistent"}, name="odd")
     assert validate("theme", theme, reg_with(("theme", theme))) == [
-        "font.family: no font 'Comic Nonexistent' is bundled or installed"
+        "text.font: no font 'Comic Nonexistent' is bundled or installed"
     ]
-    bold = {p: "bold" for p in ("title.weight", "axis.title.weight", "legend.label.weight")}
-    theme = child("theme", "fix", {"font.family": "DejaVu Sans", **bold}, name="odd")
+    bold = {
+        f"{p}.weight": "bold"
+        for p in ("title", "axis.title", "legend.label", "legend.color_bar.title")
+    }
+    theme = child("theme", "fix", {"text.font": "DejaVu Sans", **bold}, name="odd")
     assert validate("theme", theme, reg_with(("theme", theme))) == [
         "legend.key.title.weight: DejaVu Sans has no semibold weight; it has regular, bold"
     ]

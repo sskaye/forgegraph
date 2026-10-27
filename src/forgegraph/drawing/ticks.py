@@ -534,6 +534,7 @@ def minor_ticks(axis: Any, style: Style) -> None:
     """axis.tick.minor.count minor ticks between each pair of major ticks, or none."""
     n = int(style.theme["axis.tick.minor.count"])
     axis.set_minor_locator(_Between(n) if n > 0 else NullLocator())
+    axis.set_tick_params(which="minor", color=style.color("axis.tick.minor.color"))
 
 
 class _Between(Locator):

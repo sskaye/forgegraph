@@ -26,4 +26,7 @@ parameters: !var
         color:
             column: Instrument
     grid:
-        show: true
+        x:
+            show: true
+        y:
+            show: true

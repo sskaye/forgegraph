@@ -77,7 +77,7 @@ def test_a_folder_config_allows_its_packs(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     allow(tmp_path, "./acme")
     g = fg.render(graphspec(tmp_path, "acme/acme", "acme/slide"))
-    assert g.values["theme"]["font.family"] == "IBM Plex Serif"
+    assert g.values["theme"]["text.font"] == "IBM Plex Serif"
     record = g.record()
     assert record is not None and record["specs"]["theme"] == {
         "name": "acme/acme",
@@ -407,7 +407,7 @@ def test_the_skills_examples_render_in_acmes_theme_and_format(tmp_path):
         text = path.read_text().replace("forgegraph_base/base_theme", "acme/acme")
         path.write_text(text.replace("forgegraph_base/base_format", "acme/slide"))
         g = fg.render(path)
-        assert g.values["theme"]["font.family"] == "IBM Plex Serif", path.name
+        assert g.values["theme"]["text.font"] == "IBM Plex Serif", path.name
 
 
 def test_a_schedule_extends_a_packs_schedule(tmp_path):

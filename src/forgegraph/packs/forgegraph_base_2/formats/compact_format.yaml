@@ -5,7 +5,7 @@ extends: forgegraph_base/base_format          # [None, format]; Each parameter n
 
 parameters:          # !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     figure:
-        width: 106          # [auto, float > 0]; Width, mm. auto: from height and plot_area.aspect. Not both auto.
+        width: 106          # [auto, float > 0]; Width, mm. auto: from height and plot_area.aspect_ratio. Not both auto.
         base_size: 11          # [float > 0]; Base size, pt. Text, lines, ticks and gaps are multiples of it.
     output:
         dpi: 200          # [int > 0]; Resolution of png, jpg and tiff, dots per inch.

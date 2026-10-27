@@ -115,7 +115,7 @@ def new_figure(style: Style) -> tuple[GraphFigure, Axes]:
     (drawing.layout.layout)."""
     width = inches(style.format["figure.width"])
     height = inches(style.format["figure.height"])
-    aspect = float(style.theme["plot_area.aspect"])
+    aspect = float(style.theme["plot_area.aspect_ratio"])
     w = width if width is not None else height * aspect  # type: ignore[operator]
     h = height if height is not None else w / aspect
     fig = canvas_figure(w, h)
@@ -131,7 +131,7 @@ class Watermark(PathPatch):
 
     def __init__(self, ax: Axes, style: Style) -> None:
         t = style.theme
-        prop = style.font(1.0, "watermark.weight")  # 1 pt: draw() scales it to the box
+        prop = style.font("watermark", 1.0)  # 1 pt: draw() scales it to the box
         turn = Affine2D().rotate_deg(float(t["watermark.angle"]))
         outline = TextPath((0, 0), str(t["watermark.text"]), prop=prop).transformed(turn)
         if np.asarray(outline.vertices).size == 0:  # the theme check's backstop

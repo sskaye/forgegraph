@@ -8,7 +8,7 @@ whenever the layout changes, since the tick labels may change with it.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 from matplotlib.axes import Axes
 from matplotlib.axis import Axis, XAxis
@@ -22,15 +22,15 @@ from forgegraph.drawing.style import Style
 
 
 def tick_font(style: Style) -> FontProperties:
-    return style.font("axis.tick.label.size", "font.weight")
+    return style.font("axis.tick.label")
 
 
 def axis_title_font(style: Style) -> FontProperties:
-    return style.font("axis.title.size", "axis.title.weight")
+    return style.font("axis.title")
 
 
 def title_font(style: Style) -> FontProperties:
-    return style.font("title.size", "title.weight")
+    return style.font("title")
 
 
 def _in_view(axis: Axis) -> list:
@@ -115,12 +115,12 @@ def _centre_y_labels(axis: Axis, style: Style) -> None:
             _shift(label, middle)
 
 
-def _axis_title_pad(axis: Axis, style: Style) -> None:
-    """Pad the axis title so its letters sit axis.title.gap from the tick labels'."""
+def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> None:
+    """Pad the axis title so its letters sit gap (a theme path) from the tick labels'."""
     title = axis.label.get_text()
     if not title.strip():
         return
-    prop = axis_title_font(style)
+    prop = axis.label.get_fontproperties()
     edges, box = text.edges(title, prop), text.box(title, prop)
     position = axis.get_label_position()
     if isinstance(axis, XAxis):  # upright: its top faces down at the bottom, up at the top
@@ -131,7 +131,7 @@ def _axis_title_pad(axis: Axis, style: Style) -> None:
         own = box.bottom - edges.bottom if position == "left" else box.top - edges.top
     side = _side(axis)
     ticks = _tick_excess(axis, side, style) if side is not None else 0.0
-    axis.labelpad = style.pt("axis.title.gap") - own - ticks
+    axis.labelpad = style.pt(gap) - own - ticks
 
 
 def _title_pad(ax: Axes, style: Style) -> None:
@@ -143,11 +143,20 @@ def _title_pad(ax: Axes, style: Style) -> None:
     own = text.box(title, prop).bottom - text.edges(title, prop).bottom
     ticks = _tick_excess(ax.xaxis, 2, style) if _labels(ax.xaxis, 2) else 0.0
     above = [  # a key outside, above the plot box: the title sits over it
-        k.height + style.pt("legend.key.inset")
+        k.height + style.pt("legend.key.gap.outer")
         for k in keys(ax)
         if k.outside and k.position and k.position.startswith("top")
     ]
     ax.set_title(title, pad=style.pt("title.gap") - own - ticks + max(above, default=0.0))
+    align_title(ax, style)
+
+
+def align_title(ax: Axes, style: Style) -> None:
+    """Put the title at the plot box's left, centre or right (title.alignment). Matplotlib's
+    set_title centres it again, so this follows every call."""
+    alignment = cast(Any, str(style.theme["title.alignment"]))
+    ax.title.set_horizontalalignment(alignment)
+    ax.title.set_x({"left": 0.0, "center": 0.5, "right": 1.0}[alignment])
 
 
 def axes_family(ax: Axes) -> list[Axes]:
@@ -157,10 +166,15 @@ def axes_family(ax: Axes) -> list[Axes]:
 
 def apply(ax: Axes, style: Style) -> None:
     """Set every padding around the Axes' text from the theme's visible gaps."""
+    alignment = cast(Any, str(style.theme["axis.tick.label.alignment"]))  # a wrapped label's lines
+    for tick in ax.xaxis.get_major_ticks():
+        tick.label1.set_multialignment(alignment)
+        tick.label2.set_multialignment(alignment)
     for each in axes_family(ax):
+        gap = "axis.title.gap" if each is ax else "legend.color_bar.title.gap"  # a color bar's
         for axis in (each.xaxis, each.yaxis):
             _tick_pad(axis, style)
-            _axis_title_pad(axis, style)
+            _axis_title_pad(axis, style, gap)
         _centre_y_labels(each.yaxis, style)
     _title_pad(ax, style)
     for k in keys(ax):  # a key below the plot box follows the x-axis title

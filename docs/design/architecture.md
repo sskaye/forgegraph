@@ -54,7 +54,7 @@ Also:
 
 1. **The GraphSpec is the product.** Skill, notebooks, CLI, scheduler, dashboards and the future desktop app all produce or consume the same document. Python function calls build GraphSpecs; they are not a second code path.
 2. **Three tiers of control, no fourth.**
-   - **Fixed style**: house style, set by the theme and format (by the org, journal or user), never by an individual graph. Each value is a **parameter**, e.g. `plot_area.sides` or `series.colors`; a theme may also leave some parameters variable, for graphs to change.
+   - **Fixed style**: house style, set by the theme and format (by the org, journal or user), never by an individual graph. Each value is a **parameter**, e.g. `plot_area.border.sides` or `series.colors`; a theme may also leave some parameters variable, for graphs to change.
    - **Options**: what an individual graph may vary. Each is documented with a default, except the data itself (the data file and the required mappings such as `x` and `y`), which every graph must specify.
    - **Escape hatch**: raw matplotlib on a themed figure, always marked non-standard.
 3. **One source per fact; everything else is generated.** Each kind of document is defined by its definition file (§8): every parameter with its default, range and description. The code reads them; `forgegraph schema`, the catalog pages and the docs/specs mirrors are generated from them, and the skill reads them at run time. Nothing generated is edited by hand.
@@ -195,6 +195,7 @@ Interactivity is not part of the MVP. If it becomes a requirement later, the opt
 - **!var:** a GraphSpec may change it, under the same category; the file gives the value it has otherwise.
 - A tag goes before a value (`width: !var 0.15`) or on a category (`output: !var`), where it applies to everything inside unless a tag further in says otherwise. A tag with no value (`width: !var`) changes only the status.
 - **extends:** every parameter a file doesn't list is inherited, with its status. The nearest file that tags a parameter, or a category above it, decides its status. With `extends: None` the file lists every parameter and tags each, itself or through a category.
+- **Styles:** in a theme, a category marked `[text style]`, `[line style]` or `[series style]` has the parameters of `text`, `line` or `series`, and takes their values unless it, or a file nearer in the extends chain, sets its own; a GraphSpec's settings of them carry through too. A style's category leaves out the members what it draws has no use for (a tick mark has no corners), listed in spec/parameters.py, so setting one is an error.
 - In a theme or format, a graph type's name used as a heading holds parameters for that graph type only.
 
 Every size in a theme is a multiple of the format's base font ("tick labels = 0.9 × base"), so a theme renders correctly in any format. That matters because graphs go to many destinations, not mainly slides (so no `.pptx` export: the examples were collected on slides only for convenience).

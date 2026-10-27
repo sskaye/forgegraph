@@ -1,0 +1,28 @@
+# Layout specification: layout_example
+
+This page mirrors src/forgegraph/packs/forgegraph_base/layouts/layout_example.yaml, which is the specification. A test fails if they ever differ.
+
+name: layout_example          *# \[text\]; The name of the layout.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
+description: An example layout to define the specification.          *# \[text\]; The description of the layout.*\
+extends: None          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
+ \
+parameters: !var          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+    specifications:\
+        format: forgegraph_base/base_layout_format          *# \[format\]; The format that sets the layout's size and output, in place of its tiles' formats.*\
+    separators:          *# The space and lines between around the figures. The gaps use the background.color of the first tile's theme.*\
+        gap:\
+            inner: 1.5          *# \[float ≥ 0\]; The space between the figure's edges and the outer tiles, × base size.*\
+            outer: 1.5          *# \[float ≥ 0\]; The space between neighboring tiles, from the outermost text or line of one to that of the next, × base size.*\
+        line:          *# \[line style\]; The line along the middle of each gap between tiles. Its defaults are the first tile's theme's line.*\
+        border:\
+            show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
+        corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
+    tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A layout's tabs replace those it inherits.*\
+        main:\
+            grid:\
+                areas: \[\[a\]\]          *# \[text grid\]; A list of tiles for each row. A . leaves a cell blank. A name repeated over a rectangle of cells makes that tile span them, e.g. \[a, a\] makes tile a span two columns.*\
+                column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. If None, they're equal.*\
+                row_heights: None          *# \[None, floats > 0\]; The relative heights of the rows' plot boxes. If None, they're equal, or as tall as the tiles need.*\
+            tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
+                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with \~, or a path relative to this file. A layout must set it.*

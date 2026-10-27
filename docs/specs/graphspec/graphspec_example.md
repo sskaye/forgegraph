@@ -78,6 +78,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             format: auto          *# \[auto, text\]; Number format, e.g. ",.0f"; on a date axis, a date format, e.g. "%H:%M". auto: as the value axis's tick labels.*\
             total:\
                 show: false          *# \[true, false\]; With aggregation sum, also write each stack's total.*\
+        opacity: 1          *# \[0-1\]; The opacity of lines, markers and bars.*\
         line:\
             width: 0.15          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
         marker:\

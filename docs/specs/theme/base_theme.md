@@ -61,6 +61,7 @@ parameters: !fix          *# !var/!fix sets whether a GraphSpec may ch
         y:\
             show: !var false          *# \[true, false\]; Whether to draw horizontal grid lines at the y ticks.*\
     series:          *# How every series looks. The items of each list are given to the series or their groups in order, starting again from the first when they run out.*\
+        opacity: !var 1          *# \[0-1\]; The opacity of lines, markers and bars.*\
         colors: okabe_ito          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.*\
         line:          *# \[line style\]; The series lines.*\
             styles: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\

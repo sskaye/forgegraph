@@ -105,6 +105,7 @@ class Look:
     bar_edge_width: float
     bar_edge_style: str
     bar_join: str
+    opacity: float
     line_z: float
     bar_z: float
 
@@ -125,6 +126,7 @@ def _look(style: Style, benchmark: bool) -> Look:
         bar_edge.width,
         bar_edge.style if bar_edge.visible else "solid",
         bar_edge.join,
+        float(style.theme[f"{b}.opacity"]),
         3 if benchmark else 2,
         2.8 if benchmark else 1.8,
     )
@@ -656,6 +658,7 @@ def _draw_marks(
             solid_capstyle=cast(Any, look.line_cap),
             solid_joinstyle=cast(Any, look.line_join),
             dash_joinstyle=cast(Any, look.line_join),
+            alpha=look.opacity,
             marker=s.marker if markers_shown and s.values is None else "none",
             markersize=look.marker_size,
             markerfacecolor="none" if open_marker else line_color,
@@ -680,6 +683,7 @@ def _draw_marks(
                 s=look.marker_size**2,
                 edgecolors="none" if look.edge == "none" else look.edge,
                 linewidths=look.edge_width,
+                alpha=look.opacity,
                 zorder=2.5,
             )
             dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts))

@@ -195,6 +195,7 @@ class Key:
                         facecolor=h.color,
                         edgecolor=h.edge,
                         linewidth=h.edge_width if h.edge != "none" else 0.0,
+                        alpha=h.get_alpha(),
                     ),
                 )
             else:
@@ -229,6 +230,7 @@ class Key:
                 marker="none",
                 solid_capstyle="butt",  # ends exactly where the sample does
                 dash_capstyle="butt",
+                alpha=h.get_alpha(),
             ),
         )
         if h.get_marker() not in ("None", "none", None, ""):
@@ -244,6 +246,7 @@ class Key:
                     markerfacecolor=h.get_markerfacecolor(),
                     markeredgecolor=h.get_markeredgecolor(),
                     markeredgewidth=h.get_markeredgewidth(),
+                    alpha=h.get_alpha(),
                 ),
             )
 

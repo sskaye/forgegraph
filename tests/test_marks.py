@@ -13,7 +13,7 @@ from pack_helpers import allow, write_pack
 from ruamel.yaml import YAML
 
 import forgegraph as fg
-from forgegraph.drawing.key import KEY
+from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
 from forgegraph.spec.tags import with_tags
 
@@ -400,3 +400,12 @@ def test_place_shift_moves_each_point_by_its_places_offset(monkeypatch):
     expected[:, 0] += [shifts.get(key(p), 0.0) * px if np.isfinite(p) else 0.0 for p in xs]
     assert np.array_equal(moved, expected, equal_nan=True)
     assert len(looked_up) <= len(places)
+
+
+def test_series_opacity_fades_lines_markers_and_bars():
+    g = graph(**{"series.opacity": 0.4, "mark.line.show": True, "mark.marker.show": True})
+    assert {b.get_alpha() for b in bar_sets(g)} == {0.4}
+    lines = [ln for ln in g.axes.lines if ln.get_gid() is None and len(ln.get_xdata())]
+    assert lines and {ln.get_alpha() for ln in lines} == {0.4}
+    [key] = keys(g.axes)
+    assert 0.4 in {a.get_alpha() for a in key.artists}  # the key's samples look like the series

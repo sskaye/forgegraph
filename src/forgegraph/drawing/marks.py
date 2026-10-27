@@ -363,6 +363,7 @@ def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
         look.bar_z,
     )
     collection.set_linestyle(look.bar_edge_style)
+    collection.set_alpha(look.opacity)
     collection.set_joinstyle(look.bar_join)
     ax.add_collection(collection, autolim=False)
     ends = [

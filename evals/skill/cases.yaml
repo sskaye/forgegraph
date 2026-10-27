@@ -9,7 +9,9 @@
 #                          (in every turn, or the turns in look_turns: [n, ...]),
 #                          and the GraphSpec, its Parquet file and the image are in the folder
 #   lint: [checks...]      re-rendering the final GraphSpec raises no lint issues except these
-#   values: {kind:path: v} resolved values of the final GraphSpec (axis.*: either axis); v is a value, or
+#   values: {kind:path: v} resolved values of the final GraphSpec (axis.*: either axis; kind series:
+#                          every series' value, a theme series parameter as it sets it or the
+#                          theme does, and column the column it draws); v is a value, or
 #                          {in: [...]}, {contains: x} (a list containing x),
 #                          {matches: regex} (case-insensitive; a list matches if any item does),
 #                          {lt: n}
@@ -19,7 +21,7 @@
 #   x_between: [a, b]      ...and every x value is between these dates
 #   y_above: n             every y value plotted is above n
 #   only: {column: [values]}    the final Parquet file's column, if it has one, holds only these
-#   categorical_color: true     encoding.color.column is categorical: encoding.color.type categorical, or a
+#   categorical_color: true     a series' color column is categorical: its color_scale categorical, or a
 #                          column that isn't numbers
 #   themes: [names]        themes the agent may create (default: none)
 #   files: [globs]         files that must exist in the project afterwards
@@ -60,9 +62,9 @@ cases:
       lint: []
       values:
         graph_type:axis.x.data.column: {matches: "petal.?(width|length)"}  # "A vs. B" either way
-        graph_type:axis.y.data.column: {matches: "petal.?(width|length)"}
-        graph_type:encoding.color.column: {matches: "species"}
-        graph_type:mark.line.show: false
+        series:column: {matches: "petal.?(width|length)"}
+        series:color: {matches: "species"}
+        series:line.show: false
 
   - id: co2-record
     data: [co2_monthly.csv]
@@ -72,7 +74,7 @@ cases:
       lint: [dropped-rows]
       y_above: 300
       values:
-        graph_type:mark.line.show: true
+        series:line.show: true
 
   - id: penguins-shapes
     data: [penguins.csv]
@@ -85,10 +87,10 @@ cases:
       one_graphspec: true
       values:
         graph_type:axis.x.data.column: {matches: "depth"}
-        graph_type:axis.y.data.column: {matches: "length"}
-        graph_type:encoding.color.column: {matches: "species"}
-        graph_type:encoding.marker.shape.column: {matches: "sex"}
-        graph_type:mark.line.show: false
+        series:column: {matches: "length"}
+        series:color: {matches: "species"}
+        series:marker.shape: {matches: "sex"}
+        series:line.show: false
 
   - id: growth-diet
     data: [growth.csv]
@@ -99,9 +101,9 @@ cases:
       categorical_color: true
       values:
         graph_type:axis.x.data.column: {matches: "day|age"}
-        graph_type:axis.y.data.column: {matches: "weight"}
-        graph_type:encoding.color.column: {matches: "diet"}
-        graph_type:encoding.detail.column: {matches: "animal|chick"}
+        series:column: {matches: "weight"}
+        series:color: {matches: "diet"}
+        series:split: {matches: "animal|chick"}
 
   - id: fmri-traces
     data: [fmri.csv]
@@ -112,9 +114,9 @@ cases:
       only: {region: [parietal]}
       values:
         graph_type:axis.x.data.column: {matches: "time"}
-        graph_type:axis.y.data.column: {matches: "signal"}
-        graph_type:encoding.color.column: {matches: "event"}
-        graph_type:encoding.detail.column: {matches: "subject|trace"}
+        series:column: {matches: "signal"}
+        series:color: {matches: "event"}
+        series:split: {matches: "subject|trace"}
 
   - id: stocks
     data: [stocks.csv]
@@ -125,7 +127,7 @@ cases:
       x_dates: true
       lines: 5
       values:
-        graph_type:encoding.color.column: {matches: "symbol|ticker|stock"}
+        series:color: {matches: "symbol|ticker|stock"}
 
   - id: gapminder-logx
     data: [gapminder.csv]
@@ -135,9 +137,9 @@ cases:
       lint: []
       values:
         graph_type:axis.x.data.column: {matches: "gdp"}
-        graph_type:axis.y.data.column: {matches: "life"}
+        series:column: {matches: "life"}
         graph_type:axis.x.scale: log
-        graph_type:encoding.color.column: {matches: "continent"}
+        series:color: {matches: "continent"}
 
   - id: diamonds-dense
     data: [diamonds.csv]
@@ -147,12 +149,12 @@ cases:
       lint: []
       values:
         graph_type:axis.x.data.column: {matches: "carat"}
-        graph_type:axis.y.data.column: {matches: "price"}
+        series:column: {matches: "price"}
         graph_type:axis.x.scale: log
         graph_type:axis.y.scale: log
-        graph_type:encoding.color.column: {matches: "cut"}
-        graph_type:mark.line.show: false
-        theme:series.marker.size: {lt: 0.5}
+        series:color: {matches: "cut"}
+        series:line.show: false
+        series:marker.size: {lt: 0.5}
 
   - id: dose-response
     data: [dose_response.csv]
@@ -162,7 +164,7 @@ cases:
       lint: [dropped-rows, log-axis-values, outside-limits]  # dose 0 left to ForgeGraph is fine
       values:
         graph_type:axis.x.scale: log
-        graph_type:encoding.color.column: {matches: "compound"}
+        series:color: {matches: "compound"}
       says: [["zero", " 0 ", "0 µM", "dose 0", "0 dose", "= 0", "dose-0", "dose of 0"]]
 
   - id: seaice-gaps
@@ -173,7 +175,7 @@ cases:
       lint: [dropped-rows]
       x_dates: true
       values:
-        graph_type:mark.line.missing_values: gap
+        series:line.missing_values: gap
 
   - id: geyser-limits
     data: [geyser.csv]
@@ -183,10 +185,10 @@ cases:
       lint: []
       values:
         graph_type:axis.x.data.column: {matches: "duration|eruption"}
-        graph_type:axis.y.data.column: {matches: "wait"}
+        series:column: {matches: "wait"}
         graph_type:axis.y.min: 40
         graph_type:axis.y.max: 100
-        graph_type:mark.line.show: false
+        series:line.show: false
 
   - id: weather-excel
     data: [weather.xlsx]
@@ -206,8 +208,8 @@ cases:
       rows_plotted: {max: 40}
       values:
         graph_type:axis.x.data.column: {matches: "temp"}
-        graph_type:axis.y.data.column: {matches: "conduct"}
-        graph_type:mark.line.show: false
+        series:column: {matches: "conduct"}
+        series:line.show: false
 
   - id: sensor-eu
     data: [sensor_log_eu.csv]
@@ -218,7 +220,7 @@ cases:
       x_dates: true
       x_between: ["2026-03-01", "2026-03-31"]
       values:
-        graph_type:axis.y.data.column: {matches: "temp"}
+        series:column: {matches: "temp"}
 
   - id: passengers-wide
     data: [air_passengers_by_month.csv]
@@ -245,9 +247,9 @@ cases:
       files: ["**/*.svg", "**/*.pdf", "**/*.png"]
       values:
         graph_type:axis.x.data.column: {matches: "total"}
-        graph_type:axis.y.data.column: {matches: "tip"}
-        graph_type:encoding.color.column: {matches: "time"}
-        graph_type:mark.line.show: false
+        series:column: {matches: "tip"}
+        series:color: {matches: "time"}
+        series:line.show: false
         graphspec:text.title: {matches: "^tips at lunch and dinner$"}
 
   - id: serif-font
@@ -293,10 +295,10 @@ cases:
       lint: []
       tick_labels: {x: [Thur, Fri, Sat, Sun]}
       values:
-        graph_type:mark.bar.show: true
-        graph_type:mark.line.show: false
+        series:bar.show: true
+        series:line.show: false
         graph_type:axis.x.data.column: {matches: "day"}
-        graph_type:axis.y.data.column: {matches: "tip"}
+        series:column: {matches: "tip"}
 
   - id: penguins-grouped
     data: [penguins.csv]
@@ -305,10 +307,10 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.bar.show: true
-        graph_type:series.offset: side_by_side
+        series:bar.show: true
+        graph_type:arrangement.offset: side_by_side
         graph_type:axis.x.data.column: {matches: "island"}
-        graph_type:encoding.color.column: {matches: "species"}
+        series:color: {matches: "species"}
 
   - id: tips-stacked
     data: [tips.csv]
@@ -317,10 +319,10 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.bar.show: true
-        graph_type:series.aggregation: sum
-        graph_type:series.value_label.total.show: true
-        graph_type:encoding.color.column: {matches: "time|meal"}
+        series:bar.show: true
+        graph_type:arrangement.stacking: sum
+        graph_type:arrangement.total.show: true
+        series:color: {matches: "time|meal"}
 
   - id: diamonds-shares
     data: [diamonds.csv]
@@ -329,9 +331,9 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.bar.show: true
-        graph_type:series.aggregation: percent
-        graph_type:encoding.color.column: {matches: "cut"}
+        series:bar.show: true
+        graph_type:arrangement.stacking: percent
+        series:color: {matches: "cut"}
         graph_type:axis.*.data.column: {matches: "color"}  # vertical or horizontal bars
 
   - id: americas-horizontal
@@ -342,13 +344,13 @@ cases:
       lint: []
       only: {continent: [Americas], year: ["2007"]}
       values:
-        graph_type:mark.bar.show: true
-        graph_type:series.base_axis: y
+        series:bar.show: true
+        graph_type:arrangement.base_axis: y
         graph_type:axis.y.data.column: {matches: "country"}
         graph_type:axis.x.data.column: {matches: "life"}
         graph_type:axis.y.data.order.method: value
         graph_type:axis.y.data.order.direction: ascending
-        graph_type:series.value_label.show: true
+        series:value_label.show: true
 
   - id: reference-compound
     data: [dose_response.csv]
@@ -358,7 +360,7 @@ cases:
       lint: []
       only: {dose_uM: ["10", "10.0"]}
       values:  # set apart by the benchmark or by a color column, either is fine (Steven)
-        graph_type:mark.bar.show: true
+        series:bar.show: true
 
   # --- phase 5: axes and ticks -------------------------------------------------------------
 
@@ -381,7 +383,7 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:axis.y.data.column: {matches: "unemploy"}
+        series:column: {matches: "unemploy"}
         graph_type:axis.y.tick.label.format: {matches: ","}
 
   # --- phase 5: layers -----------------------------------------------------------------------
@@ -395,7 +397,7 @@ cases:
       values:
         graph_type:axis.x.scale: log
       layers:
-        - {type: reference_line, axis: y, value: 50, label.text: {matches: "half"}}
+        - {type: reference, axis: y, line_1.value: 50, line_1.label.text: {matches: "half"}}
 
   - id: savings-mean-line
     data: [economics.csv]
@@ -404,7 +406,7 @@ cases:
       graph: true
       lint: []
       layers:
-        - {type: reference_line, axis: y, value: {matches: "psavert|sav"}, aggregation.function: mean, label.text: {in: [value, aggregation_value]}}
+        - {type: reference, axis: y, line_1.value: {matches: "psavert|sav"}, line_1.aggregation.function: mean, line_1.label.text: {in: [value, aggregation_value]}}
 
   - id: enzyme-max-lines
     data: [enzyme_kinetics.csv]
@@ -413,10 +415,10 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.line.show: false
-        graph_type:encoding.color.column: {matches: "state"}
+        series:line.show: false
+        series:color: {matches: "state"}
       layers:
-        - {type: reference_line, value: {matches: "rate"}, aggregation.function: max, per_series: true}
+        - {type: reference, line_1.value: {matches: "rate"}, line_1.aggregation.function: max, per_series: true}
 
   - id: co2-corner-note
     data: [co2_monthly.csv]
@@ -435,7 +437,7 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.line.show: false
+        series:line.show: false
       layers:
         - {type: note, text: {matches: "Fisher"}, inside: false, position: {matches: "^bottom"}}
 
@@ -446,9 +448,9 @@ cases:
       graph: true
       lint: [dropped-rows, log-axis-values, outside-limits]  # dose 0 left to ForgeGraph is fine
       values:
-        graph_type:axis.y.data.aggregation: mean
+        series:aggregation.function: mean
         graph_type:axis.x.scale: log
-        graph_type:encoding.color.column: {matches: "compound"}
+        series:color: {matches: "compound"}
       layers:
         - {type: error_bar, value.aggregation.function: stddev}
 
@@ -460,8 +462,8 @@ cases:
       lint: []
       only: {region: [parietal]}
       values:
-        graph_type:axis.y.data.aggregation: mean
-        graph_type:encoding.color.column: {matches: "event"}
+        series:aggregation.function: mean
+        series:color: {matches: "event"}
       layers:
         - {type: error_bar, value.aggregation.function: ci}
 
@@ -472,8 +474,8 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:mark.bar.show: true
-        graph_type:axis.y.data.aggregation: mean
+        series:bar.show: true
+        series:aggregation.function: mean
         graph_type:axis.x.data.column: {matches: "size"}
       layers:
         - {type: error_bar, value.aggregation.function: stderr}
@@ -485,7 +487,7 @@ cases:
       graph: true
       lint: []
       values:
-        graph_type:axis.y.data.aggregation: none
+        series:aggregation.function: None
       layers:
         - {type: error_bar, value.lower: {matches: "sd"}, value.upper: {matches: "sd"}, value.aggregation.function: "None"}
 
@@ -496,10 +498,10 @@ cases:
       graph: true
       lint: [dropped-rows]
       values:
-        graph_type:mark.bar.show: true
-        graph_type:axis.y.data.column: {matches: "body.?mass"}
+        series:bar.show: true
+        series:column: {matches: "body.?mass"}
       layers:
-        - {type: reference_line, axis: y}
+        - {type: reference, axis: y}
 
   # --- phase 5: questions about ForgeGraph ------------------------------------------------
 
@@ -533,7 +535,7 @@ cases:
     turns: ["Can I annotate a graph — say a target line or a short text note — and how?"]
     expect:
       no_graph: true
-      says: [["reference_line", "reference line"], ["note"], ["layers"]]
+      says: [["reference", "reference line"], ["note"], ["layers"]]
 
   - id: q-error-bars
     data: []
@@ -612,7 +614,7 @@ cases:
       lint: []
       x_dates: true
       values:
-        graph_type:mark.bar.show: true
+        series:bar.show: true
 
   - id: seaice-weekly-ticks
     data: [seaice.csv]

@@ -39,7 +39,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -492,6 +492,25 @@ def _record_checks(case: dict[str, Any], project: Project, before: dict) -> list
     return checks
 
 
+def _series_value(values: dict[str, Any], name: str, path: str) -> Any:
+    """A series' value: its own parameter (column: the column it draws), or a theme series
+    parameter as it sets it for itself or the theme does."""
+    entry = values["series"][name]
+    if path == "column":
+        return name if entry["column"] == "name" else entry["column"]
+    if path in entry:
+        return entry[path]
+    return entry["look"].get(path, values["theme"].get(f"series.{path}", "<not a parameter>"))
+
+
+def _columns(values: dict[str, Any]) -> tuple[Any, list[str]]:
+    """The base axis's column and the series' columns, as (x, y): one of them a list."""
+    base = values["graph_type"]["arrangement.base_axis"]
+    along = values["graph_type"][f"axis.{base}.data.column"]
+    drawn = [_series_value(values, n, "column") for n in values.get("series", {})]
+    return (along, drawn) if base == "x" else (drawn[0] if drawn else None, [along])
+
+
 def _spec_checks(expect: dict[str, Any], project: Project) -> list[Check]:
     """The final GraphSpec: beside its data and graph, its lint, its values and its layers."""
     checks: list[Check] = []
@@ -533,6 +552,12 @@ def _spec_checks(expect: dict[str, Any], project: Project) -> list[Check]:
                 for key, want in expect["values"].items():
                     kind, path = key.split(":", 1)
                     found = values.get(kind, {})
+                    if kind == "series":  # every series' value
+                        each = [_series_value(values, n, path) for n in found]
+                        ok = bool(each) and all(_matches(v, want) for v in each)
+                        evidence = f"{final.name}: {dict(zip(found, each, strict=True))!r}"
+                        checks.append(Check(f"{key} = {want}", ok, evidence))
+                        continue
                     if "*" in path:  # axis.*.x: either axis's value that matches
                         options = [found.get(path.replace("*", a)) for a in ("x", "y")]
                         actual = next((o for o in options if _matches(o, want)), options)
@@ -573,8 +598,7 @@ def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
         frame = project.frame if graph is not None else None
         x = y = None
         if graph is not None:
-            values = graph.values["graph_type"]
-            x, y = values["axis.x.data.column"], values["axis.y.data.column"]
+            x, y = _columns(graph.values)
         if "lines" in expect:
             lines = [] if graph is None else graph.axes.lines
             series = sum(len(np.asarray(line.get_xdata())) > 0 for line in lines)
@@ -632,16 +656,16 @@ def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
         if expect.get("categorical_color"):
             ok, evidence = False, problem or "no data"
             if graph is not None:
-                values = graph.values["graph_type"]
-                color = values["encoding.color.column"]
-                kind = values["encoding.color.type"]
-                text = (
-                    frame is not None
-                    and color in frame
-                    and not pd.api.types.is_numeric_dtype(frame[color])
+                listed = graph.values.get("series", {})
+                found = [(n, e["color"], e["color_scale"]) for n, e in listed.items()]
+                columns = [(n, c, k) for n, c, k in found if frame is not None and c in frame]
+                ok = bool(columns) and all(
+                    k == "categorical" or not pd.api.types.is_numeric_dtype(cast(Any, frame)[c])
+                    for _, c, k in columns
                 )
-                ok = kind == "categorical" or bool(text)
-                evidence = f"encoding.color.column {color!r}, encoding.color.type {kind}"
+                evidence = ", ".join(
+                    f"series {n}: color {c!r}, color_scale {k}" for n, c, k in found
+                )
             checks.append(Check("color is categorical", ok, evidence))
     if "numeric_columns" in expect:
         evidence, ok = "no GraphSpec in the project", False

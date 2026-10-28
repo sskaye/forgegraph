@@ -45,9 +45,28 @@ jobs:
         with:
           node-version: "22"
       - run: uv sync --locked
-      - run: uv run pytest --full --cov --cov-report=term-missing
+      # Coverage runs once, on 3.14, where it's cheap (coverage.py's sys.monitoring core).
+      - if: matrix.python == '3.14'
+        run: uv run pytest --full --ignore=tests/test_perturbation.py --cov --cov-report=term-missing --durations=15
         env:
           FORGEGRAPH_REQUIRE_NODE: "1"
+      - if: matrix.python != '3.14'
+        run: uv run pytest --full --ignore=tests/test_perturbation.py --durations=15
+        env:
+          FORGEGRAPH_REQUIRE_NODE: "1"
+
+  tests-perturbation:
+    # Most of the full suite's time, in a job of its own so it runs beside the others. Whether a
+    # parameter changes the drawing doesn't depend on the Python version or operating system.
+    name: Tests (every parameter changes the drawing)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          python-version: "3.14"
+      - run: uv sync --locked
+      - run: uv run pytest --full tests/test_perturbation.py --durations=15
 
   tests-lowest:
     name: Tests (lowest dependency versions)
@@ -74,7 +93,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --locked
-      - run: uv run pytest --full
+      # the perturbation tests have a job of their own
+      - run: uv run pytest --full --ignore=tests/test_perturbation.py --durations=15
 
   package:
     # The wheel as a user gets it from pip, installed fresh and tried from outside the repo.

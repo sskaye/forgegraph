@@ -65,11 +65,13 @@ def test_schema():
     assert runner.invoke(app, ["schema", "nope"]).exit_code == 1
 
 
-def test_schema_says_which_parameters_are_fixed():
-    lines = runner.invoke(app, ["schema", "graph_type"]).output.splitlines()
-    [types] = [ln for ln in lines if ln.strip().startswith("layer.types =")]
-    [scale] = [ln for ln in lines if ln.strip().startswith("axis.x.scale =")]
-    assert types.endswith("Fixed: set by the graph type.") and "Fixed" not in scale
+def test_schema_of_a_kind_doesnt_say_whether_a_parameter_is_fixed():
+    """A kind's specification isn't what graphs are drawn with, so its statuses would
+    mislead; schema graphspec lists what a GraphSpec can set."""
+    for kind in ("graph_type", "theme", "layout", "pack"):
+        rows = cli("schema", kind)[kind]
+        assert rows and not any("fixed" in row for row in rows)
+    assert "Fixed" not in runner.invoke(app, ["schema", "graph_type"]).output
 
 
 def test_render_reports_lint(project):

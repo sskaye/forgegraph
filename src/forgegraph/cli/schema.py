@@ -131,13 +131,13 @@ def schema(
 
 
 def _pack_fields(kind: str) -> list[dict[str, Any]]:
-    """A pack.yaml's fields, from the base pack's, or a config's settings, from the reference
-    config: each with its example value, range and description."""
+    """A pack.yaml's fields, or a config's settings, from their specification files: each with
+    its example value, range and description."""
     import re
 
-    from forgegraph.spec.parameters import base_folder
+    from forgegraph.spec.parameters import specifications_folder
 
-    source = base_folder() / "pack.yaml" if kind == "pack" else base_folder().parent / "config.toml"
+    source = specifications_folder() / ("pack.yaml" if kind == "pack" else "config.toml")
     rows = []
     for line in source.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^(\w+)\s*[:=]\s*(.*?)\s{2,}# \[(.*?)\]; (.*)$", line)

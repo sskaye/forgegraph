@@ -1,5 +1,5 @@
 """Bars, how series at one place combine (arrangement.stacking, arrangement.offset), and value
-labels (graph_types/xy.yaml each series' bar and value_label; themes series.bar,
+labels (graphtype_xy.yaml each series' bar and value_label; themes series.bar,
 series.value_label)."""
 
 from __future__ import annotations

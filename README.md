@@ -79,8 +79,8 @@ extends: None
 parameters: !var
     specifications:
         graph_type: xy
-        theme: forgegraph_base/base_theme
-        format: forgegraph_base/base_format
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
     text:
         title: Cell voltage
     data:
@@ -101,7 +101,7 @@ forgegraph render voltage.yaml
 
 ## Packs and configs
 
-Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. The initial built-in packs are `forgegraph_base` and `forgegraph_base_2`, stored in src/forgegraph/packs.
+Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. ForgeGraph's built-in pack, `forgegraph_default`, is stored in src/forgegraph/packs: its theme, `light_theme`, its formats, `compact_format` for single graphs and `wide_format` for layouts, and a layout and a schedule to extend.
 
 A **config** lists the packs that may be used:
 
@@ -129,10 +129,9 @@ Every command takes `--help`, and `--json` for agents.
 
 ## Catalogs
 
-Each pack in this repository has a catalog: a page with a card for each parameter, showing what changing it does. Download a page and open it in a browser.
+The built-in pack has a catalog: a page with a card for each parameter, showing what changing it does. Download it and open it in a browser.
 
-- [forgegraph_base](https://github.com/sskaye/forgegraph/blob/main/catalog/forgegraph_base.html): ForgeGraph's own pack, with its graph types and layer types.
-- [forgegraph_base_2](https://github.com/sskaye/forgegraph/blob/main/catalog/forgegraph_base_2.html): its own theme and format, and the same graph types and layer types drawn in them.
+- [forgegraph_default](https://github.com/sskaye/forgegraph/blob/main/catalog/forgegraph_default.html): its theme and formats, and ForgeGraph's graph types and layer types drawn in them.
 
 ## Your graphs are yours
 
@@ -140,7 +139,8 @@ ForgeGraph is [MIT-licensed](https://github.com/sskaye/forgegraph/blob/main/LICE
 
 ## Documentation
 
-- [Specifications](https://github.com/sskaye/forgegraph/blob/main/docs/specs): every spec, a folder per kind.
+- [Specifications](https://github.com/sskaye/forgegraph/blob/main/docs/specifications): the file that defines each kind of spec, every parameter with its default, range and description.
+- [Built-in pack](https://github.com/sskaye/forgegraph/blob/main/docs/packs/forgegraph_default): forgegraph_default's specs.
 - [Changelog](https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md).
 - [Contributing](https://github.com/sskaye/forgegraph/blob/main/CONTRIBUTING.md): working on ForgeGraph itself.
 - Design record, in [docs/design](https://github.com/sskaye/forgegraph/blob/main/docs/design):
@@ -158,12 +158,13 @@ Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye
   - **cli/**: the `forgegraph` command.
   - **spec/**: reading, checking and resolving specs, and the provenance record.
   - **drawing/**: drawing, layout and lint. **layouts/**: `fg.layout` and layouts. **jobs/**: scheduled renders.
-  - **packs/**: packs and configs, and the built-in packs `forgegraph_base` and `forgegraph_base_2`. **fonts/**: bundled fonts and their licences.
-  - **graph_types/**, **layers/**: the graph type and layer type definitions. **catalog_build/**: the catalog builder. **catalogs/**: each definition's catalog file.
+  - **specifications/**: the specification files, which define each kind of spec, and the graph types' and layer types' catalog files.
+  - **packs/**: packs and configs, and the built-in pack `forgegraph_default`. **fonts/**: bundled fonts and their licences.
+  - **catalog_build/**: the catalog builder.
   - **skill/forgegraph/**: the agent skill. `forgemark.py`: Forgemark's review-comment format, and its pinned tool.
 - **catalog/**: the generated catalog pages.
 - **examples/**: sample data; `packs/acme`, an example pack in a deliberately different style; and `layouts/`, a paper figure and a dashboard.
 - **evals/skill/**: the skill's eval cases, run by `scripts/run_skill_evals.py`.
 - **tests/**, **scripts/**: tests, and build and maintenance scripts.
-- **docs/**: the specifications, the design record and the visual changelogs. **review/**: each build phase's review pages.
+- **docs/**: the specifications' and packs' pages, the design record and the visual changelogs. **review/**: each build phase's review pages.
 

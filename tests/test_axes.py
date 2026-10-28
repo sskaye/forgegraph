@@ -1,6 +1,6 @@
 """Each axis's data and ticks: data types, categories and their order, the tick algorithm per
 axis (auto, all, manual with a step), label formats, the theme's label rotation and wrapping,
-which axis series are drawn along, and data aggregation (graph_types/xy.yaml axis.*, series.*;
+which axis series are drawn along, and data aggregation (graphtype_xy.yaml axis.*, series.*;
 themes axis.tick.label.*)."""
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ def test_the_theme_orders_day_and_month():
     df = _dates("2026-03-01", 40, "D")
     reg = builtin().copy()
     order = {"axis.tick.label.date_order": "day_month"}
-    theme = child("theme", "forgegraph_base/base_theme", order, name="uk")
+    theme = child("theme", "forgegraph_default/light_theme", order, name="uk")
     reg.add("theme", theme)
     g = fg.xy(df, "when", "value", theme="uk", registry=reg)
     assert labels(g)[:2] == ["2 Mar\n2026", "9 Mar"]

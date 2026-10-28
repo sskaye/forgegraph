@@ -4,7 +4,7 @@ A theme or format is a spec in a pack. ForgeGraph reads it only from a pack, and
 
 ## Workflow
 
-1. Select a base spec to build from: the theme or format closest to the request (`forgegraph catalog` lists them), or a base spec: `forgegraph_base/base_theme`, `forgegraph_base/base_format`, or `forgegraph_base/base_layout_format` for a layout.
+1. Select a base spec to build from: the theme or format closest to the request (`forgegraph catalog` lists them), or a base spec: `forgegraph_default/light_theme`, `forgegraph_default/compact_format`, or `forgegraph_default/wide_format` for a layout.
 2. Select the pack for the new spec: one the user names, or a new one (see Modifying or creating a pack).
 3. Write the new spec in the pack's themes/ or formats/ folder, setting `extends` to the base spec and listing under `parameters` only the parameters you want to change. Each keeps the status it inherits; to change that, tag it `!fix` if a GraphSpec can't change it, or `!var` if it can (`width: !var 0.15`). A tag on a category applies to everything in it, and a tag with no value (`width: !var`) changes only the status. `forgegraph schema theme` and `forgegraph schema format` list every parameter, with its allowed values, default and description.
 4. List the pack in the configs that apply to the GraphSpecs that will use it (see Configs). Ask the user before changing the main config, since it applies to all work. If the main config can't be changed, list the pack in a folder config: it works, but its graphs are non-standard (watermarked) until the main config lists it.
@@ -35,7 +35,7 @@ To create a pack:
 
 ## Configs
 
-A config lists the packs a GraphSpec may use, e.g. `packs = ["forgegraph_base", "./lab"]`. A folder pack is a path from the config file. `forgegraph schema config` lists the settings.
+A config lists the packs a GraphSpec may use, e.g. `packs = ["forgegraph_default", "./lab"]`. A folder pack is a path from the config file. `forgegraph schema config` lists the settings.
 
 - The main config, \~/.config/forgegraph/config.toml (or the file FORGEGRAPH_CONFIG names), applies to all work. ForgeGraph writes it, listing the built-in packs, the first time a command reads the configs.
 - A folder config, forgegraph.toml, applies to the files in its folder and in every folder below it. A file uses the nearest one: in its own folder, or else in the closest folder above it.

@@ -1,6 +1,6 @@
 """`forgegraph catalog build`: the specification files -> a catalog page, keeping its comments.
 
-The catalog shows ForgeGraph's graph types and layer types and the base pack's themes and
+The catalog shows ForgeGraph's graph types and layer types and the default pack's themes and
 formats; a pack's catalog (`--pack`) shows that pack's themes and formats. A rebuild writes
 a fresh page, carries the old page's Forgemark comment block over, puts
 each comment back by its element's id or its text (`forgemark reattach --all`), then runs
@@ -19,12 +19,12 @@ from forgegraph.catalog_build.cards import Drawings, place, show
 from forgegraph.catalog_build.files import Catalog, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.packs import Pack
-from forgegraph.spec.parameters import BASE, NONE, Parameter, graph_type_files
+from forgegraph.spec.parameters import DEFAULT, NONE, Parameter, graph_type_files
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import Values, resolve
 
 # Package files that can't change what the catalog shows. Every other file counts, so a new
-# module counts without being listed; built-in packs other than the base pack count only
+# module counts without being listed; built-in packs other than the default pack count only
 # for their own catalog.
 UNUSED = ("__main__.py", "canvas.py", "cli", "jobs", "layouts", "skill")
 # Each kind of specification: its id, tab title and heading name.
@@ -63,7 +63,7 @@ def _depends_on(rel: Path) -> bool:
     """Whether the catalog can depend on this package file."""
     if rel.parts[0] in UNUSED:
         return False
-    return not (rel.parts[0] == "packs" and len(rel.parts) > 2 and rel.parts[1] != BASE)
+    return not (rel.parts[0] == "packs" and len(rel.parts) > 2 and rel.parts[1] != DEFAULT)
 
 
 def recorded_hash(page_text: str) -> str | None:
@@ -175,14 +175,14 @@ def instance(
 
 
 def kinds(pack: Pack | None = None) -> list[Kind]:
-    """A pack's themes and formats (the base pack's by default), and ForgeGraph's graph types
+    """A pack's themes and formats (the default pack's by default), and ForgeGraph's graph types
     and layer types, drawn in the pack's first theme and format, so a pack's catalog shows
     how each looks in it. Each with its cards."""
     reg = builtin()
-    shown = BASE
+    shown = DEFAULT
     if pack is not None:
         reg.add_pack(pack)
-        reg.allowed = frozenset({BASE, pack.name})
+        reg.allowed = frozenset({DEFAULT, pack.name})
         shown = pack.name
     own = {
         k: sorted(n for n in reg.docs[k] if reg.pack_of(k, n) == shown) for k in ("theme", "format")
@@ -208,7 +208,7 @@ def kinds(pack: Pack | None = None) -> list[Kind]:
 
 def html(pack: Pack | None = None) -> str:
     """The catalog page, without comments."""
-    title = f"{BASE if pack is None else pack.name} Catalog"
+    title = f"{DEFAULT if pack is None else pack.name} Catalog"
     version = __version__ if pack is None else pack.version
     return page(kinds(pack), inputs_hash(pack), title, version)
 

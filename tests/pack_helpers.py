@@ -23,6 +23,15 @@ needs_node = pytest.mark.skipif(
     reason="needs Node 18 or later",
 )
 
+# The default pack's spec of each kind, which test files extend.
+BUILT_IN = {
+    "theme": "forgegraph_default/light_theme",
+    "format": "forgegraph_default/compact_format",
+    "graphspec": "forgegraph_default/graphspec_example",
+    "layout": "forgegraph_default/layout",
+    "schedule": "forgegraph_default/schedule",
+}
+
 PACK_YAML = (
     "name: {name}\nversion: 1.0.0\ndescription: Test pack.\n"
     "issues: https://example.com/{name}/issues\nrequires: {requires}\n"

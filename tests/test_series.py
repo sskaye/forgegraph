@@ -1,4 +1,4 @@
-"""The series a GraphSpec lists (graph_types/xy.yaml series): each drawn from its own column,
+"""The series a GraphSpec lists (graphtype_xy.yaml series): each drawn from its own column,
 with its own settings, and its own look, the theme with what it sets for itself."""
 
 from __future__ import annotations
@@ -11,11 +11,14 @@ import pandas as pd
 import pytest
 from matplotlib.colors import to_hex
 from matplotlib.lines import Line2D
+from pack_helpers import BUILT_IN
+from pack_helpers import doc as pack_doc
 
 import forgegraph as fg
 from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.marks import VALUE_LABEL, Bars
 from forgegraph.drawing.style import Style
+from forgegraph.spec.registry import builtin
 
 TWO = pd.DataFrame(
     {
@@ -85,7 +88,8 @@ def test_line_styles_by_series_with_colors_from_a_column_get_a_style_key():
 
 
 def test_each_series_shows_its_own_marks():
-    g = graph({"a": {"bar": {"show": True}, "line": {"show": False}}, "b": {}})
+    shown = {"a": {"bar": {"show": True}, "line": {"show": False}}, "b": {}}
+    g = graph(shown, **{"legend.key.inside": False})
     [bars] = [c for c in g.axes.collections if isinstance(c, Bars)]
     assert bars.top.tolist() == [1.0, 3.0, 2.0, 4.0]  # a's bars only
     a, b = drawn(g)
@@ -210,15 +214,28 @@ def test_a_smooth_line_needs_its_points_in_order():
 
 
 def test_a_series_sets_the_themes_variable_look_for_itself():
-    g = graph({"a": {"marker": {"size": 0.9}, "opacity": 0.5}, "b": {}})
+    g = graph({"a": {"marker": {"size": 0.9}, "opacity": 0.5, "line": {"width": 0.5}}, "b": {}})
     a, b = drawn(g)
     base = Style(g.values["theme"], g.values["format"])
     assert a.get_markersize() == pytest.approx(0.9 * base.base)
     assert b.get_markersize() == pytest.approx(base.pt("series.marker.size"))
     assert a.get_alpha() == 0.5 and b.get_alpha() == 1
-    message = "series.a.line.width: fixed by theme 'forgegraph_base/base_theme'"
+    assert a.get_linewidth() == pytest.approx(0.5 * base.base)
+    reg = builtin().copy()
+    reg.add("theme", pack_doc(BUILT_IN["theme"], "pinned", fixed={"series.line.width": 0.15}))
+    settings = {"axis.x.data.column": "t", "specifications.theme": "pinned"}
+    doc = fg.graphspec("t", "xy", settings={**settings, "series": {"a": {"line": {"width": 0.5}}}})
+    message = "series.a.line.width: fixed by theme 'pinned'"
     with pytest.raises(fg.SpecError, match=re.escape(message)):
-        graph({"a": {"line": {"width": 0.5}}})
+        fg.render(doc, TWO, reg)
+
+
+def test_light_theme_fixes_the_palettes_and_a_series_still_sets_its_own_look():
+    """light_theme fixes the palettes, the lists each series takes the next item of, but a
+    series may still set its own color, line style and marker shape."""
+    look = {"color": "#123456", "line": {"style": "dashdot"}, "marker": {"shape": "plus"}}
+    [a] = drawn(graph({"a": look}))
+    assert (to_hex(a.get_color()), a.get_linestyle(), a.get_marker()) == ("#123456", "-.", "+")
 
 
 def test_a_series_cant_set_what_the_theme_fixes():

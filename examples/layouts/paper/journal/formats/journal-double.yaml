@@ -1,7 +1,7 @@
 name: journal-double          # [text]; The name of the format.
 version: 0          # [int ≥ 0]; The version number of the specification.
 description: A two-column journal figure, 183 mm wide, with 7 pt text.          # [text]; The description of the format.
-extends: forgegraph_base/base_format          # [None, format]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.
+extends: forgegraph_default/compact_format          # [None, format]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.
 
 parameters:          # !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     figure:

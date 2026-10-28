@@ -1,4 +1,4 @@
-"""Scheduled renders (architecture D12; docs/specs/schedule/base_schedule.md): jobs/run.py
+"""Scheduled renders (architecture D12; docs/specifications/schedule.md): jobs/run.py
 runs a schedule once. Whatever schedules it (the machine's scheduler, CI, an agent's scheduled
 task) runs `forgegraph job run <schedule>`."""
 

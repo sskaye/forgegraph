@@ -14,13 +14,13 @@ import forgegraph
 from forgegraph import forgemark
 from forgegraph.catalog_build.page import Card, Instance, Kind, Row, figures, open_commented, page
 
-CATALOG = Path(__file__).parents[1] / "catalog" / "forgegraph_base.html"
+CATALOG = Path(__file__).parents[1] / "catalog" / "forgegraph_default.html"
 
 
 def test_a_packs_table_shows_its_own_values():
     """A row shows the value the shown spec draws with, and whether it fixes it, not the
-    definition's: the forgegraph_base_2 theme's, not the base theme's."""
-    text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
+    specification's: light_theme's."""
+    text = CATALOG.read_text(encoding="utf-8")
 
     def cells(row: str) -> list[str]:
         start = text.index(f'<tr id="{row}">')
@@ -28,14 +28,17 @@ def test_a_packs_table_shows_its_own_values():
         found = re.findall(r"<td[^>]*>(.*?)</td>", row_text)
         return [re.sub(r"<[^>]+>", "", c) for c in found[1:]]  # after the parameter's name
 
-    theme = "theme-forgegraph_base_2-base_theme-param-"
-    assert cells(theme + "title-size")[0] == "1.45"
-    assert cells(theme + "series-marker-edge-color")[0] == "#000000"
-    assert cells("format-forgegraph_base_2-compact_format-param-output-dpi")[0] == "200"
+    theme = "theme-forgegraph_default-light_theme-param-"
+    assert cells(theme + "title-size")[0] == "1.05"
+    assert cells(theme + "grid-color")[0] == "#E6E6E6"
+    assert cells(theme + "text-font")[2] == "fixed"
+    assert cells(theme + "title-font")[2] == "fixed"  # by text.font
+    assert cells(theme + "title-weight")[2] == "variable"
+    assert cells("format-forgegraph_default-wide_format-param-figure-width")[0] == "300"
 
 
 def test_a_packs_catalog_shows_graph_and_layer_types_in_its_theme():
-    text = (CATALOG.parent / "forgegraph_base_2.html").read_text(encoding="utf-8")
+    text = CATALOG.read_text(encoding="utf-8")
     panels = set(re.findall(r'<section class="panel" id="([^"]+)"', text))
     assert {"graphtype-xy", "layer-error_bar", "layer-note", "layer-reference"} <= panels
     assert f'<p id="version" class="version">version {forgegraph.__version__}</p>' in text

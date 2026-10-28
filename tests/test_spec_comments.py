@@ -1,7 +1,7 @@
 """A parameter's comment, wherever a spec file restates it (a pack's themes, formats and
 GraphSpecs, the catalog files, the skill's examples), is its definition's comment, word for
-word: one source, so a description can't drift from what the code does. A file restating
-a parameter sets it, so "A GraphSpec must set it." is left out; a file that writes no
+word: one source, so a description can't drift from what the code does. Whether it says
+"A GraphSpec must set it." depends on whether the file sets it; a file that writes no
 comment for a parameter doesn't restate it."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any
 from ruamel.yaml import YAML
 
 import forgegraph
-from forgegraph.spec.parameters import _comment, definition_file, graph_type_files
+from forgegraph.spec.parameters import _comment, core_files, definition_file, graph_type_files
 
 PKG = Path(forgegraph.__file__).parent
 FOLDERS = {  # a spec file's folder, and the kind of spec it holds
@@ -23,8 +23,6 @@ FOLDERS = {  # a spec file's folder, and the kind of spec it holds
     "graphspecs": "graphspec",
     "layouts": "layout",
     "schedules": "schedule",
-    "graph_types": "graph_type",
-    "layers": "layer",
 }
 
 
@@ -66,7 +64,10 @@ RESTATES = {  # the definitions a file of each kind may restate
     "schedule": KIND["schedule"],
     "graph_type": GRAPH_TYPE,
 }
-LAYER = {p.stem: dict(_comments(_load(p)["parameters"])) for p in (PKG / "layers").glob("*.yaml")}
+LAYER = {
+    p.stem.removeprefix("layer_"): dict(_comments(_load(p)["parameters"]))
+    for p in core_files("layer")
+}
 
 
 def _kind(path: Path) -> str:
@@ -100,6 +101,8 @@ def _drifted(path: Path) -> Iterator[tuple[str, str, str]]:
         expected = definitions.get(p)
         if expected is not None:
             expected = re.sub(r" A \w+ must set it\.", "", expected)
+        if comment is not None:  # set it here, or, in a spec that leaves it to others, not
+            comment = re.sub(r" A \w+ must set it\.", "", comment)
         if comment is not None and expected is not None and comment != expected:
             yield p, comment, expected
 
@@ -109,6 +112,7 @@ def restating_files() -> list[Path]:
     define them, except the reference GraphSpec, which restates other kinds'."""
     defining = {definition_file(k) for k in ("theme", "format", "layout", "schedule")}
     found = [p for p in PKG.rglob("*.yaml") if {"packs", "catalogs", "skill"} & set(p.parts)]
+    found.append(definition_file("graphspec"))
     return sorted(p for p in found if p.name != "pack.yaml" and p not in defining)
 
 

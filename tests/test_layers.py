@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.colors import to_hex
+from pack_helpers import BUILT_IN
+from pack_helpers import doc as pack_doc
 from render_helpers import with_series
 
 import forgegraph as fg
@@ -732,6 +734,13 @@ def test_two_values_make_a_band_filled_between_its_lines():
     assert fill.get_alpha() == style.theme["layer.reference.fill.opacity"]
 
 
+def test_two_lines_with_no_fill_color_are_two_lines_and_no_band():
+    lines = {"type": "reference", "axis": "y", "line_1": {"value": 8}, "line_2": {"value": 25}}
+    g = graph({"t": {**lines, "fill": {"color": None}}}, **{"series.line.show": False})
+    assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [8, 25]
+    assert _fills(g) == []
+
+
 def test_an_offset_moves_a_line_by_another_aggregate():
     mean, sd = RATES["rate"].mean(), RATES["rate"].std()
     plus = {"value": "rate", "aggregation": {"function": "mean"}}
@@ -815,9 +824,13 @@ def test_a_layer_sets_the_themes_variable_look_for_itself():
     widths = sorted(ln.get_linewidth() for ln in layer_lines(g, REFERENCE))
     base = g.style
     assert widths == pytest.approx([base.pt("layer.reference.line.width"), 0.3 * base.base])
-    message = "layers.t.size: fixed by theme 'forgegraph_base/base_theme'"
-    with pytest.raises(fg.SpecError, match=re.escape(message)):
-        graph({"t": {"type": "note", "text": "x", "size": 2}})
+    reg = builtin().copy()
+    reg.add("theme", pack_doc(BUILT_IN["theme"], "pinned", fixed={"layer.note.size": 0.8}))
+    note = doc(
+        {"t": {"type": "note", "text": "x", "size": 2}}, **{"specifications.theme": "pinned"}
+    )
+    with pytest.raises(fg.SpecError, match=re.escape("layers.t.size: fixed by theme 'pinned'")):
+        fg.render(note, RATES, reg)
 
 
 def test_error_bars_can_be_a_percentile_of_the_rows():

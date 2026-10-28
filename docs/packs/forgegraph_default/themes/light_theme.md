@@ -1,0 +1,153 @@
+# Built-in pack: forgegraph_default/light_theme, a theme
+
+This page mirrors src/forgegraph/packs/forgegraph_default/themes/light_theme.yaml, which is the specification. A test fails if they ever differ.
+
+name: light_theme          *# \[text\]; The name of the theme.*\
+version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
+description: ForgeGraph's default theme, with black text and lines on a white background and the Okabe-Ito colors.          *# \[text\]; The description of the theme.*\
+extends: None          *# \[None, theme\]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.*\
+ \
+parameters: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+    text:          *# General text parameters. Each \[text style\] has these as its default values and can modify them if variable.*\
+        font: !fix Roboto          *# \[text\]; The typeface.*\
+        size: 0.9          *# \[float > 0\]; The size, × base size.*\
+        weight: regular          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+        color: "#000000"          *# \[hex color\]; The color.*\
+        gap: !fix 0.3          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        alignment: center          *# \[left, center, right\]; The text alignment.*\
+    line:          *# General line parameters. Each \[line style\] has these as its default values and can modify them if variable.*\
+        style: solid          *# \[None, solid, dashed, dotted, dashdot\]; The line style. If None, no line is drawn.*\
+        width: 0.07          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+        color: "#000000"          *# \[hex color\]; The color.*\
+        cap: projecting          *# \[butt, round, projecting\]; The shape of a line's ends.*\
+        join: round          *# \[miter, round, bevel\]; The shape of a line's corners.*\
+    background:\
+        color: !fix "#FFFFFF"          *# \[None, hex color\]; The background color of the figure and the plot area. If None, the background is transparent.*\
+    title:          *# \[text style\]; The graph's title.*\
+        size: 1.05          *# \[float > 0\]; The size, × base size.*\
+        weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+        gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+    axis:\
+        title:          *# \[text style\]; The axis titles.*\
+            size: 1.05          *# \[float > 0\]; The size, × base size.*\
+            weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+            gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        tick:          *# \[line style\]; The tick marks.*\
+            direction: !fix out          *# \[in, out, both\]; The tick direction.*\
+            sides: !fix \[left, bottom\]          *# \[left, right, top, bottom, None\]; The sides that have ticks. If None, there are no ticks.*\
+            length: 0.3          *# \[float ≥ 0\]; The tick length, × base size. If 0, the labels are drawn without tick marks.*\
+            algorithm: !fix extended_wilkinson          *# \[extended_wilkinson, wilkinson, heckbert, nelder, r_pretty, matplotlib\]; The published algorithm that places the major ticks on linear axes.*\
+            log_algorithm: !fix breaks_log          *# \[breaks_log, matplotlib\]; The algorithm that places the major ticks on log axes. breaks_log is R's algorithm and places about as many ticks as on a linear axis. matplotlib places them at powers of ten.*\
+            label:          *# \[text style\]; The tick labels.*\
+                x_rotation: 0          *# \[0-90\]; The angle of the x tick labels, in degrees. 0 is horizontal.*\
+                date_order: !fix month_day          *# \[month_day, day_month\]; The order of the day and month in automatic date tick labels. month_day gives Jul 6, and day_month gives 6 Jul.*\
+                max_wrap: !fix 1          *# \[int ≥ 0\]; The number of times an x tick label may wrap onto a new line to fit beside its neighbors. Dates never wrap. If 0, labels never wrap.*\
+            minor: !fix          *# \[line style\]; The minor tick marks.*\
+                count: 0          *# \[int ≥ 0\]; The number of minor ticks between major ticks. If 0, there are none.*\
+                length: 0.15          *# \[float ≥ 0\]; The minor tick length, × base size.*\
+                width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+        max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
+    plot_area:\
+        border:          *# \[line style\]; The plot area's border.*\
+            width: 0.08          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+            sides: \[left, bottom, top, right\]          *# \[left, right, top, bottom, None\]; The sides that have a border. If None, there is no border.*\
+        aspect_ratio: 1.1          *# \[float > 0\]; The plot area's width ÷ its height.*\
+        gap: 0.05          *# \[0-1\]; The gap between the data and the edge of the plot area, × the data's range.*\
+    grid: !fix          *# \[line style\]; The grid lines.*\
+        width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+        color: "#E6E6E6"          *# \[hex color\]; The color.*\
+        x:\
+            show: false          *# \[true, false\]; Whether to draw vertical grid lines at the x ticks.*\
+        y:\
+            show: false          *# \[true, false\]; Whether to draw horizontal grid lines at the y ticks.*\
+    series:          *# How every series looks. The items of each list are given to the series or their groups in order, starting again from the first when they run out.*\
+        opacity: 1          *# \[0-1\]; The opacity of lines, markers and bars.*\
+        colors: !fix okabe_ito          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.*\
+        line:          *# \[line style\]; The series lines.*\
+            width: 0.15          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+            styles: !fix \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\
+        marker:\
+            shapes: !fix \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
+            fills: !fix \[filled, open\]          *# \[filled, open\]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.*\
+            size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
+            edge:          *# \[line style\]; The outline of filled markers.*\
+                width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+        bar:\
+            width: 0.8          *# \[0-1\]; The fraction of the distance between neighboring bar positions that the bars at one position fill.*\
+            gap: 0.1          *# \[0-1\]; The fraction of each side-by-side bar's space left empty between it and the next bar.*\
+            edge:          *# \[line style\]; The bar outlines.*\
+                width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+        value_label:          *# \[text style\]; The value labels.*\
+            gap: 0.25          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        benchmark:          *# \[series style\]; How the benchmark looks. It looks like every other series, using the first item of each list, except for what is set here.*\
+            colors: \["#808080"\]          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.*\
+    legend:\
+        methods: \[auto, direct, key\]          *# \[auto, direct, key, none\]; The methods graphs may use to name their series, tried in order when legend.method is auto. direct writes each name beside its line, and key lists the names in a key.*\
+        label:          *# \[text style\]; The direct labels. Each label has its series' color.*\
+            size: 1.0          *# \[float > 0\]; The size, × base size.*\
+            weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+            gap: 0.2          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        key:\
+            border:          *# \[line style\]; The line around the key.*\
+                style: None          *# \[None, solid, dashed, dotted, dashdot\]; The line style. If None, no line is drawn.*\
+            background: None          *# \[None, hex color\]; The fill color behind the key. If None, there is no fill.*\
+            gap:\
+                inner: 0.5          *# \[float ≥ 0\]; The gap inside the key between its edge and its entries, × base size.*\
+                outer: 0.5          *# \[float ≥ 0\]; The gap between the plot area and the key, × base size.*\
+                row: 0.55          *# \[float > 0\]; The gap between rows of entries, × base size.*\
+            label:          *# \[text style\]; The names in the key.*\
+                size: 1.0          *# \[float > 0\]; The size, × base size.*\
+                alignment: left          *# \[left, center, right\]; The text alignment.*\
+            title:          *# \[text style\]; The key's title.*\
+                size: 1.0          *# \[float > 0\]; The size, × base size.*\
+                weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+                gap: 0.55          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+                alignment: left          *# \[left, center, right\]; The text alignment.*\
+            sample:          *# The short line and marker drawn beside each name in the key, showing how its series looks. Its marker is drawn at series.marker.size.*\
+                length: 2.0          *# \[float > 0\]; The length of the sample's line, × base size.*\
+                gap: 0.7          *# \[float > 0\]; The gap between the sample and its name, × base size.*\
+        direct:\
+            max_relative_distance: 0.8          *# \[0-1\]; The farthest a direct label may be from its series, ÷ its distance to the next nearest series.*\
+        color_bar:\
+            position: right          *# \[right, below\]; Where the color bar goes: to the right of the plot area, or under it.*\
+            width: 0.7          *# \[float > 0\]; The bar's thickness, × base size.*\
+            gap: 0.8          *# \[float > 0\]; The gap between the plot area and the bar, × base size.*\
+            colors: viridis          *# \[viridis, cividis, plasma, inferno, magma, greys, blues, red_blue, hex color, two hex colors\]; The colors for a numeric color column.*\
+            title:          *# \[text style\]; The color bar's title.*\
+                size: 1.05          *# \[float > 0\]; The size, × base size.*\
+                weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+                alignment: left          *# \[left, center, right\]; The text alignment.*\
+                position: above          *# \[above, beside\]; Where the title goes: above the bar, or beside it, reading downward. beside is invalid when position is below.*\
+    layer:\
+        error_bar:          *# \[line style\]; The error bars.*\
+            width: 0.08          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+            cap:\
+                width: 0.25          *# \[float > 0\]; The width of each error bar's caps, × base size.*\
+        reference:          *# The defaults for every reference layer's lines, labels and fill.*\
+            line:          *# \[line style\]; Each line. A line drawn per series takes its series' color.*\
+                style: dashed          *# \[None, solid, dashed, dotted, dashdot\]; The line style. If None, no line is drawn.*\
+                width: 0.08          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+                color: "#808080"          *# \[hex color\]; The color.*\
+            label:          *# \[text style\]; Each line's label. Its color may also be line, which uses the line's color.*\
+                size: 0.8          *# \[float > 0\]; The size, × base size.*\
+                color: line          *# \[line, hex color\]; The color.*\
+                gap: 0.25          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+            fill:          *# The fill between the lines of a band.*\
+                color: "#808080"          *# \[None, series, hex color\]; The fill color. series uses the series' color. If None, there is no fill.*\
+                opacity: 0.15          *# \[0-1\]; The fill opacity.*\
+        note:          *# \[text style\]; The notes.*\
+            size: 0.8          *# \[float > 0\]; The size, × base size.*\
+            color: "#404040"          *# \[hex color\]; The color.*\
+            gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+    watermark:          *# \[text style\]; The watermark drawn on non-standard graphs.*\
+        weight: bold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
+        color: "#CC0000"          *# \[hex color\]; The color.*\
+        text: NON-STANDARD          *# \[text\]; The watermark's text.*\
+        opacity: 0.18          *# \[0-1\]; The watermark's opacity.*\
+        angle: 30          *# \[-90-90\]; The watermark's angle, in degrees counterclockwise.*\
+        span: 0.8          *# \[0-1\]; The fraction of the plot area's width or height that the watermark spans, whichever it reaches first.*\
+    footnote:          *# \[text style\]; The footnotes below the figure.*\
+        size: 0.7          *# \[float > 0\]; The size, × base size.*\
+        color: "#808080"          *# \[hex color\]; The color.*\
+        gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        alignment: right          *# \[left, center, right\]; The text alignment.*

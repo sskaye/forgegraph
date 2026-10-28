@@ -2,7 +2,8 @@
 parameter ends up with, whether it's fixed, and which file set it.
 
 The nearest file in the extends chain that lists a parameter's value decides it, and the
-nearest file that tags it, or a category above it, decides whether it's fixed (see tags.py).
+nearest file that tags it, or a category above it, decides whether it's fixed (see tags.py);
+a style's member that none tags has its general parameter's status.
 In a theme or format, a graph type's name may be used as a heading; parameters under it
 apply to that graph type only and beat the general ones in the same file.
 """
@@ -60,10 +61,11 @@ def _category(heading: str | None, category: str, params: Any) -> list:
 
 
 def tag_status(
-    kind: str, doc: dict[str, Any], path: str, graph_type: str | None = None
+    kind: str, doc: dict[str, Any], path: str, graph_type: str | None = None, root: bool = True
 ) -> bool | None:
     """Whether one file's tags make a parameter fixed: the tag nearest it, under the graph
-    type's heading first; None if the file doesn't tag it."""
+    type's heading first; None if the file doesn't tag it (or tags only parameters itself,
+    when root is False)."""
     tree = doc.get(PARAMETERS)
     if not isinstance(untag(tree), dict):
         return None
@@ -71,7 +73,7 @@ def tag_status(
         under = untag(tree).get(graph_type)
         if isinstance(under, dict) and (s := status_at(under, path)) is not None:
             return s
-    return status_at(tree, path)
+    return status_at(tree, path, root)
 
 
 def chain(kind: str, doc: dict[str, Any], reg: Registry) -> list[dict[str, Any]]:
@@ -159,15 +161,22 @@ def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | Non
         for path, (_, value, origin) in own.items():
             values.setdefault(path, (value, origin))
 
+    members = _members(kind, doc, reg)
+    general = {p.path: p.inherits for p in members if p.inherits is not None}
+
     def status(path: str) -> bool:
-        return next(
-            (s for d in docs if (s := tag_status(kind, d, path, graph_type)) is not None), False
-        )
+        if path not in general:
+            found = (tag_status(kind, d, path, graph_type) for d in docs)
+            return next((s for s in found if s is not None), False)
+        # a style's member: its own tags, not parameters', else its general parameter's status
+        found = (tag_status(kind, d, path, graph_type, root=False) for d in docs)
+        own = next((s for s in found if s is not None), None)
+        return status(general[path]) if own is None else own
 
     out = Values()
     for path, (value, origin) in values.items():
         out[path] = Resolved(value, status(path), origin)
-    for p in _members(kind, doc, reg):
+    for p in members:
         if p.path not in out and p.inherits is not None and p.inherits in out:
             source = out[p.inherits]
             out[p.path] = Resolved(source.value, status(p.path), source.origin, p.inherits)
@@ -179,8 +188,8 @@ def resolve(kind: str, doc: dict[str, Any], reg: Registry, graph_type: str | Non
 
 
 def _copies(kind: str, doc: dict[str, Any], reg: Registry) -> list[Parameter]:
-    """A kind's parameters in a category with a sibling's parameters ("Same parameters as
-    x."): no file need list them."""
+    """A kind's parameters in a category with a sibling's parameters (`[same as x]`): no file
+    need list them."""
     if kind != "graph_type":
         return []
     return [p for p in definitions_for(kind, doc, reg).values() if p.same is not None]

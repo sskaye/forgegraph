@@ -5,7 +5,7 @@ This page mirrors examples/layouts/dashboard/ops/formats/dashboard.yaml, which i
 name: dashboard          *# \[text\]; The name of the format.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
 description: A 16:9 dashboard page, 420 × 236 mm, with 14 pt text.          *# \[text\]; The description of the format.*\
-extends: forgegraph_base/base_format          *# \[None, format\]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.*\
+extends: forgegraph_default/compact_format          *# \[None, format\]; Each parameter not listed is inherited from this format. If None, this file must list every parameter.*\
  \
 parameters:          *# !var/!fix sets whether a GraphSpec or layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     figure:\

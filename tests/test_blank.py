@@ -12,7 +12,7 @@ from pack_helpers import allow
 import forgegraph as fg
 from forgegraph.drawing.figure import WATERMARK
 
-THEME, FORMAT = "forgegraph_base/base_theme", "forgegraph_base/base_format"
+THEME, FORMAT = "forgegraph_default/light_theme", "forgegraph_default/compact_format"
 ACME = Path(__file__).parents[1] / "examples" / "packs" / "acme"
 
 
@@ -36,10 +36,10 @@ def test_a_canvas_is_drawn_in_its_theme_and_saved_watermarked(tmp_path):
 def test_a_canvas_with_provenance_off_records_nothing(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     (tmp_path / "acme" / "formats" / "quiet.yaml").write_text(
-        "name: quiet\nversion: 0\ndescription: test\nextends: forgegraph_base/base_format\n"
+        "name: quiet\nversion: 0\ndescription: test\nextends: forgegraph_default/compact_format\n"
         "parameters:\n    provenance:\n        level: off\n"
     )
-    allow(tmp_path, "forgegraph_base", "./acme")
+    allow(tmp_path, "forgegraph_default", "./acme")
     canvas = fg.blank(THEME, "acme/quiet", tmp_path)
     [path] = canvas.save(tmp_path / "c.png")
     assert fg.load(path) is None
@@ -49,8 +49,8 @@ def test_a_canvas_checks_its_theme_against_the_configs(tmp_path):
     shutil.copytree(ACME, tmp_path / "acme")
     with pytest.raises(fg.SpecError, match="theme: 'acme/acme' is in the pack 'acme'"):
         fg.blank("acme/acme", FORMAT, tmp_path)
-    with pytest.raises(fg.SpecError, match="did you mean 'forgegraph_base/base_theme'"):
-        fg.blank("forgegraph_base/base_thme", FORMAT, tmp_path)
+    with pytest.raises(fg.SpecError, match="did you mean 'forgegraph_default/light_theme'"):
+        fg.blank("forgegraph_default/light_thme", FORMAT, tmp_path)
     allow(tmp_path, "./acme")
     canvas = fg.blank("acme/acme", "acme/slide", tmp_path)
     with canvas.drawing():

@@ -458,8 +458,8 @@ def test_bare_and_quoted_dates_in_a_graphspec_file(tmp_path):
     (tmp_path / "dated.yaml").write_text(
         "name: dated\nversion: 0\ndescription: d\nextends: None\n"
         "parameters: !var\n"
-        "    specifications: {graph_type: xy, theme: forgegraph_base/base_theme, "
-        "format: forgegraph_base/base_format}\n"
+        "    specifications: {graph_type: xy, theme: forgegraph_default/light_theme, "
+        "format: forgegraph_default/compact_format}\n"
         "    text: {title: None}\n"
         "    data: {file: None, preprocessing: None}\n"
         "    axis:\n"

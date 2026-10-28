@@ -1,11 +1,11 @@
 """Parameter definitions, read from the specification files.
 
-Each kind is defined by one file. Graph types and layer types are ForgeGraph's code, each
-defined by its own file (graph_types/xy.yaml, layers/note.yaml); the other kinds by the base
-pack's complete specs (packs/forgegraph_base/: themes/base_theme.yaml,
-formats/base_format.yaml, layouts/layout_example.yaml, schedules/base_schedule.yaml) and its
-reference GraphSpec (graphspecs/graphspec_example.yaml). A layer file has
-only a name, version and description, and its parameters. A GraphSpec's layers and a
+Each kind is defined by one file in specifications/, which only defines it: no spec can
+name or extend it. Graph types and layer types are ForgeGraph's code, each defined by its
+own file (graphtype_xy.yaml, layer_note.yaml); the other kinds by theme.yaml, format.yaml,
+layout_example.yaml and schedule.yaml, and the reference GraphSpec,
+graphspec_example.yaml. A layer file has only a name, version and description, and its
+parameters. A GraphSpec's layers and a
 layout's tabs are collections keyed by name, checked by spec/layers.py and spec/layout.py,
 so they aren't parameters here; a tab's parameters come from the base layout's one tab
 (tab_definitions). Every line of those files, header included, is
@@ -52,17 +52,20 @@ KINDS = {
     "layout": "layouts",
     "schedule": "schedules",
 }
-REFERENCE = {
-    "theme": "base_theme",
-    "format": "base_format",
+REFERENCE = {  # each kind's specification file in SPECIFICATIONS (a graph type's or layer type's
+    # name follows its prefix in PREFIXES), or the graph type or layer type that's the default
+    "theme": "theme",
+    "format": "format",
     "graph_type": "xy",
     "graphspec": "graphspec_example",
     "layer": "reference",
     "layout": "layout_example",
-    "schedule": "base_schedule",
+    "schedule": "schedule",
 }
+PREFIXES = {"graph_type": "graphtype_", "layer": "layer_"}  # of each graph and layer type's file
+SPECIFICATIONS = "specifications"  # the package folder holding the specification files
 CORE_KINDS = ("graph_type", "layer")  # ForgeGraph's code; every other kind comes from packs
-BASE = "forgegraph_base"  # the pack whose specs define every kind but the CORE_KINDS
+DEFAULT = "forgegraph_default"  # ForgeGraph's built-in pack, which may be used with no config
 PARAMETERS = "parameters"  # the tree of a file's parameters, tagged !var or !fix (see tags.py)
 HEADER = ("name", "version", "description", "extends", PARAMETERS)
 LAYER_HEADER = ("name", "version", "description", "parameters")
@@ -107,7 +110,8 @@ STYLES = {
     "aggregation style": "aggregation_style",  # styles.yaml's
 }
 LOOKS = ("text style", "line style")  # in a graph type or layer: the theme's look, not its own
-_SAME = re.compile(r"Same parameters as (?P<name>\w+)\.")  # a category copying a sibling's
+_NAME = re.compile(r"^\w+$")
+_PATH = re.compile(r"^\w+(\.\w+)*$")
 # The members a style's category can't use, so they aren't its parameters (setting one is an
 # error): what it draws has no use for them.
 EXCLUDED = {
@@ -190,6 +194,51 @@ class Range:
         parts = [*self.literals, *(i.describe() for i in self.intervals)]
         parts += [_TYPE_TEXT[t] for t in self.types]
         return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " or " + parts[-1]
+
+
+@dataclass(frozen=True)
+class Notes:
+    """What a category's brackets say about it, the only part of its comment code reads: its
+    style, the sibling whose parameters and defaults it has (same as), and the theme category
+    its look comes from (look from). Its description is for people."""
+
+    style: str | None = None
+    same: str | None = None
+    look: str | None = None
+
+
+def notes(text: str, where: str) -> Notes:
+    """A category's annotations, separated by commas: a style word, `same as <sibling>` and
+    `look from <theme category>`. Anything else is an error."""
+    found: dict[str, str] = {}
+    for item in (s.strip() for s in text.split(",")):
+        name = item.removeprefix("same as ").strip()
+        path = item.removeprefix("look from ").strip()
+        if item in STYLES:
+            key, value, twice = "style", item, "two styles"
+        elif item.startswith("same as ") and _NAME.match(name):
+            key, value, twice = "same", name, "two 'same as'"
+        elif item.startswith("look from ") and _PATH.match(path):
+            key, value, twice = "look", path, "two 'look from'"
+        else:
+            raise ValueError(
+                f"{where}: unknown annotation '{item}'; a category's brackets take a style "
+                f"({', '.join(STYLES)}), same as <sibling> or look from <theme category>"
+            )
+        if key in found:
+            raise ValueError(f"{where}: {twice}")
+        found[key] = value
+    return Notes(**found)
+
+
+def category_notes(node: Any, key: str, where: str) -> Notes | None:
+    """A category's annotations, if its comment has brackets; None if it has none, or if key
+    is a parameter, whose brackets are its range."""
+    value = node[key]
+    if not (hasattr(value, "items") or value is None or _bare(value)):
+        return None
+    m = _COMMENT.match(_comment(node, key) or "")
+    return notes(m["range"], where) if m else None
 
 
 @dataclass(frozen=True)
@@ -414,15 +463,25 @@ def tree_has(tree: Any, path: str) -> bool:
     return tree_get(tree, path, marker) is not marker
 
 
-def base_folder() -> Path:
-    """The base pack's folder, in this package."""
-    return Path(str(files("forgegraph") / "packs" / BASE))
+def specifications_folder() -> Path:
+    """The folder of the specification files, in this package."""
+    return Path(str(files("forgegraph") / SPECIFICATIONS))
+
+
+def default_folder() -> Path:
+    """The default pack's folder, in this package."""
+    return Path(str(files("forgegraph") / "packs" / DEFAULT))
 
 
 def definition_file(kind: str, name: str | None = None) -> Path:
-    """A graph type's or layer type's own file, or the base pack's file defining a kind."""
-    root = Path(str(files("forgegraph"))) if kind in CORE_KINDS else base_folder()
-    return root / KINDS[kind] / f"{name or REFERENCE[kind]}.yaml"
+    """The specification file defining a kind, or a graph type's or layer type's own file."""
+    stem = name or REFERENCE[kind]
+    return specifications_folder() / f"{PREFIXES.get(kind, '')}{stem}.yaml"
+
+
+def core_files(kind: str) -> list[Path]:
+    """Every graph type's or layer type's own file."""
+    return sorted(specifications_folder().glob(f"{PREFIXES[kind]}*.yaml"))
 
 
 def _comment(node: Any, key: str) -> str | None:
@@ -523,12 +582,14 @@ def _walk(
         path = f"{prefix}.{key}" if prefix else str(key)
         comment = _comment(node, key)
         m = _COMMENT.match(comment or "")
-        same = _SAME.search(comment or "") if not m else None
-        if same and not hasattr(value, "items"):
+        found = category_notes(node, key, f"{where.name}: {path}") or Notes()
+        if found.same is not None:
+            if found.same not in node or found.same == key:
+                raise ValueError(f"{where.name}: {path}: same as {found.same}: no sibling category")
             parent = path.rsplit(".", 1)[0] if "." in path else ""
-            out.append(_Same(path, f"{parent}.{same['name']}" if parent else same["name"], status))
-        elif m and m["range"] in STYLES:
-            out.append(_Style(path, m["range"], status))
+            out.append(_Same(path, f"{parent}.{found.same}" if parent else found.same, status))
+        elif found.style is not None:
+            out.append(_Style(path, found.style, status))
             if hasattr(value, "items"):
                 out += _walk(path, value, status, where, in_style=True)
         elif hasattr(value, "items"):
@@ -655,8 +716,8 @@ def _parameters(
 
 @cache
 def _style_definitions(general: str) -> dict[str, Parameter]:
-    """A style's general parameters from styles.yaml (spec/styles.yaml), by path."""
-    path = Path(str(files("forgegraph") / "spec" / "styles.yaml"))
+    """A style's general parameters from styles.yaml (specifications/styles.yaml), by path."""
+    path = specifications_folder() / "styles.yaml"
     data = YAML().load(path.read_text(encoding="utf-8"))
     found = _walk(general, data[general], False, path)
     return {p.path: p for p in found if isinstance(p, Parameter)}
@@ -665,7 +726,11 @@ def _style_definitions(general: str) -> dict[str, Parameter]:
 @cache
 def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Parameter]]:
     """(header, parameters) of a definition file."""
-    path = definition_file(kind, name)
+    return read_file(kind, definition_file(kind, name))
+
+
+def read_file(kind: str, path: Path) -> tuple[dict[str, Parameter], dict[str, Parameter]]:
+    """(header, parameters) of the file at path, defining a kind."""
     data = YAML().load(path.read_text(encoding="utf-8"))
     if kind == "layer":
         header = {
@@ -683,12 +748,21 @@ def _read(kind: str, name: str) -> tuple[dict[str, Parameter], dict[str, Paramet
     tree = data[PARAMETERS]
     root = _tag(tree)
     for category, entries in tree.items():
-        style = _COMMENT.match(_comment(tree, category) or "")
-        if not hasattr(entries, "items") and not (style and style["range"] in STYLES):
+        found = category_notes(tree, category, f"{path.name}: {category}")
+        if not hasattr(entries, "items") and not (found and found.style):
             raise ValueError(f"{path.name}: {PARAMETERS}.{category} must be a category")
     items = _walk("", tree, root, path, skip=COLLECTIONS.get(kind, ()))
     looks = kind not in CORE_KINDS
     return header, {p.path: p for p in _parameters(items, tree, path, looks)}
+
+
+@cache
+def styles_in(kind: str) -> dict[str, str]:
+    """Each of a kind's categories marked with a style, by path: its style word."""
+    path = definition_file(kind)
+    data = YAML().load(path.read_text(encoding="utf-8"))
+    items = _walk("", data[PARAMETERS], False, path)
+    return {i.path: i.word for i in items if isinstance(i, _Style)}
 
 
 @cache
@@ -758,12 +832,11 @@ def categories(*kinds: str) -> frozenset[str]:
 @cache
 def graph_type_files() -> tuple[str, ...]:
     """Graph types with their own definition (extends None)."""
-    folder = Path(str(files("forgegraph") / KINDS["graph_type"]))
     out = []
-    for path in sorted(folder.glob("*.yaml")):
+    for path in core_files("graph_type"):
         data = loader().load(path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and is_none(data.get("extends")):
-            out.append(path.stem)
+            out.append(path.stem.removeprefix(PREFIXES["graph_type"]))
     return tuple(out)
 
 

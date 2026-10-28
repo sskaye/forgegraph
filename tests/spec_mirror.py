@@ -15,6 +15,7 @@ from forgegraph import forgemark
 
 ROOT = Path(__file__).parents[1]
 PACKAGE = ROOT / "src" / "forgegraph"
+SPECIFICATIONS = PACKAGE / "specifications"
 # A pack's spec folders: the kind of spec each holds, as titles name it.
 TITLES = {
     "themes": "Theme",
@@ -23,99 +24,83 @@ TITLES = {
     "layouts": "Layout",
     "schedules": "Schedule",
 }
-BASE_PACK = "forgegraph_base"
+# Each specification file's kind, as titles name it, by its name or the start of its name.
+KINDS = {
+    "theme": "Theme",
+    "format": "Format",
+    "graphtype_": "Graph type",
+    "layer_": "Layer",
+    "graphspec_example": "GraphSpec",
+    "layout_example": "Layout",
+    "schedule": "Schedule",
+    "pack": "Pack",
+    "styles": "Styles",
+}
+# Specification files whose title says what they are, not their name.
+OWN_TITLES = {
+    "provenance": "Provenance specification: the record in every saved file",
+    "config": "Config specification: config.toml and forgegraph.toml",
+}
+
+
+def _name(path: Path) -> str:
+    """The name a spec file gives itself."""
+    m = re.search(r"^name: (\S+)", path.read_text(encoding="utf-8"), re.MULTILINE)
+    return m[1] if m else path.stem
+
+
+def _specifications() -> dict[str, tuple[str, str]]:
+    """A mirror page for every specification file, and every catalog file of ForgeGraph's,
+    in docs/specifications/."""
+    out: dict[str, tuple[str, str]] = {}
+    for path in sorted([*SPECIFICATIONS.glob("*.yaml"), *SPECIFICATIONS.glob("*.toml")]):
+        kind = next((t for start, t in KINDS.items() if path.stem.startswith(start)), "")
+        title = OWN_TITLES.get(path.stem, f"{kind} specification: {_name(path)}")
+        out[f"docs/specifications/{path.stem}"] = (title, path.relative_to(ROOT).as_posix())
+    for path in sorted((SPECIFICATIONS / "catalogs").glob("*.yaml")):
+        shown = _name(path) + (" layer" if path.stem.startswith("layer_") else "")
+        out[f"docs/specifications/catalogs/{path.stem}"] = (
+            f"Catalog specification: {shown}",
+            path.relative_to(ROOT).as_posix(),
+        )
+    return out
+
+
+def _pack(folder: Path, where: str, title: str) -> dict[str, tuple[str, str]]:
+    """A mirror page for every file of a pack in folder, in where: its pack.yaml, its specs
+    and its catalog files; title is how a page names it."""
+    out: dict[str, tuple[str, str]] = {}
+
+    def add(page: str, heading: str, path: Path) -> None:
+        out[f"{where}/{page}"] = (heading, path.relative_to(ROOT).as_posix())
+
+    add("pack", f"{title}: {folder.name}'s pack.yaml", folder / "pack.yaml")
+    for sub, kind in TITLES.items():
+        for path in sorted((folder / sub).glob("*.yaml")):
+            what = kind if kind == "GraphSpec" else kind.lower()
+            add(f"{sub}/{path.stem}", f"{title}: {folder.name}/{path.stem}, a {what}", path)
+    for path in sorted((folder / "catalogs").glob("*/*.yaml")):
+        add(
+            f"catalogs/{path.parent.name}/{path.stem}",
+            f"Catalog: {folder.name}'s {path.stem}",
+            path,
+        )
+    return out
 
 
 def _built_in() -> dict[str, tuple[str, str]]:
-    """A mirror page for every built-in spec file: the graph types, the layer types, every
-    built-in pack's specs and pack.yaml, and every catalog file."""
-    out: dict[str, tuple[str, str]] = {}
-
-    def add(page: str, title: str, path: Path) -> None:
-        out[page] = (title, path.relative_to(ROOT).as_posix())
-
-    for path in sorted((PACKAGE / "graph_types").glob("*.yaml")):
-        add(f"docs/specs/graph_type/{path.stem}", f"Graph type specification: {path.stem}", path)
-    for path in sorted((PACKAGE / "layers").glob("*.yaml")):
-        add(f"docs/specs/layer/{path.stem}", f"Layer specification: {path.stem}", path)
-    for path in sorted((PACKAGE / "catalogs" / "graph_types").glob("*.yaml")):
-        add(
-            f"docs/specs/catalog/graph_type_{path.stem}",
-            f"Catalog specification: {path.stem}",
-            path,
-        )
-    for path in sorted((PACKAGE / "catalogs" / "layers").glob("*.yaml")):
-        title = f"Catalog specification: {path.stem} layer"
-        add(f"docs/specs/catalog/layer_{path.stem}", title, path)
+    """A mirror page for every specification file and every built-in pack's file."""
+    out = _specifications()
     for pack in sorted(p for p in (PACKAGE / "packs").iterdir() if (p / "pack.yaml").is_file()):
-        base = pack.name == BASE_PACK  # the base pack's pages are the specification's own
-        where = "docs/specs" if base else f"docs/specs/pack/{pack.name}"
-        page = f"docs/specs/pack/{pack.name}" if base else f"{where}/pack"
-        add(page, f"Pack specification: {pack.name}'s pack.yaml", pack / "pack.yaml")
-        for folder, kind in TITLES.items():
-            for path in sorted((pack / folder).glob("*.yaml")):
-                page = (
-                    f"{where}/{kind.lower()}/{path.stem}"
-                    if base
-                    else f"{where}/{folder}/{path.stem}"
-                )
-                title = (
-                    f"{kind} specification: {path.stem}"
-                    if base
-                    else f"{kind}: {pack.name}/{path.stem}"
-                )
-                add(page, title, path)
-        for path in sorted((pack / "catalogs").glob("*/*.yaml")):
-            page = (
-                f"docs/specs/catalog/{path.stem}"
-                if base
-                else f"{where}/catalogs/{path.parent.name}/{path.stem}"
-            )
-            title = (
-                f"Catalog specification: {path.stem}"
-                if base
-                else f"Catalog: {pack.name}'s {path.stem}"
-            )
-            add(page, title, path)
+        out.update(_pack(pack, f"docs/packs/{pack.name}", "Built-in pack"))
     return out
 
 
 # Each mirror page, by its path without .md, and the title and source file it shows: every
-# built-in spec file, and these.
+# built-in spec file, the example pack's, and these.
 MIRRORS = {
     **_built_in(),
-    "docs/specs/provenance/provenance": (
-        "Provenance specification: the record in every saved file",
-        "src/forgegraph/spec/provenance.yaml",
-    ),
-    "docs/specs/config/config": (
-        "Config specification: config.toml and forgegraph.toml",
-        "src/forgegraph/packs/config.toml",
-    ),
-    "docs/specs/pack/acme/pack": (
-        "Pack example: acme's pack.yaml",
-        "examples/packs/acme/pack.yaml",
-    ),
-    "docs/specs/pack/acme/themes/acme": (
-        "Pack example: acme/acme, a theme",
-        "examples/packs/acme/themes/acme.yaml",
-    ),
-    "docs/specs/pack/acme/formats/slide": (
-        "Pack example: acme/slide, a format",
-        "examples/packs/acme/formats/slide.yaml",
-    ),
-    "docs/specs/pack/acme/graphspecs/polarization-curve": (
-        "Pack example: acme/polarization-curve, a GraphSpec to extend",
-        "examples/packs/acme/graphspecs/polarization-curve.yaml",
-    ),
-    "docs/specs/pack/acme/layouts/dashboard": (
-        "Pack example: acme/dashboard, a layout to extend",
-        "examples/packs/acme/layouts/dashboard.yaml",
-    ),
-    "docs/specs/pack/acme/schedules/workday": (
-        "Pack example: acme/workday, a schedule to extend",
-        "examples/packs/acme/schedules/workday.yaml",
-    ),
+    **_pack(ROOT / "examples" / "packs" / "acme", "docs/packs/acme", "Pack example"),
     "examples/layouts/paper/cell_performance.layout": (
         "Layout example: cell_performance, a paper figure",
         "examples/layouts/paper/cell_performance.layout.yaml",

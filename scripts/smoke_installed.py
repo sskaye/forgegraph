@@ -71,8 +71,8 @@ def main() -> None:
 
     runs.to_parquet("runs.parquet")
     for name, theme, fmt in (
-        ("base", "forgegraph_base/base_theme", "forgegraph_base/base_format"),
-        ("base_2", "forgegraph_base_2/base_theme", "forgegraph_base_2/compact_format"),
+        ("compact", "forgegraph_default/light_theme", "forgegraph_default/compact_format"),
+        ("wide", "forgegraph_default/light_theme", "forgegraph_default/wide_format"),
     ):
         Path(f"{name}.yaml").write_text(GRAPHSPEC.format(theme=theme, format=fmt))
         report = forgegraph("render", f"{name}.yaml")
@@ -82,12 +82,12 @@ def main() -> None:
 
     listed = forgegraph("catalog")
     packs = {p["name"] for p in listed["packs"]}
-    assert packs == {"forgegraph_base", "forgegraph_base_2"}, packs
+    assert packs == {"forgegraph_default"}, packs
 
     installed = forgegraph("skill", "install", "--dest", str(folder / "skills"))
     assert (folder / "skills" / "forgegraph" / "SKILL.md").is_file(), installed
 
-    canvas = fg.blank("forgegraph_base/base_theme", "forgegraph_base/base_format")
+    canvas = fg.blank("forgegraph_default/light_theme", "forgegraph_default/compact_format")
     with canvas.drawing():
         canvas.axes.plot([1, 2, 3], [2, 1, 3])
     [drawn] = canvas.save("canvas.png")

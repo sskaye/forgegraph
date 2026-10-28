@@ -9,19 +9,25 @@ from pack_helpers import doc
 
 import forgegraph as fg
 from forgegraph.spec.explain import explain
-from forgegraph.spec.parameters import EXCLUDED, definitions
-from forgegraph.spec.registry import Registry, builtin
+from forgegraph.spec.parameters import EXCLUDED, definition_file, definitions
+from forgegraph.spec.registry import Registry, builtin, load_yaml
 from forgegraph.spec.resolve import resolve
 from forgegraph.spec.series import theme_for
-from forgegraph.spec.tags import var
+from forgegraph.spec.tags import fix, untag, var
 from forgegraph.spec.validate import validate
 
-BASE = "forgegraph_base/base_theme"
+
+def plain() -> dict:
+    """The theme specification as a theme to extend, every parameter fixed: it sets no style's
+    members, so each takes its general parameter's value."""
+    spec = load_yaml(definition_file("theme"))
+    return {**spec, "name": "plain", "parameters": fix(untag(spec["parameters"]))}
 
 
 def theme(name: str = "house", **params) -> tuple[dict, Registry]:
-    d = doc(BASE, name, untagged={k.replace("__", "."): v for k, v in params.items()})
+    d = doc("plain", name, untagged={k.replace("__", "."): v for k, v in params.items()})
     reg = builtin().copy()
+    reg.add("theme", plain())
     reg.add("theme", d)
     return d, reg
 
@@ -95,7 +101,13 @@ def test_a_members_status_is_its_own():
 
 
 def test_a_graphspecs_setting_carries_through_to_the_members_that_inherit_it():
-    _, reg = theme("open", text__size=var(), series__line__width=var(), title__size=1.05)
+    _, reg = theme(
+        "open",
+        text__size=var(),
+        series__line__width=var(),
+        series__marker__size=var(),
+        title__size=1.05,
+    )
     look = {"line": {"width": 0.3}, "marker": {"size": 0.6}}
     spec = fg.graphspec("g", "xy", theme="open", settings={"text.size": 1.2, "series": {"y": look}})
     assert validate("graphspec", spec, reg) == []

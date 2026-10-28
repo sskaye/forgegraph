@@ -75,7 +75,7 @@ def test_cadences_that_cant_run_exactly_are_errors(interval, unit, at, message):
 
 def test_a_schedules_cadence_is_checked_with_the_file():
     schedule = doc(
-        "forgegraph_base/base_schedule",
+        "forgegraph_default/schedule",
         variable={"cadence.interval.count": 2, "cadence.interval.unit": "day"},
     )
     assert validate("schedule", schedule, builtin()) == [

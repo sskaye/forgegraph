@@ -26,7 +26,7 @@ from forgegraph.jobs import status as status_file
 
 def schedule_doc(name: str = "lab", **variable: Any) -> dict[str, Any]:
     targets = {"files": ["p.yaml"], "output_folder": "out"}
-    return doc("forgegraph_base/base_schedule", name, variable={"targets": targets, **variable})
+    return doc("forgegraph_default/schedule", name, variable={"targets": targets, **variable})
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_paths_a_parent_schedule_sets_are_found_from_its_folder(project):
     dump(parent, schedules / "lab.yaml")
     work = project / "work"
     work.mkdir()
-    allow(work, "forgegraph_base", "../packs/house")
+    allow(work, "forgegraph_default", "../packs/house")
     child = schedule_doc("weekly")
     child["extends"] = "house/lab"
     del child["parameters"]["targets"]
@@ -82,10 +82,10 @@ def test_a_target_drawn_with_a_nonstandard_pack_says_so(project, monkeypatch):
     main = project / "main.toml"
     main.write_text("packs = []\n")
     monkeypatch.setenv("FORGEGRAPH_CONFIG", str(main))
-    (project / "forgegraph.toml").write_text('packs = ["forgegraph_base"]\n')
+    (project / "forgegraph.toml").write_text('packs = ["forgegraph_default"]\n')
     assert job_run.run(project / "lab.schedule.yaml") == 0
     [target] = status(project).targets
-    assert target.ok and target.nonstandard_packs == ["forgegraph_base"]
+    assert target.ok and target.nonstandard_packs == ["forgegraph_default"]
 
 
 @pytest.mark.slow
@@ -224,7 +224,7 @@ def test_a_layout_target_takes_its_oldest_tiles_time(project):
     old = datetime(2026, 1, 2, 3, 4).timestamp()
     os.utime(project / "q.parquet", (old, old))
     tab = {"grid": {"areas": [["p"], ["q"]]}, "tiles": {"p": "p.yaml", "q": "q.yaml"}}
-    layout = doc("forgegraph_base/layout_example", "both", variable={"tabs": {"T": tab}})
+    layout = doc("forgegraph_default/layout", "both", variable={"tabs": {"T": tab}})
     dump(layout, project / "both.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["both.layout.yaml"], "output_folder": "out"}),
@@ -243,9 +243,9 @@ def test_a_layout_targets_tiles_are_read_as_its_render_reads_them(project):
     tiles.mkdir()
     shutil.copy(project / "p.yaml", tiles / "p.yaml")
     shutil.copy(project / "p.parquet", tiles / "p.parquet")
-    (tiles / "forgegraph.toml").write_text("packs = ['forgegraph_base', 'not_installed']\n")
+    (tiles / "forgegraph.toml").write_text("packs = ['forgegraph_default', 'not_installed']\n")
     tab = {"grid": {"areas": [["p"]]}, "tiles": {"p": "tiles/p.yaml"}}
-    layout = doc("forgegraph_base/layout_example", "tiled", variable={"tabs": {"T": tab}})
+    layout = doc("forgegraph_default/layout", "tiled", variable={"tabs": {"T": tab}})
     dump(layout, project / "tiled.layout.yaml")
     dump(
         schedule_doc(targets={"files": ["tiled.layout.yaml"], "output_folder": "out"}),

@@ -5,7 +5,7 @@ This page mirrors examples/layouts/dashboard/lab_throughput.layout.yaml, which i
 name: lab_throughput\
 version: 0\
 description: Daily operations view of lab throughput.\
-extends: forgegraph_base/layout_example\
+extends: forgegraph_default/layout\
  \
 parameters:          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     specifications:\

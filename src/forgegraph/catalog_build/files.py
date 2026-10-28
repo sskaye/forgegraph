@@ -2,7 +2,8 @@
 
 A catalog file shows the file of that name: a theme's or format's is in its pack's
 catalogs/themes/ or catalogs/formats/, named like the spec it shows (pack/name); a graph
-type's or layer type's in ForgeGraph's catalogs/graph_types/ or catalogs/layers/. It names
+type's or layer type's in ForgeGraph's specifications/catalogs/, named like its definition
+file (graphtype_xy.yaml, layer_note.yaml). It names
 the GraphSpec every card changes (`baseline`) and the numbered baselines (`baselines`: each
 the baseline with one or more changes, non-standard, or footnoted, drawn with a footnote),
 generic scenarios a card can be drawn on. A layer type's catalog also gives the GraphSpec
@@ -19,7 +20,6 @@ baseline's drawing is an error, fixed by adding a baseline that shows it.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -30,12 +30,14 @@ from forgegraph.packs import Pack
 from forgegraph.spec.common import ProblemsError
 from forgegraph.spec.parameters import (
     KINDS,
+    PREFIXES,
     Parameter,
     check_parameter,
     definitions,
     flatten,
     is_none,
     series_definitions,
+    specifications_folder,
 )
 from forgegraph.spec.registry import Registry, load_yaml
 from forgegraph.spec.resolve import Values, resolve
@@ -65,19 +67,21 @@ class Catalog:
 
 
 def find(packs: list[Pack]) -> dict[str, dict[str, tuple[dict[str, Any], Path]]]:
-    """Every catalog file, by kind and name: ForgeGraph's for graph types and layer types,
-    and each pack's for its themes and formats, named pack/name."""
+    """Every catalog file, by kind and name: ForgeGraph's for graph types and layer types, in
+    specifications/catalogs/, and each pack's for its themes and formats, named pack/name."""
     found: dict[str, dict[str, tuple[dict[str, Any], Path]]] = {k: {} for k in FOLDERS}
-    roots: list[tuple[Path, str]] = [(Path(str(files("forgegraph") / "catalogs")), "")]
-    roots += [(p.folder / "catalogs", f"{p.name}/") for p in packs]
-    for base, prefix in roots:
-        for kind, folder in FOLDERS.items():
-            if (kind in ("graph_type", "layer")) == bool(prefix):
-                continue  # graph types and layer types are ForgeGraph's; the rest packs'
-            for path in sorted((base / folder).glob("*.yaml")):
-                doc = load_yaml(path)
-                if isinstance(doc, dict) and "name" in doc:
-                    found[kind][f"{prefix}{doc['name']}"] = (doc, path)
+    own = specifications_folder() / "catalogs"
+    paths = [(k, p, "") for k in ("graph_type", "layer") for p in own.glob(f"{PREFIXES[k]}*.yaml")]
+    for pack in packs:
+        for kind in ("theme", "format"):
+            paths += [
+                (kind, p, f"{pack.name}/")
+                for p in (pack.folder / "catalogs" / FOLDERS[kind]).glob("*.yaml")
+            ]
+    for kind, path, prefix in sorted(paths, key=lambda found: (found[2], str(found[1]))):
+        doc = load_yaml(path)
+        if isinstance(doc, dict) and "name" in doc:
+            found[kind][f"{prefix}{doc['name']}"] = (doc, path)
     return found
 
 

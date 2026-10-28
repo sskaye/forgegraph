@@ -6,7 +6,7 @@ markers around the text each one is on (MARKER) and one comment block at its end
 markup out, and rewrite() writes a rebuilt document and puts its comments back with the tool.
 
     uv run python scripts/forgemark.py lint review/phase-02/recreations.html
-    uv run python scripts/forgemark.py reattach docs/specs/theme/base_theme.md --all
+    uv run python scripts/forgemark.py reattach docs/specifications/theme.md --all
 
 The tool is one JavaScript file from Forgemark's GitHub release (MIT licence), needing only
 Node 18+. It's downloaded once into the user's cache folder, checked against the SHA-256

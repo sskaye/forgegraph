@@ -21,8 +21,9 @@ from forgegraph.catalog_build.page import figures
 
 ROOT = Path(__file__).parents[1]
 BASELINES = "tests/baselines"
-CATALOG = "catalog/forgegraph_base.html"
-EARLIER_CATALOG = "catalog/catalog.html"  # forgegraph_base's page before phase 6
+CATALOG = "catalog/forgegraph_default.html"
+# The ForgeGraph catalog page's earlier names: forgegraph_base's, before 0.4, and before phase 6
+EARLIER_CATALOGS = ("catalog/forgegraph_base.html", "catalog/catalog.html")
 
 
 def _git(*args: str) -> bytes:
@@ -44,12 +45,12 @@ def _pages(ref: str | None) -> set[str]:
         return {f"catalog/{p.name}" for p in (ROOT / "catalog").glob("*.html")}
     names = _git("ls-tree", "--name-only", f"{ref}:catalog").decode().split()
     pages = {f"catalog/{n}" for n in names if n.endswith(".html")}
-    return {CATALOG if p == EARLIER_CATALOG else p for p in pages}
+    return {CATALOG if p in EARLIER_CATALOGS else p for p in pages}
 
 
 def _catalog(ref: str | None, page: str) -> dict[str, bytes]:
     text = None
-    for name in (page, EARLIER_CATALOG) if page == CATALOG else (page,):
+    for name in (page, *EARLIER_CATALOGS) if page == CATALOG else (page,):
         try:
             text = (
                 (ROOT / name).read_text(encoding="utf-8")

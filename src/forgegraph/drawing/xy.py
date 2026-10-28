@@ -1,4 +1,4 @@
-"""The xy graph type (graph_types/xy.yaml): y against x, one series per group of rows.
+"""The xy graph type (graphtype_xy.yaml): y against x, one series per group of rows.
 
 `draw()` draws into an Axes it's given, so a layout can place several graphs on one figure;
 `place()` and `label()` finish what needs the figure's final size (drawing.layout.finish runs

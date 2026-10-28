@@ -28,6 +28,7 @@ from forgegraph.drawing.key import KEY, keys
 from forgegraph.drawing.style import LINE_STYLES, Style, isolated
 from forgegraph.drawing.text import footprint
 from forgegraph.drawing.ticks import LogTicks, NiceTicks, breaks_log
+from forgegraph.fonts import WEIGHTS
 from forgegraph.spec.parameters import NONE
 
 # --- the figure follows the theme and format ---------------------------------------------
@@ -40,7 +41,7 @@ def test_sizes_come_from_the_theme_and_base_font():
     t = g.style.theme
     assert tick.get_fontsize() == pytest.approx(t["axis.tick.label.size"] * 10)
     assert ax.xaxis.label.get_fontsize() == pytest.approx(t["axis.title.size"] * 10)
-    assert ax.xaxis.label.get_fontweight() in (t["axis.title.weight"], "normal", 400)
+    assert ax.xaxis.label.get_fontweight() == WEIGHTS[t["axis.title.weight"]]
     assert ax.get_lines()[0].get_linewidth() == pytest.approx(t["series.line.width"] * 10)
     assert ax.spines["left"].get_linewidth() == pytest.approx(t["plot_area.border.width"] * 10)
 
@@ -129,7 +130,7 @@ def test_interior_labels_name_each_cell_in_its_color():
         "Cell A": "#0072B2",
         "Cell B": "#E69F00",
         "Cell C": "#009E73",
-        "Benchmark": "#0072B2",  # each list's first item: the palette's first color
+        "Benchmark": "#808080",  # the theme's series.benchmark.colors
     }
 
 
@@ -138,7 +139,7 @@ def test_one_series_is_named_unless_the_y_title_names_it():
     assert fg.xy(frame, x="t", y="v").labelling == "none"  # the y-axis title is "v"
     assert fg.xy(frame, x="t", y="v", parameters={"axis.y.title": "Volts"}).labelling == "direct"
     none = {"legend.method": "none"}
-    message = "legend.method: theme 'forgegraph_base/base_theme' allows only"
+    message = "legend.method: theme 'forgegraph_default/light_theme' allows only"
     with pytest.raises(fg.SpecError, match=re.escape(message)):
         fg.xy(frame, x="t", y="v", parameters=none)
 
@@ -292,7 +293,8 @@ def test_numeric_color_by_draws_a_color_bar():
             "benchmark.data_column": NONE,
             "benchmark.value": NONE,
             "legend.color_bar.title.text": "Temperature (°C)",
-        }
+        },
+        theme={"legend.color_bar.title.alignment": "center"},
     )
     [bar] = g.axes.child_axes
     [title] = bar.texts  # legend.color_bar.position right, title.position above
@@ -471,12 +473,11 @@ def test_provenance_levels(tmp_path):
 
 @pytest.mark.slow
 def test_the_provenance_spec_lists_what_each_level_records(tmp_path):
-    """src/forgegraph/spec/provenance.yaml names every entry of the record, by level."""
+    """src/forgegraph/specifications/provenance.yaml names every entry of the record, by level."""
     from ruamel.yaml import YAML
 
-    spec = YAML(typ="safe").load(
-        (Path(fg.__file__).parent / "spec" / "provenance.yaml").read_text(encoding="utf-8")
-    )
+    path = Path(fg.__file__).parent / "specifications" / "provenance.yaml"
+    spec = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
     minimal, full = spec["minimal"], spec["full"]
     [path] = render(format={"provenance.level": "minimal"}).save(tmp_path / "m.png")
     record = fg.load(path)
@@ -484,7 +485,7 @@ def test_the_provenance_spec_lists_what_each_level_records(tmp_path):
     assert record is not None and set(record) | {"nonstandard_packs"} == set(minimal)
     assert set(record["specs"]) == {"graph_type", "theme", "format"}
     assert record["specs"]["theme"] == {
-        "name": "forgegraph_base/base_theme",
+        "name": "forgegraph_default/light_theme",
         "version": 0,
         "pack_version": fg.__version__,
     }
@@ -724,7 +725,7 @@ def test_inherited_data_file_is_found_from_the_file_that_sets_it(tmp_path):
     """A GraphSpec extending another finds a relative data.file from the other's folder."""
     house = write_pack(tmp_path / "packs")
     graphspec_file(house / "graphspecs", "base")
-    allow(tmp_path, "forgegraph_base", "./packs/house")
+    allow(tmp_path, "forgegraph_default", "./packs/house")
     (tmp_path / "elsewhere").mkdir()
     child = tmp_path / "elsewhere" / "child.yaml"
     child.write_text(
@@ -968,7 +969,7 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     g = draw(
         fanned,
         Change("axis.max_extension", 0.4),
-        spec="forgegraph_base/graphspec_example",
+        spec="forgegraph_default/graphspec_example",
     )
     assert g.labelling == "direct"
     ticks = [t for t in g.axes.get_xticks() if t <= g.axes.get_xlim()[1]]

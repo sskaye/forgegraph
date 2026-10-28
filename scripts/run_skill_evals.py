@@ -257,6 +257,12 @@ def _matches(actual: Any, expected: Any) -> bool:
     if isinstance(expected, dict) and "matches" in expected:
         items = actual if isinstance(actual, list) else [actual]
         return any(re.search(expected["matches"], str(i), re.IGNORECASE) for i in items)
+    if isinstance(expected, dict) and "palette" in expected:  # the name, or its colors
+        from forgegraph.drawing.style import PALETTES
+
+        colors = {c.upper() for c in PALETTES[expected["palette"]]}
+        listed = isinstance(actual, list) and {str(c).upper() for c in actual} == colors
+        return actual == expected["palette"] or listed
     if isinstance(expected, dict) and "lt" in expected:
         return isinstance(actual, int | float) and actual < expected["lt"]
     return norm(actual) == norm(expected)
@@ -557,6 +563,8 @@ def _spec_checks(expect: dict[str, Any], project: Project) -> list[Check]:
                     if kind == "series":  # every series' value
                         each = [_series_value(values, n, path) for n in found]
                         ok = bool(each) and all(_matches(v, want) for v in each)
+                        if path == "color" and set(each) == {"series"}:  # a series per group
+                            ok = ok and len(each) > 1
                         evidence = f"{final.name}: {dict(zip(found, each, strict=True))!r}"
                         checks.append(Check(f"{key} = {want}", ok, evidence))
                         continue

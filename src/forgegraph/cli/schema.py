@@ -81,7 +81,6 @@ def schema(
                 "parameter": p.path,
                 "default": p.default,
                 "range": p.range.describe(),
-                "fixed": p.fixed,
                 "required": p.required,
                 "description": p.description,
             }
@@ -94,7 +93,6 @@ def schema(
                     "parameter": p.path,
                     "default": p.default,
                     "range": p.range.describe(),
-                    "fixed": False,
                     "required": False,
                     "description": f"{p.description} The format's value unless the layout sets it.",
                 }
@@ -108,7 +106,6 @@ def schema(
                     else "tabs.<tab>.tiles.<tile>",
                     "default": p.default,
                     "range": p.range.describe(),
-                    "fixed": False,
                     "required": p is tile or p.path == "grid.areas",
                     "description": p.description,
                 }
@@ -122,10 +119,7 @@ def schema(
             typer.echo(k)
             for p in params:
                 value = p.get("value", p.get("default"))
-                fixed = f" Fixed: set by the {k.replace('_', ' ')}." if p.get("fixed") else ""
-                typer.echo(
-                    f"  {p['parameter']} = {value!r}: {p['range']}. {p['description']}{fixed}"
-                )
+                typer.echo(f"  {p['parameter']} = {value!r}: {p['range']}. {p['description']}")
 
     report(out, as_json, text, default=str)
 
@@ -142,7 +136,7 @@ def _pack_fields(kind: str) -> list[dict[str, Any]]:
     for line in source.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^(\w+)\s*[:=]\s*(.*?)\s{2,}# \[(.*?)\]; (.*)$", line)
         if m:
-            rows.append({"parameter": m[1], "default": m[2], "range": m[3], "fixed": False,
+            rows.append({"parameter": m[1], "default": m[2], "range": m[3],
                          "required": True, "description": m[4]})  # fmt: skip
     return rows
 

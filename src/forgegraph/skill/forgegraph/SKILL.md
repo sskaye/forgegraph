@@ -22,9 +22,9 @@ The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec'
 - `forgegraph catalog`: lists the packs available, with each of their graph types, layer types, themes, formats, layouts, schedules, GraphSpecs, and reference notes.
 - `forgegraph pack-notes`: prints the reference notes from the available packs, labelled by pack.
 - `forgegraph schema graphspec --graph-type <type> --theme <theme> --format <format>`: lists every parameter a GraphSpec can set (its own, and the variable ones of the graph type, theme and format), with default, allowed values and description.
-- `forgegraph schema theme`, `forgegraph schema format`, `forgegraph schema layer`, `forgegraph schema graph_type`, `forgegraph schema layout`, `forgegraph schema schedule`, `forgegraph schema pack`, `forgegraph schema config`: lists every parameter of the schema with their type, <!-- fmc:1 -->description, default value, and whether it is fixed or can be changed by the GraphSpec.<!-- /fmc:1 -->
+- `forgegraph schema theme`, `forgegraph schema format`, `forgegraph schema layer`, `forgegraph schema graph_type`, `forgegraph schema layout`, `forgegraph schema schedule`, `forgegraph schema pack`, `forgegraph schema config`: lists every parameter of the schema with their type, description, and default value. Does not show whether a parameter is fixed or variable.
 - `forgegraph render <graphspec or layout> --json`: saves the graph or layout files and lists lint issues. A layout file ends in `.layout.yaml`.
-- `forgegraph explain <graphspec or layout>`: <!-- fmc:2 -->lists every value the graph or layout is drawn with, and which file set it.<!-- /fmc:2 -->
+- `forgegraph explain <graphspec or layout>`: lists every value the graph or layout is drawn with, whether it's fixed or variable, and which file set it.
 - `forgegraph job run <schedule>`: renders the GraphSpecs and layouts a schedule file names.
 
 Every command takes `--help`.
@@ -48,33 +48,3 @@ Every command takes `--help`.
 - [examples/figure.layout.yaml](examples/figure.layout.yaml): a layout of xy.yaml above bars.yaml.
 - [examples/figure.schedule.yaml](examples/figure.schedule.yaml): figure.layout.yaml rendered every weekday at 06:00.
 
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "description, default value, and whether it is fixed or can be changed by the GraphSpec."
-  context_before: ", forgegraph schema config: lists every parameter of the schema with their type,"
-  context_after: "forgegraph render <graphspec or layout> --json: saves the graph or layout files"
-  author: Claude
-  timestamp: 2026-10-28T02:16:34Z
-  resolved: false
-  body: |
-    Problem: these commands show each kind's specification, which fixes nothing (except one graph type parameter), so `forgegraph schema theme` lists every theme parameter as variable. This sentence says it shows whether each is fixed, and in the evals it sent Haiku to this command to find what light_theme locks.
-    
-    Proposed change: as suggested. If agents still look here for a theme's statuses, the next step would be a `--theme NAME` option on `forgegraph schema theme` showing NAME's values and statuses; I'm not proposing it now.
-  suggested_edit:
-    from: "description, default value, and whether it is fixed or can be changed by the GraphSpec."
-    to: "description and default value, as the kind's specification defines them. A theme's or format's fixed parameters are the ones `forgegraph schema graphspec` doesn't list."
-- id: 2
-  anchor_text: "lists every value the graph or layout is drawn with, and which file set it."
-  context_before: "A layout file ends in .layout.yaml. forgegraph explain <graphspec or layout>:"
-  context_after: "forgegraph job run <schedule>: renders the GraphSpecs and layouts a schedule fil"
-  author: Claude
-  timestamp: 2026-10-28T02:16:35Z
-  resolved: false
-  body: |
-    Problem: explain also shows whether each value is fixed, which answers what a GraphSpec's theme and format lock, but the skill doesn't say so.
-    
-    Proposed change: as suggested, matching the command's own help.
-  suggested_edit:
-    from: "lists every value the graph or layout is drawn with, and which file set it."
-    to: "lists every value the graph or layout is drawn with, whether it's fixed, and which file set it."
--->

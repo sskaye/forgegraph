@@ -4,32 +4,26 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ## 0.4.0 (2026-10-27)
 
-### Added
+### New Features
 
-- **Series by name.** A GraphSpec lists the series it draws under `series`, each from its own column and with its own color, line, markers, bars, value labels and aggregation.
-- **Reference lines and bands.** The `reference` layer draws a line at a value or at a statistic of the data, such as its mean or a percentile, or a shaded band between two lines.
-- **More statistics.** A series, a reference line and error bars can show the mean, median, a percentile, the standard deviation, the standard error or a confidence interval.
-- **Stepped and smooth lines.** `line.interpolate` draws a series' line in steps or as a smooth curve.
-- **Dates as values.** Axis limits, reference lines and the benchmark take dates, such as `2025-08-25`.
+- **Multiple Series.** GraphSpecs can now have independent Series, enabling full control over the marker, line, and bar properties and not just variation by a palette.
+- **Reference bands.** The `reference_line` layer is now `reference` and has been augmented to also draw lines per element of the series and bands. It also can now compute a value plus offset (e.g. a line at mean + 3 s.d.). This enables drawing of error bands, confidence intervals of model fits, and other more complex references.
+- **More aggregations.** Series, reference lines, and error bars can show the mean, median, percentile, standard deviation, standard error or confidence intervals.
+- **Stepped and smooth lines.** `line.interpolate` can now be steps or a smooth curve in addition to a direct line.
+- **Dates as values.** Dates, such as `2025-08-25`, can now be used directly in all relevant parameters.
 
-### Changed
+### Changes
 
-- **One built-in pack, `forgegraph_default`,** in place of `forgegraph_base` and `forgegraph_base_2`. Its theme is `light_theme`, and its formats are `compact_format` and `wide_format`; together they draw 0.3's look. A config that lists `forgegraph_base` or `forgegraph_base_2` is an error: list `forgegraph_default` instead.
-- **The default theme fixes more.** `light_theme` fixes the font, the spacing around text, the palettes and the grid, so a GraphSpec can't change them; another theme can. A series can still set its own color, line style, marker and line width.
-- **Themes, formats and GraphSpecs are written differently.** Each has one `parameters` tree, and `!fix` or `!var` tags say what a GraphSpec may change, in place of the `fixed_parameters` and `variable_parameters` blocks. A theme sets the look of all text and all lines once, under `text` and `line`, and each part, such as the title or the tick labels, uses it unless it sets its own.
-- **`forgegraph schema theme`** no longer says which parameters are fixed. `forgegraph schema graphspec` lists what a GraphSpec can set, and `forgegraph explain` shows what's fixed.
+- **One built-in pack, `forgegraph_default`.** `forgegraph_base` is renamed `forgegraph_default` and its specifications have been renamed. `forgegraph_base_2` has been removed. Please update your config and any GraphSpecs or packs referencing the old packs. The default theme has been tuned slightly to fix more parameters, reducing complexity of graph design.
+- **Themes, formats and GraphSpecs are written differently.** Each has one `parameters` tree, and `!fix` and `!var` tags are used to set what a GraphSpec can change, in place of the `fixed_parameters` and `variable_parameters` blocks. A theme sets the parameters of all text and all lines once, under `text` and `line`, and each category that uses them, such as the title or the tick labels, only needs to modify the parameters that are different from that default.
+- **Simplified Specifications.** Numerous simplifications to the way specifications are written, making them easier to read and modify.
 
-### Removed
-
-- `forgegraph_base_2`, with no replacement.
-- The `reference_line` layer, replaced by `reference`, and the `encoding`, `mark` and `axis.*.data.aggregation` settings, replaced by each series' own settings.
-
-### Fixed
+### Bug Fixes
 
 - Dates on the y axis draw as they do on x: date ticks, reference lines at a date column's mean or median, and error bars in days.
 - The lint no longer counts reference lines and error bars as data points outside the axis limits, or as values of 0 or below on a log axis.
 - Values that differ from an axis limit only by rounding are no longer reported as outside it.
-- A light theme's powers of ten on a log axis no longer give a `font-fallback` lint issue.
+- In a theme with a light font weight, powers of ten on a log axis no longer give a `font-fallback` lint issue.
 - `null` and `~` are accepted everywhere a spec can say None.
 
 ## 0.3.0 (2026-10-25)

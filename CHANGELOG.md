@@ -1,10 +1,8 @@
 # Changelog
 
-ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
+ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
 ## 0.4.0 (2026-10-27)
-
-Images that changed: the [visual changelog](docs/visual-changelog/0.4.0.html).
 
 ### Added
 
@@ -35,8 +33,6 @@ Images that changed: the [visual changelog](docs/visual-changelog/0.4.0.html).
 - `null` and `~` are accepted everywhere a spec can say None.
 
 ## 0.3.0 (2026-10-25)
-
-Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).
 
 ### Added
 
@@ -79,8 +75,6 @@ Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).
 - A config naming a pack that can't be found, or another pack problem, stops `catalog`, `pack-notes`, `schema` and `explain` with its problems listed (`error:` lines, exit 1), not a traceback; with `--json`, one problem each, not one joined line.
 
 ## 0.2.0 (2026-10-24)
-
-Images that changed: the [visual changelog](docs/visual-changelog/0.2.0.html).
 
 ### Changed
 

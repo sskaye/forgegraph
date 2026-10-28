@@ -39,6 +39,6 @@ Open a GitHub issue describing the graph you need, ideally with an example image
 
 1. Set the new version in pyproject.toml and in the built-in pack's pack.yaml, and for a new minor version, its `requires` (`">=0.4, <0.5"` for 0.4).
 2. Rebuild the catalog and mirrors (above).
-3. Write the visual changelog, `uv run python scripts/visual_changelog.py v<last version>`, and the CHANGELOG entry, linking it.
+3. Write the CHANGELOG entry: the key features a user would want to know were added, changed or removed, and the bugs fixed.
 4. Merge with CI green, and tag the merge commit `v<version>`.
 5. Run the Publish workflow.

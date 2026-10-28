@@ -3,14 +3,14 @@
 This page mirrors src/forgegraph/packs/forgegraph_default/pack.yaml, which is the specification. A test fails if they ever differ.
 
 name: forgegraph_default          *# \[text\]; The pack's name, either a folder where the pack is stored or a pip pack's entry point.*\
-version: 0.3.0          *# \[text\]; The pack's release version.*\
+version: 0.4.0          *# \[text\]; The pack's release version.*\
 description: ForgeGraph's built-in default pack. So it’s always possible to create a graph.          *# \[text\]; One line, describing what the pack is.*\
 issues: https://github.com/sskaye/forgegraph/issues          *# \[text\]; Where to file feature requests and bug reports about the pack.*\
-requires: <!-- fmc:1 -->">=0.3, <0.4"<!-- /fmc:1 -->          *# \[None, version specifier\]; The ForgeGraph version required for the pack. pip format, e.g. ">=0.6, <1". If None, it works with any version.*
+requires: <!-- fmc:1 -->">=0.4, <0.5"<!-- /fmc:1 -->          *# \[None, version specifier\]; The ForgeGraph version required for the pack. pip format, e.g. ">=0.6, <1". If None, it works with any version.*
 
 <!-- forgemark-comments
 - id: 1
-  anchor_text: "\">=0.3, <0.4\""
+  anchor_text: "\">=0.4, <0.5\""
   context_before: "xt\\]; Where to file feature requests and bug reports about the pack.*\\ requires:"
   context_after: "# \\[None, version specifier\\]; The ForgeGraph version required for the pack."
   author: "Steven Kaye"
@@ -22,4 +22,8 @@ requires: <!-- fmc:1 -->">=0.3, <0.4"<!-- /fmc:1 -->          *# \[Non
       timestamp: 2026-10-27T21:14:27Z
       body: |
         Added. A test requires a built-in pack to need ForgeGraph's own minor version and to carry ForgeGraph's version, so until 0.4.0 is released this reads ">=0.3, <0.4" and the version is 0.3.0 (not 0.1.0). The release's version bump makes that test fail until this is changed to ">=0.4, <0.5".
+    - author: Claude
+      timestamp: 2026-10-28T03:30:17Z
+      body: |
+        With the 0.4.0 release, this now reads ">=0.4, <0.5" and the pack version is 0.4.0.
 -->

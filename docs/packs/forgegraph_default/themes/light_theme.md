@@ -4,10 +4,10 @@ This page mirrors src/forgegraph/packs/forgegraph_default/themes/light_theme.yam
 
 name: light_theme          *# \[text\]; The name of the theme.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
-description: ForgeGraph's default theme, with black text and lines on white, semibold titles and the Okabe-Ito colors.          *# \[text\]; The description of the theme.*\
+description: ForgeGraph's default theme, with black text and lines on a white background and the Okabe-Ito colors.          *# \[text\]; The description of the theme.*\
 extends: None          *# \[None, theme\]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.*\
  \
-<!-- fmc:1 -->parameters<!-- /fmc:1 -->: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
+parameters: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
     text:          *# General text parameters. Each \[text style\] has these as its default values and can modify them if variable.*\
         font: !fix Roboto          *# \[text\]; The typeface.*\
         size: 0.9          *# \[float > 0\]; The size, × base size.*\
@@ -63,9 +63,9 @@ extends: None          *# \[None, theme\]; Each parameter not listed i
     series:          *# How every series looks. The items of each list are given to the series or their groups in order, starting again from the first when they run out.*\
         opacity: 1          *# \[0-1\]; The opacity of lines, markers and bars.*\
         colors: !fix okabe_ito          *# \[okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors\]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.*\
-        line: !fix          *# \[line style\]; The series lines.*\
+        line:          *# \[line style\]; The series lines.*\
             width: 0.15          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
-            styles: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\
+            styles: !fix \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\
         marker:\
             shapes: !fix \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
             fills: !fix \[filled, open\]          *# \[filled, open\]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.*\
@@ -151,19 +151,3 @@ extends: None          *# \[None, theme\]; Each parameter not listed i
         color: "#808080"          *# \[hex color\]; The color.*\
         gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
         alignment: right          *# \[left, center, right\]; The text alignment.*
-
-<!-- forgemark-comments
-- id: 1
-  anchor_text: parameters
-  context_before: "If None, this file must list every parameter.*\\ \\"
-  context_after: ": !var # !var/!fix sets whether a GraphSpec may change a property."
-  author: "Steven Kaye"
-  timestamp: "2026-10-27T19:22:53.389Z"
-  resolved: false
-  body: "A lot of parameters are general styles. Please add in what’s required to make this match the current base_theme."
-  replies:
-    - author: Claude
-      timestamp: 2026-10-27T21:14:27Z
-      body: |
-        Done. light_theme sets the 0.3 look through the general styles: semibold titles at 1.05, grey grid lines, the grey benchmark, dashed grey reference lines with their labels in the line's color, smaller grey notes, the bold red watermark, and the small grey footnote at the right. Key labels and the key's and color bar's titles are left-aligned, as they were in 0.3. Bars keep the new series.bar.width and series.bar.gap, since the 0.3 values were in other units.
--->

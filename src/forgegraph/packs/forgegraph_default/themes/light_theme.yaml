@@ -1,6 +1,6 @@
 name: light_theme          # [text]; The name of the theme.
 version: 0          # [int ≥ 0]; The version number of the specification.
-description: ForgeGraph's default theme, with black text and lines on white, semibold titles and the Okabe-Ito colors.          # [text]; The description of the theme.
+description: ForgeGraph's default theme, with black text and lines on a white background and the Okabe-Ito colors.          # [text]; The description of the theme.
 extends: None          # [None, theme]; Each parameter not listed is inherited from this theme. If None, this file must list every parameter.
 
 parameters: !var          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
@@ -59,9 +59,9 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
     series:          # How every series looks. The items of each list are given to the series or their groups in order, starting again from the first when they run out.
         opacity: 1          # [0-1]; The opacity of lines, markers and bars.
         colors: !fix okabe_ito          # [okabe_ito, tol_bright, tol_muted, tableau_10, color_blind, hex colors]; The colors given to the series, or to the values of a series' color column: a named palette or a list of colors.
-        line: !fix          # [line style]; The series lines.
+        line:          # [line style]; The series lines.
             width: 0.15          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
-            styles: [solid, dashed, dotted, dashdot]          # [solid, dashed, dotted, dashdot]; The line styles given to the series, or to the values of a series' line.style column.
+            styles: !fix [solid, dashed, dotted, dashdot]          # [solid, dashed, dotted, dashdot]; The line styles given to the series, or to the values of a series' line.style column.
         marker:
             shapes: !fix [circle, square, triangle_up, diamond, triangle_down, cross]          # [circle, square, triangle_up, triangle_down, diamond, cross, plus]; The marker shapes given to the series, or to the values of a series' marker.shape column.
             fills: !fix [filled, open]          # [filled, open]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.

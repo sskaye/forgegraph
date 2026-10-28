@@ -4,7 +4,7 @@ This page mirrors src/forgegraph/packs/forgegraph_default/layouts/layout.yaml, w
 
 name: layout          *# \[text\]; The name of the layout.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
-description: One tab, in the wide format, for layouts to extend.          *# \[text\]; The description of the layout.*\
+description: The default layout for the default pack.          *# \[text\]; The description of the layout.*\
 extends: None          *# \[None, layout\]; Each parameter not listed is inherited from this layout. If None, this file must list every parameter.*\
  \
 parameters: !var          *# !var/!fix sets whether a layout may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
@@ -28,4 +28,4 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
                 column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. If None, they're equal.*\
                 row_heights: None          *# \[None, floats > 0\]; The relative heights of the rows' plot boxes. If None, they're equal, or as tall as the tiles need.*\
             tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
-                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with ~, or a path relative to this file. A layout must set it.*
+                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with \~, or a path relative to this file. A layout must set it.*

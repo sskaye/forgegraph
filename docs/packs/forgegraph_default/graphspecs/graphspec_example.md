@@ -4,7 +4,7 @@ This page mirrors src/forgegraph/packs/forgegraph_default/graphspecs/graphspec_e
 
 name: graphspec_example          *# \[text\]; The name of the GraphSpec.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
-description: The default pack's example GraphSpec for its catalog.          *# \[text\]; The description of the GraphSpec.*\
+description: The default pack's example GraphSpec for extension and the catalog.          *# \[text\]; The description of the GraphSpec.*\
 extends: None          *# \[None, graphspec\]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.*\
  \
 parameters: !var          *# !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\
@@ -15,7 +15,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
     text:\
         title: Polarization, 60 °C          *# \[None, text\]; The graph's title. If None, there is no title.*\
     data:\
-        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
+        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with \~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
         preprocessing: None          *# \[None, text\]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.*\
     axis:\
         x:\

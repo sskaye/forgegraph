@@ -5,7 +5,10 @@ A tag goes before a parameter's value (`width: !var 0.15`) or on a category (`ou
 where it applies to everything inside unless a tag further in says otherwise. A tag with no
 value (`width: !var`) changes only the status; the value comes from the file it extends. A
 parameter's status comes from the nearest file in the extends chain that tags it or a
-category above it; within one file, the tag nearest the parameter decides.
+category above it; within one file, the tag nearest the parameter decides. A style's member
+(title.font, from text.font) that no file tags, itself or through a category inside
+parameters, has its general parameter's status: a fixed text.font fixes every text style's
+font.
 
 In memory, a tagged category is a TaggedMap, a dict that also knows its status, and any
 other tagged value is a Tagged. In JSON, as provenance records a GraphSpec, a tagged value is
@@ -118,10 +121,10 @@ def plain(node: Any) -> Any:
     return node
 
 
-def status_at(tree: Any, path: str) -> bool | None:
+def status_at(tree: Any, path: str, root: bool = True) -> bool | None:
     """The status a tree's tags give a dotted path: the tag nearest it, on it or on a
-    category above it; None if none does."""
-    found = status(tree)
+    category above it (or on the tree itself, unless root is False); None if none does."""
+    found = status(tree) if root else None
     node = untag(tree)
     for key in path.split("."):
         if not isinstance(node, dict) or key not in node:

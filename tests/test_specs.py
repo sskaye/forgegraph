@@ -570,15 +570,33 @@ parameters: !var
 
 def test_inheritance_keeps_values_and_lets_a_file_move_a_parameter():
     theme = child("theme", "fix", {"axis.tick.direction": "in"})
-    tree_set(theme["parameters"], "series.line.width", var(0.12))
+    tree_set(theme["parameters"], "axis.tick.label.max_wrap", var(2))
     reg = reg_with(("theme", theme))
     assert validate("theme", theme, reg) == []
     r = {p: (v.value, v.fixed) for p, v in resolve("theme", theme, reg).items()}
     assert r["axis.tick.direction"] == ("in", True)
-    assert r["series.line.width"] == (0.12, False)  # fixed in light_theme, variable here
+    assert r["axis.tick.label.max_wrap"] == (2, False)  # fixed in light_theme, variable here
     assert r["axis.tick.length"] == (0.3, False)  # inherited
     assert r["grid.x.show"] == (False, True)
-    assert r["title.font"] == ("Roboto", False)  # a member: the general text's font, its own tag
+    assert r["title.font"] == ("Roboto", True)  # a member: fixed, as light_theme's text.font is
+
+
+def test_a_styles_member_has_its_general_parameters_status_unless_tagged_itself():
+    """A fixed text.font fixes every text style's font, even where the theme sets the style's
+    own; a tag on the member, or on a category it's in, beats it, and parameters' tag doesn't."""
+    theme = child("theme", None, {"title.font": var(), "legend": var()}, name="open")
+    tree_set(theme["parameters"], "axis.title.font", "Roboto")
+    reg = reg_with(("theme", theme))
+    assert validate("theme", theme, reg) == []
+    r = resolve("theme", theme, reg)
+    assert r.fixed("text.font") and r.fixed("axis.title.font") and r.fixed("footnote.font")
+    assert not r.fixed("title.font")  # its own tag
+    assert not r.fixed("legend.key.label.font")  # a category it's in
+    assert not r.fixed("title.weight")  # text.weight is variable
+    loose = child("theme", None, {"text.font": fix()}, name="loose")
+    loose["parameters"] = var(loose["parameters"])  # !var on parameters itself
+    reg = reg_with(("theme", loose))
+    assert resolve("theme", loose, reg).fixed("title.font")
 
 
 def test_a_tag_with_no_value_changes_only_the_status():
@@ -606,7 +624,7 @@ def test_a_category_tag_covers_everything_in_it_and_beats_the_files_it_extends()
     assert r.fixed("series.marker.edge.width")
     assert not r.fixed("axis.tick.length")  # fixed in the base, variable through axis here
     assert not r.fixed("axis.tick.label.size")
-    assert r.fixed("series.line.width")  # untouched: the base's
+    assert r.fixed("series.line.styles")  # untouched: the base's
 
 
 def test_a_file_extending_none_tags_every_parameter():

@@ -1,6 +1,6 @@
 name: graphspec_example          # [text]; The name of the GraphSpec.
 version: 0          # [int ≥ 0]; The version number of the specification.
-description: The default pack's example GraphSpec for its catalog.          # [text]; The description of the GraphSpec.
+description: The default pack's example GraphSpec for extension and the catalog.          # [text]; The description of the GraphSpec.
 extends: None          # [None, graphspec]; Each parameter not listed is inherited from this GraphSpec. If None, this file must list every parameter.
 
 parameters: !var          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.

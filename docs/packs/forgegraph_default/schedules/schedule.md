@@ -4,7 +4,7 @@ This page mirrors src/forgegraph/packs/forgegraph_default/schedules/schedule.yam
 
 name: schedule          *# \[text\]; The name of the schedule, which also names its status file and log.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
-description: A schedule for schedules to extend.          *# \[text\]; The description of the schedule.*\
+description: A default schedule to extend.          *# \[text\]; The description of the schedule.*\
 extends: None          *# \[None, schedule\]; Each parameter not listed is inherited from this schedule. If None, this file must list every parameter.*\
  \
 parameters: !var          *# !var/!fix sets whether a schedule may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.*\

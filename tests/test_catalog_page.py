@@ -32,7 +32,8 @@ def test_a_packs_table_shows_its_own_values():
     assert cells(theme + "title-size")[0] == "1.05"
     assert cells(theme + "grid-color")[0] == "#E6E6E6"
     assert cells(theme + "text-font")[2] == "fixed"
-    assert cells(theme + "title-font")[2] == "variable"
+    assert cells(theme + "title-font")[2] == "fixed"  # by text.font
+    assert cells(theme + "title-weight")[2] == "variable"
     assert cells("format-forgegraph_default-wide_format-param-figure-width")[0] == "300"
 
 

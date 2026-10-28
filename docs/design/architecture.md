@@ -429,7 +429,7 @@ Every output embeds a provenance record, at its format's provenance.level (full,
 - **One version number: the library's**, using semver. The built-in packs are released with it and carry its version; other packs have their own, like any package.
   - **Major:** a breaking change to a spec format.
   - **Minor:** releases may change how graphs look.
-- **Visual changelog:** each release lists every appearance change, with before and after images of every catalog card and regression graph that changed.
+- **Visual changelog:** `scripts/visual_changelog.py` shows before and after images of every catalog card and regression graph that changed between two commits, for checking how a change alters the look.
 - **Pinning:** projects and scheduled renders pin versions through their lockfile, so a dashboard can't change appearance overnight.
 - **No telemetry.** Feature requests come from the request flow and GitHub issues.
 

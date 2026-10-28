@@ -1,40 +1,32 @@
 # Changelog
 
-ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written. From 0.2.0 on, each release's entry links its visual changelog: before and after images of every catalog card and regression graph that changed, made with `scripts/visual_changelog.py`.
+ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
 ## 0.4.0 (2026-10-27)
 
-Images that changed: the [visual changelog](docs/visual-changelog/0.4.0.html).
+### New Features
 
-### Changed
+- **Multiple Series.** GraphSpecs can now have independent Series, enabling full control over the marker, line, and bar properties and not just variation by a palette.
+- **Reference bands.** The `reference_line` layer is now `reference` and has been augmented to also draw lines per element of the series and bands. It also can now compute a value plus offset (e.g. a line at mean + 3 s.d.). This enables drawing of error bands, confidence intervals of model fits, and other more complex references.
+- **More aggregations.** Series, reference lines, and error bars can show the mean, median, percentile, standard deviation, standard error or confidence intervals.
+- **Stepped and smooth lines.** `line.interpolate` can now be steps or a smooth curve in addition to a direct line.
+- **Dates as values.** Dates, such as `2025-08-25`, can now be used directly in all relevant parameters.
 
-- **Breaking for existing specs and configs:** one built-in pack, `forgegraph_default`, replaces `forgegraph_base` and `forgegraph_base_2`. Its specs are `light_theme` (in place of `forgegraph_base/base_theme`), `compact_format` (`base_format`), `wide_format` (`base_layout_format`), `layout` (`layout_example`), `schedule` (`base_schedule`) and `graphspec_example`; `forgegraph_base_2` has no replacement. A main config listing `forgegraph_base` or `forgegraph_base_2` is an error: list `forgegraph_default` instead. light_theme draws 0.3's look. It fixes every text's font and gap, the palettes (the colors, line styles, marker shapes and fills that series take in turn), the ticks' direction, sides and algorithms, and the grid, so a GraphSpec that sets `grid.x.show` needs a theme that leaves it variable; a series may still set its own color, line style, marker shape and line width. The default layout draws no line between tiles and leaves 0.25 × the base size at the figure's edges.
-- The specification files, which define each kind, are in `src/forgegraph/specifications/`, and their pages in `docs/specifications/`; no spec can name or extend them. The built-in pack's pages are in `docs/packs/forgegraph_default/`, and the catalog page is `catalog/forgegraph_default.html`.
-- A category's brackets in a specification file say what the code reads about it, from a fixed set: its style, `same as <sibling>` for a category with a sibling's parameters, and `look from <theme category>` for a layer category whose look comes from the theme. Anything else there is an error, and descriptions are never read, so rewording one changes nothing.
-- A style's member that no file tags, itself or through a category inside `parameters`, is fixed or variable as its general parameter is: a fixed `text.font` fixes every text style's font, even where the theme sets the style's own.
-- `forgegraph schema <kind>` no longer says whether a parameter is fixed: it shows the kind's specification, which isn't what graphs are drawn with. `forgegraph schema graphspec` lists what a GraphSpec can set, and `forgegraph explain` shows what's fixed.
-- A reference layer's `fill.color` may be None: two lines with values make a band only when it isn't.
-- **Breaking for existing specs:** a GraphSpec lists its series by name under `series`, each drawn from its own column (by default, the column of its name) with its own settings: `aggregation`, `split`, `order`, `color`, `color_scale`, `line`, `marker`, `bar` and `value_label`, and the theme's variable series parameters it sets for itself. They replace `axis.*.data.aggregation`, `encoding.*` and `mark.*`; the value axis's `data.column` is None. `arrangement.base_axis`, `arrangement.stacking`, `arrangement.offset` and `arrangement.total.show` replace `series.base_axis`, `series.aggregation`, `series.offset` and `series.value_label.total.show`. A series' color, line style, marker shape and fill take `first`, `series`, a value or a column; series take palette colors in the order they're listed.
-- **Breaking for existing specs:** the `reference` layer replaces `reference_line`: `line_1` and `line_2`, each at a value or from a column, with its own `aggregation` and `offset` (aggregation styles), `scope`, line and label (with `label.inside`), and the `fill` of a band between them. The theme's `layer.reference` replaces `layer.reference_line`.
-- An aggregation style (`function`, `multiplier`, `percentile`) for a series, a reference line and error bars; functions include `percentile`, `stddev`, `stderr` and `ci`.
-- `line.interpolate` draws a series' line straight, in steps (`step_after`, `step_before`, `step_center`) or as a smooth curve that never overshoots its points.
-- A note and a reference layer's lines, labels and fill may set the theme's variable look for themselves.
-- A style key (one from `encoding.line.style.column`, `encoding.marker.shape.column` or `encoding.marker.fill.column`) follows `legend.key.title.text`, as the series' key does: `column_name`, the default, gives each key its own column's name, so default graphs are unchanged; `None` removes every key's title; a text titles one key, and with more than one key drawn it's an error. With no `encoding.color.column`, a style key's samples are drawn in the one series color, not the text color. `render --json` reports `style_keys`, the column each style key drawn explains (for a layout, each tile's), beside `labelling`.
-- A range type `date`: a date, or a date and time, as YAML's bare date (`2025-08-25`, `2025-08-25 06:00:00`) or ISO 8601 text (`"2025-08-25T06:00"`); a time with a zone is at its clock time, as the data's are. `axis.x.min`, `axis.x.max`, `axis.y.min` and `axis.y.max`, a reference line's `value` and `benchmark.value` take it: on a datetime axis or column, a date is drawn exactly where its day number is, and numbers keep working as day numbers. A date on an axis that isn't dates is an error naming the axis's type. Text that reads as a date is a reference line's column only if the data has a column of that name. Provenance records write dates as ISO 8601 text.
-- On a date value axis, what would draw nonsense is an error that says what to do: stacking (`series.aggregation` sum or percent), adding up rows (`axis.*.data.aggregation` sum), bars (`mark.bar.show`, which would start at 1970), and value labels without a date format. A reference line at a date column's aggregate is on a date axis only, at its mean, median, min or max, with multiplier 1. A date axis's `tick.label.format` must have a date directive.
+### Changes
 
-### Fixed
+- **One built-in pack, `forgegraph_default`.** `forgegraph_base` is renamed `forgegraph_default` and its specifications have been renamed. `forgegraph_base_2` has been removed. Please update your config and any GraphSpecs or packs referencing the old packs. The default theme has been tuned slightly to fix more parameters, reducing complexity of graph design.
+- **Themes, formats and GraphSpecs are written differently.** Each has one `parameters` tree, and `!fix` and `!var` tags are used to set what a GraphSpec can change, in place of the `fixed_parameters` and `variable_parameters` blocks. A theme sets the parameters of all text and all lines once, under `text` and `line`, and each category that uses them, such as the title or the tick labels, only needs to modify the parameters that are different from that default.
+- **Simplified Specifications.** Numerous simplifications to the way specifications are written, making them easier to read and modify.
 
-- In a theme whose text is light, powers of ten on a log axis and superscripts in labels no longer give a `font-fallback` lint issue. They were always drawn in the theme's font and weight; the issue came from the faces matplotlib loads for maths but doesn't draw these with.
-- The `outside-limits` and `log-axis-values` lint checks count only data points. A reference line's ends and an error bar's ends no longer count as points outside a set axis limit, or as values of 0 or below on a log axis.
-- A style key on the benchmark's column matches the drawing: its entries are the groups the series are styled by, so a value after the benchmark no longer gets the next value's style, and the benchmark, drawn in its own style, has no style sample and is named once, by `legend.method`. When `legend.method: key` doesn't fit, the error says why: every position in `legend.key.positions` is taken or covers data, naming the position each style key took.
-- YAML's null (`null`, `~` or nothing) is None everywhere a spec can say None. `extends: null` failed with `KeyError: None`, and a file extending null wasn't required to list every parameter.
-- Computed values are compared with an axis's limits allowing for float noise: a value is past a limit only if it's past by more than 1e-9 of the axis's span, measured in powers of ten on a log axis. A stack that totals `axis.y.max` but for its last digits isn't reported by `outside-limits`; a reference line at a computed value that equals a set limit isn't an error; bars whose values are 0 but for float noise still stand on the axis; and a tick a hair past the end of the view, which matplotlib draws, is measured for layout and lint and counts when log labels choose between plain numbers and powers of ten.
-- Dates and times draw the same on y as on x: every value placed on an axis (the data, its aggregates, stacks, reference lines, error bars and limits) becomes a number the same way, so a date y axis has date ticks, a reference line at a date column's aggregate lands on it, and error bars from a date column's spread are in days. With value labels off, a date `tick.label.format` such as `"%H:%M"` on y is no longer refused as a number format; value labels and a reference line's value on a date axis are written in a date format.
+### Bug Fixes
+
+- Dates on the y axis draw as they do on x: date ticks, reference lines at a date column's mean or median, and error bars in days.
+- The lint no longer counts reference lines and error bars as data points outside the axis limits, or as values of 0 or below on a log axis.
+- Values that differ from an axis limit only by rounding are no longer reported as outside it.
+- In a theme with a light font weight, powers of ten on a log axis no longer give a `font-fallback` lint issue.
+- `null` and `~` are accepted everywhere a spec can say None.
 
 ## 0.3.0 (2026-10-25)
-
-Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).
 
 ### Added
 
@@ -77,8 +69,6 @@ Images that changed: the [visual changelog](docs/visual-changelog/0.3.0.html).
 - A config naming a pack that can't be found, or another pack problem, stops `catalog`, `pack-notes`, `schema` and `explain` with its problems listed (`error:` lines, exit 1), not a traceback; with `--json`, one problem each, not one joined line.
 
 ## 0.2.0 (2026-10-24)
-
-Images that changed: the [visual changelog](docs/visual-changelog/0.2.0.html).
 
 ### Changed
 

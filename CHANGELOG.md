@@ -12,7 +12,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 ### Changes
 
-- **Titles.** Titles now sit the full `title.gap` above the plot, measured from the line the letters sit on, so titles side by side line up whatever their letters. Titles sit slightly higher than in 0.4.
+- **Titles.** Titles now sit `title.gap` above the plot, measured from the line the letters sit on, so titles side by side line up whatever their letters. The default theme's `title.gap` is now 0.41, which keeps its titles where they were. A theme that sets its own `title.gap` will see its titles sit a little higher than in 0.4.
 - **Notes above the plot.** A note placed outside the plot at the top now goes between the title and the plot, instead of above the title.
 - **Tab names on the page.** The tab names are written in the theme's font and color, instead of the browser's font in dark grey.
 

@@ -1,12 +1,10 @@
 # Open issues, 2026-10-28
 
-The 19 issues open on GitHub, checked on 0.4.0, and five bugs found while reproducing them. Each says who filed it: two came from another user, and the rest from your agent while rebuilding existing graphs, most of them a 29-chart, five-tab health dashboard.
+The 14 issues open on GitHub, checked on 0.4.0, and five bugs found while reproducing them. Each says who filed it: two came from another user, and the rest from your agent while rebuilding existing graphs, most of them a 29-chart, five-tab health dashboard.
 
 ## Summary
 
-Closed on GitHub: #17 to #26, #31, #37, #38, #42, #45, #46, #48, #49, #50 and #52 (built or found working), and #39 and #57 (not planned).
-
-Decided in the review but still open on GitHub: #30 (built in sskaye/forgegraph#58: labels and notes now grow the axis for room), and #27, #28, #41 and #53 (declined).
+Closed on GitHub: #17 to #26, #30, #31, #37, #38, #42, #45, #46, #48, #49, #50 and #52 (built or found working), and #27, #28, #39, #41, #53 and #57 (declined or not planned).
 
 Filed by another user, waiting for your decision:
 - **Requests:** #67, #68.

@@ -40,7 +40,7 @@ from forgegraph.drawing.layout import (
 )
 from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
-from forgegraph.fonts import WEIGHTS, font_file
+from forgegraph.fonts import WEIGHTS, font_file, font_weights
 from forgegraph.graph import Graph, Prepared, prepare, render
 from forgegraph.layouts.separators import (
     apply_separators,
@@ -322,6 +322,11 @@ def _tab_bar(values: dict[str, Any], first: Style, base: float, line: LineStyle)
         return text_member(values, first, "tab_bar.label", name)
 
     family, weight = str(member("font")), WEIGHTS[str(member("weight"))]
+    if weight not in font_weights(family):  # one of them the first tile's theme's
+        has = ", ".join(n for n, w in WEIGHTS.items() if w in font_weights(family))
+        raise SpecError(
+            [f"tab_bar.label.weight: {family} has no {member('weight')} weight; it has {has}"]
+        )
     return page.TabBar(
         family,
         float(member("size")) * base,

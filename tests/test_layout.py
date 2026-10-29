@@ -649,6 +649,13 @@ def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(projec
     assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, times base size 10
 
 
+def test_the_tab_bars_font_must_be_installed():
+    found = _check(
+        {"tab_bar": {"label": {"font": "No Such Font"}}, "tabs": {"T": tab([["a"]], a="a.yaml")}}
+    )
+    assert "tab_bar.label.font: no font 'No Such Font' is bundled or installed" in found
+
+
 @pytest.mark.parametrize(
     ("line", "message"),
     [
@@ -701,7 +708,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     figure = layout.tabs[0].figure
     width_pt = figure.get_size_inches()[0] * 72
     out, half = 1.5 * 10 / 2, 0.07 * 10 / 2  # the border's centre and half its width, pt
-    svg = base64.b64decode(re.findall(r"base64,([^\"]+)", text)[0])
+    svg = base64.b64decode(re.findall(r"svg\+xml;base64,([^\"]+)", text)[0])
     box = re.search(rb'viewBox="([^"]+)"', svg)
     assert box is not None
     left, top, width, _ = (float(v) for v in box[1].split())

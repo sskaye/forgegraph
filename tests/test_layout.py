@@ -7,13 +7,23 @@ import base64
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, cast
 
 import numpy as np
 import pytest
 from matplotlib.lines import Line2D
-from pack_helpers import BUILT_IN, allow, cli_problems, doc, dump, graphspec_file, write_pack
+from pack_helpers import (
+    BUILT_IN,
+    allow,
+    cli_problems,
+    doc,
+    dump,
+    graphspec_file,
+    needs_node,
+    write_pack,
+)
 from PIL import Image
 from render_helpers import BASE, painted_draws, polarization, with_series
 from typer.testing import CliRunner
@@ -499,6 +509,165 @@ def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     assert sorted(record_of(project / "out" / "fig.html")["tabs"]) == ["By cell", "Overview"]
 
 
+NESTED = {
+    "Platinum": {
+        "tabs": {
+            "Voltage": tab([["pv"]], pv="volt.yaml"),
+            "Power": tab([["pp"]], pp="power.yaml"),
+        }
+    },
+    "Nickel": {"tabs": {"Voltage": tab([["nv"]], nv="volt.yaml")}},
+    "Notes": {"tabs": {"Deep": {"tabs": {"Deeper": tab([["d"]], d="power.yaml")}}}},
+}
+
+
+def test_tabs_hold_tabs_to_any_depth(project):
+    """Each tab that's a grid is drawn, named by its path: its files by every tab on the path,
+    and the page has a tab bar for each tab holding tabs."""
+    types = ("png", "html")
+    dump(_format("both", types), project / "house" / "formats" / "both.yaml")
+    path = write_layout(project, NESTED, fmt="house/both")
+    layout = fg.layout(path)
+    assert [t.name for t in layout.tabs] == [
+        "Platinum / Voltage",
+        "Platinum / Power",
+        "Nickel / Voltage",
+        "Notes / Deep / Deeper",
+    ]
+    saved = [p.name for p in layout.save_all(project / "out" / "fig")]
+    assert saved == [
+        "fig-platinum-voltage.png",
+        "fig-platinum-power.png",
+        "fig-nickel-voltage.png",
+        "fig-notes-deep-deeper.png",
+        "fig.html",
+    ]
+    page = (project / "out" / "fig.html").read_text()
+    assert re.findall(r'<nav role="tablist" data-under="([^"]*)">', page) == [
+        "",
+        "platinum",
+        "nickel",
+        "notes",
+        "notes/deep",
+    ]
+    assert '<a role="tab" href="#nickel">Nickel</a>' in page
+    assert '<a role="tab" href="#notes/deep/deeper">Deeper</a>' in page
+    assert '<section id="nickel/voltage"><h2>Nickel / Voltage</h2><img' in page
+    assert sorted(record_of(project / "out" / "fig.html")["tabs"])[0] == "Nickel / Voltage"
+    tile = explain_layout(path)[1]["Platinum.tabs.Power", "pp"]
+    assert tile.theme["title.size"].value is not None
+
+
+@needs_node
+def test_a_pages_link_to_a_tab_holding_tabs_keeps_the_ones_showing_below_it(project):
+    path = write_layout(project, NESTED, output={"file_types": ["html"]})
+    [page] = fg.layout(path).save_all(project / "out" / "fig")
+    script = re.search(r"<script>\s*(function pick.*?)\n\(function", page.read_text(), re.S)
+    assert script
+    ids = ["platinum/voltage", "platinum/power", "nickel/voltage", "notes/deep/deeper"]
+    cases = [
+        ("nickel", "platinum/voltage", "nickel/voltage"),  # the same chart in another group
+        ("nickel", "platinum/power", "nickel/voltage"),  # it has no Power: its first
+        ("platinum", "nickel/voltage", "platinum/voltage"),
+        ("platinum/power", "nickel/voltage", "platinum/power"),  # a tab itself
+        ("notes", None, "notes/deep/deeper"),
+        ("", None, "platinum/voltage"),  # no link: the first tab
+        ("nowhere", None, "platinum/voltage"),
+    ]
+    calls = "".join(
+        f"console.log(pick({json.dumps(ids)}, {json.dumps(to)}, {json.dumps(now)}));"
+        for to, now, _ in cases
+    )
+    node = shutil.which("node")
+    assert node is not None
+    done = subprocess.run(
+        [node, "-e", script[1] + calls], capture_output=True, text=True, check=True
+    )
+    assert done.stdout.split() == [want for _, _, want in cases]
+
+
+@pytest.mark.parametrize(
+    ("tabs", "message"),
+    [
+        (
+            {"T": {"tabs": {"A": tab([["a"]], a="a.yaml")}, "grid": {"areas": [["b"]]}}},
+            "tabs.T.grid: a tab holding tabs has no grid; put it in one of its tabs",
+        ),
+        ({"T": {"tabs": {}}}, "tabs.T.tabs: must be one or more tabs, each under its name"),
+        (
+            {"T": {"tabs": {"A": {"grid": {"areas": [["a", "b"]]}, "tiles": {"a": "a.yaml"}}}}},
+            "tabs.T.tabs.A.tiles: no tile for 'b', which grid.areas names",
+        ),
+        (
+            {
+                "A b": {"tabs": {"C": tab([["a"]], a="a.yaml")}},
+                "A": {"tabs": {"B c": tab([["b"]], b="b.yaml")}},
+            },
+            "tabs.A.tabs.B c: gives the same file names as tab 'A b / C' (a-b-c); rename one",
+        ),
+        (
+            {"T": {"tabs": {"A": tab([["a"]], a="a.yaml")}}, "U": tab([["a"]], a="b.yaml")},
+            "tabs.U.tiles.a: also a tile in tab 'T / A'; names are unique",
+        ),
+    ],
+)
+def test_nested_tab_rules(tabs, message):
+    found = _check({"tabs": tabs})
+    assert message in found, found
+
+
+def _page_style(page: str) -> str:
+    found = re.search(r"<style>(.*?)</style>", page, re.S)
+    assert found
+    return found[1]
+
+
+def test_the_tab_bar_takes_tab_bar_label_and_line(project):
+    two = {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")}
+    label = {"color": "#AA0000", "weight": "bold", "size": 1.0, "alignment": "right"}
+    line = {"style": "dashed", "width": 0.1, "color": "#00AA00"}
+    path = write_layout(
+        project, two, output={"file_types": ["html"]}, tab_bar={"label": label, "line": line}
+    )
+    [page] = fg.layout(path).save_all(project / "out" / "fig")
+    css = _page_style(page.read_text())
+    base = 10  # the auto format's base size
+    assert '@font-face { font-family: "Roboto"; font-weight: 700;' in css
+    assert f"font-size: {base:g}pt; font-weight: 700;\n  color: #AA0000;" in css
+    assert "justify-content: flex-end;" in css
+    assert f"border-bottom: {0.1 * base:g}pt dashed #00AA00;" in css
+    assert 'nav a[aria-selected="true"] { border-bottom-color: #AA0000; }' in css
+
+
+def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(project):
+    two = {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")}
+    [page] = fg.layout(write_layout(project, two, output={"file_types": ["html"]})).save_all(
+        project / "out" / "fig"
+    )
+    css = _page_style(page.read_text())
+    assert "font-weight: 400;\n  color: #000000;" in css and "justify-content: center;" in css
+    assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, times base size 10
+
+
+def test_the_tab_bars_font_must_be_installed():
+    found = _check(
+        {"tab_bar": {"label": {"font": "No Such Font"}}, "tabs": {"T": tab([["a"]], a="a.yaml")}}
+    )
+    assert "tab_bar.label.font: no font 'No Such Font' is bundled or installed" in found
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        ({"style": "dashdot"}, "tab_bar.line.style"),
+        ({"cap": "round"}, "tab_bar.line.cap"),
+    ],
+)
+def test_the_tab_bar_line_is_one_a_page_can_draw(line, message):
+    found = _check({"tab_bar": {"line": line}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
+    assert any(message in p for p in found), found
+
+
 def test_a_layout_sets_its_formats_variable_parameters(project):
     path = write_layout(
         project,
@@ -539,7 +708,7 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     figure = layout.tabs[0].figure
     width_pt = figure.get_size_inches()[0] * 72
     out, half = 1.5 * 10 / 2, 0.07 * 10 / 2  # the border's centre and half its width, pt
-    svg = base64.b64decode(re.findall(r"base64,([^\"]+)", text)[0])
+    svg = base64.b64decode(re.findall(r"svg\+xml;base64,([^\"]+)", text)[0])
     box = re.search(rb'viewBox="([^"]+)"', svg)
     assert box is not None
     left, top, width, _ = (float(v) for v in box[1].split())

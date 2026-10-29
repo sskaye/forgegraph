@@ -359,10 +359,31 @@ def _theme_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
     return errors
 
 
+def _layout_rules(doc: dict[str, Any], reg: Registry) -> list[str]:
+    """A layout's tabs, and its tab bar's font: installed (its packs' registered first), with
+    the weight the layout gives it. A member the layout doesn't set is its first tile's
+    theme's, checked with that theme."""
+    errors = layout_problems(doc, reg)
+    use_fonts("layout", doc, reg)
+    values = resolve("layout", doc, reg)
+    font, weight = "tab_bar.label.font", "tab_bar.label.weight"
+    if font in values:
+        family = str(values[font].value)
+        if not font_available(family):
+            errors.append(f"{font}: no font '{family}' is bundled or installed")
+        elif weight in values and WEIGHTS.get(values[weight].value) not in font_weights(family):
+            has = font_weights(family)
+            names = ", ".join(n for n, w in WEIGHTS.items() if w in has)
+            errors.append(
+                f"{weight}: {family} has no {values[weight].value} weight; it has {names}"
+            )
+    return errors
+
+
 # Each kind's own rules, after its parameters are each found valid (see validate).
 _RULES: dict[str, Callable[[dict[str, Any], Registry], list[str]]] = {
     "graphspec": _graphspec_problems,
-    "layout": layout_problems,
+    "layout": _layout_rules,
     "schedule": _schedule_problems,
     "theme": _theme_rules,
 }

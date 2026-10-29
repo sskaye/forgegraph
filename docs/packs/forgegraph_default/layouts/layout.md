@@ -21,11 +21,17 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         border:\
             show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
         corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
-    tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A layout's tabs replace those it inherits.*\
+    tab_bar:          *# The row of tab names at the top of the HTML page of a layout with more than one tab.*\
+        label:          *# \[text style\]; The tab names. Its defaults are the first tile's theme's text. The selected tab is underlined in its color.*\
+        line:          *# \[line style\]; The line under the tab bar, and the border's top when the border is drawn. Its defaults are the first tile's theme's line.*\
+            style: None          *# \[None, solid, dashed, dotted\]; The line style. If None, no line is drawn.*\
+            width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\
+            color: "#D9D9D9"          *# \[hex color\]; The color.*\
+    tabs:          *# The layout's tabs, in order, each under the name shown on its tab. A tab holds a grid and its tiles, or tabs of its own, to any depth. A layout's tabs replace those it inherits.*\
         main:\
             grid:\
                 areas: \[\[a\]\]          *# \[text grid\]; A list of tiles for each row. A . leaves a cell blank. A name repeated over a rectangle of cells makes that tile span them, e.g. \[a, a\] makes tile a span two columns.*\
                 column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. If None, they're equal.*\
                 row_heights: None          *# \[None, floats > 0\]; The relative heights of the rows' plot boxes. If None, they're equal, or as tall as the tiles need.*\
             tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
-                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with \~, or a path relative to this file. A layout must set it.*
+                a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with ~, or a path relative to this file. A layout must set it.*

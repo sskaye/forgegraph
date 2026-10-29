@@ -38,10 +38,17 @@ from forgegraph.drawing.layout import (
     footnote_room,
     place_footnote,
 )
-from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
+from forgegraph.fonts import WEIGHTS, font_file, font_weights
 from forgegraph.graph import Graph, Prepared, prepare, render
-from forgegraph.layouts.separators import apply_separators, backgrounds, gap_color, line_style
+from forgegraph.layouts.separators import (
+    apply_separators,
+    backgrounds,
+    gap_color,
+    line_style,
+    text_member,
+)
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
@@ -116,8 +123,10 @@ class TabFigure(Inspected):
     """A layout's tab as drawn: one figure holding its tiles."""
 
     layout: Layout
-    name: str
-    slug: str
+    name: str  # its path, as messages and records write it: Platinum / Voltage
+    slug: str  # its path in file names
+    link: str  # its path in a page's links
+    path: tuple[str, ...]  # the names of the tabs it's in, then its own
     figure: GraphFigure
     tiles: dict[str, Tile]
     grid: Grid
@@ -257,17 +266,20 @@ class Layout(Saved):
         path = stem.with_name(f"{stem.name}.{kind}")
         if kind == "html":
             first = self.tabs[0].style
-            look = line_style(self.values, first, float(self.format["figure.base_size"]))
-            rule = look.width if look.visible else 0.0
+            base = float(self.format["figure.base_size"])
+            look = line_style(self.values, first, base)
+            border = look.width if look.visible else 0.0
             framed = not one and look.visible and bool(self.values["separators.border.show"])
+            bar = line_style(self.values, first, base, "tab_bar.line")
             with self.tabs[0].saving():
                 shown = [
                     page.Shown(
                         None if one else t.name,
-                        None if one else t.slug,
-                        _framed(t, export.svg(t.figure, dpi), rule)
+                        None if one else t.link,
+                        _framed(t, export.svg(t.figure, dpi), border)
                         if framed
                         else export.svg(t.figure, dpi),
+                        () if one else t.path,
                     )
                     for t in self.tabs
                 ]
@@ -279,8 +291,7 @@ class Layout(Saved):
                     shown,
                     self.record(),
                     "transparent" if color == "none" else color,
-                    look.color,
-                    rule,
+                    _tab_bar(self.values, first, base, bar) if not one else None,
                     framed,
                     self.freshness,
                 )
@@ -303,12 +314,39 @@ class Layout(Saved):
         return self.tabs[0].figure, self.tabs[0].style
 
 
-def _framed(tab: TabFigure, svg: bytes, rule: float) -> bytes:
+def _tab_bar(values: dict[str, Any], first: Style, base: float, line: LineStyle) -> page.TabBar:
+    """The page's tab bar: tab_bar.label and tab_bar.line, each member the layout doesn't set
+    its first tile's theme's general text or line."""
+
+    def member(name: str) -> Any:
+        return text_member(values, first, "tab_bar.label", name)
+
+    family, weight = str(member("font")), WEIGHTS[str(member("weight"))]
+    if weight not in font_weights(family):  # one of them the first tile's theme's
+        has = ", ".join(n for n, w in WEIGHTS.items() if w in font_weights(family))
+        raise SpecError(
+            [f"tab_bar.label.weight: {family} has no {member('weight')} weight; it has {has}"]
+        )
+    return page.TabBar(
+        family,
+        float(member("size")) * base,
+        weight,
+        str(member("color")),
+        float(member("gap")) * base,
+        str(member("alignment")),
+        font_file(family, weight),
+        line.style if line.visible else "none",
+        line.width if line.visible else 0.0,
+        line.color,
+    )
+
+
+def _framed(tab: TabFigure, svg: bytes, border: float) -> bytes:
     """A tab's SVG cut down to its border, without the border's top side: on a page, the
     line under the tab bar is the border's top."""
     width, height = page.size(svg)
     out = tab.grid.edge / 2 * 72  # the border's centre, in points from each edge
-    half = rule / 2
+    half = border / 2
     return page.crop(svg, out - half, out + half, width - out + half, height - out + half)
 
 
@@ -367,22 +405,24 @@ def _check(doc: Any, reg: Registry) -> None:
 
 def tile_files(layout: Loaded) -> tuple[dict[str, dict[str, Path]], list[str]]:
     """Each tab's tiles' GraphSpec files, {tab: {tile: path}}, in reading order, and what's
-    wrong with them. They're found from the folder of the file listing the layout's tabs."""
+    wrong with them. A tab is keyed by where it is under tabs: Voltage, or
+    Platinum.tabs.Voltage. They're found from the folder of the file listing the layout's tabs."""
     folder = layout.folder_for(tabs_source(layout.doc, layout.reg))
     out: dict[str, dict[str, Path]] = {}
     problems = []
     for tab in tabs(layout.doc, layout.reg):
-        out[tab.name] = {}
+        key = _key(tab)
+        out[key] = {}
         for name in tab.places():
             file = str(tab.tiles[name])
-            where = f"tabs.{tab.name}.tiles.{name}"
+            where = f"{tab.where}.tiles.{name}"
             target = placed(file, folder)
             if is_layout(target):
                 problems.append(f"{where}: '{file}' is a layout; a tile is a GraphSpec file")
             elif not target.is_file():
                 problems.append(f"{where}: no GraphSpec file at '{target}'")
             else:
-                out[tab.name][name] = target
+                out[key][name] = target
     return out, problems
 
 
@@ -470,16 +510,16 @@ def render_layout(
     layout._own_packs = sorted(packs_used("layout", doc, reg) & reg.nonstandard)
     prepared: dict[str, dict[str, Prepared]] = {}
     for tab in listed:
-        prepared[tab.name] = {}
-        for name, path in files[tab.name].items():
+        prepared[_key(tab)] = {}
+        for name, path in files[_key(tab)].items():
             try:
-                prepared[tab.name][name] = prepare(path, data.get(name), reg, format=fmt)
+                prepared[_key(tab)][name] = prepare(path, data.get(name), reg, format=fmt)
             except SpecError as e:
                 problems += [f"{_where(tab, name)}: {p}" for p in e.problems]
     if problems:
         raise SpecError(problems)
     for tab in listed:
-        layout.tabs.append(_draw_tab(layout, tab, prepared[tab.name], footnote))
+        layout.tabs.append(_draw_tab(layout, tab, prepared[_key(tab)], footnote))
     layout.nonstandard_packs = sorted({p for t in layout.tabs for p in t.nonstandard_packs})
     return layout
 
@@ -524,7 +564,7 @@ def _draw_tab(
         try:
             grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes))
         except LayoutError as e:
-            raise SpecError([f"tabs.{tab.name}: {e}"]) from None
+            raise SpecError([f"{tab.where}: {e}"]) from None
         backgrounds(fig, grid, placed, float(layout.values["separators.corner_radius"]) * base)
         place_footnote(fig, edge, edge)
         apply_separators(fig, grid, layout.values, base, first.style)
@@ -532,7 +572,7 @@ def _draw_tab(
     for p in placed:
         prepared[p.name].finish(drawn[p.name])
         tiles[p.name] = Tile(p.name, str(tab.tiles[p.name]), prepared[p.name], p.ax, drawn[p.name])
-    result = TabFigure(layout, tab.name, tab.slug, fig, tiles, grid)
+    result = TabFigure(layout, tab.name, tab.slug, tab.link, tab.path, fig, tiles, grid)
     used = {p for prep in prepared.values() for p in prep.nonstandard_packs}
     result.seal(fig, font_problems, sorted({*layout._own_packs, *used}))
     return result
@@ -540,7 +580,12 @@ def _draw_tab(
 
 def _where(tab: Tab, name: str) -> str:
     """Where a tile's problem is: its place in the layout, and its GraphSpec file."""
-    return f"tabs.{tab.name}.tiles.{name} ({tab.tiles[name]})"
+    return f"{tab.where}.tiles.{name} ({tab.tiles[name]})"
+
+
+def _key(tab: Tab) -> str:
+    """A tab's key in tile_files and explain_layout: where it is under tabs."""
+    return tab.where.removeprefix("tabs.")
 
 
 def _tile_call(tab: Tab, tile: Placed, function: Any, *args: Any) -> Any:

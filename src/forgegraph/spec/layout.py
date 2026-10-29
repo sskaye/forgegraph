@@ -1,12 +1,13 @@
 """A layout's tabs, their grids and tiles (architecture D11).
 
-A layout lists its tabs by name, in order. Each tab is a grid: grid.areas has a list per row
-naming the tile in each cell, `.` for a blank cell, and a name repeated over a rectangle of
-cells makes that tile span them. grid.column_widths and grid.row_heights are the relative
-sizes of the columns' and rows' plot boxes, and tiles names the GraphSpec file drawn in each
-area. The nearest file in a layout's extends chain that lists tabs decides all of them: a
-layout's tabs replace those it inherits, unless that file tags them !fix. A tag goes on tabs,
-never inside them.
+A layout lists its tabs by name, in order. A tab holds tabs of its own, to any depth, or is a
+grid: grid.areas has a list per row naming the tile in each cell, `.` for a blank cell, and a
+name repeated over a rectangle of cells makes that tile span them. grid.column_widths and
+grid.row_heights are the relative sizes of the columns' and rows' plot boxes, and tiles names
+the GraphSpec file drawn in each area. A tab that's a grid is drawn; it's named by its path,
+the names of the tabs it's in and its own. The nearest file in a layout's extends chain that
+lists tabs decides all of them: a layout's tabs replace those it inherits, unless that file
+tags them !fix. A tag goes on tabs, never inside them.
 
 Every rule here is an error naming where it is; nothing is filled in or guessed.
 """
@@ -25,6 +26,7 @@ from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
 
 BLANK = "."
 TAB_KEYS = ("grid", "tiles")
+NESTED = "tabs"  # a tab holding tabs of its own
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,7 @@ class Area:
 
 @dataclass(frozen=True)
 class Tab:
-    name: str
+    path: tuple[str, ...]  # the names of the tabs it's in, then its own
     areas: list[list[str]]
     tiles: dict[str, Any]  # tile name -> GraphSpec file, as written (None: unset)
     column_widths: list[float] | None
@@ -62,8 +64,24 @@ class Tab:
         return len(self.areas[0])
 
     @property
+    def name(self) -> str:
+        """Its path, as messages and records write it: Platinum / Voltage."""
+        return " / ".join(self.path)
+
+    @property
+    def where(self) -> str:
+        """Where it is in the layout file: tabs.Platinum.tabs.Voltage."""
+        return "tabs." + ".tabs.".join(self.path)
+
+    @property
     def slug(self) -> str:
-        return slug(self.name)
+        """Its path in file names: platinum-voltage."""
+        return "-".join(slug(n) for n in self.path)
+
+    @property
+    def link(self) -> str:
+        """Its path in a page's links: platinum/voltage."""
+        return "/".join(slug(n) for n in self.path)
 
     def places(self) -> dict[str, Area]:
         """Each tile's area, in reading order of its top-left cell."""
@@ -114,17 +132,32 @@ def resolve_tabs(doc: dict[str, Any], reg: Registry) -> tuple[dict[str, Any], st
     return (listed[1], f"layout '{source.get('name')}'") if listed else ({}, "")
 
 
+def leaves(
+    entries: dict[str, Any], path: tuple[str, ...] = ()
+) -> list[tuple[tuple[str, ...], Any]]:
+    """The tabs that are grids, in order, each with its path: a tab holding tabs gives
+    theirs."""
+    out = []
+    for name, entry in entries.items():
+        here = (*path, str(name))
+        if isinstance(entry, dict) and NESTED in entry:
+            out += leaves(entry[NESTED], here)
+        else:
+            out.append((here, entry))
+    return out
+
+
 def tabs(doc: dict[str, Any], reg: Registry) -> list[Tab]:
-    """A valid layout's tabs, in order."""
+    """A valid layout's tabs that are grids, in order."""
     grid, _ = tab_definitions()
     out = []
-    for name, entry in resolve_tabs(doc, reg)[0].items():
+    for path, entry in leaves(resolve_tabs(doc, reg)[0]):
         g = entry["grid"]
         widths = g.get("column_widths", grid["grid.column_widths"].default)
         heights = g.get("row_heights", grid["grid.row_heights"].default)
         out.append(
             Tab(
-                str(name),
+                path,
                 [[str(c) for c in row] for row in g["areas"]],
                 {str(k): v for k, v in entry["tiles"].items()},
                 None if is_none(widths) else [float(w) for w in widths],
@@ -187,11 +220,29 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         return [f"{where}: must be one or more tabs, each under its name"]
     if inside := _tagged_inside(entries, where):
         return [f"{inside}: a tag goes on tabs, not inside them"]
-    grid_defs, tile_def = tab_definitions()
     names: dict[str, str] = {}  # tile name -> the tab it's in
+    files: dict[str, str] = {}  # a tab's path in file names -> the tab
+    errors += _tabs_problems(entries, where, (), names, files)
+    if not errors:
+        errors += _sizes_problems(doc, reg, entries, where)
+    return errors
+
+
+def _tabs_problems(
+    entries: dict[str, Any],
+    where: str,
+    path: tuple[str, ...],
+    names: dict[str, str],
+    files: dict[str, str],
+) -> list[str]:
+    """Problems with one level of tabs, and with the tabs inside them. names and files hold
+    what every tab so far uses: tile names, and paths in file names, are unique."""
+    grid_defs, tile_def = tab_definitions()
+    errors: list[str] = []
     slugs: dict[str, str] = {}
     for tab_name, entry in entries.items():
         at = f"{where}.{tab_name}"
+        here = (*path, str(tab_name))
         tab_slug = slug(str(tab_name))
         if not tab_slug:
             errors.append(f"{at}: a tab's name needs a letter or digit, for file names and links")
@@ -204,10 +255,22 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
             slugs[tab_slug] = str(tab_name)
         before = len(errors)  # the tab's own problems, after its name's
         if not isinstance(entry, dict):
-            errors.append(f"{at}: must be a tab: its grid and tiles")
+            errors.append(f"{at}: must be a tab: its grid and tiles, or tabs of its own")
+            continue
+        if NESTED in entry:
+            errors += [
+                f"{at}.{k}: a tab holding tabs has no {k}; put it in one of its tabs"
+                for k in entry
+                if k != NESTED
+            ]
+            inner = entry[NESTED]
+            if not isinstance(inner, dict) or not inner:
+                errors.append(f"{at}.{NESTED}: must be one or more tabs, each under its name")
+            elif len(errors) == before:
+                errors += _tabs_problems(inner, f"{at}.{NESTED}", here, names, files)
             continue
         errors += [
-            f"{at}.{k}: unknown; a tab has only {', '.join(TAB_KEYS)}"
+            f"{at}.{k}: unknown; a tab has grid and tiles, or tabs of its own"
             for k in entry
             if k not in TAB_KEYS
         ]
@@ -231,6 +294,13 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
             errors += [f"{at}.tiles.{tile}{s}: {m}" for s, m in check_parameter(tile_def, file)]
         if len(errors) > before:
             continue
+        file_slug = "-".join(slug(n) for n in here)
+        if len(here) > 1 and file_slug in files:
+            errors.append(
+                f"{at}: gives the same file names as tab '{files[file_slug]}' ({file_slug}); "
+                "rename one"
+            )
+        files[file_slug] = " / ".join(here)
         areas = [[str(c) for c in row] for row in grid["areas"]]
         places, problems = _places(areas)
         errors += [f"{at}.grid.areas: {p}" for p in problems]
@@ -247,7 +317,7 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         for n in places:
             if n in names:
                 errors.append(f"{at}.tiles.{n}: also a tile in tab '{names[n]}'; names are unique")
-            names[n] = str(tab_name)
+            names[n] = " / ".join(here)
         for key, count in (("column_widths", len(areas[0])), ("row_heights", len(areas))):
             sizes = grid.get(key)
             if isinstance(sizes, list) and len(sizes) != count:
@@ -256,8 +326,6 @@ def layout_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
                     f"{at}.grid.{key}: {len(sizes)} sizes, but the grid has {count} "
                     f"{what}{'s' if count != 1 else ''}"
                 )
-    if not errors:
-        errors += _sizes_problems(doc, reg, entries, where)
     return errors
 
 
@@ -266,11 +334,15 @@ def drawing_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
     tile."""
     entries, _ = resolve_tabs(doc, reg)
     return [
-        f"tabs.{name}.tiles.{tile}: must be set before the layout can be drawn: a GraphSpec file"
-        for name, entry in entries.items()
+        f"{_where(path)}.tiles.{tile}: must be set before the layout can be drawn: a GraphSpec file"
+        for path, entry in leaves(entries)
         for tile, file in entry["tiles"].items()
         if is_none(file)
     ]
+
+
+def _where(path: tuple[str, ...]) -> str:
+    return "tabs." + ".tabs.".join(path)
 
 
 def _sizes_problems(
@@ -287,10 +359,10 @@ def _sizes_problems(
     for size, key in (("height", "row_heights"), ("width", "column_widths")):
         if values.value(f"figure.{size}") != "auto":
             continue
-        for tab_name, entry in entries.items():
+        for path, entry in leaves(entries):
             if not is_none(entry["grid"].get(key)):
                 errors.append(
-                    f"{where}.{tab_name}.grid.{key}: format '{chosen}' has figure.{size} auto, "
+                    f"{_where(path)}.grid.{key}: format '{chosen}' has figure.{size} auto, "
                     f"so the tiles set each {'row' if key == 'row_heights' else 'column'}'s "
                     f"size; give the format a {size}, or remove {key}"
                 )

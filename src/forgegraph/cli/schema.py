@@ -111,6 +111,16 @@ def schema(
                 }
                 for p in [*grid.values(), tile]
             ]
+            out[k].append(
+                {
+                    "parameter": "tabs.<tab>.tabs.<tab>",
+                    "default": None,
+                    "range": "a tab",
+                    "required": False,
+                    "description": "A tab's own tabs, each under its name, in place of its grid "
+                    "and tiles; they may hold tabs too.",
+                }
+            )
 
     def text() -> None:
         for note in out.pop("notes", []):

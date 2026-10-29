@@ -80,3 +80,13 @@ def font_weights(family: str) -> set[int]:
         for f in font_manager.fontManager.ttflist
         if f.name == family and f.style == "normal" and str(f.weight).isdigit()
     }
+
+
+def font_file(family: str, weight: int) -> Path:
+    """The file matplotlib draws a family at a weight from, to embed where text is written
+    as text, such as a page's tab bar."""
+    from matplotlib import font_manager
+
+    register_fonts()
+    prop = font_manager.FontProperties(family=family, weight=weight)
+    return Path(font_manager.findfont(prop, fallback_to_default=False))

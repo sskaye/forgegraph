@@ -7,6 +7,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    # A pull request that changes only pages no test reads skips the tests and packaging: review/,
+    # docs/ but for the spec and pack pages the tests compare with their files, CHANGELOG.md and
+    # CONTRIBUTING.md. The first job still checks them for secrets and deny-listed terms.
+    name: Code changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: diff
+        run: |
+          code=false
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then code=true; fi
+          # a pull request is checked out as its merge commit, whose first parent is the base
+          while read -r file; do
+            case "$file" in
+              docs/specifications/*|docs/packs/*) code=true ;;
+              review/*|docs/*|CHANGELOG.md|CONTRIBUTING.md) ;;
+              *) code=true ;;
+            esac
+          done < <(git diff --name-only HEAD^1 HEAD)
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   checks:
     name: Lint, types, secrets, deny-list
     runs-on: ubuntu-latest
@@ -31,6 +57,8 @@ jobs:
 
   tests-linux:
     name: Tests (Linux, Python ${{ matrix.python }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -59,6 +87,8 @@ jobs:
     # Most of the full suite's time, in a job of its own so it runs beside the others. Whether a
     # parameter changes the drawing doesn't depend on the Python version or operating system.
     name: Tests (every parameter changes the drawing)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -70,6 +100,8 @@ jobs:
 
   tests-lowest:
     name: Tests (lowest dependency versions)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -82,6 +114,8 @@ jobs:
 
   tests-other-os:
     name: Tests (${{ matrix.os }}, Python 3.12)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -99,6 +133,8 @@ jobs:
   package:
     # The wheel as a user gets it from pip, installed fresh and tried from outside the repo.
     name: Package (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

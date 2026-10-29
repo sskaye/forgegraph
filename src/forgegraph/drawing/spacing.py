@@ -116,7 +116,9 @@ def _centre_y_labels(axis: Axis, style: Style) -> None:
 
 
 def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> None:
-    """Pad the axis title so its letters sit gap (a theme path) from the tick labels'."""
+    """Pad the axis title so it sits gap (a theme path) from the tick labels' letters: from
+    its own letters where its top faces them, and from its baseline where its baseline does,
+    so a title's descenders don't move it."""
     title = axis.label.get_text()
     if not title.strip():
         return
@@ -124,30 +126,29 @@ def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> No
     edges, box = text.edges(title, prop), text.box(title, prop)
     position = axis.get_label_position()
     if isinstance(axis, XAxis):  # upright: its top faces down at the bottom, up at the top
-        own = box.top - edges.top if position == "bottom" else box.bottom - edges.bottom
+        own = box.top - edges.top if position == "bottom" else box.bottom
     elif round(axis.label.get_rotation()) % 360 == 270:  # reads downward: its baseline faces in
-        own = box.bottom - edges.bottom
+        own = box.bottom
     else:  # reads upward: on the left its baseline faces the plot, on the right its top does
-        own = box.bottom - edges.bottom if position == "left" else box.top - edges.top
+        own = box.bottom if position == "left" else box.top - edges.top
     side = _side(axis)
     ticks = _tick_excess(axis, side, style) if side is not None else 0.0
     axis.labelpad = style.pt(gap) - own - ticks
 
 
 def _title_pad(ax: Axes, style: Style) -> None:
-    """Pad the title so its letters sit title.gap above what's under it."""
-    title = ax.get_title()
-    if not title.strip():
+    """Pad the title so its baseline sits title.gap above what's under it: descenders hang
+    into the gap, so titles beside each other share a baseline whatever their letters.
+    Matplotlib's title pad is to its baseline (va baseline)."""
+    if not ax.get_title().strip():
         return
-    prop = title_font(style)
-    own = text.box(title, prop).bottom - text.edges(title, prop).bottom
     ticks = _tick_excess(ax.xaxis, 2, style) if _labels(ax.xaxis, 2) else 0.0
     above = [  # a key outside, above the plot box: the title sits over it
         k.height + style.pt("legend.key.gap.outer")
         for k in keys(ax)
         if k.outside and k.position and k.position.startswith("top")
     ]
-    ax.set_title(title, pad=style.pt("title.gap") - own - ticks + max(above, default=0.0))
+    ax.set_title(ax.get_title(), pad=style.pt("title.gap") - ticks + max(above, default=0.0))
     align_title(ax, style)
 
 

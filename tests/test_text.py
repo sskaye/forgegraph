@@ -97,6 +97,27 @@ def test_x_and_y_tick_labels_sit_the_same_gap_from_their_ticks():
     assert gaps[1] == pytest.approx(expected, abs=0.5 * PT)
 
 
+def test_titles_sit_on_their_baselines_whatever_their_letters():
+    """A title, and a y-axis title reading upward, are spaced from their baselines, so
+    descenders don't move them (matplotlib's box is the same depth for any letters)."""
+    renderer = None
+    found = []
+    for words in ("Polarization", "Typology"):  # no descenders, then several
+        g = render({"axis.y.title": words}, title=words)
+        renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+        title = g.axes.title.get_window_extent(renderer)
+        y_title = g.axes.yaxis.label.get_window_extent(renderer)
+        found.append((title.y0 - g.axes.bbox.y1, g.axes.bbox.x0 - y_title.x1))
+    assert renderer is not None
+    assert found[0][0] == pytest.approx(found[1][0], abs=0.01)
+    title = g.axes.title
+    baseline = title.get_transform().transform(title.get_position())[1]
+    gap = g.style.pt("title.gap") * g.figure.dpi / 72
+    assert baseline - g.axes.bbox.y1 == pytest.approx(gap, abs=0.01)
+    assert found[0][1] == pytest.approx(found[1][1], abs=0.01)
+    assert text.edges("Typology", g.axes.title.get_fontproperties()).bottom > 0
+
+
 def test_y_tick_labels_are_centred_on_their_ticks():
     g = render()
     renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]

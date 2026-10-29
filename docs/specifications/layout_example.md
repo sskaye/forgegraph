@@ -81,4 +81,8 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         3. The selected tab is marked only by its underline. Today it's also drawn semibold; dropping that lets label.weight decide every tab's weight.
         4. With nested tabs (#67), every level's tab bar uses the same style.
         5. These change only the HTML page, since images and PDFs have no tab bar.
+    - author: Claude
+      timestamp: 2026-10-29T05:16:29Z
+      body: |
+        Built in sskaye/forgegraph#75 as agreed: tab_bar.label and tab_bar.line, below on this page. The selected tab is underlined in the label's color, the label's alignment places the names and its gap spaces them, the page embeds the label's font, and the line can be solid, dashed or dotted. The default pack's layout keeps no line under the bar.
 -->

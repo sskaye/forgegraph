@@ -8,14 +8,18 @@ does, and the page carries the record of everything on it in its head, as JSON.
 A layout with several tabs gets a tab bar, which is part of the page, not of any figure, as
 wide as the figures, in the layout's tab_bar look (TabBar): its names in tab_bar.label's
 font, which the page embeds, size, weight, color, gap and alignment, the selected one
-underlined in that color, and tab_bar.line under it. Each tab's link (#overview) opens it.
-Tabs holding tabs get a tab bar for each level, the one under each tab showing the tabs in
-it; a link names the whole path (#platinum/voltage). Choosing a tab that holds tabs keeps
-the tabs below it of the same names as the ones showing, where it has them, so the same
-chart can be compared across groups; otherwise it shows its first. Where scripts don't run,
-there's no tab bar, and every tab shows, one after another under its name. When the layout
-draws a border, the line under the tab bars is the border's top: each figure is cropped to
-its border, without the border's own top side.
+underlined in that color, and tab_bar.line under it. Tabs holding tabs get a tab bar for
+each level, the one under each tab showing the tabs in it. The page's style switches the
+tabs, so they work where its scripts don't run: each name labels a hidden choice, one for
+each name at each level, and the style shows the tab the choices pick (_tab_choices). A
+choice is shared by the tabs of its name in every group, so choosing a tab that holds tabs
+shows the tabs below it last chosen, where it has them, and the same chart can be compared
+across groups; otherwise it shows its first. Where the scripts run, each name is
+also a link (#overview, or the whole path, #platinum/voltage), so a tab can be linked to,
+opened in a new window and returned to with Back. In a browser too old for the style (from
+before 2023), there's no tab bar, and every tab shows, one after another under its name.
+When the layout draws a border, the line under the tab bars is the border's top: each figure
+is cropped to its border, without the border's own top side.
 
 A scheduled run's page carries its data's time and how old the data may get (Freshness). A
 short script compares them with the viewer's clock and shows a banner at the top when the
@@ -110,68 +114,82 @@ body { margin: 0; padding: 16px; font: 15px/1.4 system-ui, -apple-system, "Segoe
 main { max-width: %(width)s; }
 img { display: block; width: 100%%; height: auto; }
 .tabbars { display: none; margin-bottom: %(under)s; }
-.tabbed .tabbars { display: block; }
+.tabs { position: relative; }
+.tabs > input { position: absolute; top: 0; left: 0; margin: 0; opacity: 0;
+  pointer-events: none; }
 nav { display: flex; flex-wrap: wrap; justify-content: %(justify)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
-nav[hidden] { display: none; }
-nav a, h2 { font-family: %(family)s; font-size: %(size)s; font-weight: %(weight)s;
+nav a, nav label, h2 { font-family: %(family)s; font-size: %(size)s; font-weight: %(weight)s;
   color: %(color)s; }
-nav a { padding: %(gap)s; text-decoration: none; border-bottom: 3px solid transparent;
-  margin-bottom: -%(rule_width)s; }
-nav a[aria-selected="true"] { border-bottom-color: %(color)s; }
+nav a, nav label { padding: %(gap)s; text-decoration: none; cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -%(rule_width)s; }
 #forgegraph-stale { margin-bottom: 12px; padding: 8px 12px; background: #FFF4CE;
   border: 1px solid #E0B000; color: #4A3B00; }
 section + section { margin-top: 24px; }
 h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
-.tabbed section { display: none; margin-top: 0; }
-.tabbed section.shown { display: block; }
-.tabbed h2 { display: none; }
+@supports selector(:has(a)) {
+  .tabbars { display: block; }
+  .tabbars nav:not([data-under=""]) { display: none; }
+  .tabs section { display: none; margin-top: 0; }
+  .tabs h2 { display: none; }
+}
 """
 
-# pick is a function of its arguments alone, so it can be tested: the tab a link opens.
-_PICK = """
-function pick(ids, target, current) {
-  if (ids.indexOf(target) >= 0) return target;
-  var under = ids.filter(function (id) { return id.indexOf(target + "/") === 0; });
-  if (!under.length) return ids[0];
-  var depth = target.split("/").length, now = current ? current.split("/") : [];
-  var best = under[0], kept = -1;
-  under.forEach(function (id) {
-    var parts = id.split("/"), same = 0;
-    while (depth + same < parts.length && parts[depth + same] === now[depth + same]) same++;
-    if (same > kept) { best = id; kept = same; }
-  });
-  return best;
+# choices is a function of its arguments alone, so it can be tested: the choices a link sets,
+# from each tab's id and choices. A link to a tab holding tabs sets only its own, so the
+# style shows the tab below it last chosen, or its first.
+_CHOICES = """
+function choices(tabs, target) {
+  var i, depth = target.split("/").length;
+  for (i = 0; i < tabs.length; i++) if (tabs[i][0] === target) return tabs[i][1];
+  for (i = 0; i < tabs.length; i++) {
+    if (tabs[i][0].indexOf(target + "/") === 0) return tabs[i][1].slice(0, depth);
+  }
+  return tabs[0][1];
 }
 """
 
 _SCRIPT = (
-    _PICK
+    _CHOICES
     + """
 (function () {
-  var sections = document.querySelectorAll("section");
-  var bars = document.querySelectorAll("nav");
-  var links = document.querySelectorAll("nav a");
-  if (!links.length) return;
-  document.body.classList.add("tabbed");
-  var ids = Array.prototype.map.call(sections, function (s) { return s.id; });
-  var current = null;
-  function show() {
-    var id = pick(ids, decodeURIComponent(location.hash.slice(1)), current);
-    if (location.hash && location.hash.slice(1) !== id) {
-      history.replaceState(null, "", "#" + id);
-    }
-    current = id;
-    sections.forEach(function (s) { s.classList.toggle("shown", s.id === id); });
-    bars.forEach(function (n) {
-      var under = n.getAttribute("data-under");
-      n.hidden = under !== "" && id.indexOf(under + "/") !== 0;
+  var sections = document.querySelectorAll(".tabs section");
+  if (!sections.length) return;
+  var tabs = Array.prototype.map.call(sections, function (s) {
+    return [s.id, s.getAttribute("data-choices").split(" ")];
+  });
+  document.querySelectorAll(".tabs > input").forEach(function (input) {
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+  });
+  document.querySelectorAll(".tabbars nav").forEach(function (nav) {
+    nav.setAttribute("role", "tablist");
+  });
+  var links = Array.prototype.map.call(document.querySelectorAll(".tabbars label"),
+    function (label) {
+      var a = document.createElement("a"), to = label.getAttribute("data-path");
+      a.href = "#" + to;
+      a.setAttribute("role", "tab");
+      a.setAttribute("data-path", to);
+      a.textContent = label.textContent;
+      label.parentNode.replaceChild(a, label);
+      return a;
     });
+  function showing() {
+    for (var i = 0; i < sections.length; i++) {
+      if (getComputedStyle(sections[i]).display !== "none") return sections[i].id;
+    }
+    return tabs[0][0];
+  }
+  function show() {
+    var target = decodeURIComponent(location.hash.slice(1));
+    choices(tabs, target).forEach(function (c) { document.getElementById(c).checked = true; });
+    var id = showing();
+    if (target && target !== id) history.replaceState(null, "", "#" + id);
     links.forEach(function (a) {
-      var to = a.getAttribute("href").slice(1);
-      var on = id === to || id.indexOf(to + "/") === 0;
-      a.setAttribute("aria-selected", on ? "true" : "false");
+      var to = a.getAttribute("data-path");
+      a.setAttribute("aria-selected", id === to || id.indexOf(to + "/") === 0 ? "true" : "false");
     });
   }
   window.addEventListener("hashchange", show);
@@ -276,7 +294,10 @@ def write(
     look = {"background": background, "width": f"{width:g}pt", "under": "0" if framed else "12px"}
     look.update(_bar_look(bar) if bar is not None else _NO_BAR)
     parts.append(f"<style>{_STYLE % look}</style>")
-    parts += ["</head>", "<body>", "<main>"]
+    choices, rules = _tab_choices(shown, look["color"]) if tabbed else ([], "")
+    if tabbed:
+        parts.append(f"<style>{rules}</style>")
+    parts += ["</head>", "<body>", '<main class="tabs">' if tabbed else "<main>", *choices]
     if freshness is not None:
         data = json.dumps(
             {
@@ -295,6 +316,8 @@ def write(
         alt = html.escape(f"{title}: {s.name}" if tabbed else title)
         heading = f"<h2>{html.escape(str(s.name))}</h2>" if tabbed else ""
         where = f' id="{s.slug}"' if s.slug else ""
+        if tabbed:
+            where += f' data-choices="{" ".join(_choices(s.path))}"'
         parts.append(
             f'<section{where}>{heading}<img alt="{alt}" src="data:image/svg+xml;base64,{image}">'
             "</section>"
@@ -308,23 +331,94 @@ def write(
     return path
 
 
-def _tab_bars(shown: list[Shown]) -> list[str]:
-    """A tab bar for each tab holding tabs, and one for the top level: each lists the tabs in
-    it, linking to their paths. data-under: the path of the tab whose tabs it lists."""
+def _choice(path: tuple[str, ...]) -> str:
+    """The id of the hidden choice that picks a tab: one per name at each level, shared by the
+    tabs of that name in every group, so choosing a group keeps the tabs below it."""
     from forgegraph.spec.layout import slug
 
-    bars: dict[tuple[str, ...], dict[tuple[str, ...], str]] = {}  # tab -> its tabs, by path
+    return f"tab{len(path)}-{slug(path[-1])}"
+
+
+def _choices(path: tuple[str, ...]) -> list[str]:
+    """The choices that show a tab: its own and those of the tabs it's in."""
+    return [_choice(path[: d + 1]) for d in range(len(path))]
+
+
+def _children(shown: list[Shown]) -> dict[tuple[str, ...], list[tuple[str, ...]]]:
+    """Each tab holding tabs (the top level is ()), and its tabs' paths, in order."""
+    out: dict[tuple[str, ...], list[tuple[str, ...]]] = {}
     for s in shown:
         for depth in range(len(s.path)):
-            bars.setdefault(s.path[:depth], {}).setdefault(s.path[: depth + 1], s.path[depth])
+            tabs = out.setdefault(s.path[:depth], [])
+            if s.path[: depth + 1] not in tabs:
+                tabs.append(s.path[: depth + 1])
+    return out
+
+
+def _tab_choices(shown: list[Shown], color: str) -> tuple[list[str], str]:
+    """The hidden choices, the first tab's checked, and the rules that show what they pick:
+    at each level, the tab of the chosen name, or the group's first when it has none. The
+    rules show that tab, the tab bar of the tabs in it, the line under its name, and an
+    outline around a name whose choice the keyboard is on."""
+    from forgegraph.spec.layout import slug
+
+    children = _children(shown)
+    first = set(_choices(shown[0].path))
+    choices: dict[str, int] = {}  # each choice, and its level
+    for tabs in children.values():
+        for path in tabs:
+            choices.setdefault(_choice(path), len(path))
+    inputs = [
+        f'<input type="radio" name="tab{level}" id="{c}"' + (" checked>" if c in first else ">")
+        for c, level in choices.items()
+    ]
+
+    def picked(path: tuple[str, ...]) -> str:
+        """The selector that holds when path is the tab showing at its level and above."""
+        out = ""
+        for depth in range(1, len(path) + 1):
+            tabs = children[path[: depth - 1]]
+            if path[:depth] == tabs[0]:  # the first: unless another in its group is chosen
+                others = ", ".join(f"#{_choice(p)}:checked" for p in tabs[1:])
+                out += f":not(:has({others}))" if others else ""
+            else:
+                out += f":has(#{_choice(path[:depth])}:checked)"
+        return out
+
+    def link(path: tuple[str, ...]) -> str:
+        return "/".join(slug(n) for n in path)  # a style's text isn't HTML: no escapes
+
+    rules = [f'  .tabs{picked(s.path)} section[id="{s.slug}"] {{ display: block; }}' for s in shown]
+    for under, tabs in children.items():
+        if under:
+            rules.append(
+                f'  .tabs{picked(under)} nav[data-under="{link(under)}"] {{ display: flex; }}'
+            )
+        rules += [
+            f'  .tabs{picked(path)} [data-path="{link(path)}"] {{ border-bottom-color: {color}; }}'
+            for path in tabs
+        ]
+    rules += [
+        f'  #{c}:focus-visible ~ .tabbars label[for="{c}"] {{ outline: 2px solid {color}; }}'
+        for c in choices
+    ]
+    return inputs, "\n".join(["@supports selector(:has(a)) {", *rules, "}"])
+
+
+def _tab_bars(shown: list[Shown]) -> list[str]:
+    """A tab bar for each tab holding tabs, and one for the top level: each lists the tabs in
+    it, each name choosing its tab. data-under: the path of the tab whose tabs it lists."""
+    from forgegraph.spec.layout import slug
+
     out = []
-    for under, tabs in bars.items():
+    for under, tabs in _children(shown).items():
         link = "/".join(slug(n) for n in under)
-        out.append(f'<nav role="tablist" data-under="{html.escape(link)}">')
+        out.append(f'<nav data-under="{html.escape(link)}">')
         out += [
-            f'<a role="tab" href="#{html.escape("/".join(slug(n) for n in path))}">'
-            f"{html.escape(name)}</a>"
-            for path, name in tabs.items()
+            f'<label for="{_choice(path)}" '
+            f'data-path="{html.escape("/".join(slug(n) for n in path))}">'
+            f"{html.escape(path[-1])}</label>"
+            for path in tabs
         ]
         out.append("</nav>")
     return out

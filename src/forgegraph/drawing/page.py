@@ -7,8 +7,12 @@ does, and the page carries the record of everything on it in its head, as JSON.
 
 A layout with several tabs gets a tab bar, which is part of the page, not of any figure, in
 the system's interface font, as wide as the figures. Each tab's link (#overview) opens it.
-Where scripts don't run, every tab shows, one after another under its name. When the layout
-draws a border, the line under the tab bar is the border's top: each figure is cropped to
+Tabs holding tabs get a tab bar for each level, the one under each tab showing the tabs in
+it; a link names the whole path (#platinum/voltage). Choosing a tab that holds tabs keeps
+the tabs below it of the same names as the ones showing, where it has them, so the same
+chart can be compared across groups; otherwise it shows its first. Where scripts don't run,
+there's no tab bar, and every tab shows, one after another under its name. When the layout
+draws a border, the line under the tab bars is the border's top: each figure is cropped to
 its border, without the border's own top side.
 
 A scheduled run's page carries its data's time and how old the data may get (Freshness). A
@@ -65,12 +69,13 @@ function staleMessage(asOf, now, hours, cadence) {
 
 @dataclass(frozen=True)
 class Shown:
-    """One figure on a page: its tab's name and slug (None for a graph or a one-tab layout)
-    and its SVG."""
+    """One figure on a page: its tab's name and link (None for a graph or a one-tab layout),
+    its SVG, and its tab's path, the names of the tabs it's in and its own."""
 
     name: str | None
-    slug: str | None
+    slug: str | None  # its link: platinum/voltage
     svg: bytes
+    path: tuple[str, ...] = ()
 
 
 _STYLE = """
@@ -79,8 +84,11 @@ body { margin: 0; padding: 16px; font: 15px/1.4 system-ui, -apple-system, "Segoe
   Roboto, sans-serif; color: #333333; }
 main { max-width: %(width)s; }
 img { display: block; width: 100%%; height: auto; }
-nav { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-bottom: %(under)s;
+.tabbars { display: none; margin-bottom: %(under)s; }
+.tabbed .tabbars { display: block; }
+nav { display: flex; flex-wrap: wrap; gap: 4px 20px;
   border-bottom: %(rule_width)s solid %(rule)s; }
+nav[hidden] { display: none; }
 nav a { padding: 6px 0; color: inherit; text-decoration: none;
   border-bottom: 3px solid transparent; margin-bottom: -%(rule_width)s; }
 nav a[aria-selected="true"] { border-bottom-color: #333333; font-weight: 600; }
@@ -94,24 +102,56 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 %(under)s; padding-bottom: 6
 .tabbed h2 { display: none; }
 """
 
-_SCRIPT = """
+# pick is a function of its arguments alone, so it can be tested: the tab a link opens.
+_PICK = """
+function pick(ids, target, current) {
+  if (ids.indexOf(target) >= 0) return target;
+  var under = ids.filter(function (id) { return id.indexOf(target + "/") === 0; });
+  if (!under.length) return ids[0];
+  var depth = target.split("/").length, now = current ? current.split("/") : [];
+  var best = under[0], kept = -1;
+  under.forEach(function (id) {
+    var parts = id.split("/"), same = 0;
+    while (depth + same < parts.length && parts[depth + same] === now[depth + same]) same++;
+    if (same > kept) { best = id; kept = same; }
+  });
+  return best;
+}
+"""
+
+_SCRIPT = (
+    _PICK
+    + """
 (function () {
   var sections = document.querySelectorAll("section");
+  var bars = document.querySelectorAll("nav");
   var links = document.querySelectorAll("nav a");
   if (!links.length) return;
   document.body.classList.add("tabbed");
+  var ids = Array.prototype.map.call(sections, function (s) { return s.id; });
+  var current = null;
   function show() {
-    var id = decodeURIComponent(location.hash.slice(1)) || sections[0].id;
-    if (!document.getElementById(id)) id = sections[0].id;
+    var id = pick(ids, decodeURIComponent(location.hash.slice(1)), current);
+    if (location.hash && location.hash.slice(1) !== id) {
+      history.replaceState(null, "", "#" + id);
+    }
+    current = id;
     sections.forEach(function (s) { s.classList.toggle("shown", s.id === id); });
+    bars.forEach(function (n) {
+      var under = n.getAttribute("data-under");
+      n.hidden = under !== "" && id.indexOf(under + "/") !== 0;
+    });
     links.forEach(function (a) {
-      a.setAttribute("aria-selected", a.getAttribute("href") === "#" + id ? "true" : "false");
+      var to = a.getAttribute("href").slice(1);
+      var on = id === to || id.indexOf(to + "/") === 0;
+      a.setAttribute("aria-selected", on ? "true" : "false");
     });
   }
   window.addEventListener("hashchange", show);
   show();
 })();
 """
+)
 
 
 def _json(record: dict[str, Any] | None) -> str:
@@ -188,9 +228,7 @@ def write(
         parts.append(f'<script type="application/json" id="{STALE_ID}-data">{data}</script>')
         parts.append(f'<script id="{STALE_ID}-script">{_STALE % {"id": STALE_ID}}</script>')
     if tabbed:
-        parts.append('<nav role="tablist">')
-        parts += [f'<a role="tab" href="#{s.slug}">{html.escape(str(s.name))}</a>' for s in shown]
-        parts.append("</nav>")
+        parts += ['<div class="tabbars">', *_tab_bars(shown), "</div>"]
     for s in shown:
         image = base64.b64encode(s.svg).decode("ascii")
         alt = html.escape(f"{title}: {s.name}" if tabbed else title)
@@ -207,6 +245,28 @@ def write(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(parts), encoding="utf-8")
     return path
+
+
+def _tab_bars(shown: list[Shown]) -> list[str]:
+    """A tab bar for each tab holding tabs, and one for the top level: each lists the tabs in
+    it, linking to their paths. data-under: the path of the tab whose tabs it lists."""
+    from forgegraph.spec.layout import slug
+
+    bars: dict[tuple[str, ...], dict[tuple[str, ...], str]] = {}  # tab -> its tabs, by path
+    for s in shown:
+        for depth in range(len(s.path)):
+            bars.setdefault(s.path[:depth], {}).setdefault(s.path[: depth + 1], s.path[depth])
+    out = []
+    for under, tabs in bars.items():
+        link = "/".join(slug(n) for n in under)
+        out.append(f'<nav role="tablist" data-under="{html.escape(link)}">')
+        out += [
+            f'<a role="tab" href="#{html.escape("/".join(slug(n) for n in path))}">'
+            f"{html.escape(name)}</a>"
+            for path, name in tabs.items()
+        ]
+        out.append("</nav>")
+    return out
 
 
 def read(path: Path) -> dict[str, Any] | None:

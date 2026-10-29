@@ -18,7 +18,7 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         border:\
             show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
         corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
-    tabs:          *# The layout's tabs, in order, <!-- fmc:1 -->each under the name shown on its tab<!-- /fmc:1 -->. A layout's tabs replace those it inherits.*\
+    tabs:          *# The layout's tabs, in order, <!-- fmc:1 -->each under the name shown on its tab<!-- /fmc:1 -->. A tab holds a grid and its tiles, or tabs of its own, to any depth. A layout's tabs replace those it inherits.*\
         main:\
             grid:\
                 areas: \[\[a\]\]          *# \[text grid\]; A list of tiles for each row. A . leaves a cell blank. A name repeated over a rectangle of cells makes that tile span them, e.g. \[a, a\] makes tile a span two columns.*\
@@ -31,7 +31,7 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
 - id: 1
   anchor_text: "each under the name shown on its tab"
   context_before: "s of each tile's background, × base size.*\\ tabs: # The layout's tabs, in order,"
-  context_after: ". A layout's tabs replace those it inherits.*\\ main:\\ grid:\\ areas: \\[\\[a\\]\\] #"
+  context_after: ". A tab holds a grid and its tiles, or tabs of its own, to any depth."
   author: Claude
   timestamp: 2026-10-29T03:24:33Z
   resolved: false

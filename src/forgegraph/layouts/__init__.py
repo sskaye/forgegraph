@@ -116,8 +116,10 @@ class TabFigure(Inspected):
     """A layout's tab as drawn: one figure holding its tiles."""
 
     layout: Layout
-    name: str
-    slug: str
+    name: str  # its path, as messages and records write it: Platinum / Voltage
+    slug: str  # its path in file names
+    link: str  # its path in a page's links
+    path: tuple[str, ...]  # the names of the tabs it's in, then its own
     figure: GraphFigure
     tiles: dict[str, Tile]
     grid: Grid
@@ -264,10 +266,11 @@ class Layout(Saved):
                 shown = [
                     page.Shown(
                         None if one else t.name,
-                        None if one else t.slug,
+                        None if one else t.link,
                         _framed(t, export.svg(t.figure, dpi), rule)
                         if framed
                         else export.svg(t.figure, dpi),
+                        () if one else t.path,
                     )
                     for t in self.tabs
                 ]
@@ -367,22 +370,24 @@ def _check(doc: Any, reg: Registry) -> None:
 
 def tile_files(layout: Loaded) -> tuple[dict[str, dict[str, Path]], list[str]]:
     """Each tab's tiles' GraphSpec files, {tab: {tile: path}}, in reading order, and what's
-    wrong with them. They're found from the folder of the file listing the layout's tabs."""
+    wrong with them. A tab is keyed by where it is under tabs: Voltage, or
+    Platinum.tabs.Voltage. They're found from the folder of the file listing the layout's tabs."""
     folder = layout.folder_for(tabs_source(layout.doc, layout.reg))
     out: dict[str, dict[str, Path]] = {}
     problems = []
     for tab in tabs(layout.doc, layout.reg):
-        out[tab.name] = {}
+        key = _key(tab)
+        out[key] = {}
         for name in tab.places():
             file = str(tab.tiles[name])
-            where = f"tabs.{tab.name}.tiles.{name}"
+            where = f"{tab.where}.tiles.{name}"
             target = placed(file, folder)
             if is_layout(target):
                 problems.append(f"{where}: '{file}' is a layout; a tile is a GraphSpec file")
             elif not target.is_file():
                 problems.append(f"{where}: no GraphSpec file at '{target}'")
             else:
-                out[tab.name][name] = target
+                out[key][name] = target
     return out, problems
 
 
@@ -470,16 +475,16 @@ def render_layout(
     layout._own_packs = sorted(packs_used("layout", doc, reg) & reg.nonstandard)
     prepared: dict[str, dict[str, Prepared]] = {}
     for tab in listed:
-        prepared[tab.name] = {}
-        for name, path in files[tab.name].items():
+        prepared[_key(tab)] = {}
+        for name, path in files[_key(tab)].items():
             try:
-                prepared[tab.name][name] = prepare(path, data.get(name), reg, format=fmt)
+                prepared[_key(tab)][name] = prepare(path, data.get(name), reg, format=fmt)
             except SpecError as e:
                 problems += [f"{_where(tab, name)}: {p}" for p in e.problems]
     if problems:
         raise SpecError(problems)
     for tab in listed:
-        layout.tabs.append(_draw_tab(layout, tab, prepared[tab.name], footnote))
+        layout.tabs.append(_draw_tab(layout, tab, prepared[_key(tab)], footnote))
     layout.nonstandard_packs = sorted({p for t in layout.tabs for p in t.nonstandard_packs})
     return layout
 
@@ -524,7 +529,7 @@ def _draw_tab(
         try:
             grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes))
         except LayoutError as e:
-            raise SpecError([f"tabs.{tab.name}: {e}"]) from None
+            raise SpecError([f"{tab.where}: {e}"]) from None
         backgrounds(fig, grid, placed, float(layout.values["separators.corner_radius"]) * base)
         place_footnote(fig, edge, edge)
         apply_separators(fig, grid, layout.values, base, first.style)
@@ -532,7 +537,7 @@ def _draw_tab(
     for p in placed:
         prepared[p.name].finish(drawn[p.name])
         tiles[p.name] = Tile(p.name, str(tab.tiles[p.name]), prepared[p.name], p.ax, drawn[p.name])
-    result = TabFigure(layout, tab.name, tab.slug, fig, tiles, grid)
+    result = TabFigure(layout, tab.name, tab.slug, tab.link, tab.path, fig, tiles, grid)
     used = {p for prep in prepared.values() for p in prep.nonstandard_packs}
     result.seal(fig, font_problems, sorted({*layout._own_packs, *used}))
     return result
@@ -540,7 +545,12 @@ def _draw_tab(
 
 def _where(tab: Tab, name: str) -> str:
     """Where a tile's problem is: its place in the layout, and its GraphSpec file."""
-    return f"tabs.{tab.name}.tiles.{name} ({tab.tiles[name]})"
+    return f"{tab.where}.tiles.{name} ({tab.tiles[name]})"
+
+
+def _key(tab: Tab) -> str:
+    """A tab's key in tile_files and explain_layout: where it is under tabs."""
+    return tab.where.removeprefix("tabs.")
 
 
 def _tile_call(tab: Tab, tile: Placed, function: Any, *args: Any) -> Any:

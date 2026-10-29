@@ -23,6 +23,7 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
     tab_bar:          *# The row of tab names at the top of the HTML page of a layout with more than one tab.*\
         label:          *# \[text style\]; The tab names. Its defaults are the first tile's theme's text. The selected tab is underlined in its color.*\
+            alignment: left          *# \[left, center, right\]; The text alignment.*\
         line:          *# \[line style\]; The line under the tab bar, and the border's top when the border is drawn. Its defaults are the first tile's theme's line.*\
             style: None          *# \[None, solid, dashed, dotted\]; The line style. If None, no line is drawn.*\
             width: 0.05          *# \[float ≥ 0\]; The width, × base size. If 0, no line is drawn.*\

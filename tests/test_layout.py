@@ -500,8 +500,8 @@ def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     pdf = (project / "out" / "fig.pdf").read_bytes()
     assert len(re.findall(rb"/Type /Page\b", pdf)) == 2
     page = (project / "out" / "fig.html").read_text()
-    assert '<a role="tab" href="#overview">Overview</a>' in page
-    assert '<section id="by-cell"><h2>By cell</h2><img' in page
+    assert '<label for="tab1-overview" data-path="overview">Overview</label>' in page
+    assert '<section id="by-cell" data-choices="tab1-by-cell"><h2>By cell</h2><img' in page
     for p in saved:
         record = record_of(p)
         assert record["layout"]["name"] == "fig"
@@ -543,47 +543,125 @@ def test_tabs_hold_tabs_to_any_depth(project):
         "fig.html",
     ]
     page = (project / "out" / "fig.html").read_text()
-    assert re.findall(r'<nav role="tablist" data-under="([^"]*)">', page) == [
+    assert re.findall(r'<nav data-under="([^"]*)">', page) == [
         "",
         "platinum",
         "nickel",
         "notes",
         "notes/deep",
     ]
-    assert '<a role="tab" href="#nickel">Nickel</a>' in page
-    assert '<a role="tab" href="#notes/deep/deeper">Deeper</a>' in page
-    assert '<section id="nickel/voltage"><h2>Nickel / Voltage</h2><img' in page
+    assert '<label for="tab1-nickel" data-path="nickel">Nickel</label>' in page
+    assert '<label for="tab3-deeper" data-path="notes/deep/deeper">Deeper</label>' in page
+    assert (
+        '<section id="nickel/voltage" data-choices="tab1-nickel tab2-voltage">'
+        "<h2>Nickel / Voltage</h2><img"
+    ) in page
     assert sorted(record_of(project / "out" / "fig.html")["tabs"])[0] == "Nickel / Voltage"
     tile = explain_layout(path)[1]["Platinum.tabs.Power", "pp"]
     assert tile.theme["title.size"].value is not None
 
 
 @needs_node
-def test_a_pages_link_to_a_tab_holding_tabs_keeps_the_ones_showing_below_it(project):
+def test_a_pages_link_sets_its_tabs_choices_or_a_groups_own(project):
+    """A link to a tab sets its choices and those of the tabs it's in; one to a tab holding
+    tabs sets only its own, so the style shows the tab last chosen below it."""
     path = write_layout(project, NESTED, output={"file_types": ["html"]})
     [page] = fg.layout(path).save_all(project / "out" / "fig")
-    script = re.search(r"<script>\s*(function pick.*?)\n\(function", page.read_text(), re.S)
+    text = page.read_text()
+    script = re.search(r"<script>\s*(function choices.*?)\n\(function", text, re.S)
     assert script
-    ids = ["platinum/voltage", "platinum/power", "nickel/voltage", "notes/deep/deeper"]
+    tabs = [
+        [i, c.split()]
+        for i, c in re.findall(r'<section id="([^"]+)" data-choices="([^"]+)">', text)
+    ]
+    first = ["tab1-platinum", "tab2-voltage"]
     cases = [
-        ("nickel", "platinum/voltage", "nickel/voltage"),  # the same chart in another group
-        ("nickel", "platinum/power", "nickel/voltage"),  # it has no Power: its first
-        ("platinum", "nickel/voltage", "platinum/voltage"),
-        ("platinum/power", "nickel/voltage", "platinum/power"),  # a tab itself
-        ("notes", None, "notes/deep/deeper"),
-        ("", None, "platinum/voltage"),  # no link: the first tab
-        ("nowhere", None, "platinum/voltage"),
+        ("platinum/power", ["tab1-platinum", "tab2-power"]),
+        ("nickel", ["tab1-nickel"]),
+        ("notes/deep", ["tab1-notes", "tab2-deep"]),
+        ("", first),  # no link: the first tab
+        ("nowhere", first),
     ]
     calls = "".join(
-        f"console.log(pick({json.dumps(ids)}, {json.dumps(to)}, {json.dumps(now)}));"
-        for to, now, _ in cases
+        f"console.log(JSON.stringify(choices({json.dumps(tabs)}, {json.dumps(to)})));"
+        for to, _ in cases
     )
     node = shutil.which("node")
     assert node is not None
     done = subprocess.run(
         [node, "-e", script[1] + calls], capture_output=True, text=True, check=True
     )
-    assert done.stdout.split() == [want for _, _, want in cases]
+    assert [json.loads(line) for line in done.stdout.split()] == [want for _, want in cases]
+
+
+class _Page:
+    """A tabbed page's hidden choices, and its style's rules for what they show, followed as a
+    browser would: a rule holds when each of its :has(#a:checked) and :not(:has(#b:checked,
+    #c:checked)) does."""
+
+    def __init__(self, text: str) -> None:
+        inputs = re.findall(r'<input type="radio" name="([^"]+)" id="([^"]+)"( checked)?>', text)
+        self.groups = {c: group for group, c, _ in inputs}
+        self.checked = {c for _, c, on in inputs if on}
+        style = re.search(
+            r"<style>@supports selector\(:has\(a\)\) \{\n(.*?)\n\}</style>", text, re.S
+        )
+        assert style
+        self.rules = [  # (conditions, element) of each rule on the choices
+            tuple(line.strip().split(" {")[0].removeprefix(".tabs").rsplit(" ", 1))
+            for line in style[1].split("\n")
+            if line.strip().startswith(".tabs")
+        ]
+        self.sections = re.findall(r'<section id="([^"]+)" data-choices="([^"]+)">', text)
+
+    def choose(self, *choices: str) -> None:
+        """Click these choices' labels, in turn."""
+        for c in choices:
+            self.checked = {d for d in self.checked if self.groups[d] != self.groups[c]} | {c}
+
+    def _holds(self, conditions: str) -> bool:
+        for negated, inside in re.findall(r"(:not\()?:has\(([^)]*)\)", conditions):
+            ids = [c.strip().removeprefix("#").removesuffix(":checked") for c in inside.split(",")]
+            if any(c in self.checked for c in ids) == bool(negated):
+                return False
+        return True
+
+    def showing(self, pattern: str) -> list[str]:
+        """What the holding rules pick, of the elements pattern matches (its group)."""
+        return [
+            m[1]
+            for conditions, element in self.rules
+            if (m := re.fullmatch(pattern, element)) and self._holds(conditions)
+        ]
+
+
+SECTION, NAV, NAME = r'section\[id="(.*)"\]', r'nav\[data-under="(.*)"\]', r'\[data-path="(.*)"\]'
+
+
+def test_a_pages_tabs_switch_without_its_scripts(project):
+    """The page's style shows one tab, the one its hidden choices pick; a group's tabs keep the
+    name chosen below it, or show its first; and each tab's own choices show it, as the
+    script sets them for a link."""
+    path = write_layout(project, NESTED, output={"file_types": ["html"]})
+    [page] = fg.layout(path).save_all(project / "out" / "fig")
+    browser = _Page(page.read_text())
+    steps = [
+        ((), "platinum/voltage", ["", "platinum"]),
+        (("tab2-power",), "platinum/power", ["", "platinum"]),
+        (("tab1-nickel",), "nickel/voltage", ["", "nickel"]),  # it has no Power: its first
+        (("tab1-platinum",), "platinum/power", ["", "platinum"]),  # Power still chosen
+        (("tab1-notes",), "notes/deep/deeper", ["", "notes", "notes/deep"]),
+    ]
+    for clicks, shown, bars in steps:
+        browser.choose(*clicks)
+        assert browser.showing(SECTION) == [shown]
+        assert browser.showing(NAV) == bars[1:]  # the top one always shows
+        assert browser.showing(NAME) == [
+            "/".join(shown.split("/")[:n]) for n in range(1, shown.count("/") + 2)
+        ]
+    for section, choices in browser.sections:
+        browser.choose(*choices.split())
+        assert browser.showing(SECTION) == [section]
 
 
 @pytest.mark.parametrize(
@@ -630,13 +708,14 @@ def test_the_tab_bar_takes_tab_bar_label_and_line(project):
         project, two, output={"file_types": ["html"]}, tab_bar={"label": label, "line": line}
     )
     [page] = fg.layout(path).save_all(project / "out" / "fig")
-    css = _page_style(page.read_text())
+    text = page.read_text()
+    css = _page_style(text)
     base = 10  # the auto format's base size
     assert '@font-face { font-family: "Roboto"; font-weight: 700;' in css
     assert f"font-size: {base:g}pt; font-weight: 700;\n  color: #AA0000;" in css
     assert "justify-content: flex-end;" in css
     assert f"border-bottom: {0.1 * base:g}pt dashed #00AA00;" in css
-    assert 'nav a[aria-selected="true"] { border-bottom-color: #AA0000; }' in css
+    assert '[data-path="one"] { border-bottom-color: #AA0000; }' in text
 
 
 def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(project):

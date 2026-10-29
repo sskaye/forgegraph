@@ -271,6 +271,38 @@ def test_a_look_must_come_from_a_theme_category_of_its_style(tmp_path, first, me
         looks_in(_layer_file(tmp_path, first=first))
 
 
+def test_a_theme_style_with_a_look_from_another_takes_that_styles_members():
+    """axis.x.tick.label and axis.y.tick.label take axis.tick.label's members, not its own
+    plain parameters, and y has no alignment: its labels don't wrap."""
+    defs = definitions("theme")
+    assert defs["axis.x.tick.label.size"].inherits == "axis.tick.label.size"
+    assert defs["axis.y.tick.label.color"].inherits == "axis.tick.label.color"
+    assert "axis.x.tick.label.x_rotation" not in defs
+    assert "axis.x.tick.label.alignment" in defs and "axis.y.tick.label.alignment" not in defs
+
+
+THEME_FILE = """\
+name: t          # [text]; The name of the theme.
+version: 0          # [int ≥ 0]; The version number of the specification.
+description: A test theme.          # [text]; The description of the theme.
+extends: None          # [None, theme]; What it extends.
+
+parameters:
+    text:
+        font: Roboto          # [text]; The typeface.
+    first:          # [text style, look from second]; The first.
+    second:          # [text style]; The second.
+"""
+
+
+def test_a_theme_style_takes_its_look_only_from_a_style_before_it(tmp_path):
+    path = tmp_path / "t.yaml"
+    path.write_text(THEME_FILE, encoding="utf-8")
+    message = "t.yaml: first: look from second: no text style's category of that name before it"
+    with pytest.raises(ValueError, match=re.escape(message)):
+        read_file("theme", path)
+
+
 def test_a_copied_category_must_name_a_sibling(tmp_path):
     path = _layer_file(tmp_path, second="[same as frist]; The second.")
     with pytest.raises(ValueError, match=r"t\.yaml: second: same as frist: no sibling category"):
@@ -597,6 +629,23 @@ def test_a_styles_member_has_its_general_parameters_status_unless_tagged_itself(
     loose["parameters"] = var(loose["parameters"])  # !var on parameters itself
     reg = reg_with(("theme", loose))
     assert resolve("theme", loose, reg).fixed("title.font")
+
+
+def test_a_tick_label_style_per_axis_takes_axis_tick_labels_value_and_status():
+    """Fixing axis.tick.label.size fixes both axes' sizes unless a file sets one; a GraphSpec
+    may set axis.x.tick.label.size where it's variable."""
+    theme = child("theme", None, {"axis.tick.label.size": fix(0.8)}, name="sized")
+    tree_set(theme["parameters"], "axis.y.tick.label.size", var(1.2))
+    reg = reg_with(("theme", theme))
+    assert validate("theme", theme, reg) == []
+    r = resolve("theme", theme, reg)
+    assert (r["axis.x.tick.label.size"].value, r.fixed("axis.x.tick.label.size")) == (0.8, True)
+    assert (r["axis.y.tick.label.size"].value, r.fixed("axis.y.tick.label.size")) == (1.2, False)
+    assert r.fixed("axis.x.tick.label.font")  # text.font, fixed by light_theme
+    graph = spec({"specifications.theme": "sized", "axis.y.tick.label.size": 0.6})
+    assert validate("graphspec", graph, reg) == []
+    graph = spec({"specifications.theme": "sized", "axis.x.tick.label.size": 0.6})
+    assert validate("graphspec", graph, reg) != []
 
 
 def test_a_tag_with_no_value_changes_only_the_status():

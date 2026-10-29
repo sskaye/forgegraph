@@ -841,3 +841,37 @@ def test_error_bars_can_be_a_percentile_of_the_rows():
     low, high = ys[0::3], ys[1::3]
     medians = RATES.groupby("conc")["rate"].median().to_numpy()
     assert ((high - low) / 2).tolist() == pytest.approx(medians.tolist())
+
+
+def test_a_note_outside_at_the_top_sits_between_the_title_and_the_plot():
+    g = graph(
+        {"n": {"type": "note", "text": "Slope 0.5", "inside": False, "position": "top_left"}},
+        **{"text.title": "Rates"},
+    )
+    [note] = [t for t in g.axes.texts if t.get_gid() == NOTE]
+    renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    box, plot = note.get_window_extent(renderer), g.axes.bbox
+    assert box.y0 > plot.y1
+    assert g.axes.title.get_window_extent(renderer).y0 >= box.y1 - 0.01
+
+
+def test_a_note_outside_at_the_top_sits_over_a_key_there():
+    g = graph(
+        {"n": {"type": "note", "text": "Slope 0.5", "inside": False, "position": "top_right"}},
+        **{
+            "series.color": "state",
+            "legend.method": "key",
+            "series.aggregation.function": "mean",
+            "legend.key.positions": ["top_left"],
+            "legend.key.inside": False,
+            "text.title": "Rates",
+        },
+    )
+    from forgegraph.drawing.key import keys
+
+    [note] = [t for t in g.axes.texts if t.get_gid() == NOTE]
+    renderer = g.figure.canvas.get_renderer()  # type: ignore[attr-defined]
+    box = note.get_window_extent(renderer)
+    [key] = [k for k in keys(g.axes) if k.outside]
+    assert box.y0 > key.bbox().y1
+    assert g.axes.title.get_window_extent(renderer).y0 >= box.y1 - 0.01

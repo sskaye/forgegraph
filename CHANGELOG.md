@@ -8,6 +8,7 @@ ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a mino
 
 - **Nested tabs.** A tab in a layout can now hold tabs of its own, to any depth. The HTML page shows a row of tabs for each level, and switching to another group keeps the same chart showing.
 - **Tick labels per axis.** `axis.x.tick.label` and `axis.y.tick.label` set the size, weight and color of each axis's tick labels separately. Anything they don't set comes from `axis.tick.label`.
+- **Tabs without scripts.** The tabs on a layout's HTML page now work where the page's scripts don't run, such as in a browser with JavaScript turned off. Before, such a page showed every tab, one below another.
 - **Tab bar style.** A layout's `tab_bar.label` and `tab_bar.line` set the look of the tab names and of the line under them on the HTML page. By default they follow the first graph's theme.
 
 ### Changes

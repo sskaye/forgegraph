@@ -19,7 +19,7 @@ parameters: !var          *# !var/!fix sets whether a schedule may cha
     freshness:\
         stamp:\
             show: true          *# \[true, false\]; Whether to draw the "data as of" stamp, with the cadence, in every output.*\
-        stale_after_hours: auto          *# \[auto, float > 0\]; <!-- fmc:1 -->How old the data may get before the HTML page shows the stale banner.<!-- /fmc:1 --> auto is one period plus 25%.*\
+        stale_after_hours: auto          *# \[auto, float > 0\]; How old the data may get before the HTML page shows the stale banner, where the page's scripts run. auto is one period plus 25%.*\
     status:\
         file: auto          *# \[auto, text\]; The status file: an absolute path, a path starting with ~, or a path relative to the file that sets it. auto uses \<name>.status.json in output_folder, or beside this file.*\
     on_failure:\
@@ -28,18 +28,3 @@ parameters: !var          *# !var/!fix sets whether a schedule may cha
     on_success:\
         command: None          *# \[None, texts\]; The program and arguments run, without a shell, when a run succeeds. If None, nothing is run.*\
         timeout_seconds: 60          *# \[int > 0\]; The time the command may take before it's stopped.*
-
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "How old the data may get before the HTML page shows the stale banner."
-  context_before: "h the cadence, in every output.*\\ stale_after_hours: auto # \\[auto, float > 0\\];"
-  context_after: "auto is one period plus 25%.*\\ status:\\ file: auto # \\[auto, text\\]; The status"
-  author: Claude
-  timestamp: 2026-10-29T15:02:29Z
-  resolved: false
-  body: |
-    Problem: the banner is shown by the page's script, so it doesn't appear where scripts don't run; the "data as of" footnote always shows (drawing/page.py). The same text is in forgegraph_default's schedule.
-  suggested_edit:
-    from: "How old the data may get before the HTML page shows the stale banner."
-    to: "How old the data may get before the HTML page shows the stale banner, where the page's scripts run."
--->

@@ -15,7 +15,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
     text:\
         title: Polarization, 60 °C          *# \[None, text\]; The graph's title. If None, there is no title.*\
     data:\
-        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with \~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
+        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
         preprocessing: None          *# \[None, text\]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.*\
     axis:\
         x:\
@@ -25,7 +25,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 order:\
                     method: source          *# \[source, alphanumeric, value\]; The order of the categories. source keeps the order in the data, alphanumeric sorts them naturally, and value sorts them by the other axis's value.*\
                     direction: ascending          *# \[ascending, descending\]; The direction of the category order.*\
-            title: column_name          *# \[None, column_name, text\]; The axis title. column_name uses the name of axis.column if it's the base_axis or the series' column if it's not. With several series, use text or None.*\
+            title: column_name          *# \[None, column_name, text\]; The axis title. column_name uses the name of data.column if it's the base_axis or the series' column if it's not. With several series, use text or None.*\
             scale: linear          *# \[linear, log\]; The axis scale.*\
             min: None          *# \[None, float, date\]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.*\
             max: None          *# \[None, float, date\]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.*\
@@ -41,7 +41,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 order:\
                     method: source          *# \[source, alphanumeric, value\]; The order of the categories. source keeps the order in the data, alphanumeric sorts them naturally, and value sorts them by the other axis's value.*\
                     direction: ascending          *# \[ascending, descending\]; The direction of the category order.*\
-            title: column_name          *# \[None, column_name, text\]; The axis title. column_name uses the name of axis.column if it's the base_axis or the series' column if it's not. With several series, use text or None.*\
+            title: column_name          *# \[None, column_name, text\]; The axis title. column_name uses the name of data.column if it's the base_axis or the series' column if it's not. With several series, use text or None.*\
             scale: linear          *# \[linear, log\]; The axis scale.*\
             min: None          *# \[None, float, date\]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.*\
             max: None          *# \[None, float, date\]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.*\

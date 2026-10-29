@@ -37,44 +37,10 @@ Open a GitHub issue describing the graph you need, ideally with an example image
 
 ## Releasing
 
-1. Set the new version in pyproject.toml <!-- fmc:1 -->and in the built-in pack's pack.yaml, and for a new minor version, its<!-- /fmc:1 --> `requires` (`">=0.4, <0.5"` for 0.4).
+1. Set the new version in pyproject.toml, in the built-in pack's pack.yaml and in the definitions' (src/forgegraph/specifications/pack.yaml), and for a new minor version, their `requires` (`">=0.4, <0.5"` for 0.4).
 2. Rebuild the catalog and mirrors (above).
-3. <!-- fmc:2 -->Write the CHANGELOG entry<!-- /fmc:2 -->: the key features a user would want to know were added, changed or removed, and the bugs fixed.
-4. Merge with CI green, and tag the merge commit `v<version>`.
-5. <!-- fmc:3 -->Run the Publish workflow.<!-- /fmc:3 -->
+3. Write the CHANGELOG entry: the key features a user would want to know were added, changed or removed, and the bugs fixed.
+4. Write the visual changelog: `uv run python scripts/visual_changelog.py v<previous version>`, which saves docs/visual-changelog/<version>.html.
+5. Merge with CI green, and tag the merge commit `v<version>`.
+6. Run the Publish workflow, then create the GitHub release with the CHANGELOG entry as its notes.
 
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "and in the built-in pack's pack.yaml, and for a new minor version, its"
-  context_before: "No code is needed. Releasing Set the new version in pyproject.toml"
-  context_after: "requires (\">=0.4, <0.5\" for 0.4)."
-  author: Claude
-  timestamp: 2026-10-29T15:03:16Z
-  resolved: false
-  body: |
-    Problem: the definitions' pack.yaml still says 0.4.0 and ">=0.4, <0.5" (see the thread on docs/specifications/pack.md), because no step says to update it.
-  suggested_edit:
-    from: "and in the built-in pack's pack.yaml, and for a new minor version, its"
-    to: "in the built-in pack's pack.yaml and in the definitions' (src/forgegraph/specifications/pack.yaml), and for a new minor version, their"
-- id: 2
-  anchor_text: "Write the CHANGELOG entry"
-  context_before: "Rebuild the catalog and mirrors (above)."
-  context_after: ": the key features a user would want to know were added, changed or removed, and"
-  author: Claude
-  timestamp: 2026-10-29T15:03:16Z
-  resolved: false
-  body: |
-    Problem: 0.2, 0.3 and 0.4 each have a visual changelog in docs/visual-changelog (architecture D15 lists it under stability), but 0.5 has none, since no step says to write one.
-    Proposed change: add a step after this one: "Write the visual changelog: uv run python scripts/visual_changelog.py v<previous version>, which saves docs/visual-changelog/<version>.html." Then write 0.5.0's against v0.4.0.
-- id: 3
-  anchor_text: "Run the Publish workflow."
-  context_before: "Merge with CI green, and tag the merge commit v<version>."
-  author: Claude
-  timestamp: 2026-10-29T15:03:16Z
-  resolved: false
-  body: |
-    Problem: the GitHub release is a step we take each time, but it isn't listed.
-  suggested_edit:
-    from: "Run the Publish workflow."
-    to: "Run the Publish workflow, then create the GitHub release with the CHANGELOG entry as its notes."
--->

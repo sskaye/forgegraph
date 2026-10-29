@@ -12,7 +12,7 @@ parameters:          *# !var/!fix sets whether a layout may change a p
         format: ops/dashboard\
     separators:\
         line:\
-            <!-- fmc:1 -->width: 0.05<!-- /fmc:1 -->\
+            width: 0.05\
         border:\
             show: true\
     tabs:\
@@ -36,15 +36,3 @@ parameters:          *# !var/!fix sets whether a layout may change a p
                 gc_ms_01: runs_gc_ms_01.yaml\
                 icp_oes_01: runs_icp_oes_01.yaml
 
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "width: 0.05"
-  context_before: "icitly overridden.*\\ specifications:\\ format: ops/dashboard\\ separators:\\ line:\\"
-  context_after: "\\ border:\\ show: true\\ tabs:\\ Overview:\\ grid:\\ areas: \\[\\[weekly, weekly, lost\\"
-  author: Claude
-  timestamp: 2026-10-29T15:03:02Z
-  resolved: false
-  body: |
-    Problem: this dashboard sets the separator line's width and border.show, but inherits separators.line.style: None from forgegraph_default/layout, and a line is drawn only when its style draws one (layouts/separators.py). So it draws no lines between the tiles and no border, and doesn't show the 0.5 line under the tab bar meeting the border.
-    Proposed change: add style: solid above this line (in lab_throughput.layout.yaml), then check the drawn dashboard. If no lines were intended, delete width and border instead.
--->

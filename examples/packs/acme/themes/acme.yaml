@@ -6,7 +6,7 @@ extends: forgegraph_default/light_theme          # [None, theme]; Each parameter
 parameters:          # !var/!fix sets whether a GraphSpec may change a property. Subcategories/parameters inherit the setting of the one above them unless explicitly overridden.
     text:
         font: IBM Plex Serif          # [text]; The typeface.
-    title:          # [text style]; The graph's title.
+    title:          # [text style]; The graph's title. Its gap is measured from the line its letters sit on.
         weight: medium          # [light, regular, medium, semibold, bold]; The weight.
     plot_area:
         border:          # [line style]; The plot area's border.

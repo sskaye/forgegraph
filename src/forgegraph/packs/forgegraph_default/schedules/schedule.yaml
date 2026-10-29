@@ -15,7 +15,7 @@ parameters: !var          # !var/!fix sets whether a schedule may change a prope
     freshness:
         stamp:
             show: true          # [true, false]; Whether to draw the "data as of" stamp, with the cadence, in every output.
-        stale_after_hours: auto          # [auto, float > 0]; How old the data may get before the HTML page shows the stale banner. auto is one period plus 25%.
+        stale_after_hours: auto          # [auto, float > 0]; How old the data may get before the HTML page shows the stale banner, where the page's scripts run. auto is one period plus 25%.
     status:
         file: auto          # [auto, text]; The status file: an absolute path, a path starting with ~, or a path relative to the file that sets it. auto uses <name>.status.json in output_folder, or beside this file.
     on_failure:

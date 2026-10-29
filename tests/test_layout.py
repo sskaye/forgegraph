@@ -616,6 +616,51 @@ def test_nested_tab_rules(tabs, message):
     assert message in found, found
 
 
+def _page_style(page: str) -> str:
+    found = re.search(r"<style>(.*?)</style>", page, re.S)
+    assert found
+    return found[1]
+
+
+def test_the_tab_bar_takes_tab_bar_label_and_line(project):
+    two = {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")}
+    label = {"color": "#AA0000", "weight": "bold", "size": 1.0, "alignment": "right"}
+    line = {"style": "dashed", "width": 0.1, "color": "#00AA00"}
+    path = write_layout(
+        project, two, output={"file_types": ["html"]}, tab_bar={"label": label, "line": line}
+    )
+    [page] = fg.layout(path).save_all(project / "out" / "fig")
+    css = _page_style(page.read_text())
+    base = 10  # the auto format's base size
+    assert '@font-face { font-family: "Roboto"; font-weight: 700;' in css
+    assert f"font-size: {base:g}pt; font-weight: 700;\n  color: #AA0000;" in css
+    assert "justify-content: flex-end;" in css
+    assert f"border-bottom: {0.1 * base:g}pt dashed #00AA00;" in css
+    assert 'nav a[aria-selected="true"] { border-bottom-color: #AA0000; }' in css
+
+
+def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(project):
+    two = {"One": tab([["volt"]], volt="volt.yaml"), "Two": tab([["power"]], power="power.yaml")}
+    [page] = fg.layout(write_layout(project, two, output={"file_types": ["html"]})).save_all(
+        project / "out" / "fig"
+    )
+    css = _page_style(page.read_text())
+    assert "font-weight: 400;\n  color: #000000;" in css and "justify-content: center;" in css
+    assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, × base size 10
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        ({"style": "dashdot"}, "tab_bar.line.style"),
+        ({"cap": "round"}, "tab_bar.line.cap"),
+    ],
+)
+def test_the_tab_bar_line_is_one_a_page_can_draw(line, message):
+    found = _check({"tab_bar": {"line": line}, "tabs": {"T": tab([["a"]], a="a.yaml")}})
+    assert any(message in p for p in found), found
+
+
 def test_a_layout_sets_its_formats_variable_parameters(project):
     path = write_layout(
         project,

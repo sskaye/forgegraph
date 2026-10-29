@@ -5,8 +5,10 @@ it looks the same in every browser; it's shown at its own size and shrinks, with
 reflowing, to fit a narrower window. The SVG carries its provenance record, as every SVG file
 does, and the page carries the record of everything on it in its head, as JSON.
 
-A layout with several tabs gets a tab bar, which is part of the page, not of any figure, in
-the system's interface font, as wide as the figures. Each tab's link (#overview) opens it.
+A layout with several tabs gets a tab bar, which is part of the page, not of any figure, as
+wide as the figures, in the layout's tab_bar look (TabBar): its names in tab_bar.label's
+font, which the page embeds, size, weight, color, gap and alignment, the selected one
+underlined in that color, and tab_bar.line under it. Each tab's link (#overview) opens it.
 Tabs holding tabs get a tab bar for each level, the one under each tab showing the tabs in
 it; a link names the whole path (#platinum/voltage). Choosing a tab that holds tabs keeps
 the tabs below it of the same names as the ones showing, where it has them, so the same
@@ -68,6 +70,28 @@ function staleMessage(asOf, now, hours, cadence) {
 
 
 @dataclass(frozen=True)
+class TabBar:
+    """A page's tab bar: its names' font (family, size in points, weight number, color, the
+    gap around each in points, and their alignment), the font's file, and the line under it
+    (matplotlib's line style, "none" for none; its width in points; its color)."""
+
+    family: str
+    size: float
+    weight: int
+    color: str
+    gap: float
+    alignment: str
+    font: Path
+    line: str
+    line_width: float
+    line_color: str
+
+
+CSS_LINES = {"-": "solid", "--": "dashed", ":": "dotted", "none": "none"}
+JUSTIFY = {"left": "flex-start", "center": "center", "right": "flex-end"}
+
+
+@dataclass(frozen=True)
 class Shown:
     """One figure on a page: its tab's name and link (None for a graph or a one-tab layout),
     its SVG, and its tab's path, the names of the tabs it's in and its own."""
@@ -82,21 +106,24 @@ _STYLE = """
 html { background: %(background)s; }
 body { margin: 0; padding: 16px; font: 15px/1.4 system-ui, -apple-system, "Segoe UI",
   Roboto, sans-serif; color: #333333; }
+%(font_face)s
 main { max-width: %(width)s; }
 img { display: block; width: 100%%; height: auto; }
 .tabbars { display: none; margin-bottom: %(under)s; }
 .tabbed .tabbars { display: block; }
-nav { display: flex; flex-wrap: wrap; gap: 4px 20px;
-  border-bottom: %(rule_width)s solid %(rule)s; }
+nav { display: flex; flex-wrap: wrap; justify-content: %(justify)s;
+  border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
 nav[hidden] { display: none; }
-nav a { padding: 6px 0; color: inherit; text-decoration: none;
-  border-bottom: 3px solid transparent; margin-bottom: -%(rule_width)s; }
-nav a[aria-selected="true"] { border-bottom-color: #333333; font-weight: 600; }
+nav a, h2 { font-family: %(family)s; font-size: %(size)s; font-weight: %(weight)s;
+  color: %(color)s; }
+nav a { padding: %(gap)s; text-decoration: none; border-bottom: 3px solid transparent;
+  margin-bottom: -%(rule_width)s; }
+nav a[aria-selected="true"] { border-bottom-color: %(color)s; }
 #forgegraph-stale { margin-bottom: 12px; padding: 8px 12px; background: #FFF4CE;
   border: 1px solid #E0B000; color: #4A3B00; }
 section + section { margin-top: 24px; }
-h2 { font-size: 15px; font-weight: 600; margin: 0 0 %(under)s; padding-bottom: 6px;
-  border-bottom: %(rule_width)s solid %(rule)s; }
+h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
+  border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
 .tabbed section { display: none; margin-top: 0; }
 .tabbed section.shown { display: block; }
 .tabbed h2 { display: none; }
@@ -154,6 +181,44 @@ _SCRIPT = (
 )
 
 
+_NO_BAR = {  # a page without a tab bar sets none of its look
+    "font_face": "",
+    "justify": "flex-start",
+    "rule": "transparent",
+    "rule_width": "0pt",
+    "rule_style": "none",
+    "family": "inherit",
+    "size": "inherit",
+    "weight": "inherit",
+    "color": "inherit",
+    "gap": "0",
+}
+
+
+def _bar_look(bar: TabBar) -> dict[str, str]:
+    """The page style's values for a tab bar, with its font embedded."""
+    data = base64.b64encode(bar.font.read_bytes()).decode("ascii")
+    kind = "opentype" if bar.font.suffix.lower() == ".otf" else "truetype"
+    family = json.dumps(bar.family)  # a CSS string: quoted, with quotes escaped
+    face = (
+        f"@font-face {{ font-family: {family}; font-weight: {bar.weight}; "
+        f'src: url("data:font/{"otf" if kind == "opentype" else "ttf"};base64,{data}") '
+        f'format("{kind}"); }}'
+    )
+    return {
+        "font_face": face,
+        "justify": JUSTIFY[bar.alignment],
+        "rule": bar.line_color if bar.line_width > 0 else "transparent",
+        "rule_width": f"{bar.line_width:g}pt",
+        "rule_style": CSS_LINES[bar.line],
+        "family": family,
+        "size": f"{bar.size:g}pt",
+        "weight": str(bar.weight),
+        "color": bar.color,
+        "gap": f"{bar.gap:g}pt",
+    }
+
+
 def _json(record: dict[str, Any] | None) -> str:
     """The record as JSON that can't end the script element it's in."""
     return json.dumps(record, sort_keys=True).replace("</", "<\\/")
@@ -186,15 +251,16 @@ def write(
     shown: list[Shown],
     record: dict[str, Any] | None,
     background: str = "#FFFFFF",
-    rule: str = "#D9D9D9",
-    rule_width: float = 0.75,
+    bar: TabBar | None = None,
     framed: bool = False,
     freshness: Freshness | None = None,
 ) -> Path:
-    """Write the page. background: behind the figures; rule and rule_width: the tab bar's
-    line, in points; framed: the figures are cropped to their border, so the tab bar's line
-    is its top; freshness: a scheduled run's, for the stale banner."""
+    """Write the page. background: behind the figures; bar: the tab bar's look, for several
+    tabs; framed: the figures are cropped to their border, so the tab bar's line is its top;
+    freshness: a scheduled run's, for the stale banner."""
     tabbed = len(shown) > 1
+    if tabbed and bar is None:
+        raise ValueError("a page of several tabs needs its tab bar's look")
     width = max(size(s.svg)[0] for s in shown)
     parts = [
         "<!doctype html>",
@@ -207,13 +273,8 @@ def write(
     ]
     if record is not None:
         parts.append(f'<script type="application/json" id="{SCRIPT_ID}">{_json(record)}</script>')
-    look = {
-        "background": background,
-        "rule": rule,
-        "rule_width": f"{rule_width:g}pt",
-        "width": f"{width:g}pt",
-        "under": "0" if framed else "12px",
-    }
+    look = {"background": background, "width": f"{width:g}pt", "under": "0" if framed else "12px"}
+    look.update(_bar_look(bar) if bar is not None else _NO_BAR)
     parts.append(f"<style>{_STYLE % look}</style>")
     parts += ["</head>", "<body>", "<main>"]
     if freshness is not None:

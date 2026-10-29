@@ -132,12 +132,14 @@ EXCLUDED = {
     "layer.note": ("alignment",),  # its lines line up on its position's side
     "watermark": ("size", "gap", "alignment"),  # one line, spanning the plot area
     "axis.y.tick.label": ("alignment",),  # y tick labels don't wrap
+    "tab_bar.line": ("cap", "join"),  # a page's border line
     "series.benchmark": ("bar.gap",),  # one gap for all the bars side by side
 }
 # A style's member whose range isn't its general parameter's.
 RANGES = {
     "series.marker.edge.style": "None, solid",  # a marker's outline can't be dashed
     "layer.reference.label.color": "line, hex color",  # line: the line's color
+    "tab_bar.line.style": "None, solid, dashed, dotted",  # as a page's borders draw
 }
 
 _INTERVAL = re.compile(r"^(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)$")

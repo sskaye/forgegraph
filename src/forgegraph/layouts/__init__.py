@@ -38,10 +38,17 @@ from forgegraph.drawing.layout import (
     footnote_room,
     place_footnote,
 )
-from forgegraph.drawing.style import Style, isolated
+from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
+from forgegraph.fonts import WEIGHTS, font_file
 from forgegraph.graph import Graph, Prepared, prepare, render
-from forgegraph.layouts.separators import apply_separators, backgrounds, gap_color, line_style
+from forgegraph.layouts.separators import (
+    apply_separators,
+    backgrounds,
+    gap_color,
+    line_style,
+    text_member,
+)
 from forgegraph.spec.access import packs_used
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.layout import Tab, drawing_problems, tabs, tabs_source
@@ -259,15 +266,17 @@ class Layout(Saved):
         path = stem.with_name(f"{stem.name}.{kind}")
         if kind == "html":
             first = self.tabs[0].style
-            look = line_style(self.values, first, float(self.format["figure.base_size"]))
-            rule = look.width if look.visible else 0.0
+            base = float(self.format["figure.base_size"])
+            look = line_style(self.values, first, base)
+            border = look.width if look.visible else 0.0
             framed = not one and look.visible and bool(self.values["separators.border.show"])
+            bar = line_style(self.values, first, base, "tab_bar.line")
             with self.tabs[0].saving():
                 shown = [
                     page.Shown(
                         None if one else t.name,
                         None if one else t.link,
-                        _framed(t, export.svg(t.figure, dpi), rule)
+                        _framed(t, export.svg(t.figure, dpi), border)
                         if framed
                         else export.svg(t.figure, dpi),
                         () if one else t.path,
@@ -282,8 +291,7 @@ class Layout(Saved):
                     shown,
                     self.record(),
                     "transparent" if color == "none" else color,
-                    look.color,
-                    rule,
+                    _tab_bar(self.values, first, base, bar) if not one else None,
                     framed,
                     self.freshness,
                 )
@@ -306,12 +314,34 @@ class Layout(Saved):
         return self.tabs[0].figure, self.tabs[0].style
 
 
-def _framed(tab: TabFigure, svg: bytes, rule: float) -> bytes:
+def _tab_bar(values: dict[str, Any], first: Style, base: float, line: LineStyle) -> page.TabBar:
+    """The page's tab bar: tab_bar.label and tab_bar.line, each member the layout doesn't set
+    its first tile's theme's general text or line."""
+
+    def member(name: str) -> Any:
+        return text_member(values, first, "tab_bar.label", name)
+
+    family, weight = str(member("font")), WEIGHTS[str(member("weight"))]
+    return page.TabBar(
+        family,
+        float(member("size")) * base,
+        weight,
+        str(member("color")),
+        float(member("gap")) * base,
+        str(member("alignment")),
+        font_file(family, weight),
+        line.style if line.visible else "none",
+        line.width if line.visible else 0.0,
+        line.color,
+    )
+
+
+def _framed(tab: TabFigure, svg: bytes, border: float) -> bytes:
     """A tab's SVG cut down to its border, without the border's top side: on a page, the
     line under the tab bar is the border's top."""
     width, height = page.size(svg)
     out = tab.grid.edge / 2 * 72  # the border's centre, in points from each edge
-    half = rule / 2
+    half = border / 2
     return page.crop(svg, out - half, out + half, width - out + half, height - out + half)
 
 

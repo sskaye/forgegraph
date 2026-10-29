@@ -18,6 +18,9 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         border:\
             show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
         corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
+    tab_bar:          *# The row of tab names at the top of the HTML page of a layout with more than one tab.*\
+        label:          *# \[text style\]; The tab names. Its defaults are the first tile's theme's text. The selected tab is underlined in its color.*\
+        line:          *# \[line style\]; The line under the tab bar, and the border's top when the border is drawn. Its defaults are the first tile's theme's line.*\
     tabs:          *# The layout's tabs, in order, <!-- fmc:1 -->each under the name shown on its tab<!-- /fmc:1 -->. A tab holds a grid and its tiles, or tabs of its own, to any depth. A layout's tabs replace those it inherits.*\
         main:\
             grid:\
@@ -30,7 +33,7 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
 <!-- forgemark-comments
 - id: 1
   anchor_text: "each under the name shown on its tab"
-  context_before: "s of each tile's background, × base size.*\\ tabs: # The layout's tabs, in order,"
+  context_before: "faults are the first tile's theme's line.*\\ tabs: # The layout's tabs, in order,"
   context_after: ". A tab holds a grid and its tiles, or tabs of its own, to any depth."
   author: Claude
   timestamp: 2026-10-29T03:24:33Z

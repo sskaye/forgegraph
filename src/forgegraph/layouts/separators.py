@@ -21,12 +21,15 @@ from forgegraph.spec.layout import BLANK
 LINE = ("style", "width", "color", "cap", "join")  # a line style's members
 
 
-def line_style(values: dict[str, Any], first: Style, base: float) -> LineStyle:
-    """The separators' line: each member the layout sets, else its first tile's theme's
-    general line; its width times the layout's base size."""
+def line_style(
+    values: dict[str, Any], first: Style, base: float, at: str = "separators.line"
+) -> LineStyle:
+    """A layout's line style (at: the separators' line, or the tab bar's): each member the
+    layout sets, else its first tile's theme's general line; its width times the layout's
+    base size."""
 
     def member(name: str) -> Any:
-        path = f"separators.line.{name}"
+        path = f"{at}.{name}"
         return values[path] if path in values else first.theme[f"line.{name}"]
 
     style = member("style")
@@ -37,6 +40,13 @@ def line_style(values: dict[str, Any], first: Style, base: float) -> LineStyle:
         str(member("cap")),
         str(member("join")),
     )
+
+
+def text_member(values: dict[str, Any], first: Style, at: str, name: str) -> Any:
+    """A layout's text style's member (at: its path): the layout's, else its first tile's
+    theme's general text."""
+    path = f"{at}.{name}"
+    return values[path] if path in values else first.theme[f"text.{name}"]
 
 
 def gap_color(first: Style) -> str:

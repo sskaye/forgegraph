@@ -51,4 +51,31 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
     Alternative: a tab_label text style here, with the first tile's theme's text as its defaults, as separators.line takes the theme's line. It would let a layout style its tab names apart from the figures' text, but nothing has asked for that.
     
     Recommendation: no new parameter.
+  replies:
+    - author: Steven
+      timestamp: "2026-10-29T03:40:06.714Z"
+      body: |-
+        Better to have the control.
+        Proposal:
+        - Under tabs, add the param “tab_label” (or whatever the standard name is for the text that appears in a tab), which should be text_style, enabling setting of the params of the tab title text. 
+        - The selected tab is underlined in that text color
+        - Add an additional parameter for the line under the tab bar. Again, name whatever that’s normally called and make it line style.
+        -  The page embeds the font, since a browser shows a typeface only if the viewer has it installed or the page carries it.
+    - author: Claude
+      timestamp: 2026-10-29T03:41:14Z
+      body: |
+        Agreed, with one change to where the parameters go and suggested names.
+        
+        1. They can't go under tabs. tabs is a mapping of the author's own tab names, so a parameter there would read as a tab named tab_label, and a layout couldn't name a tab that. They need a category of their own beside tabs and separators.
+        2. Names: the usual name for the strip of tabs is the "tab bar", for the text in a tab its "label", and for the line under the bar a "divider". "line" matches separators.line, so I'd use it over divider.
+        
+        Proposed lines:
+        
+            tab_bar:          # The row of tab names at the top of the HTML page of a layout with more than one tab.
+                label:          # [text style]; The tab names. Its defaults are the first tile's theme's text. The selected tab is underlined in its color.
+                line:          # [line style]; The line under the tab bar. Its defaults are the first tile's theme's line.
+        
+        3. The selected tab is marked only by its underline. Today it's also drawn semibold; dropping that lets label.weight decide every tab's weight.
+        4. With nested tabs (#67), every level's tab bar uses the same style.
+        5. These change only the HTML page, since images and PDFs have no tab bar.
 -->

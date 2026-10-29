@@ -2,6 +2,26 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.5.0 (2026-10-29)
+
+### New Features
+
+- **Nested tabs.** A tab in a layout can now hold tabs of its own, to any depth. The HTML page shows a row of tabs for each level, and switching to another group keeps the same chart showing.
+- **Tick labels per axis.** `axis.x.tick.label` and `axis.y.tick.label` set the size, weight and color of each axis's tick labels separately. Anything they don't set comes from `axis.tick.label`.
+- **Tabs without scripts.** The tabs on a layout's HTML page now work where the page's scripts don't run, such as in a browser with JavaScript turned off. Before, such a page showed every tab, one below another.
+- **Tab bar style.** A layout's `tab_bar.label` and `tab_bar.line` set the look of the tab names and of the line under them on the HTML page. By default they follow the first graph's theme.
+
+### Changes
+
+- **Titles.** Titles now sit `title.gap` above the plot, measured from the line the letters sit on, so titles side by side line up whatever their letters. The default theme's `title.gap` is now 0.41, which keeps its titles where they were. A theme that sets its own `title.gap` will see its titles sit a little higher than in 0.4.
+- **Notes above the plot.** A note placed outside the plot at the top now goes between the title and the plot, instead of above the title.
+- **Tab names on the page.** The tab names are written in the theme's font and color, instead of the browser's font in dark grey.
+
+### Bug Fixes
+
+- Tick labels now use the theme's tick label font and weight. Before, only their size and color were applied.
+- A y-axis title reading upward now sits the same distance from the tick labels whatever its letters.
+
 ## 0.4.0 (2026-10-27)
 
 ### New Features

@@ -26,7 +26,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
     title:          *# \[text style\]; The graph's title.*\
         size: 1.05          *# \[float > 0\]; The size, × base size.*\
         weight: semibold          *# \[light, regular, medium, semibold, bold\]; The weight.*\
-        gap: 0.5          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
+        gap: 0.41          *# \[float ≥ 0\]; The gap between the text and whatever is around it, × base size.*\
     axis:\
         title:          *# \[text style\]; The axis titles.*\
             size: 1.05          *# \[float > 0\]; The size, × base size.*\

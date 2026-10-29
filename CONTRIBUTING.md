@@ -9,7 +9,7 @@ uv sync
 uv run pre-commit install
 ```
 
-While you work, `uv run pytest` runs the development suite: every test not marked slow, in parallel. The full suite adds the slow ones (every catalog card drawn, the image baselines, the catalog pages, and any test over a second). CI runs it on every pull request, and it's the one to run before a release:
+While you work, `uv run pytest` runs the development suite: every test not marked slow, in parallel. The full suite adds the slow ones (every catalog card drawn, the image baselines, the catalog pages, and any test over a second). CI runs it on every pull request that changes more than pages no test reads (`review/`, `CHANGELOG.md`, `CONTRIBUTING.md`, and `docs/` other than the spec and pack pages), and it's the one to run before a release:
 
 ```bash
 uv run pytest --full && uv run ruff check . && uv run ruff format --check && uv run pyright

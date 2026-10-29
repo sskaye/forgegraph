@@ -646,7 +646,7 @@ def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(projec
     )
     css = _page_style(page.read_text())
     assert "font-weight: 400;\n  color: #000000;" in css and "justify-content: center;" in css
-    assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, × base size 10
+    assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, times base size 10
 
 
 @pytest.mark.parametrize(

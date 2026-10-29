@@ -42,6 +42,7 @@ from matplotlib.transforms import Bbox
 from forgegraph.drawing import labels, limits, marks
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
+from forgegraph.drawing.key import keys
 from forgegraph.drawing.markup import markup
 from forgegraph.drawing.style import Style, unset
 from forgegraph.drawing.text import measure
@@ -726,9 +727,28 @@ def _draw_bars(
     caps.set_transform(transform)
 
 
+TOP_NOTE = "_forgegraph_top_note"  # on a note above the plot box: its gap, in points
+
+
+def _under_top_notes(ax: Axes, renderer: Any) -> float:
+    """How far above the plot box a note outside at the top starts, in display pixels: past
+    the x-axis's tick labels on top, and past a key outside at the top."""
+    plot = ax.get_window_extent(renderer)
+    reach = 0.0
+    if any(t.label2.get_visible() and t.label2.get_text() for t in ax.xaxis.get_major_ticks()):
+        box = ax.xaxis.get_tightbbox(renderer)
+        reach = max(reach, box.y1 - plot.y1) if box is not None else reach
+    for k in keys(ax):
+        if k.outside and k.position and k.position.startswith("top"):
+            room = k.height + k.style.pt("legend.key.gap.outer")
+            reach = max(reach, room * ax.figure.dpi / 72)  # type: ignore[union-attr]
+    return reach
+
+
 def notes_outside(ax: Axes, layers: dict[str, dict[str, Any]], style: Style) -> None:
-    """Notes outside the plot area: above the title, or below the x-axis title. Drawn before
-    layout, which makes room for them."""
+    """Notes outside the plot area: at the top, between the title and the plot box (above a
+    key outside at the top), or below the x-axis title. Drawn before layout, which makes room
+    for them; the title moves up over a note at the top."""
     for name, layer in layers.items():
         if layer["type"] != "note" or layer["inside"]:
             continue
@@ -743,19 +763,19 @@ def notes_outside(ax: Axes, layers: dict[str, dict[str, Any]], style: Style) -> 
         own = look(style, layer)
         gap = own.pt("layer.note.gap")
         top = vertical == "top"
-        anchor = ax.title if top else ax.xaxis.label
 
-        def edge(renderer: Any, anchor: Any = anchor, top: bool = top) -> Bbox:
+        def edge(renderer: Any, top: bool = top) -> Bbox:
             plot = ax.get_window_extent(renderer)
-            if anchor.get_text():
-                box = anchor.get_window_extent(renderer)
-            elif top:
-                box = plot
+            if top:
+                reach = _under_top_notes(ax, renderer)
+                return Bbox.from_extents(plot.x0, plot.y0, plot.x1, plot.y1 + reach)
+            if ax.xaxis.label.get_text():
+                box = ax.xaxis.label.get_window_extent(renderer)
             else:
                 box = ax.xaxis.get_tightbbox(renderer) or plot
             return Bbox.from_extents(plot.x0, box.y0, plot.x1, box.y1)
 
-        _note(
+        note = _note(
             ax,
             layer["text"],
             (fraction, 1.0 if top else 0.0),
@@ -765,6 +785,8 @@ def notes_outside(ax: Axes, layers: dict[str, dict[str, Any]], style: Style) -> 
             "bottom" if top else "top",
             own,
         )
+        if top:
+            setattr(note, TOP_NOTE, gap)
 
 
 def _note(

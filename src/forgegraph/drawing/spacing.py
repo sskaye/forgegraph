@@ -18,6 +18,7 @@ from matplotlib.transforms import ScaledTranslation, Transform
 
 from forgegraph.drawing import limits, text
 from forgegraph.drawing.key import keys
+from forgegraph.drawing.layers import TOP_NOTE
 from forgegraph.drawing.style import Style
 
 
@@ -136,6 +137,10 @@ def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> No
     axis.labelpad = style.pt(gap) - own - ticks
 
 
+def _box_height(box: text.Box) -> float:
+    return box.top + box.bottom
+
+
 def _title_pad(ax: Axes, style: Style) -> None:
     """Pad the title so its baseline sits title.gap above what's under it: descenders hang
     into the gap, so titles beside each other share a baseline whatever their letters.
@@ -148,7 +153,13 @@ def _title_pad(ax: Axes, style: Style) -> None:
         for k in keys(ax)
         if k.outside and k.position and k.position.startswith("top")
     ]
-    ax.set_title(ax.get_title(), pad=style.pt("title.gap") - ticks + max(above, default=0.0))
+    notes = [  # a note outside at the top, over any key: the title sits over it too
+        _box_height(text.box(t.get_text(), t.get_fontproperties())) + getattr(t, TOP_NOTE)
+        for t in ax.texts
+        if hasattr(t, TOP_NOTE) and t.get_visible()
+    ]
+    room = max(above, default=0.0) + max(notes, default=0.0)
+    ax.set_title(ax.get_title(), pad=style.pt("title.gap") - ticks + room)
     align_title(ax, style)
 
 

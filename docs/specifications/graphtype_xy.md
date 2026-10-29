@@ -16,7 +16,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 order:\
                     method: source          *# \[source, alphanumeric, value\]; The order of the categories. source keeps the order in the data, alphanumeric sorts them naturally, and value sorts them by the other axis's value.*\
                     direction: ascending          *# \[ascending, descending\]; The direction of the category order.*\
-            title: column_name          *# \[None, column_name, text\]; The axis title. column_name uses the name of axis.column if it's the base_axis or the series' column if it's not. With several series, use text or None.*\
+            title: column_name          *# \[None, column_name, text\]; The axis title. column_name <!-- fmc:1 -->uses the name of axis.column if<!-- /fmc:1 --> it's the base_axis or the series' column if it's not. With several series, use text or None.*\
             scale: linear          *# \[linear, log\]; The axis scale.*\
             min: None          *# \[None, float, date\]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.*\
             max: None          *# \[None, float, date\]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.*\
@@ -72,3 +72,18 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 text: column_name          *# \[None, column_name, text\]; The color bar's title. column_name uses the name of the series' color column. If None, there is no title.*\
     layer:\
         types: !fix \[reference, note, error_bar\]          *# \[layer types\]; The layer types that a GraphSpec of this graph type may use.*
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "uses the name of axis.column if"
+  context_before: column_name
+  context_after: "it's the base_axis or the series' column if it's not."
+  author: Claude
+  timestamp: 2026-10-29T15:02:27Z
+  resolved: false
+  body: |
+    Problem: there's no axis.column; the parameter is axis.<x|y>.data.column. The same sentence is in both graphspec_example files (the definition and forgegraph_default's, twice each), which would change with it.
+  suggested_edit:
+    from: "uses the name of axis.column if"
+    to: "uses the name of data.column if"
+-->

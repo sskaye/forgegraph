@@ -12,7 +12,7 @@ ForgeGraph is a library and agent skill for making high-quality graphs quickly a
 - **Graph type**: the type of graph, e.g. xy drawn with lines, markers, or bars.
 - **Theme**: the look: fixed styles (fonts, palettes, spines, ticks, legend style), plus defaults for options.
 - **Format**: destination-specific features: figure size, base font size, file type, dpi, etc.
-- **Layers**: overlays on a graph: reference lines, error bars, notes.
+- **Layers**: overlays on a graph: <!-- fmc:1 -->reference lines, error bars, notes<!-- /fmc:1 -->.
 - **Layout**: multiple GraphSpecs can be arranged in one figure: for multi-panel figures, dashboards.
 
 The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec's `data.file`.
@@ -48,3 +48,17 @@ Every command takes `--help`.
 - [examples/figure.layout.yaml](examples/figure.layout.yaml): a layout of xy.yaml above bars.yaml.
 - [examples/figure.schedule.yaml](examples/figure.schedule.yaml): figure.layout.yaml rendered every weekday at 06:00.
 
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "reference lines, error bars, notes"
+  context_before: "Layers: overlays on a graph:"
+  context_after: ". Layout: multiple GraphSpecs can be arranged in one figure: for multi-panel fig"
+  author: Claude
+  timestamp: 2026-10-29T15:03:02Z
+  resolved: false
+  body: |
+    Problem: the reference layer draws bands too since 0.4, and the README now says so.
+  suggested_edit:
+    from: "reference lines, error bars, notes"
+    to: "reference lines and bands, error bars, notes"
+-->

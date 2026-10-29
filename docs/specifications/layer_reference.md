@@ -19,7 +19,7 @@ parameters:\
             text: None          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.*\
             position: auto          *# \[auto, start_above, start_below, center_above, center_below, end_above, end_below\]; auto selects the first option that doesn't overlap the data and is invalid if inside is false.*\
             inside: true          *# \[true, false\]; Whether the label is inside the plot area. If false, it's beyond the plot area at the line's start or end, and a center position is invalid.*\
-            format: auto          *# \[auto, format\]; The format of the value. auto uses one more decimal than the axis's tick labels, or on a date axis, the tick label format.*\
+            format: auto          *# \[auto, format\]; The format of the value. <!-- fmc:3 -->auto uses one more decimal than the axis's tick labels, or on a date axis, the tick label format.<!-- /fmc:3 -->*\
     line_2:          *# \[same as line_1\]; The second line.*\
     fill:          *# \[look from layer.reference.fill\]; The fill between the lines of a band.*\
         color: "#808080"          *# \[None, <!-- fmc:2 -->series, hex color<!-- /fmc:2 -->\]; The fill color. series uses the series' color. If None, there is no fill.*\
@@ -52,4 +52,16 @@ parameters:\
       timestamp: 2026-10-27T21:14:27Z
       body: |
         Done. fill.color takes None, which draws no fill, here and in the theme's layer.reference.fill.color.
+- id: 3
+  anchor_text: "auto uses one more decimal than the axis's tick labels, or on a date axis, the tick label format."
+  context_before: "position is invalid.*\\ format: auto # \\[auto, format\\]; The format of the value."
+  context_after: "\\ line_2: # \\[same as line_1\\]; The second line.*\\ fill: # \\[look from layer.ref"
+  author: Claude
+  timestamp: 2026-10-29T15:02:28Z
+  resolved: false
+  body: |
+    Problem: auto uses the axis's tick.label.format whenever it's set (drawing/axes.py, number_text), as the 0.3 changelog says; on a date axis with both auto, it's an error.
+  suggested_edit:
+    from: "auto uses one more decimal than the axis's tick labels, or on a date axis, the tick label format."
+    to: "auto uses the axis's tick label format if it's set, and otherwise one more decimal than the tick labels show. On a date axis, it uses the tick label format, which must then be set."
 -->

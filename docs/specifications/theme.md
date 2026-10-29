@@ -23,7 +23,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         join: round          *# \[miter, round, bevel\]; The shape of a line's corners.*\
     background:\
         color: "#FFFFFF"          *# \[None, hex color\]; The background color of the figure and the plot area. If None, the background is transparent.*\
-    title:          *# \[text style\]; The graph's title.*\
+    title:          *# \[text style\]; <!-- fmc:2 -->The graph's title.<!-- /fmc:2 -->*\
     axis:\
         title:          *# \[text style\]; The axis titles.*\
         tick:          *# \[line style\]; The tick marks.*\
@@ -65,7 +65,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             shapes: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
             fills: \[filled, open\]          *# \[filled, open\]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.*\
             size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
-            edge:          *# \[line style\]; The outline of filled markers.*\
+            edge:          *# \[line style\]; <!-- fmc:1 -->The outline of filled markers.<!-- /fmc:1 -->*\
         bar:\
             width: 0.8          *# \[0-1\]; The fraction of the distance between neighboring bar positions that the bars at one position fill.*\
             gap: 0.1          *# \[0-1\]; The fraction of each side-by-side bar's space left empty between it and the next bar.*\
@@ -113,3 +113,30 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         angle: 30          *# \[-90-90\]; The watermark's angle, in degrees counterclockwise.*\
         span: 0.8          *# \[0-1\]; The fraction of the plot area's width or height that the watermark spans, whichever it reaches first.*\
     footnote:          *# \[text style\]; The footnotes below the figure.*
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "The outline of filled markers."
+  context_before: "ze: 0.5 # \\[float > 0\\]; The marker size, × base size.*\\ edge: # \\[line style\\];"
+  context_after: "\\ bar:\\ width: 0.8 # \\[0-1\\]; The fraction of the distance between neighboring b"
+  author: Claude
+  timestamp: 2026-10-29T15:02:29Z
+  resolved: false
+  body: |
+    Problem: open markers are drawn at edge.width too (drawing/xy.py). Less sure: you may not want the description to cover open markers. The same text is in light_theme.
+  suggested_edit:
+    from: "The outline of filled markers."
+    to: "The outline of filled markers. Open markers are outlined at its width, in their series' color."
+- id: 2
+  anchor_text: "The graph's title."
+  context_before: "If None, the background is transparent.*\\ title: # \\[text style\\];"
+  context_after: "\\ axis:\\ title: # \\[text style\\]; The axis titles.*\\ tick: # \\[line style\\]; The"
+  author: Claude
+  timestamp: 2026-10-29T15:02:29Z
+  resolved: false
+  body: |
+    Problem: since 0.5, title.gap is measured from the baseline (drawing/spacing.py), which the generic text gap description doesn't say. The same text is in light_theme.
+  suggested_edit:
+    from: "The graph's title."
+    to: "The graph's title. Its gap is measured from the line its letters sit on."
+-->

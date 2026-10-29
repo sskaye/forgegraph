@@ -146,9 +146,7 @@ ForgeGraph is [MIT-licensed](https://github.com/sskaye/forgegraph/blob/main/LICE
 - [Built-in pack](https://github.com/sskaye/forgegraph/blob/main/docs/packs/forgegraph_default): forgegraph_default's specs.
 - [Changelog](https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md).
 - [Contributing](https://github.com/sskaye/forgegraph/blob/main/CONTRIBUTING.md): working on ForgeGraph itself.
-- Design record, in [docs/design](https://github.com/sskaye/forgegraph/blob/main/docs/design):
-  - [Architecture](https://github.com/sskaye/forgegraph/blob/main/docs/design/architecture.md): how ForgeGraph is designed, and why.
-  - [To do](https://github.com/sskaye/forgegraph/blob/main/docs/design/todo.md): what's still planned.
+- [Architecture](https://github.com/sskaye/forgegraph/blob/main/docs/design/architecture.md): how ForgeGraph is designed, and why.
 
 ## Contributing
 

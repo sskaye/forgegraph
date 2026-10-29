@@ -18,14 +18,14 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
         border:\
             show: false          *# \[true, false\]; Whether to also draw the line around the outside of the tiles, through the middle of the inner gap.*\
         corner_radius: 0          *# \[float ≥ 0\]; The radius of the corners of each tile's background, × base size.*\
-    tab_bar:          *# The row of tab names at the top of the HTML page of a layout with more than one tab.*\
+    tab_bar:          *# <!-- fmc:3 -->The row of tab names at the top of the HTML page of a layout with more than one tab.<!-- /fmc:3 -->*\
         label:          *# \[text style\]; The tab names. Its defaults are the first tile's theme's text. The selected tab is underlined in its color.*\
-        line:          *# \[line style\]; The line under the tab bar, and the border's top when the border is drawn. Its defaults are the first tile's theme's line.*\
+        line:          *# \[line style\]; <!-- fmc:4 -->The line under the tab bar, and the border's top when the border is drawn.<!-- /fmc:4 --> Its defaults are the first tile's theme's line.*\
     tabs:          *# The layout's tabs, in order, <!-- fmc:1 -->each under the name shown on its tab<!-- /fmc:1 -->. A tab holds a grid and its tiles, or tabs of its own, to any depth. A layout's tabs replace those it inherits.*\
         main:\
             grid:\
                 areas: \[\[a\]\]          *# \[text grid\]; A list of tiles for each row. A . leaves a cell blank. A name repeated over a rectangle of cells makes that tile span them, e.g. \[a, a\] makes tile a span two columns.*\
-                column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. If None, they're equal.*\
+                column_widths: None          *# \[None, floats > 0\]; The relative widths of the columns' plot boxes. <!-- fmc:2 -->If None, they're equal.<!-- /fmc:2 -->*\
                 row_heights: None          *# \[None, floats > 0\]; The relative heights of the rows' plot boxes. If None, they're equal, or as tall as the tiles need.*\
             tiles:          *# The GraphSpec drawn in each area of the grid, under the area's name.*\
                 a: None          *# \[text\]; The GraphSpec file: an absolute path, a path starting with ~, or a path relative to this file. A layout must set it.*
@@ -85,4 +85,40 @@ parameters: !var          *# !var/!fix sets whether a layout may chang
       timestamp: 2026-10-29T05:16:29Z
       body: |
         Built in sskaye/forgegraph#75 as agreed: tab_bar.label and tab_bar.line, below on this page. The selected tab is underlined in the label's color, the label's alignment places the names and its gap spaces them, the page embeds the label's font, and the line can be solid, dashed or dotted. The default pack's layout keeps no line under the bar.
+- id: 2
+  anchor_text: "If None, they're equal."
+  context_before: "hs: None # \\[None, floats > 0\\]; The relative widths of the columns' plot boxes."
+  context_after: "\\ row_heights: None # \\[None, floats > 0\\]; The relative heights of the rows' pl"
+  author: Claude
+  timestamp: 2026-10-29T15:02:28Z
+  resolved: false
+  body: |
+    Problem: when the format's width is auto, the columns take the widths their tiles' aspect ratios need (drawing/layout.py), as row_heights already says for heights. The same text is in forgegraph_default's layout.
+  suggested_edit:
+    from: "If None, they're equal."
+    to: "If None, they're equal, or as wide as the tiles need."
+- id: 3
+  anchor_text: "The row of tab names at the top of the HTML page of a layout with more than one tab."
+  context_before: "; The radius of the corners of each tile's background, × base size.*\\ tab_bar: #"
+  context_after: "\\ label: # \\[text style\\]; The tab names."
+  author: Claude
+  timestamp: 2026-10-29T15:02:28Z
+  resolved: false
+  body: |
+    Problem: with nested tabs, the page has a row of tab names for each level (drawing/page.py). The same text is in forgegraph_default's layout.
+  suggested_edit:
+    from: "The row of tab names at the top of the HTML page of a layout with more than one tab."
+    to: "The rows of tab names on the HTML page of a layout with more than one tab: one for the layout's tabs, and one under each tab that holds tabs."
+- id: 4
+  anchor_text: "The line under the tab bar, and the border's top when the border is drawn."
+  context_before: "The selected tab is underlined in its color.*\\ line: # \\[line style\\];"
+  context_after: "Its defaults are the first tile's theme's line.*\\ tabs: # The layout's tabs, in"
+  author: Claude
+  timestamp: 2026-10-29T15:02:28Z
+  resolved: false
+  body: |
+    Problem: with nested tabs, every tab bar gets this line, and only the last one's is the border's top. The same text is in forgegraph_default's layout.
+  suggested_edit:
+    from: "The line under the tab bar, and the border's top when the border is drawn."
+    to: "The line under each tab bar. When the border is drawn, the line under the last tab bar is the border's top."
 -->

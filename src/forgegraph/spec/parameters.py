@@ -131,6 +131,7 @@ EXCLUDED = {
     "layer.reference.label": ("alignment",),  # placed by its position
     "layer.note": ("alignment",),  # its lines line up on its position's side
     "watermark": ("size", "gap", "alignment"),  # one line, spanning the plot area
+    "axis.y.tick.label": ("alignment",),  # y tick labels don't wrap
     "series.benchmark": ("bar.gap",),  # one gap for all the bars side by side
 }
 # A style's member whose range isn't its general parameter's.
@@ -540,6 +541,7 @@ class _Style:
     path: str
     word: str  # "text style", "line style" or "series style"
     fixed: bool | None
+    look: str | None = None  # in a theme: the style whose members its members take, if not text's
 
 
 @dataclass(frozen=True)
@@ -589,7 +591,7 @@ def _walk(
             parent = path.rsplit(".", 1)[0] if "." in path else ""
             out.append(_Same(path, f"{parent}.{found.same}" if parent else found.same, status))
         elif found.style is not None:
-            out.append(_Style(path, found.style, status))
+            out.append(_Style(path, found.style, status, found.look))
             if hasattr(value, "items"):
                 out += _walk(path, value, status, where, in_style=True)
         elif hasattr(value, "items"):
@@ -638,12 +640,26 @@ def _expand(
             generals = [
                 g for g in definitions("theme").values() if g.path.startswith(f"{general}.")
             ]
+        source: dict[str, Parameter] = {}  # look from another style: its members, by name
+        if style.look is not None:
+            if style.look not in made:
+                raise ValueError(
+                    f"{where.name}: {style.path}: look from {style.look}: no {style.word}'s "
+                    "category of that name before it"
+                )
+            for p in [*params.values(), *made[style.look]]:
+                if p.path.startswith(f"{style.look}.") and p.inherits is not None:
+                    source[p.path[len(style.look) + 1 :]] = p
         for g in generals:
             if not g.path.startswith(f"{general}.") or g.path.startswith(f"{style.path}."):
                 continue
             rel = g.path[len(general) + 1 :]
             if rel in excluded or (rel.split(".")[-1] in excluded and "." not in rel):
                 continue
+            if style.look is not None:
+                if rel not in source:
+                    continue  # a member the style it takes its look from doesn't have
+                g = Parameter(**{**source[rel].__dict__, "description": g.description})
             path = f"{style.path}.{rel}"
             rng = parse_range(RANGES[path]) if path in RANGES else g.range
             if path in bare:

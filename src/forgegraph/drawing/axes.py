@@ -361,7 +361,7 @@ def ticks_and_labels(
         raise DrawError(f"{prefix}.scale: log, but the axis is categorical")
     t = style.theme
     order = str(t["axis.tick.label.date_order"])
-    gap = style.pt("axis.tick.label.gap")
+    gap = style.pt(f"{prefix}.tick.label.gap")
     locator: Locator
     if algorithm == "all":
         locator = FixedLocator(sorted(set(float(v) for v in values if not np.isnan(v))))
@@ -375,7 +375,7 @@ def ticks_and_labels(
         locator = LogTicks(
             str(t["axis.tick.log_algorithm"]),
             str(t["axis.tick.algorithm"]),
-            style.pt("axis.tick.label.gap"),
+            gap,
             integer=kind == "integer",
         )
     elif kind == "date":
@@ -415,7 +415,7 @@ def ticks_and_labels(
         formatter = Wrapped(
             formatter or axis.get_major_formatter(),
             int(t["axis.tick.label.max_wrap"]),
-            style.pt("axis.tick.label.gap"),
+            gap,
         )
     if formatter is not None:
         axis.set_major_formatter(formatter)
@@ -431,11 +431,12 @@ def _spacing(values: np.ndarray) -> float | None:
 
 
 def check_fit(ax: Axes, gt: dict[str, Any], style: Style) -> None:
-    """Tick labels that run together, or come within the theme's axis.tick.label.gap of each
-    other, are an error: all and manual are never thinned, and auto's algorithms count
-    labels by their height, not their width, so long labels can still meet."""
-    gap = style.pt("axis.tick.label.gap") * ax.figure.dpi / 72
+    """Tick labels that run together, or come within the theme's tick label gap of each
+    other (axis.x.tick.label.gap or axis.y's), are an error: all and manual are never
+    thinned, and auto's algorithms count labels by their height, not their width, so long
+    labels can still meet."""
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
+        gap = style.pt(f"axis.{name}.tick.label.gap") * ax.figure.dpi / 72
         algorithm = gt[f"axis.{name}.tick.algorithm"]
         # get_majorticklabels updates the ticks first: before a draw they're stale
         if _run_together([t for t in axis.get_majorticklabels() if t.get_text()], gap):

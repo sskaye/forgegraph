@@ -39,6 +39,12 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             minor:          *# \[line style\]; The minor tick marks.*\
                 count: 0          *# \[int ≥ 0\]; The number of minor ticks between major ticks. If 0, there are none.*\
                 length: 0.15          *# \[float ≥ 0\]; The minor tick length, × base size.*\
+        x:\
+            tick:\
+                label:          *# \[text style, look from axis.tick.label\]; The x-axis tick labels. Each parameter not set here is axis.tick.label's.*\
+        y:\
+            tick:\
+                label:          *# \[text style, look from axis.tick.label\]; The y-axis tick labels. Each parameter not set here is axis.tick.label's.*\
         max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
     plot_area:\
         border:          *# \[line style\]; The plot area's border.*\

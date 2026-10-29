@@ -21,9 +21,11 @@ from forgegraph.drawing.key import keys
 from forgegraph.drawing.layers import TOP_NOTE
 from forgegraph.drawing.style import Style
 
+TICK_LABEL = "axis.tick.label"  # a color bar's tick labels; a graph's are each axis's own
 
-def tick_font(style: Style) -> FontProperties:
-    return style.font("axis.tick.label")
+
+def tick_font(style: Style, path: str = TICK_LABEL) -> FontProperties:
+    return style.font(path)
 
 
 def axis_title_font(style: Style) -> FontProperties:
@@ -55,10 +57,10 @@ def _side(axis: Axis) -> int | None:
     return which if _labels(axis, which) else None
 
 
-def _tick_excess(axis: Axis, which: int, style: Style) -> float:
+def _tick_excess(axis: Axis, which: int, style: Style, path: str) -> float:
     """How far the tick labels' boxes on one side reach past their letters, on the side away
-    from the ticks, in points."""
-    prop, labels = tick_font(style), _labels(axis, which)
+    from the ticks, in points. path: their text style."""
+    prop, labels = tick_font(style, path), _labels(axis, which)
     if not labels:
         return 0.0
     row = text.row(labels, prop)
@@ -71,9 +73,9 @@ def _tick_excess(axis: Axis, which: int, style: Style) -> float:
     return widest.advance - widest.right
 
 
-def _tick_pad(axis: Axis, style: Style) -> None:
-    """Pad each tick label so its letters sit axis.tick.label.gap from the tick."""
-    gap, prop = style.pt("axis.tick.label.gap"), tick_font(style)
+def _tick_pad(axis: Axis, style: Style, path: str) -> None:
+    """Pad each tick label so its letters sit its style's gap (path) from the tick."""
+    gap, prop = style.pt(f"{path}.gap"), tick_font(style, path)
     which = 1 if _labels(axis, 1) else 2
     labels = _labels(axis, which)
     if not labels:
@@ -103,10 +105,10 @@ def _shift(label: Text, points: float) -> None:
     setattr(label, _SHIFT, (moved, base))
 
 
-def _centre_y_labels(axis: Axis, style: Style) -> None:
+def _centre_y_labels(axis: Axis, style: Style, path: str) -> None:
     """Centre the y tick labels' letters on their ticks: each sits on its baseline at the
     tick (ytick.alignment is baseline), moved down by the middle of the row's edges."""
-    prop = tick_font(style)
+    prop = tick_font(style, path)
     labels = _labels(axis, 1) + _labels(axis, 2)
     if not labels:
         return
@@ -116,7 +118,7 @@ def _centre_y_labels(axis: Axis, style: Style) -> None:
             _shift(label, middle)
 
 
-def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> None:
+def _axis_title_pad(axis: Axis, style: Style, gap: str, path: str) -> None:
     """Pad the axis title so it sits gap (a theme path) from the tick labels' letters: from
     its own letters where its top faces them, and from its baseline where its baseline does,
     so a title's descenders don't move it."""
@@ -133,7 +135,7 @@ def _axis_title_pad(axis: Axis, style: Style, gap: str = "axis.title.gap") -> No
     else:  # reads upward: on the left its baseline faces the plot, on the right its top does
         own = box.bottom if position == "left" else box.top - edges.top
     side = _side(axis)
-    ticks = _tick_excess(axis, side, style) if side is not None else 0.0
+    ticks = _tick_excess(axis, side, style, path) if side is not None else 0.0
     axis.labelpad = style.pt(gap) - own - ticks
 
 
@@ -147,7 +149,7 @@ def _title_pad(ax: Axes, style: Style) -> None:
     Matplotlib's title pad is to its baseline (va baseline)."""
     if not ax.get_title().strip():
         return
-    ticks = _tick_excess(ax.xaxis, 2, style) if _labels(ax.xaxis, 2) else 0.0
+    ticks = _tick_excess(ax.xaxis, 2, style, "axis.x.tick.label") if _labels(ax.xaxis, 2) else 0.0
     above = [  # a key outside, above the plot box: the title sits over it
         k.height + style.pt("legend.key.gap.outer")
         for k in keys(ax)
@@ -178,18 +180,29 @@ def axes_family(ax: Axes) -> list[Axes]:
     return [ax, *cast(list[Axes], ax.child_axes)]
 
 
+def _tick_labels(axis: Axis, style: Style, path: str) -> None:
+    """Draw the tick labels in their text style (path): its font, weight, size and color, and
+    for wrapped x labels, its alignment. Ticks matplotlib makes later copy the first one's."""
+    prop, color = tick_font(style, path), style.color(f"{path}.color")
+    alignment = style.theme.get(f"{path}.alignment")  # a wrapped label's lines (x only)
+    for tick in axis.get_major_ticks():
+        for label in (tick.label1, tick.label2):
+            label.set_fontproperties(prop)
+            label.set_color(color)
+            if alignment is not None:
+                label.set_multialignment(cast(Any, str(alignment)))
+
+
 def apply(ax: Axes, style: Style) -> None:
     """Set every padding around the Axes' text from the theme's visible gaps."""
-    alignment = cast(Any, str(style.theme["axis.tick.label.alignment"]))  # a wrapped label's lines
-    for tick in ax.xaxis.get_major_ticks():
-        tick.label1.set_multialignment(alignment)
-        tick.label2.set_multialignment(alignment)
     for each in axes_family(ax):
         gap = "axis.title.gap" if each is ax else "legend.color_bar.title.gap"  # a color bar's
-        for axis in (each.xaxis, each.yaxis):
-            _tick_pad(axis, style)
-            _axis_title_pad(axis, style, gap)
-        _centre_y_labels(each.yaxis, style)
+        for name, axis in (("x", each.xaxis), ("y", each.yaxis)):
+            path = f"axis.{name}.tick.label" if each is ax else TICK_LABEL
+            _tick_labels(axis, style, path)
+            _tick_pad(axis, style, path)
+            _axis_title_pad(axis, style, gap, path)
+        _centre_y_labels(each.yaxis, style, "axis.y.tick.label" if each is ax else TICK_LABEL)
     _title_pad(ax, style)
     for k in keys(ax):  # a key below the plot box follows the x-axis title
         k.follow(ax)

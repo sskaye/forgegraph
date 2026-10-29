@@ -185,6 +185,32 @@ def test_each_text_takes_its_own_color_and_font():
     assert to_hex(g.axes.xaxis.get_major_ticks()[0].tick1line.get_color()) == "#000000"
 
 
+def test_each_axis_tick_labels_take_their_own_style_and_axis_tick_labels_otherwise():
+    """axis.x.tick.label and axis.y.tick.label set each axis's tick labels; what they don't set
+    is axis.tick.label's, including its font and weight, which are drawn."""
+    from matplotlib.colors import to_hex
+    from render_helpers import render
+
+    g = render(
+        theme={
+            "axis.tick.label.font": "Source Sans 3",
+            "axis.tick.label.weight": "bold",
+            "axis.x.tick.label.size": 0.5,
+            "axis.y.tick.label.color": "#00AA00",
+        }
+    )
+    g.figure.canvas.draw()
+    x = next(t for t in g.axes.xaxis.get_ticklabels() if t.get_text())
+    y = next(t for t in g.axes.yaxis.get_ticklabels() if t.get_text())
+    assert x.get_fontsize() == pytest.approx(g.style.pt("axis.x.tick.label.size"))
+    assert y.get_fontsize() == pytest.approx(g.style.pt("axis.tick.label.size"))
+    assert float(x.get_fontsize()) < float(y.get_fontsize())
+    assert to_hex(y.get_color()) == "#00aa00" and to_hex(x.get_color()) == "#000000"
+    for label in (x, y):
+        assert label.get_fontproperties().get_family() == ["Source Sans 3"]
+        assert label.get_fontweight() in ("bold", 700)
+
+
 @pytest.mark.parametrize(("alignment", "location"), [("left", "left"), ("right", "right")])
 def test_an_axis_titles_alignment_places_it_along_its_axis(alignment, location):
     from render_helpers import render

@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # The actions the workflows use. Python dependencies get security updates only: the package
+  # sets minimum versions, and CI's lowest-versions job tests them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

@@ -1,0 +1,26 @@
+name: Feature request
+description: A graph type, layer or option that ForgeGraph doesn't have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you're trying to make
+      description: The graph or feature you need, and what it's for.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What ForgeGraph does today
+      description: What stops you, and any workaround you used.
+  - type: textarea
+    id: example
+    attributes:
+      label: An example
+      description: An image or sketch of what you want, and a little sample data if you can share it. Leave out data that isn't yours to share.
+  - type: input
+    id: version
+    attributes:
+      label: ForgeGraph version
+      description: The output of `forgegraph --version`.

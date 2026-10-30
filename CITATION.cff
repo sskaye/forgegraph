@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: If you use ForgeGraph in your work, please cite it as below.
+title: ForgeGraph
+abstract: Fast, consistent, publication-quality graphs from pandas DataFrames, for people and AI agents.
+type: software
+authors:
+  - given-names: Steven
+    family-names: Kaye
+repository-code: https://github.com/sskaye/forgegraph
+url: https://pypi.org/project/forgegraph/
+license: MIT
+keywords:
+  - data visualization
+  - plotting
+  - matplotlib
+  - scientific visualization

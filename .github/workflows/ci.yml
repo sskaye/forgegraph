@@ -48,6 +48,9 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run pyright
       - name: Deny-listed terms
+        # Dependabot's runs don't get the repository's secrets, and it changes only the lock file
+        # and the actions' versions.
+        if: github.actor != 'dependabot[bot]'
         run: uv run python scripts/check_denylist.py
         env:
           FORGEGRAPH_DENYLIST: ${{ secrets.DENYLIST }}

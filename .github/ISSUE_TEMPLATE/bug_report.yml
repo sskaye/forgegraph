@@ -1,0 +1,35 @@
+name: Bug report
+description: Something ForgeGraph draws or does wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you got, and any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: The GraphSpec or layout
+      description: The file that shows the problem, as short as you can make it. Leave out data that isn't yours to share.
+      render: yaml
+  - type: textarea
+    id: image
+    attributes:
+      label: The image
+      description: The graph ForgeGraph drew, if the problem is in how it looks.
+  - type: input
+    id: version
+    attributes:
+      label: ForgeGraph version
+      description: The output of `forgegraph --version`.
+    validations:
+      required: true

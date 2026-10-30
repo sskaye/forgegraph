@@ -1,0 +1,69 @@
+site_name: ForgeGraph
+site_description: Fast, consistent, publication-quality graphs from pandas DataFrames, usable by people and AI agents.
+site_url: https://sskaye.github.io/forgegraph/
+repo_url: https://github.com/sskaye/forgegraph
+repo_name: sskaye/forgegraph
+edit_uri: ""
+docs_dir: docs/site
+strict: true
+
+# The Reference's commands and specifications pages are generated from the CLI and the
+# definition files as the site is built, and added to the end of the navigation (hooks).
+hooks:
+  - scripts/docs_site.py
+
+nav:
+  - Get started:
+      - Overview: index.md
+      - Installation: get-started/installation.md
+      - Quickstart: get-started/quickstart.md
+      - The agent skill: get-started/skill.md
+  - Reference:
+      - Python API: reference/python-api.md
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            docstring_style: google
+            filters: ["!^_"]

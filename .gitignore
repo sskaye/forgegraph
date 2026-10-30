@@ -20,6 +20,9 @@ htmlcov/
 .ipynb_checkpoints/
 .cache/
 
+# The documentation site, as mkdocs builds it
+/site/
+
 # Claude Code's local settings
 .claude/
 

@@ -31,6 +31,16 @@ uv run python scripts/build_recreations.py --baselines
 
 `uv run python scripts/visual_changelog.py main` then shows every image that changed.
 
+## The documentation site
+
+The site is built with MkDocs from docs/site. Its Reference pages are generated as it's built: the commands from the CLI, the specifications and the built-in pack from their files, and the Python API from the docstrings (scripts/docs_site.py). To build it and read it while you work:
+
+```bash
+uv run --group docs mkdocs serve
+```
+
+CI builds it on every pull request, and a broken link fails the build. Publishing a GitHub release deploys it to GitHub Pages.
+
 ## Requesting a graph type
 
 Open a GitHub issue describing the graph you need, ideally with an example image or sketch and a little sample data. No code is needed.

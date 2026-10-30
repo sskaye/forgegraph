@@ -27,8 +27,8 @@ from pathlib import Path
 COMMENTS = "<!-- forgemark-comments"  # the start of a document's comment block
 MARKER = re.compile(r"<!-- /?fmc:\d+ -->")  # a comment's start or end marker
 
-VERSION = "1.12.0"
-SHA256 = "6963b01c8ddf64f159aeb8edf2cc29c0aca630d373072688e96b06284137916a"
+VERSION = "1.12.1"
+SHA256 = "5d69978249aab812819fa5e2e39ef9e3fa3ffe4299c6057bec866bcccf571298"
 URL = (
     f"https://github.com/sskaye/forgemark/releases/download/v{VERSION}/forgemark-cli-{VERSION}.mjs"
 )

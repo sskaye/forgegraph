@@ -635,6 +635,8 @@ def error_bars(
                 )
             low = centres - distances["lower"]
             high = centres + distances["upper"]
+            words = None if unset(how) else spread_words(str(how), multiplier, percentile)
+            s.errors.setdefault(axis, (distances["lower"], distances["upper"], words))
             if log and bool((low[np.isfinite(low)] <= 0).any()):
                 raise DrawError(
                     f"{where}.value.lower: a bar reaches 0 or below on axis.{axis}'s log scale"
@@ -642,6 +644,21 @@ def error_bars(
             places = numbers(s.x if along_value else s.y)
             shifted = marks.shifted(ax, roles.base, s.shifts, s.spacing)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
+
+
+_SPREADS = {"ci": "95%CI", "stddev": "SD", "stderr": "SE"}
+
+
+def spread_words(how: str, multiplier: float, percentile: float) -> str:
+    """An error bar's aggregation in a reader's words: 95%CI, SD, SE, 90th percentile, or
+    the function's name, with a multiplier other than 1 in front."""
+    if how == "percentile":
+        whole = f"{percentile:g}"
+        last = 0 if "." in whole or 10 <= int(whole) % 100 <= 20 else int(whole) % 10
+        words = f"{whole}{ {1: 'st', 2: 'nd', 3: 'rd'}.get(last, 'th') } percentile"
+    else:
+        words = _SPREADS.get(how, how)
+    return words if multiplier == 1 else f"{multiplier:g} × {words}"  # noqa: RUF001
 
 
 def _distances(

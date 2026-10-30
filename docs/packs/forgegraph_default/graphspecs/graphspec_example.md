@@ -15,7 +15,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
     text:\
         title: Polarization, 60 °C          *# \[None, text\]; The graph's title. If None, there is no title.*\
     data:\
-        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with \~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
+        file: polarization.parquet          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
         preprocessing: None          *# \[None, text\]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.*\
     axis:\
         x:\
@@ -100,7 +100,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 text: column_name          *# \[None, column_name, text\]; The color bar's title. column_name uses the name of the series' color column. If None, there is no title.*\
     output:\
         dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
-        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
+        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save. An html page shows each figure, and each data point's values when it's pointed at or tapped.*\
     provenance:\
         level: full          *# \[full, minimal, off\]; What each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs. off records nothing.*\
     layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.*\

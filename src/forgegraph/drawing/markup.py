@@ -9,6 +9,7 @@ Labels that come from column names are never parsed: `literal()` draws them exac
 
 from __future__ import annotations
 
+import html
 import re
 
 _SCRIPT = re.compile(r"\^\{([^}]*)\}|\^(-?\d+)|_\{([^}]*)\}")
@@ -40,3 +41,19 @@ def markup(label: str) -> str:
 def literal(label: str) -> str:
     """A column name or data value -> matplotlib text drawn exactly as written."""
     return _plain(str(label))
+
+
+def to_html(label: str) -> str:
+    """Text a user wrote -> HTML, its script fragments as superscripts and subscripts."""
+    out, pos = [], 0
+    for m in _SCRIPT.finditer(label):
+        out.append(html.escape(label[pos : m.start()]))
+        sup_braced, sup_digits, sub = m.groups()
+        if sub is not None:
+            out.append(f"<sub>{html.escape(sub)}</sub>")
+        else:
+            sup = sup_braced if sup_braced is not None else sup_digits
+            out.append(f"<sup>{html.escape(sup)}</sup>")
+        pos = m.end()
+    out.append(html.escape(label[pos:]))
+    return "".join(out)

@@ -22,12 +22,12 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, to_hex
 from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, limits, marks, spacing, ticks
+from forgegraph.drawing import colorbar, layers, limits, marks, readout, spacing, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
@@ -203,6 +203,13 @@ class Series:
     shifts: dict[float, tuple[float, float]] = field(default_factory=dict)  # at each place
     spacing: Any = None  # the space between places its bars are fractions of (draw)
     bar_fraction: float = 0.0  # its bars' width, as a fraction of that space
+    groups: dict[str, Any] = field(default_factory=dict)  # each grouping column's value
+    # each axis's first error bar: the distances below and above each point, and their
+    # aggregation in a reader's words (layers.error_bars)
+    errors: dict[str, tuple[np.ndarray, np.ndarray, str | None]] = field(default_factory=dict)
+    line: Line2D | None = None  # its line and markers (draw)
+    bars: marks.Bars | None = None
+    ring: Any = None  # the color around a pointed-at point: one, or one per point
 
     def shows(self, mark: str) -> bool:
         """Whether it draws its lines, markers or bars."""
@@ -679,6 +686,7 @@ def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]
                     order=(position, *(index.get(dim.by, 0) for dim in DIMENSIONS)),
                 )
             d.rows, d.place_column = rows.index, x
+            d.groups = {k: v for k, v in values.items() if k != "__bench__"}
             out.append(d)
     out.sort(key=lambda d: (d.benchmark, d.order))  # group order; the benchmark last, on top
     return out
@@ -742,6 +750,7 @@ def draw(
     drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = drawn_series, r, lines, listed
     drawn.style_keys = _style_keys(gt, enc, style, drawn.listed)
     layers.notes_outside(ax, listed, style)
+    readout.attach(ax, drawn, gt)
     return drawn
 
 
@@ -878,9 +887,10 @@ def _draw_marks(
             zorder=look.line_z,
         )
         line.set_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
-        handle = line
+        handle = s.line = line
+        s.ring = to_hex(line_color)
         if s.shows("bar"):
-            bar = marks.bars(ax, s, r.base, line_color)
+            bar = s.bars = marks.bars(ax, s, r.base, line_color)
             if not (lines_shown or markers_shown):
                 handle = bar  # the key's sample is a swatch of the bar
         if s.values is not None and markers_shown and norm is not None:
@@ -898,6 +908,7 @@ def _draw_marks(
                 zorder=2.5,
             )
             dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
+            s.ring = [to_hex(cmap(norm(float(v)))) for v in s.values]
         if s.label is not None:
             handles.setdefault(s.label, handle)
             colors.setdefault(s.label, line_color)

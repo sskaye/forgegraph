@@ -13,4 +13,4 @@ parameters:          *# !var/!fix sets whether a GraphSpec or layout m
         height: auto          *# \[auto, float > 0\]; The figure's height in mm. auto calculates it from the width and plot_area.aspect_ratio.*\
         base_size: 7          *# \[float > 0\]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.*\
     output:\
-        file_types: \[pdf, png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*
+        file_types: \[pdf, png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save. An html page shows each figure, and each data point's values when it's pointed at or tapped.*

@@ -2,7 +2,7 @@
 
 import pytest
 
-from forgegraph.drawing.markup import literal, markup
+from forgegraph.drawing.markup import literal, markup, to_html
 
 
 @pytest.mark.parametrize(
@@ -29,3 +29,17 @@ def test_markup(written, drawn):
 )
 def test_column_names_are_drawn_exactly(name, drawn):
     assert literal(name) == drawn
+
+
+@pytest.mark.parametrize(
+    ("written", "shown"),
+    [
+        ("Cell Current (mA/cm^2)", "Cell Current (mA/cm<sup>2</sup>)"),
+        ("P_{max} in 6M KOH_{aq}", "P<sub>max</sub> in 6M KOH<sub>aq</sub>"),
+        ("Rate (mol L^-1)", "Rate (mol L<sup>-1</sup>)"),
+        ("a < b & $c", "a &lt; b &amp; $c"),
+        ("x_{<i>}", "x<sub>&lt;i&gt;</sub>"),
+    ],
+)
+def test_markup_in_html(written, shown):
+    assert to_html(written) == shown

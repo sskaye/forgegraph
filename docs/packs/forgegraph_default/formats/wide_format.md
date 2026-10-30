@@ -14,7 +14,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec or lay
         base_size: 18          *# \[float > 0\]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.*\
     output:\
         dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
-        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
+        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save. An html page shows each figure, and each data point's values when it's pointed at or tapped.*\
     provenance:\
         level: full          *# \[full, minimal, off\]; What each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs. off records nothing.*
 
@@ -34,8 +34,8 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec or lay
         Fixed: the page mirrors its own file.
 - id: 3
   anchor_text: "300"
-  context_before: "he setting of the one above them unless explicitly overridden.*\\ figure:\\ width:"
-  context_after: "# \\[auto, float > 0\\]; The figure's width in mm."
+  context_before: "figure: width:"
+  context_after: "# [auto, float > 0]; The figure's width in mm."
   author: "Steven Kaye"
   timestamp: "2026-10-27T19:11:02.971Z"
   resolved: false

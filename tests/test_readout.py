@@ -237,8 +237,8 @@ def _hits(marks: list[list[Any]], pointers: list[tuple[float, float]], size=(500
     )
     node = shutil.which("node")
     assert node is not None
-    done = subprocess.run(
-        [node, "-e", functions + calls], capture_output=True, text=True, check=True
+    done = subprocess.run(  # on stdin: many marks are too long for a command line
+        [node], input=functions + calls, capture_output=True, text=True, check=True
     )
     return json.loads(done.stdout)
 

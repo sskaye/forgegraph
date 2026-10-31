@@ -1,0 +1,24 @@
+name: polarization
+version: 0
+description: Polarization curves of three fuel cells, voltage against current density.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Polarization curves
+    data:
+        file: cell_polarization.parquet
+        preprocessing: examples/sample-data/cell_polarization.csv, unchanged
+    axis:
+        x:
+            data:
+                column: current_density_a_cm2
+            title: Current density (A/cm^2)
+        y:
+            title: Voltage (V)
+    series:
+        voltage_v:
+            color: cell

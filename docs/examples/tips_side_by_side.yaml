@@ -1,0 +1,46 @@
+name: tips_side_by_side
+version: 0
+description: The mean tip on each day, for women and men side by side, with the 95 % confidence interval of each mean.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Tips by day
+    data:
+        file: tips.parquet
+        preprocessing: examples/sample-data/tips.csv, unchanged
+    axis:
+        x:
+            data:
+                column: day
+                order:
+                    method: value
+                    direction: descending
+            title: None
+        y:
+            title: Mean tip ($)
+    arrangement:
+        offset: side_by_side
+    legend:
+        key:
+            inside: false
+    series:
+        tip:
+            aggregation:
+                function: mean
+            color: sex
+            line:
+                show: false
+            marker:
+                show: false
+            bar:
+                show: true
+    layers:
+        spread:
+            type: error_bar
+            value:
+                aggregation:
+                    function: ci

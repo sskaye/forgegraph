@@ -1,11 +1,8 @@
 name: Documentation
 
-# Builds the documentation site on every pull request, and deploys it to GitHub Pages when a
-# release is published, or when run by hand on main.
+# Deploys the documentation site to GitHub Pages when a release is published, or when run by hand
+# on main. CI builds it on every pull request and push to main (ci.yml).
 on:
-  pull_request:
-  push:
-    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
@@ -31,8 +28,7 @@ jobs:
         run: uv run --group docs mkdocs build
         env:
           NO_MKDOCS_2_WARNING: "1"
-      - if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
 

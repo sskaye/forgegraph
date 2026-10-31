@@ -8,7 +8,8 @@ docs_dir: docs/site
 strict: true
 
 # The Reference's commands and specifications pages are generated from the CLI and the
-# definition files as the site is built, and added to the end of the navigation (hooks).
+# definition files as the site is built, and added to the Reference in the navigation; the
+# guides' and gallery's graphs are drawn from docs/examples as it's built (hooks).
 hooks:
   - scripts/docs_site.py
 
@@ -18,13 +19,27 @@ nav:
       - Installation: get-started/installation.md
       - Quickstart: get-started/quickstart.md
       - The agent skill: get-started/skill.md
+  - Guides:
+      - Graphs: guides/graphs.md
+      - Series: guides/series.md
+      - Layers: guides/layers.md
+      - Layouts and dashboards: guides/layouts.md
+      - Themes, formats and packs: guides/themes-formats-packs.md
+      - Configs: guides/configs.md
+      - Schedules: guides/schedules.md
+      - Provenance: guides/provenance.md
+  - Gallery: gallery.md
   - Reference:
       - Python API: reference/python-api.md
+  - Help:
+      - Troubleshooting: help/troubleshooting.md
+  - Release notes: release-notes.md
 
 theme:
   name: material
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
     - content.code.copy
@@ -44,11 +59,16 @@ extra_css:
 
 markdown_extensions:
   - admonition
+  - pymdownx.details
   - attr_list
   - toc:
       permalink: true
   - pymdownx.highlight
   - pymdownx.superfences
+  # Pages include the example files and the CHANGELOG as they are; a missing one fails the build.
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
 
 plugins:
   - search

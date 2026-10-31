@@ -1,0 +1,29 @@
+name: penguins
+version: 0
+description: Bill depth against bill length for three penguin species, as markers colored and shaped by species.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Penguin bills
+    data:
+        file: penguins.parquet
+        preprocessing: examples/sample-data/penguins.csv, unchanged
+    axis:
+        x:
+            data:
+                column: bill_length_mm
+            title: Bill length (mm)
+        y:
+            title: Bill depth (mm)
+    series:
+        bill_depth_mm:
+            color: species
+            line:
+                show: false
+            marker:
+                shape: species
+                size: 0.3

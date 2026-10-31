@@ -1,8 +1,11 @@
-"""MkDocs hooks for the documentation site (mkdocs.yml): the Reference's generated pages.
+"""MkDocs hooks for the documentation site (mkdocs.yml): its generated pages and images.
 
 - Commands: every `forgegraph` command, from the CLI itself.
 - Specifications and the built-in pack: each definition file and each of forgegraph_default's
   specs, shown whole. The pages and their titles are the mirrors' (tests/spec_mirror.py).
+- Images: every graph the guides and gallery show, drawn from its file as the site builds
+  (EXAMPLES), so a page never shows a graph its spec no longer draws, and a spec that can't
+  be drawn fails the build.
 
 Build the site with:  uv run --group docs mkdocs build
 """
@@ -10,11 +13,17 @@ Build the site with:  uv run --group docs mkdocs build
 from __future__ import annotations
 
 import html
+import io
+import os
+import shutil
 import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import typer.main
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "tests"))
@@ -23,6 +32,23 @@ from spec_mirror import MIRRORS, ROOT
 
 from forgegraph.cli import app
 
+EXAMPLES = ROOT / "docs" / "examples"  # the guides' and gallery's GraphSpecs, layouts and pack
+SAMPLE_DATA = ROOT / "examples" / "sample-data"
+# The repository's own example layouts the pages show, drawn where they are.
+LAYOUTS = [
+    ROOT / "examples" / "layouts" / "paper" / "cell_performance.layout.yaml",
+    ROOT / "examples" / "layouts" / "dashboard" / "lab_throughput.layout.yaml",
+]
+# The packs the examples use, all listed in the main config they're drawn with, so nothing is
+# watermarked as non-standard.
+PACKS = [
+    "forgegraph_default",
+    EXAMPLES / "packs" / "lab",
+    ROOT / "examples" / "packs" / "acme",
+    ROOT / "examples" / "layouts" / "paper" / "journal",
+    ROOT / "examples" / "layouts" / "dashboard" / "ops",
+]
+IMAGE_WIDTH = 1200  # px: the images are drawn at their format's resolution, then made this wide
 REPO = "https://github.com/sskaye/forgegraph/blob/main"
 SPECIFICATIONS = "docs/specifications/"
 PACK = "docs/packs/forgegraph_default/"
@@ -206,7 +232,93 @@ def on_files(files: Any, config: Any) -> Any:
     for path, content in generated.items():
         files.append(File.generated(config, path, content=content))
     files.append(File.generated(config, "get-started/voltage.png", content=_quickstart_image()))
+    for path, content in example_images().items():
+        files.append(File.generated(config, path, content=content))
     return files
+
+
+# Each sample dataset as the examples read it, where that isn't the CSV as it is: its dates as
+# dates, and CO₂'s missing months, written -99.99, as missing.
+PREPARE = {
+    "co2_monthly": lambda d: d.assign(
+        date=pd.to_datetime(d["date"]), co2_ppm=d["co2_ppm"].mask(d["co2_ppm"] < 0)
+    ),
+    "economics": lambda d: d.assign(date=pd.to_datetime(d["date"])),
+}
+
+
+def example_images() -> dict[str, bytes]:
+    """Every example drawn, by its image's path in the site: images/<name>.png for each
+    GraphSpec and layout in docs/examples and each of LAYOUTS, or for a layout of several
+    tabs, images/<name>-<tab>.png; and each layout in docs/examples as its HTML page,
+    pages/<name>.html. Each GraphSpec in docs/examples reads a sample dataset as
+    Parquet (data.file: <dataset>.parquet), written from examples/sample-data as it's drawn.
+    An example that can't be drawn, is non-standard or has a lint issue other than rows left
+    out is an error."""
+    import forgegraph as fg
+
+    out: dict[str, bytes] = {}
+    with _main_config() as folder:
+        work = folder / "examples"
+        work.mkdir()
+        for spec in sorted(EXAMPLES.glob("*.yaml")):
+            shutil.copy(spec, work / spec.name)
+            for dataset in _datasets(spec):
+                frame = pd.read_csv(SAMPLE_DATA / f"{dataset}.csv")
+                PREPARE.get(dataset, lambda d: d)(frame).to_parquet(work / f"{dataset}.parquet")
+        for spec in [*sorted(work.glob("*.yaml")), *LAYOUTS]:
+            layout = spec.name.endswith(".layout.yaml")
+            drawn = fg.layout(spec) if layout else fg.render(spec)
+            problems = [i for i in drawn.issues if i.check != "dropped-rows"]
+            if drawn.nonstandard or problems:
+                raise ValueError(f"{spec.name}: non-standard, or lint issues: {problems}")
+            name = spec.name.removesuffix(".yaml").removesuffix(".layout")
+            for image in drawn._write(folder / "images" / name, ["png"]):
+                out[f"images/{image.name}"] = _narrowed(image.read_bytes())
+            if layout and spec.parent == work:  # its page, to try its tabs and readouts
+                [page] = drawn._write(folder / "pages" / name, ["html"])
+                out[f"pages/{page.name}"] = page.read_bytes()
+    return out
+
+
+def _datasets(spec: Path) -> list[str]:
+    """The sample datasets a GraphSpec reads: its data.file's name, less .parquet."""
+    text = spec.read_text(encoding="utf-8")
+    return [
+        line.split(":", 1)[1].strip().removesuffix(".parquet")
+        for line in text.splitlines()
+        if line.strip().startswith("file:") and line.strip().endswith(".parquet")
+    ]
+
+
+@contextmanager
+def _main_config() -> Iterator[Path]:
+    """A folder with a main config listing PACKS, in use while the examples are drawn."""
+    before = os.environ.get("FORGEGRAPH_CONFIG")
+    with tempfile.TemporaryDirectory() as folder:
+        config = Path(folder) / "config.toml"
+        config.write_text(f"packs = {[str(p) for p in PACKS]}\n".replace("'", '"'))
+        os.environ["FORGEGRAPH_CONFIG"] = str(config)
+        try:
+            yield Path(folder)
+        finally:
+            if before is None:
+                del os.environ["FORGEGRAPH_CONFIG"]
+            else:
+                os.environ["FORGEGRAPH_CONFIG"] = before
+
+
+def _narrowed(png: bytes) -> bytes:
+    """A PNG made IMAGE_WIDTH wide, if it's wider: the site shows it no wider."""
+    from PIL import Image
+
+    image = Image.open(io.BytesIO(png))
+    if image.width > IMAGE_WIDTH:
+        height = round(image.height * IMAGE_WIDTH / image.width)
+        image = image.resize((IMAGE_WIDTH, height), Image.Resampling.LANCZOS)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
 
 
 def _quickstart_image() -> bytes:

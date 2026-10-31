@@ -1,0 +1,28 @@
+name: co2
+version: 0
+description: Monthly CO₂ at Mauna Loa, on a date axis, with the line broken where a month is missing.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Atmospheric CO_{2}
+    data:
+        file: co2_monthly.parquet
+        preprocessing: examples/sample-data/co2_monthly.csv, with its dates read as dates and -99.99 as missing
+    axis:
+        x:
+            data:
+                column: date
+            title: None
+        y:
+            title: CO_{2} (ppm)
+    series:
+        Monthly mean:
+            column: co2_ppm
+            marker:
+                show: false
+            line:
+                missing_values: gap

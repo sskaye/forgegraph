@@ -1,0 +1,33 @@
+name: assay_summary
+version: 0
+description: Each compound's mean response at each dose, with error bars from the standard deviations in the data.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Dose response
+    data:
+        file: assay_summary.parquet
+        preprocessing: examples/sample-data/assay_summary.csv, unchanged
+    axis:
+        x:
+            data:
+                column: dose_uM
+                type: categorical
+            title: Dose (µM)
+        y:
+            title: Response (%)
+    series:
+        mean_response_pct:
+            color: compound
+    layers:
+        spread:
+            type: error_bar
+            value:
+                lower: sd_pct
+                upper: sd_pct
+                aggregation:
+                    function: None

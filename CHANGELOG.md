@@ -2,6 +2,17 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.6.1 (2026-10-31)
+
+### Changes
+
+- **A reference line for each look.** With `per_series`, a reference layer now draws a line for each look its series are drawn in: each color, marker shape, marker fill and line style. Before, groups that differed only in marker shape, fill or line style shared one line. Lines that `split` draws, such as replicates, still share one.
+- **Guides on the documentation site.** The site now has a guide to each part of ForgeGraph, a gallery of worked examples, help with every lint issue and common error, and the release notes.
+
+### Bug Fixes
+
+- `per_series` with series colored on a scale is now an error. Before, it drew a single line over all the rows in the palette's first color.
+
 ## 0.6.0 (2026-10-30)
 
 ### New Features

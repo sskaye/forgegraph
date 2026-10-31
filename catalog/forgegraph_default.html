@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="forgegraph-inputs" content="00861358346948c9db645aa932b3fffac06a4fd69a339ba366cc5010ac041615">
+<meta name="forgegraph-inputs" content="fb23cd4657898a2a9f7367a927bb66c080b39a4e62c132f4a31fe1305a2bfdd4">
 <title>forgegraph_default Catalog</title>
 <style>
 :root { --fg:#1f2328; --muted:#57606a; --line:#d0d7de; --soft:#f6f8fa; --bg:#fff;
@@ -1173,7 +1173,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 </details>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="graphtype-xy-param-axis-x-title"><td class="path" style="padding-left:2.85rem" title="axis.x.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>The axis title. column_name uses the name of axis.column if it&#x27;s the base_axis or the series&#x27; column if it&#x27;s not. With several series, use text or None.</td></tr>
+<tr id="graphtype-xy-param-axis-x-title"><td class="path" style="padding-left:2.85rem" title="axis.x.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>The axis title. column_name uses the name of data.column if it&#x27;s the base_axis or the series&#x27; column if it&#x27;s not. With several series, use text or None.</td></tr>
 <tr id="graphtype-xy-param-axis-x-scale"><td class="path" style="padding-left:2.85rem" title="axis.x.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>The axis scale.</td></tr>
 <tr id="graphtype-xy-param-axis-x-min"><td class="path" style="padding-left:2.85rem" title="axis.x.min">min</td><td>None</td><td>float | date | None</td><td>variable</td><td>The axis minimum. On a datetime axis, it&#x27;s a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. If None, it&#x27;s the lowest value minus plot_area.gap × the data&#x27;s range.</td></tr>
 <tr id="graphtype-xy-param-axis-x-max"><td class="path" style="padding-left:2.85rem" title="axis.x.max">max</td><td>None</td><td>float | date | None</td><td>variable</td><td>The axis maximum. On a datetime axis, it&#x27;s a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. If None, it&#x27;s the highest value plus plot_area.gap × the data&#x27;s range.</td></tr>
@@ -1204,7 +1204,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </details>
 </details>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="graphtype-xy-param-axis-y-title"><td class="path" style="padding-left:2.85rem" title="axis.y.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>The axis title. column_name uses the name of axis.column if it&#x27;s the base_axis or the series&#x27; column if it&#x27;s not. With several series, use text or None.</td></tr>
+<tr id="graphtype-xy-param-axis-y-title"><td class="path" style="padding-left:2.85rem" title="axis.y.title">title</td><td>column_name</td><td>text | column_name | None</td><td>variable</td><td>The axis title. column_name uses the name of data.column if it&#x27;s the base_axis or the series&#x27; column if it&#x27;s not. With several series, use text or None.</td></tr>
 <tr id="graphtype-xy-param-axis-y-scale"><td class="path" style="padding-left:2.85rem" title="axis.y.scale">scale</td><td>linear</td><td>linear | log</td><td>variable</td><td>The axis scale.</td></tr>
 <tr id="graphtype-xy-param-axis-y-min"><td class="path" style="padding-left:2.85rem" title="axis.y.min">min</td><td>None</td><td>float | date | None</td><td>variable</td><td>The axis minimum. On a datetime axis, it&#x27;s a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. If None, it&#x27;s the lowest value minus plot_area.gap × the data&#x27;s range.</td></tr>
 <tr id="graphtype-xy-param-axis-y-max"><td class="path" style="padding-left:2.85rem" title="axis.y.max">max</td><td>None</td><td>float | date | None</td><td>variable</td><td>The axis maximum. On a datetime axis, it&#x27;s a date, e.g. 2025-08-25 or &quot;2025-08-25T06:00&quot;. If None, it&#x27;s the highest value plus plot_area.gap × the data&#x27;s range.</td></tr>
@@ -1605,8 +1605,8 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 </table>
 <details class="category" id="layer-error_bar-category-value"><summary style="padding-left:0.5rem" title="value">value</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
-<tr id="layer-error_bar-param-value-lower"><td class="path" style="padding-left:1.6rem" title="value.lower">lower</td><td>data_column</td><td>float | column | data_column</td><td>variable</td><td>The distance below each value: a number or a column. data_column uses the axis&#x27;s data column.</td></tr>
-<tr id="layer-error_bar-param-value-upper"><td class="path" style="padding-left:1.6rem" title="value.upper">upper</td><td>data_column</td><td>float | column | data_column</td><td>variable</td><td>The distance above each value: a number or a column. data_column uses the axis&#x27;s data column.</td></tr>
+<tr id="layer-error_bar-param-value-lower"><td class="path" style="padding-left:1.6rem" title="value.lower">lower</td><td>data_column</td><td>float ≥ 0 | column | data_column</td><td>variable</td><td>The distance below each value: a number or a column. data_column uses the column drawn along the axis: the series&#x27; column on the value axis, or data.column on the base axis. It needs aggregation.function.</td></tr>
+<tr id="layer-error_bar-param-value-upper"><td class="path" style="padding-left:1.6rem" title="value.upper">upper</td><td>data_column</td><td>float ≥ 0 | column | data_column</td><td>variable</td><td>The distance above each value: a number or a column. data_column uses the column drawn along the axis: the series&#x27; column on the value axis, or data.column on the base axis. It needs aggregation.function.</td></tr>
 </table>
 <details class="category" id="layer-error_bar-category-value-aggregation"><summary style="padding-left:1.75rem" title="value.aggregation">aggregation</summary>
 <table class="params"><colgroup><col class="path"><col class="default"><col class="allowed"><col class="status"><col class="description"></colgroup>
@@ -1725,7 +1725,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <tr id="layer-reference-param-line_1-label-text"><td class="path" style="padding-left:2.85rem" title="line_1.label.text">text</td><td>None</td><td>text | aggregation | value | aggregation_value | None</td><td>variable</td><td>aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.</td></tr>
 <tr id="layer-reference-param-line_1-label-position"><td class="path" style="padding-left:2.85rem" title="line_1.label.position">position</td><td>auto</td><td>auto | start_above | start_below | center_above | center_below | end_above | end_below</td><td>variable</td><td>auto selects the first option that doesn&#x27;t overlap the data and is invalid if inside is false.</td></tr>
 <tr id="layer-reference-param-line_1-label-inside"><td class="path" style="padding-left:2.85rem" title="line_1.label.inside">inside</td><td>true</td><td>true | false</td><td>variable</td><td>Whether the label is inside the plot area. If false, it&#x27;s beyond the plot area at the line&#x27;s start or end, and a center position is invalid.</td></tr>
-<tr id="layer-reference-param-line_1-label-format"><td class="path" style="padding-left:2.85rem" title="line_1.label.format">format</td><td>auto</td><td>format | auto</td><td>variable</td><td>The format of the value. auto uses one more decimal than the axis&#x27;s tick labels, or on a date axis, the tick label format.</td></tr>
+<tr id="layer-reference-param-line_1-label-format"><td class="path" style="padding-left:2.85rem" title="line_1.label.format">format</td><td>auto</td><td>format | auto</td><td>variable</td><td>The format of the value. auto uses the axis&#x27;s tick label format if it&#x27;s set, and otherwise one more decimal than the tick labels show. On a date axis, it uses the tick label format, which must then be set.</td></tr>
 </table>
 </details>
 </details>
@@ -1755,7 +1755,7 @@ figure { margin:0; } figure img { max-width:100%; height:auto; }
 <tr id="layer-reference-param-line_2-label-text"><td class="path" style="padding-left:2.85rem" title="line_2.label.text">text</td><td>None</td><td>text | aggregation | value | aggregation_value | None</td><td>variable</td><td>aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.</td></tr>
 <tr id="layer-reference-param-line_2-label-position"><td class="path" style="padding-left:2.85rem" title="line_2.label.position">position</td><td>auto</td><td>auto | start_above | start_below | center_above | center_below | end_above | end_below</td><td>variable</td><td>auto selects the first option that doesn&#x27;t overlap the data and is invalid if inside is false.</td></tr>
 <tr id="layer-reference-param-line_2-label-inside"><td class="path" style="padding-left:2.85rem" title="line_2.label.inside">inside</td><td>true</td><td>true | false</td><td>variable</td><td>Whether the label is inside the plot area. If false, it&#x27;s beyond the plot area at the line&#x27;s start or end, and a center position is invalid.</td></tr>
-<tr id="layer-reference-param-line_2-label-format"><td class="path" style="padding-left:2.85rem" title="line_2.label.format">format</td><td>auto</td><td>format | auto</td><td>variable</td><td>The format of the value. auto uses one more decimal than the axis&#x27;s tick labels, or on a date axis, the tick label format.</td></tr>
+<tr id="layer-reference-param-line_2-label-format"><td class="path" style="padding-left:2.85rem" title="line_2.label.format">format</td><td>auto</td><td>format | auto</td><td>variable</td><td>The format of the value. auto uses the axis&#x27;s tick label format if it&#x27;s set, and otherwise one more decimal than the tick labels show. On a date axis, it uses the tick label format, which must then be set.</td></tr>
 </table>
 </details>
 </details>

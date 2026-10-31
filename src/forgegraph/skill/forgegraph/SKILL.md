@@ -12,7 +12,7 @@ ForgeGraph is a library and agent skill for making high-quality graphs quickly a
 - **Graph type**: the type of graph, e.g. xy drawn with lines, markers, or bars.
 - **Theme**: the look: fixed styles (fonts, palettes, spines, ticks, legend style), plus defaults for options.
 - **Format**: destination-specific features: figure size, base font size, file type, dpi, etc.
-- **Layers**: overlays on a graph: reference lines, error bars, notes.
+- **Layers**: overlays on a graph: reference lines and bands, error bars, notes.
 - **Layout**: multiple GraphSpecs can be arranged in one figure: for multi-panel figures, dashboards.
 
 The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec's `data.file`.

@@ -229,6 +229,54 @@ def test_a_line_per_series_in_its_color():
     assert len({ln.get_color() for ln in lines}) == 2
 
 
+LOOKS = pd.DataFrame(
+    {
+        "x": [1.0, 2, 1, 2, 1, 2, 1, 2],
+        "y": [1.0, 2, 3, 4, 10, 20, 30, 40],
+        "g": ["p", "p", "p", "p", "q", "q", "q", "q"],
+        "kind": ["a", "a", "b", "b", "a", "a", "b", "b"],
+        "temp": [10.0, 10, 10, 10, 20, 20, 20, 20],
+    }
+)
+MAX_PER_SERIES = {
+    "t": {
+        "type": "reference",
+        "axis": "y",
+        "per_series": True,
+        "line_1": {"value": "y", "aggregation": {"function": "max"}},
+    }
+}
+LOOKS_SETTINGS = {
+    "axis.x.data.column": "x",
+    "axis.y.data.column": ["y"],
+    "legend.method": "key",
+    "legend.key.inside": False,
+    "legend.key.title.text": "None",
+}
+
+
+@pytest.mark.parametrize("by", ["series.marker.shape", "series.line.style", "series.marker.fill"])
+def test_a_line_per_series_for_each_look_not_only_each_color(by):
+    g = graph(MAX_PER_SERIES, LOOKS, **LOOKS_SETTINGS, **{"series.color": "g", by: "kind"})
+    lines = layer_lines(g, REFERENCE)
+    assert sorted(ln.get_ydata()[0] for ln in lines) == [2.0, 4.0, 20.0, 40.0]
+    assert len({ln.get_color() for ln in lines}) == 2  # each in its series' color
+
+
+def test_a_line_per_series_takes_in_the_lines_split_draws():
+    g = graph(
+        MAX_PER_SERIES, LOOKS, **LOOKS_SETTINGS, **{"series.color": "g", "series.split": "kind"}
+    )
+    assert sorted(ln.get_ydata()[0] for ln in layer_lines(g, REFERENCE)) == [4.0, 40.0]
+
+
+def test_a_line_per_series_colored_on_a_scale_is_an_error():
+    with pytest.raises(
+        fg.SpecError, match=r"layers\.t\.per_series: the series are colored on a scale"
+    ):
+        graph(MAX_PER_SERIES, LOOKS, **LOOKS_SETTINGS, **{"series.color": "temp"})
+
+
 TWO_Y = pd.DataFrame(
     {"x": [1.0, 2.0, 3.0, 4.0, 5.0], "a": [10.0, 100, 1000, 300, 50], "b": [20.0, 40, 60, 80, 100]}
 )

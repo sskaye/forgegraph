@@ -5,8 +5,10 @@
   date is a column only if one has that name), or from a column's drawn values: its
   aggregate times its multiplier, plus its offset (an aggregate too), over all the rows for
   a straight line, or at each place for a line that follows the data; with no aggregation,
-  through each row. With per_series, the layer is drawn once per named series, all its
-  replicates together, in its color. A date column's aggregate is a date, on a date axis
+  through each row. With per_series, the layer is drawn once for each look the series are
+  drawn in (color, line style, marker shape and fill), from the rows drawn in it, so split's
+  lines share one, in its color; series colored on a scale have no color each, so that's an
+  error. A date column's aggregate is a date, on a date axis
   only. A line outside the data widens an automatic axis; outside a set limit, it's an
   error. Its label, placed after layout, sits at one end or the middle, beside the line:
   auto takes the first position (LABEL_ORDER) inside the plot and clear of the data and
@@ -291,12 +293,18 @@ def reference_lines(
         if kinds.get(axis) == "categorical":
             raise DrawError(f"{where}.axis: {axis} is categorical, so a line can't mark a value")
         groups: list[tuple[pd.DataFrame, str]] = []
-        if layer["per_series"]:  # each named series, with all its replicates
-            named: dict[tuple[bool, Any], list[Any]] = {}
+        if layer["per_series"]:  # each look, with all its split lines
+            if any(s.listed.numeric_color for s in series if not s.benchmark):
+                raise DrawError(
+                    f"{where}.per_series: the series are colored on a scale, so there's no color "
+                    "to draw each line in; set per_series: false"
+                )
+            looks: dict[tuple[Any, ...], list[Any]] = {}
             for s in series:
                 if s.rows is not None:
-                    named.setdefault((s.benchmark, s.label), []).append(s)
-            for members in named.values():
+                    key = (s.benchmark, s.color, s.linestyle, s.marker, s.fill)
+                    looks.setdefault(key, []).append(s)
+            for members in looks.values():
                 rows = frame.loc[np.concatenate([m.rows for m in members])]
                 groups.append((_each_row_once(cast(pd.DataFrame, rows)), members[0].color))
         else:

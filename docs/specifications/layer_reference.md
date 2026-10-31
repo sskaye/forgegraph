@@ -8,7 +8,7 @@ description: A horizontal or vertical line, or a shaded band between two lines, 
  \
 parameters:\
     axis: None          *# \[x, y\]; The axis the values are on. y draws horizontal lines. A GraphSpec must set it.*\
-    per_series: false          *# \[true, false\]; If true, the layer is drawn for every series with matching color. If false, it's drawn for all data combined.*\
+    per_series: false          *# \[true, false\]; If true, the layer is drawn for every series with matching color, marker shape, marker fill and line style. If false, it's drawn for all data combined.*\
     line_1:          *# The first line.*\
         value: None          *# \[None, float, date, column\]; A number, a date, or a column.*\
         aggregation:          *# \[aggregation style\]; How the column's rows are combined into the line's value. If its function is None, the values are used as-is.*\

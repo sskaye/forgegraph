@@ -142,6 +142,7 @@ ForgeGraph is [MIT-licensed](https://github.com/sskaye/forgegraph/blob/main/LICE
 
 ## Documentation
 
+- [Documentation site](https://sskaye.github.io/forgegraph/): getting started, and a reference for every specification, command and Python function.
 - [Specifications](https://github.com/sskaye/forgegraph/blob/main/docs/specifications): the file that defines each kind of spec, every parameter with its default, range and description.
 - [Built-in pack](https://github.com/sskaye/forgegraph/blob/main/docs/packs/forgegraph_default): forgegraph_default's specs.
 - [Changelog](https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md).

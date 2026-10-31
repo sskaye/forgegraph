@@ -1,0 +1,13 @@
+name: lab_theme
+version: 0
+description: The lab's look, the built-in theme with Paul Tol's bright colors and horizontal grid lines.
+extends: forgegraph_default/light_theme
+
+parameters:
+    series:
+        colors: tol_bright
+    grid:
+        y:
+            show: true
+    title:
+        weight: bold

@@ -1,0 +1,5 @@
+name: lab
+version: 1.0.0
+description: A lab's house style, for the guide to themes, formats and packs.
+issues: https://github.com/sskaye/forgegraph/issues
+requires: ">=0.6, <1"

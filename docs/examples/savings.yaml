@@ -1,0 +1,58 @@
+name: savings
+version: 0
+description: The personal savings rate by month, with a line at its mean and a band one standard deviation either side.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Personal savings rate
+    data:
+        file: economics.parquet
+        preprocessing: examples/sample-data/economics.csv, with its dates read as dates
+    axis:
+        x:
+            data:
+                column: date
+            title: None
+        y:
+            title: Savings rate (%)
+    series:
+        Savings rate:
+            column: psavert
+            marker:
+                show: false
+    layers:
+        spread:
+            type: reference
+            axis: y
+            line_1:
+                value: psavert
+                aggregation:
+                    function: mean
+                offset:
+                    function: stddev
+                    multiplier: -1
+                line:
+                    style: None
+            line_2:
+                value: psavert
+                aggregation:
+                    function: mean
+                offset:
+                    function: stddev
+                line:
+                    style: None
+        mean:
+            type: reference
+            axis: y
+            line_1:
+                value: psavert
+                aggregation:
+                    function: mean
+                label:
+                    text: aggregation_value
+                    position: end_above
+                    inside: false

@@ -1,0 +1,24 @@
+name: acme_polarization
+version: 0
+description: The polarization curves in the example acme pack's theme and slide format.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: acme/acme
+        format: acme/slide
+    text:
+        title: Polarization curves
+    data:
+        file: cell_polarization.parquet
+        preprocessing: examples/sample-data/cell_polarization.csv, unchanged
+    axis:
+        x:
+            data:
+                column: current_density_a_cm2
+            title: Current density (A/cm^2)
+        y:
+            title: Voltage (V)
+    series:
+        voltage_v:
+            color: cell

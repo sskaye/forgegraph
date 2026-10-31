@@ -1,0 +1,26 @@
+name: cells
+version: 0
+description: The fuel cells' graphs under one tab, beside a tab of the CO₂ record.
+extends: forgegraph_default/layout
+
+parameters:
+    specifications:
+        format: forgegraph_default/compact_format
+    tabs:
+        Cells:
+            tabs:
+                Polarization:
+                    grid:
+                        areas: [[curves]]
+                    tiles:
+                        curves: polarization.yaml
+                Durability:
+                    grid:
+                        areas: [[voltage]]
+                    tiles:
+                        voltage: durability.yaml
+        CO2:
+            grid:
+                areas: [[record]]
+            tiles:
+                record: co2.yaml

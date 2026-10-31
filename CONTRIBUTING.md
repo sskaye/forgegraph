@@ -33,7 +33,7 @@ uv run python scripts/build_recreations.py --baselines
 
 ## The documentation site
 
-The site is built with MkDocs from docs/site. Its Reference pages are generated as it's built: the commands from the CLI, the specifications and the built-in pack from their files, and the Python API from the docstrings (scripts/docs_site.py). To build it and read it while you work:
+The site is built with MkDocs from docs/site. Its Reference pages are generated as it's built: the commands from the CLI, the specifications and the built-in pack from their files, and the Python API from the docstrings (scripts/docs_site.py). The guides' and gallery's graphs are drawn as it's built, from the GraphSpecs, layouts and pack in docs/examples and the layouts in examples/layouts, with data from examples/sample-data, so an example that can't be drawn standard and lint-clean fails the build. To build it and read it while you work:
 
 ```bash
 uv run --group docs mkdocs serve

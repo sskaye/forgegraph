@@ -1,0 +1,33 @@
+name: dose_response
+version: 0
+description: The mean response of three compounds at each dose, with error bars of one standard deviation and a note.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Dose response
+    data:
+        file: dose_response.parquet
+        preprocessing: examples/sample-data/dose_response.csv, unchanged
+    axis:
+        x:
+            data:
+                column: dose_uM
+                type: categorical
+            title: Dose (µM)
+        y:
+            title: Response (%)
+    series:
+        response_pct:
+            aggregation:
+                function: mean
+            color: compound
+    layers:
+        spread:
+            type: error_bar
+        replicates:
+            type: note
+            text: Mean ± SD of 3 replicates

@@ -1,0 +1,11 @@
+name: poster
+version: 0
+description: A graph for a poster, wider than the built-in compact format and with larger text.
+extends: forgegraph_default/compact_format
+
+parameters:
+    figure:
+        width: 200
+        base_size: 22
+    output:
+        file_types: [png, pdf]

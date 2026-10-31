@@ -33,13 +33,13 @@ nav:
       - Python API: reference/python-api.md
   - Help:
       - Troubleshooting: help/troubleshooting.md
-      - FAQ: help/faq.md
       - Changelog: help/changelog.md
 
 theme:
   name: material
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
     - content.code.copy

@@ -98,18 +98,6 @@ The personal savings rate by month, with a line at its mean, labelled outside th
     --8<-- "docs/examples/savings.yaml"
     ```
 
-## A figure for a paper
-
-Three graphs of three fuel cells on one journal-width figure, in the journal pack's format, from [examples/layouts/paper](https://github.com/sskaye/forgegraph/tree/main/examples/layouts/paper), where its GraphSpecs and data are.
-
-![Voltage and resistance over time on the left, and the polarization curves spanning both rows on the right.](images/cell_performance.png)
-
-??? example "Layout"
-
-    ```yaml
-    --8<-- "examples/layouts/paper/cell_performance.layout.yaml"
-    ```
-
 ## A dashboard
 
 The Overview tab of a lab's throughput dashboard, from [examples/layouts/dashboard](https://github.com/sskaye/forgegraph/tree/main/examples/layouts/dashboard). Its other tab shows the runs on each instrument.

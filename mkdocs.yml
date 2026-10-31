@@ -29,8 +29,8 @@ theme:
     - navigation.top
     - content.code.copy
     - search.suggest
-  # One light look, after TabPFN's documentation: near-black text on white, navy headings and
-  # links (stylesheets/extra.css).
+  # One light look, after TabPFN's documentation: black text and headings on white, navy links
+  # (stylesheets/extra.css).
   palette:
     scheme: default
     primary: custom

@@ -1,12 +1,12 @@
-/* The look, after TabPFN's documentation (docs.priorlabs.ai): near-black text on white, navy
-   headings, links and selected pages, Inter headings, and a white header with a hairline under
-   it. Body text is #0c0c0c on white and navy is #101075, both well past WCAG AA's 4.5:1. */
+/* The look, after TabPFN's documentation (docs.priorlabs.ai): black text and headings on
+   white, navy links and selected pages, Inter headings, and a white header with a hairline under
+   it. Navy (#101075) on white is well past WCAG AA's 4.5:1. */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap");
 
 :root,
 [data-md-color-scheme="default"] {
   --navy: #101075;
-  --ink: #0c0c0c;
+  --ink: #000000;
   --hairline: #e4e4e7;
   --md-primary-fg-color: #ffffff;
   --md-primary-fg-color--light: #ffffff;
@@ -50,7 +50,7 @@
 .md-typeset h3 {
   font-family: Inter, "DM Sans", sans-serif;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--ink);
 }
 
 .md-nav__link {
@@ -72,7 +72,7 @@
 .md-nav__item--section > .md-nav__link,
 .md-nav__item--section > label.md-nav__link,
 .md-nav--primary > .md-nav__title {
-  color: var(--navy);
+  color: var(--ink);
   font-weight: 600;
 }
 

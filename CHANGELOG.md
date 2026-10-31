@@ -2,6 +2,24 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.6.0 (2026-10-30)
+
+### New Features
+
+- **Values on hover.** Pointing at a data point on a graph in an HTML page, or tapping it, shows its values: each axis's value, with its error bar where it has one, and its series' group. A value with an error bar is rounded to the error's last digit, as in 8.0 ± 0.4 (95%CI). It works on markers, lines and bars, and in every tile of a layout.
+- **Feature requests from the agent.** When the agent makes a graph ForgeGraph can't draw, or one that's watermarked, it asks whether you'd like to file a feature request for what was missing.
+- **A documentation site.** Getting started, and a reference for every specification, command and Python function, built from the repository.
+
+### Changes
+
+- **HTML pages are larger.** Each HTML page now carries its graphs' points and the font their values are written in, about 0.2 MB more for the font.
+- **Issue forms.** Feature requests and bug reports on GitHub now have forms, and the agent writes requests under their headings.
+
+### Bug Fixes
+
+- A negative error bar distance is now an error when the spec is read, instead of when the graph is drawn.
+- The specifications' descriptions now match what ForgeGraph does.
+
 ## 0.5.0 (2026-10-29)
 
 ### New Features

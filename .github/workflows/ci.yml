@@ -160,3 +160,18 @@ jobs:
         run: |
           if [ -d "$RUNNER_TEMP/clean/Scripts" ]; then bin="$RUNNER_TEMP/clean/Scripts"; else bin="$RUNNER_TEMP/clean/bin"; fi
           PATH="$bin:$PATH" "$bin/python" -I "$GITHUB_WORKSPACE/scripts/smoke_installed.py"
+
+  all-checks:
+    # The check main's ruleset requires: every job above passed, or was skipped because the pull
+    # request changes no code. A skipped matrix job reports under its unexpanded name, such as
+    # "Tests (Linux, Python ${{ matrix.python }})", so the ruleset can't require the jobs
+    # themselves.
+    name: All checks
+    needs: [changes, checks, tests-linux, tests-perturbation, tests-lowest, tests-other-os, package]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}  # it reads only the other jobs' results
+    steps:
+      - name: A job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

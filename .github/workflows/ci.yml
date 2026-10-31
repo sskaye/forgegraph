@@ -161,13 +161,28 @@ jobs:
           if [ -d "$RUNNER_TEMP/clean/Scripts" ]; then bin="$RUNNER_TEMP/clean/Scripts"; else bin="$RUNNER_TEMP/clean/bin"; fi
           PATH="$bin:$PATH" "$bin/python" -I "$GITHUB_WORKSPACE/scripts/smoke_installed.py"
 
+  docs:
+    # The documentation site, built strictly as docs.yml deploys it: a broken link, a missing page
+    # or an example that doesn't draw fails it. It runs on every pull request, docs-only ones too.
+    name: Documentation site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --group docs
+      - run: uv run --group docs mkdocs build
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+
   all-checks:
     # The check main's ruleset requires: every job above passed, or was skipped because the pull
     # request changes no code. A skipped matrix job reports under its unexpanded name, such as
     # "Tests (Linux, Python ${{ matrix.python }})", so the ruleset can't require the jobs
     # themselves.
     name: All checks
-    needs: [changes, checks, tests-linux, tests-perturbation, tests-lowest, tests-other-os, package]
+    needs: [changes, checks, tests-linux, tests-perturbation, tests-lowest, tests-other-os, package, docs]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}  # it reads only the other jobs' results

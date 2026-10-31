@@ -41,7 +41,7 @@ A series' rows can be split into groups by a column. Each of `color`, `line.styl
 
 ![Bill depth against bill length, a color and a marker shape for each penguin species.](../images/penguins.png){ width="480" }
 
-- **split** names columns whose values split the series into separate lines without a style of their own, such as replicates.
+- **split** specifies how rows should be grouped for aggregation or line paths. This can be used to, for example, prevent averaging of data from replicates or draw independent lines for multiple runs under the same conditions.
 - **order** puts the groups in sorted order, or with `data`, in the order they first appear.
 - **A numeric color column** draws on a color scale, with a color bar beside the plot. `color_scale: categorical` gives each number a palette color instead.
 

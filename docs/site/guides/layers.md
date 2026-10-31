@@ -15,7 +15,7 @@ A second line, `line_2`, makes the layer a band, filled between the two lines. T
 ![The savings rate by month, with a grey band one standard deviation either side of the mean and a dashed line at the mean, labelled Mean: 14.9.](../images/savings.png){ width="480" }
 
 - **label.text** writes the line's label: `aggregation` writes, for example, Mean, `value` writes 14.9, `aggregation_value` writes Mean: 14.9, and other text is written as it's given. `label.position` and `label.inside` place it; here it's outside the plot, at the line's end.
-- **per_series: true** draws the layer for each series in its color, from that series' rows, instead of once for all the data.
+- **per_series: true** draws the layer for every series with matching color, marker shape, marker fill and line style, in its color and from its rows, instead of once for all the data.
 - **scope: each** makes a line that follows the data, instead of a straight line over all the rows.
 
 ## Error bars

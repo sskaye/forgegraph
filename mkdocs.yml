@@ -33,7 +33,7 @@ nav:
       - Python API: reference/python-api.md
   - Help:
       - Troubleshooting: help/troubleshooting.md
-      - Changelog: help/changelog.md
+  - Release notes: release-notes.md
 
 theme:
   name: material

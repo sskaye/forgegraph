@@ -1,0 +1,83 @@
+/* The look, after TabPFN's documentation (docs.priorlabs.ai): black text and headings on
+   white, navy links and selected pages, Inter headings, and a white header with a hairline under
+   it. Navy (#101075) on white is well past WCAG AA's 4.5:1. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap");
+
+:root,
+[data-md-color-scheme="default"] {
+  --navy: #101075;
+  --ink: #000000;
+  --hairline: #e4e4e7;
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #ffffff;
+  --md-primary-bg-color: var(--navy);
+  --md-primary-bg-color--light: var(--navy);
+  --md-accent-fg-color: var(--navy);
+  --md-accent-fg-color--transparent: rgba(16, 16, 117, 0.08);
+  --md-default-fg-color: var(--ink);
+  --md-default-fg-color--light: #3f3f46;
+  --md-default-fg-color--lighter: #71717a;
+  --md-typeset-color: var(--ink);
+  --md-typeset-a-color: var(--navy);
+  --md-code-bg-color: #f4f4f5;
+  --md-code-fg-color: var(--ink);
+}
+
+.md-header {
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: none;
+}
+
+.md-tabs {
+  background-color: #ffffff;
+  color: var(--ink);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.md-search__form {
+  background-color: #f4f4f5;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-family: Inter, "DM Sans", sans-serif;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.md-nav__link {
+  color: var(--ink);
+}
+
+.md-nav__link--active {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.md-sidebar--primary .md-nav__link--active {
+  background-color: #ececf1;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-left: -8px;
+}
+
+.md-nav__item--section > .md-nav__link,
+.md-nav__item--section > label.md-nav__link,
+.md-nav--primary > .md-nav__title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A specification's lines carry long comments: wrap them rather than scroll. */
+.md-typeset pre > code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

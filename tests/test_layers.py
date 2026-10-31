@@ -451,7 +451,7 @@ def test_error_bars_of_aggregated_rows_on_a_date_axis():
         (
             {"lower": -1, "upper": 1, "aggregation": {"function": "None"}},
             {},
-            "is below 0; it's a distance",
+            "must be data_column, a number, 0 or more or a column name",
         ),
         (
             {"lower": 100, "upper": 1, "aggregation": {"function": "None"}},

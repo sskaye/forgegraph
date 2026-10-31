@@ -12,7 +12,7 @@ minimal:          *# Written at minimal and full.*\
     provenance_level: minimal          *# \[full, minimal\]; The provenance level at which the record was written.*\
     forgegraph_version: X.Y.Z          *# \[text\]; The ForgeGraph version that drew the file.*\
     created: "2026-10-24T09:00:00Z"          *# \[text\]; When the file was drawn, in ISO 8601 and UTC. If SOURCE_DATE_EPOCH is set, it's taken from that.*\
-    graphspec: {}          *# \[mapping\]; The GraphSpec as written, without data.file and data.preprocessing. There is none for a blank canvas.*\
+    graphspec: {}          *# \[mapping\]; The GraphSpec as written; at minimal, without data.file and data.preprocessing. There is none for a blank canvas.*\
     specs: {}          *# \[mapping\]; Each spec used, by kind: its name and version, and its pack's version if it's in a pack.*\
     nonstandard: false          *# \[true, false\]; Whether something was drawn outside the specs the config permits, so the graph is watermarked.*\
     nonstandard_packs: \[\]          *# \[texts\]; The packs used that the main config doesn't list, which make the graph non-standard. It's left out if there are none.*\
@@ -24,4 +24,4 @@ full:          *# Written at full only, as well as everything in minim
  \
 layout:          *# Written for a layout, at the layout's level, in place of graphspec, resolved, data and preprocessing.*\
     layout: {}          *# \[mapping\]; The layout file as written.*\
-    tabs: {}          *# \[mapping\]; For each tab the file shows, each tile's GraphSpec file and the entries above for it, at the layout's level.*
+    tabs: {}          *# \[mapping\]; For each tab with a grid that the file shows, under its path (e.g. Platinum / Voltage), each tile's GraphSpec file and the entries above for it, at the layout's level.*

@@ -1,4 +1,4 @@
-name: forgegraph_default          # [text]; The pack's name, either a folder where the pack is stored or a pip pack's entry point.
+name: forgegraph_default          # [text]; The pack's name, which its specs' names start with (pack/name); a pip pack's must match its entry point.
 version: 0.5.0          # [text]; The pack's release version.
 description: ForgeGraph's built-in default pack. So it’s always possible to create a graph.          # [text]; One line, describing what the pack is.
 issues: https://github.com/sskaye/forgegraph/issues          # [text]; Where to file feature requests and bug reports about the pack.

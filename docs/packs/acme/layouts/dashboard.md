@@ -15,3 +15,4 @@ parameters:          *# !var/!fix sets whether a layout may change a p
             outer: 2          *# \[float ≥ 0\]; The space between neighboring tiles, from the outermost text or line of one to that of the next, × base size.*\
         line:\
             width: 0.05          *# \[float ≥ 0\]; The width of the line along the middle of each gap between tiles, × base size. If 0, no line is drawn.*
+

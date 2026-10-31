@@ -9,8 +9,9 @@ You describe a graph in a **GraphSpec**. ForgeGraph draws it in a house style se
 - **Themes:** fixes the look of the graph (fonts, palette, lines, keys, etc.).
 - **Formats:** sets the destination: figure size, base font size, file types and resolution, e.g. a slide, a journal column or a dashboard tile.
 - **GraphTypes:** defines the type of graph and its parameters. E.g. `xy` (lines, markers and bars).
-- **Layers:** features drawn over a graph. E.g. reference lines, notes, & error bars.
+- **Layers:** features drawn over a graph. E.g. reference lines and bands, notes, & error bars.
 - **GraphSpecs:** specify the data, theme, format, and all customizable properties.
+- **Series:** each series in a graph has its own marker, line and bar properties, and can show a summary of its data, such as the mean, a percentile or a confidence interval.
 - **Layouts:** combine multiple graphs into a larger figure or multi-tab dashboard.
 - **Scheduled renders:** re-render graphs and dashboards on a schedule set with cron, launchd, or by an agent.
 - **Provenance:** every saved file contains its specifications as metadata, enabling inspection of how the graph was made and reproduction of it.
@@ -18,7 +19,7 @@ You describe a graph in a **GraphSpec**. ForgeGraph draws it in a house style se
 - **Configs:** control which packs may be used, per user or folder. Used to enforce use of style pack(s) and watermark non-standard graphs.
 - **Lint:** Graphs are linted on rendering, with warnings for issues including overlapping or clipped text, a key covering data, or fonts too small.
 
-**Status:** 0.x.  `xy` graph type (lines, markers, & bars), reference lines, error bars, and notes layers, initial style packs. More graph types are planned. If there’s specific ones you want, [open an issue](https://github.com/sskaye/forgegraph/issues).
+**Status:** Until 1.0, a new minor version may change how graphs look or how specs are written; the [changelog](https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md) lists what changed in each release. `forgegraph catalog` lists the graph types, layers and packs you have. More graph types are planned. If there are specific ones you want, [open an issue](https://github.com/sskaye/forgegraph/issues).
 
 ## Install
 
@@ -101,7 +102,7 @@ forgegraph render voltage.yaml
 
 ## Packs and configs
 
-Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. ForgeGraph's built-in pack, `forgegraph_default`, is stored in src/forgegraph/packs: its theme, `light_theme`, its formats, `compact_format` for single graphs and `wide_format` for layouts, and a layout and a schedule to extend.
+Every named theme, format, GraphSpec, layout and schedule comes from a **pack**, a folder or pip package of specs, and is named `pack/name`. ForgeGraph's built-in pack, `forgegraph_default`, is stored in src/forgegraph/packs. It has a theme and formats, so a graph can always be drawn, and specs to extend; `forgegraph catalog` lists them.
 
 A **config** lists the packs that may be used:
 
@@ -115,11 +116,13 @@ On macOS, a scheduled render that writes into a cloud-synced folder needs Full D
 
 ## Commands
 
+`forgegraph --help` lists every command. The main ones:
+
 - `forgegraph render <graphspec or layout>`: draw and save, and report lint.
 - `forgegraph explain <graphspec or layout>`: every value it's drawn with, and which file set it.
 - `forgegraph catalog`: the packs, graph types, layer types, themes, formats, GraphSpecs, layouts, schedules and reference notes available here.
 - `forgegraph schema graphspec --graph-type <type> --theme <theme> --format <format>`: every parameter a GraphSpec can set.
-- `forgegraph schema <kind>`: every parameter of a theme, format, layer, layout, schedule, pack or config.
+- `forgegraph schema <kind>`: every parameter of a theme, format, graph type, layer, layout, schedule, pack or config.
 - `forgegraph pack-notes`: the reference notes of the packs available here.
 - `forgegraph load <file>`: a saved graph's record, and its GraphSpec.
 - `forgegraph job run <schedule>`: render a schedule's GraphSpecs and layouts once.
@@ -143,9 +146,7 @@ ForgeGraph is [MIT-licensed](https://github.com/sskaye/forgegraph/blob/main/LICE
 - [Built-in pack](https://github.com/sskaye/forgegraph/blob/main/docs/packs/forgegraph_default): forgegraph_default's specs.
 - [Changelog](https://github.com/sskaye/forgegraph/blob/main/CHANGELOG.md).
 - [Contributing](https://github.com/sskaye/forgegraph/blob/main/CONTRIBUTING.md): working on ForgeGraph itself.
-- Design record, in [docs/design](https://github.com/sskaye/forgegraph/blob/main/docs/design):
-  - [Architecture](https://github.com/sskaye/forgegraph/blob/main/docs/design/architecture.md): how ForgeGraph is designed, and why.
-  - [To do](https://github.com/sskaye/forgegraph/blob/main/docs/design/todo.md): what's still planned.
+- [Architecture](https://github.com/sskaye/forgegraph/blob/main/docs/design/architecture.md): how ForgeGraph is designed, and why.
 
 ## Contributing
 
@@ -166,5 +167,5 @@ Feature requests and bug reports go to [GitHub issues](https://github.com/sskaye
 - **examples/**: sample data; `packs/acme`, an example pack in a deliberately different style; and `layouts/`, a paper figure and a dashboard.
 - **evals/skill/**: the skill's eval cases, run by `scripts/run_skill_evals.py`.
 - **tests/**, **scripts/**: tests, and build and maintenance scripts.
-- **docs/**: the specifications' and packs' pages, the design record and the visual changelogs. **review/**: each build phase's review pages.
+- **docs/**: the specifications' and packs' pages, the design record and the visual changelogs. **review/**: review pages: each build phase's, the audit's and the refactoring's, and the open issues list.
 

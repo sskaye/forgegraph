@@ -19,7 +19,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         join: round          # [miter, round, bevel]; The shape of a line's corners.
     background:
         color: "#FFFFFF"          # [None, hex color]; The background color of the figure and the plot area. If None, the background is transparent.
-    title:          # [text style]; The graph's title.
+    title:          # [text style]; The graph's title. Its gap is measured from the line its letters sit on.
     axis:
         title:          # [text style]; The axis titles.
         tick:          # [line style]; The tick marks.
@@ -61,7 +61,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
             shapes: [circle, square, triangle_up, diamond, triangle_down, cross]          # [circle, square, triangle_up, triangle_down, diamond, cross, plus]; The marker shapes given to the series, or to the values of a series' marker.shape column.
             fills: [filled, open]          # [filled, open]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.
             size: 0.5          # [float > 0]; The marker size, × base size.
-            edge:          # [line style]; The outline of filled markers.
+            edge:          # [line style]; The outline of filled markers. Open markers are outlined at its width, in their series' color.
         bar:
             width: 0.8          # [0-1]; The fraction of the distance between neighboring bar positions that the bars at one position fill.
             gap: 0.1          # [0-1]; The fraction of each side-by-side bar's space left empty between it and the next bar.

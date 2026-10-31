@@ -5,7 +5,7 @@ description: An error bar on each point or bar.          # [text]; The descripti
 parameters:
     axis: y          # [x, y]; The axis the bars extend along.
     value:
-        lower: data_column          # [data_column, float, column]; The distance below each value: a number or a column. data_column uses the axis's data column.
-        upper: data_column          # [data_column, float, column]; The distance above each value: a number or a column. data_column uses the axis's data column.
-        aggregation:          # [aggregation style]; When the data columns are aggregated, the distances are this aggregate of the lower and upper columns.
+        lower: data_column          # [data_column, float ≥ 0, column]; The distance below each value: a number or a column. data_column uses the column drawn along the axis: the series' column on the value axis, or data.column on the base axis. It needs aggregation.function.
+        upper: data_column          # [data_column, float ≥ 0, column]; The distance above each value: a number or a column. data_column uses the column drawn along the axis: the series' column on the value axis, or data.column on the base axis. It needs aggregation.function.
+        aggregation:          # [aggregation style]; When the series is aggregated, the distances are this aggregate of the rows each mark stands for, in the lower and upper columns.
             function: stddev

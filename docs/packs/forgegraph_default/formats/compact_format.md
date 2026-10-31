@@ -1,6 +1,6 @@
 # Built-in pack: forgegraph_default/compact_format, a format
 
-<!-- fmc:1 -->This page mirrors src/forgegraph/packs/forgegraph_default/formats/compact_format.yaml<!-- /fmc:1 -->, which is the specification. A test fails if they ever differ.
+This page mirrors src/forgegraph/packs/forgegraph_default/formats/compact_format.yaml, which is the specification. A test fails if they ever differ.
 
 name: compact_format          *# \[text\]; The name of the format.*\
 version: 0          *# \[int ≥ 0\]; The version number of the specification.*\
@@ -18,18 +18,3 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec or lay
     provenance:\
         level: full          *# \[full, minimal, off\]; What each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs. off records nothing.*
 
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "This page mirrors src/forgegraph/packs/forgegraph_default/formats/compact_format.yaml"
-  context_before: "# Built-in pack: forgegraph_default/compact_format, a format"
-  context_after: ", which is the specification."
-  author: "Steven Kaye"
-  timestamp: "2026-10-27T19:05:05.573Z"
-  resolved: false
-  body: fix
-  replies:
-    - author: Claude
-      timestamp: 2026-10-27T21:14:27Z
-      body: |
-        Fixed: the page mirrors its own file.
--->

@@ -12,7 +12,7 @@ ForgeGraph is a library and agent skill for making high-quality graphs quickly a
 - **Graph type**: the type of graph, e.g. xy drawn with lines, markers, or bars.
 - **Theme**: the look: fixed styles (fonts, palettes, spines, ticks, legend style), plus defaults for options.
 - **Format**: destination-specific features: figure size, base font size, file type, dpi, etc.
-- **Layers**: overlays on a graph: reference lines, error bars, notes.
+- **Layers**: overlays on a graph: reference lines and bands, error bars, notes.
 - **Layout**: multiple GraphSpecs can be arranged in one figure: for multi-panel figures, dashboards.
 
 The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec's `data.file`.
@@ -37,8 +37,9 @@ Every command takes `--help`.
 4. Render and check the output for issues: the lint and the image itself. On an error, use the error message and `forgegraph explain` to debug. If a command reports a non-standard pack, tell the user.
 5. Iterate until the graph or layout meets the request and is a good visualization of the data. Check the image after each iteration, including follow-up requests.
 6. Do a final inspection of the graph or layout to confirm everything before sharing with the user.
-7. If the user has provided a local folder, or you were started in one, save the GraphSpec, the graph and the Parquet file (if you created it) to that folder, not a temporary one.
-8. If scheduling a job, write the schedule file and schedule `forgegraph job run <schedule>` using the method of your choice.
+7. If you made a non-standard or watermarked graph or layout, or any visual not drawn by ForgeGraph, ask the user whether they'd like to file a feature request for what ForgeGraph couldn't do (see references/requests.md). Otherwise, don't mention it.
+8. If the user has provided a local folder, or you were started in one, save the GraphSpec, the graph and the Parquet file (if you created it) to that folder, not a temporary one.
+9. If scheduling a job, write the schedule file and schedule `forgegraph job run <schedule>` using the method of your choice.
 
 ## Examples
 

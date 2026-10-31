@@ -170,6 +170,7 @@ jobs:
     needs: [changes, checks, tests-linux, tests-perturbation, tests-lowest, tests-other-os, package]
     if: always()
     runs-on: ubuntu-latest
+    permissions: {}  # it reads only the other jobs' results
     steps:
       - name: A job failed or was cancelled
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

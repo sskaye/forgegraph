@@ -14,7 +14,6 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec or lay
         base_size: 18          *# \[float > 0\]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.*\
     output:\
         dpi: 600          *# \[int > 0\]; The resolution of png, jpg and tiff files, in dots per inch.*\
-        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save.*\
+        file_types: \[png\]          *# \[png, jpg, tiff, svg, pdf, html\]; The file types to save. An html page shows each figure, and each data point's values when it's pointed at or tapped.*\
     provenance:\
         level: full          *# \[full, minimal, off\]; What each saved file records about how it was made. full records every value and the data file. minimal records the GraphSpec and the specs. off records nothing.*
-

@@ -38,6 +38,7 @@ from forgegraph.drawing.layout import (
     footnote_room,
     place_footnote,
 )
+from forgegraph.drawing.readout import marks
 from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import WEIGHTS, font_file, font_weights
@@ -280,6 +281,7 @@ class Layout(Saved):
                         if framed
                         else export.svg(t.figure, dpi),
                         () if one else t.path,
+                        tuple(marks(t.figure)),
                     )
                     for t in self.tabs
                 ]

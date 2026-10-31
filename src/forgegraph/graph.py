@@ -19,6 +19,7 @@ from forgegraph.drawing.axes import value_number
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
 from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
+from forgegraph.drawing.readout import marks
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
@@ -119,7 +120,8 @@ class Graph(Inspected, Saved):
             for kind in kinds:
                 path = stem.with_name(f"{stem.name}.{kind}")
                 if kind == "html":
-                    shown = [page.Shown(None, None, export.svg(self.figure, dpi))]
+                    image = export.svg(self.figure, dpi)
+                    shown = [page.Shown(None, None, image, marks=tuple(marks(self.figure)))]
                     title = str(self.spec.get("name", stem.name))
                     background = self.style.theme["background.color"]
                     out.append(

@@ -32,6 +32,8 @@ import forgegraph as fg
 from forgegraph.cli import app
 from forgegraph.drawing.figure import WATERMARK
 from forgegraph.drawing.layout import visible_extent
+from forgegraph.drawing.page import READOUTS
+from forgegraph.drawing.readout import _DRAWINGS
 from forgegraph.layouts import Layout, explain_layout
 from forgegraph.spec.layout import slug
 from forgegraph.spec.parameters import definition_file
@@ -501,7 +503,9 @@ def test_tabs_save_a_file_each_a_pdf_page_each_and_one_page(project):
     assert len(re.findall(rb"/Type /Page\b", pdf)) == 2
     page = (project / "out" / "fig.html").read_text()
     assert '<label for="tab1-overview" data-path="overview">Overview</label>' in page
-    assert '<section id="by-cell" data-choices="tab1-by-cell"><h2>By cell</h2><img' in page
+    assert (
+        '<section id="by-cell" data-choices="tab1-by-cell"><h2>By cell</h2><div class="figure"><img'
+    ) in page
     for p in saved:
         record = record_of(p)
         assert record["layout"]["name"] == "fig"
@@ -554,7 +558,7 @@ def test_tabs_hold_tabs_to_any_depth(project):
     assert '<label for="tab3-deeper" data-path="notes/deep/deeper">Deeper</label>' in page
     assert (
         '<section id="nickel/voltage" data-choices="tab1-nickel tab2-voltage">'
-        "<h2>Nickel / Voltage</h2><img"
+        '<h2>Nickel / Voltage</h2><div class="figure"><img'
     ) in page
     assert sorted(record_of(project / "out" / "fig.html")["tabs"])[0] == "Nickel / Voltage"
     tile = explain_layout(path)[1]["Platinum.tabs.Power", "pp"]
@@ -797,6 +801,27 @@ def test_with_a_border_the_tab_bars_line_is_its_top(project):
     assert "border-bottom: 0.7pt solid #000000" in text  # the tab bar's line, as the border
 
 
+def test_each_tabs_points_have_readouts_within_its_image(project):
+    dump(
+        _format("page", ("html",)),
+        project / "house" / "formats" / "page.yaml",
+    )
+    path = write_layout(
+        project,
+        {"One": tab([["volt", "power"]], volt="volt.yaml", power="power.yaml")},
+        fmt="house/page",
+        separators={"border": {"show": True}},
+    )
+    layout = fg.layout(path)
+    [page_file] = layout.save_all(project / "out" / "fig")
+    found = re.findall(rf'class="{READOUTS}">(.*?)</script>', page_file.read_text(), re.S)
+    [data] = [json.loads(f) for f in found]
+    drawn = sum(len(s.x) for ax in layout.tabs[0].figure.axes for s in _series_of(ax))
+    assert len(data["marks"]) == drawn > 0
+    assert all(0 <= m[0] <= 1 and 0 <= m[1] <= 1 for m in data["marks"])
+    assert data["names"] == ["current_density", "cell_voltage", "cell", "power_density"]
+
+
 @pytest.mark.slow
 def test_one_tab_is_saved_without_its_name(project):
     path = write_layout(project, {"Figure": tab([["volt"]], volt="volt.yaml")})
@@ -1004,3 +1029,7 @@ def test_the_example_layouts_render(folder, layout, tmp_path, monkeypatch):
     monkeypatch.chdir(work)
     drawn = fg.layout(work / layout)
     assert drawn.tabs and not drawn.issues
+
+
+def _series_of(ax: Any) -> list[Any]:
+    return _DRAWINGS[ax].drawn.series if ax in _DRAWINGS else []

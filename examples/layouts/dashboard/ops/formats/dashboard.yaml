@@ -10,4 +10,4 @@ parameters:          # !var/!fix sets whether a GraphSpec or layout may change a
         base_size: 14          # [float > 0]; The base size in points. The sizes of text, lines, ticks and gaps are multiples of it.
     output:
         dpi: 300          # [int > 0]; The resolution of png, jpg and tiff files, in dots per inch.
-        file_types: [png, html]          # [png, jpg, tiff, svg, pdf, html]; The file types to save.
+        file_types: [png, html]          # [png, jpg, tiff, svg, pdf, html]; The file types to save. An html page shows each figure, and each data point's values when it's pointed at or tapped.

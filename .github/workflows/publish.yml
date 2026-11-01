@@ -12,6 +12,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@v1.14.3

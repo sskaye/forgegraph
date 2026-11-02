@@ -159,6 +159,34 @@ def test_a_color_column_reads_out_under_the_keys_title_or_its_name(tmp_path):
     assert lines(readouts(titled, tmp_path)[0])[0][2] == ("Cell", "A")
 
 
+def test_a_color_by_the_categorical_base_axis_has_only_its_axis_line(tmp_path):
+    df = pd.DataFrame({"Group": list("AABB"), "Value": [1.0, 1.2, 2.0, 2.2]})
+    g = fg.render(
+        fg.graphspec(
+            "t",
+            "xy",
+            settings={
+                "axis.x.data.column": "Group",
+                "axis.x.data.type": "categorical",
+                "axis.x.tick.algorithm": "all",
+                "series": {
+                    "Value": {
+                        "color": "Group",
+                        "line": {"show": False},
+                        "aggregation": {"function": "mean"},
+                    }
+                },
+            },
+        ),
+        df,
+    )
+    data = readouts(g, tmp_path)[0]
+    assert [[data["names"][i], v] for i, v in data["marks"][1][6]] == [
+        ["Group", "B"],
+        ["Value", "2.10"],
+    ]
+
+
 def test_one_series_has_no_series_line(tmp_path):
     df = pd.DataFrame({"t": [0.0, 1.0], "v": [1.0, 2.0]})
     assert [len(line) for line in lines(readouts(graph(df, "t", "v"), tmp_path)[0])] == [2, 2]

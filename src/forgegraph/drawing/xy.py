@@ -346,7 +346,7 @@ def build_series(
     frame = _drawable_rows(frame, r, gt, kind, listed, drawn)
     enc = _encodings(frame, gt, style, listed)
     frame = _category_positions(frame, r, gt, kind, enc, listed, drawn)
-    drawn_series = _series(frame, r, enc, listed)
+    drawn_series = _series(frame, r, enc, listed, drawn.categories.get(r.base))
     _group_warnings(enc, listed, drawn)
     return drawn_series, frame, r, enc
 
@@ -622,10 +622,15 @@ def _points(rows: pd.DataFrame, x: str, s: Listed) -> tuple[np.ndarray, np.ndarr
     return axis_data.numbers(points.index), np.asarray(points, dtype=float) * multiplier
 
 
-def _scale_values(rows: pd.DataFrame, x: str, s: Listed, column: str) -> np.ndarray:
+def _scale_values(
+    rows: pd.DataFrame, x: str, s: Listed, column: str, cats: list[Any] | None
+) -> np.ndarray:
     """A drawn series' values on the color scale, one per point: with an aggregation, a
-    point's rows must share one."""
-    values = pd.Series(np.asarray(_col(rows, column), dtype=float), index=rows.index)
+    point's rows must share one. The base axis's column holds its categories' positions by
+    now (cats), and these are the categories themselves."""
+    raw = _col(rows, column)
+    own = [cats[round(float(v))] for v in raw] if column == x and cats is not None else raw
+    values = pd.Series(np.asarray(own, dtype=float), index=rows.index)
     if s.aggregation is None:
         return np.asarray(values, dtype=float)
     at = values.groupby(_col(rows, x), sort=False, dropna=False)
@@ -638,9 +643,12 @@ def _scale_values(rows: pd.DataFrame, x: str, s: Listed, column: str) -> np.ndar
     return np.asarray(at.first(), dtype=float)
 
 
-def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]) -> list[Series]:
+def _series(
+    frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed], cats: list[Any] | None
+) -> list[Series]:
     """One series per group of each listed series' rows, styled by its groups; the benchmark
-    last, on top."""
+    last, on top. A categorical base axis's column holds positions by now (cats, its
+    categories), and a group is named and styled by its category."""
     x = r.base_column
     out: list[Series] = []
     for position, s in enumerate(listed):
@@ -651,6 +659,8 @@ def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]
         for key, group in groups:
             key = key if isinstance(key, tuple) else (key,)
             values = dict(zip([*s.grouping, "__bench__"], key, strict=True))
+            if cats is not None and x in values:
+                values[x] = cats[round(float(values[x]))]
             rows = cast(pd.DataFrame, group)
             if s.values["line.connect_order"] == "x":
                 rows = rows.sort_values(by=x, kind="stable")
@@ -696,7 +706,9 @@ def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]
                     label,
                     _look(s.style, False),
                     s,
-                    values=_scale_values(rows, x, s, str(color_col)) if s.numeric_color else None,
+                    values=_scale_values(rows, x, s, str(color_col), cats)
+                    if s.numeric_color
+                    else None,
                     order=(position, *(index.get(dim.by, 0) for dim in DIMENSIONS)),
                 )
             d.rows, d.place_column = rows.index, x
@@ -762,7 +774,11 @@ def draw(
     _axes(ax, drawn_series, lines, gt, style, drawn, r)
     drawn.y_title = _decorate(ax, gt, style, r, title, norm, drawn.listed)
     drawn.series, drawn.roles, drawn.ref_lines, drawn.layers = drawn_series, r, lines, listed
-    drawn.style_keys = _style_keys(gt, enc, style, drawn.listed)
+    drawn.style_keys = [
+        k
+        for k in _style_keys(gt, enc, style, drawn.listed)
+        if not _on_its_axis(gt, k.column, drawn)
+    ]
     layers.notes_outside(ax, listed, style)
     readout.attach(ax, drawn, gt)
     return drawn
@@ -1031,6 +1047,17 @@ def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)
 
 
+def _on_its_axis(gt: dict[str, Any], column: str | None, drawn: Drawn) -> bool:
+    """Whether legend.method auto leaves a column's groups unnamed, as the categorical base
+    axis names them already."""
+    r = cast(Roles, drawn.roles)
+    return (
+        gt["legend.method"] == "auto"
+        and drawn.kinds[r.base] == "categorical"
+        and column == r.base_column
+    )
+
+
 def _legend_column(listed: list[Listed]) -> str | None:
     """The column the series' names come from, when their colors all come from one."""
     colors = {s.by.get(COLOR.by) for s in listed}
@@ -1078,6 +1105,9 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     y_title = drawn.y_title
     if method == "none" or not groups or ([g.name for g in groups] == [y_title]):
         drawn.labelling = "none"  # one series named by the y-axis title already
+        return
+    if _on_its_axis(gt, _legend_column(drawn.listed), drawn):
+        drawn.labelling = "none"
         return
     allowed = [m for m in style.theme["legend.methods"] if m not in ("auto", "none")]
     if any(s.shows("bar") for s in drawn.listed):  # names beside bars would need rules

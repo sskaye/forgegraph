@@ -18,6 +18,12 @@ across groups; otherwise it shows its first. Where the scripts run, each name is
 also a link (#overview, or the whole path, #platinum/voltage), so a tab can be linked to,
 opened in a new window and returned to with Back. In a browser too old for the style (from
 before 2023), there's no tab bar, and every tab shows, one after another under its name.
+
+The tab bars stay at the top of the window while the page scrolls, over the figures and their
+readouts, and switching tabs leaves the page where it is, so the same tile stays in view: the
+choices are fixed to the window, so that choosing one doesn't scroll to it, and the script
+handles a click on a link in place of the browser, which would scroll to the tab. A link
+opened from elsewhere does scroll to its tab, which stops below the tab bars.
 When the layout draws a border, the line under the tab bars is the border's top: each figure
 is cropped to its border, without the border's own top side.
 
@@ -123,9 +129,10 @@ body { margin: 0; padding: 16px; font: 15px/1.4 system-ui, -apple-system, "Segoe
 %(font_face)s
 main { max-width: %(width)s; }
 img { display: block; width: 100%%; height: auto; }
-.tabbars { display: none; margin-bottom: %(under)s; }
+.tabbars { display: none; margin-bottom: %(under)s; position: sticky; top: 0; z-index: 2;
+  background: %(background)s; }
 .tabs { position: relative; }
-.tabs > input { position: absolute; top: 0; left: 0; margin: 0; opacity: 0;
+.tabs > input { position: fixed; top: 0; left: 0; margin: 0; opacity: 0;
   pointer-events: none; }
 nav { display: flex; flex-wrap: wrap; justify-content: %(justify)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
@@ -184,8 +191,15 @@ _SCRIPT = (
       a.setAttribute("data-path", to);
       a.textContent = label.textContent;
       label.parentNode.replaceChild(a, label);
+      a.addEventListener("click", function (event) {
+        if (event.button || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        event.preventDefault();
+        if (location.hash !== "#" + to) history.pushState(null, "", "#" + to);
+        show();
+      });
       return a;
     });
+  var bars = document.querySelector(".tabbars");
   function showing() {
     for (var i = 0; i < sections.length; i++) {
       if (getComputedStyle(sections[i]).display !== "none") return sections[i].id;
@@ -195,6 +209,8 @@ _SCRIPT = (
   function show() {
     var target = decodeURIComponent(location.hash.slice(1));
     choices(tabs, target).forEach(function (c) { document.getElementById(c).checked = true; });
+    var below = bars.offsetHeight + parseFloat(getComputedStyle(bars).marginBottom) + "px";
+    sections.forEach(function (s) { s.style.scrollMarginTop = below; });
     var id = showing();
     if (target && target !== id) history.replaceState(null, "", "#" + id);
     links.forEach(function (a) {

@@ -74,6 +74,19 @@ def test_a_decimal_column_of_whole_numbers_can_be_made_integer():
     )
 
 
+@pytest.mark.parametrize("algorithm", ALGORITHMS)
+@pytest.mark.parametrize("span", [(-0.5, 1.5), (-0.5, 2.5), (0.5, 1.5), (-0.1, 1.1), (-0.5, 109.5)])
+def test_every_algorithm_keeps_to_whole_numbers_on_a_whole_number_axis(algorithm, span):
+    assert all(float(v).is_integer() for v in ALGORITHMS[algorithm](*span, 5, integer=True))
+
+
+def test_two_categories_each_get_a_tick_and_a_label():
+    df = pd.DataFrame({"run": ["1", "2"], "rate": [1.0, 2.0]})
+    g = graph(df, "run", "rate", **{"axis.x.data.type": "categorical"})
+    assert ticks(g) == [0.0, 1.0]
+    assert labels(g) == ["1", "2"]
+
+
 def test_integer_on_fractions_is_an_error():
     df = MONTHS.assign(month=MONTHS["month"] + 0.5)
     with pytest.raises(fg.SpecError, match="integer, but 'month' has values that aren't whole"):

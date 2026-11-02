@@ -19,7 +19,7 @@ R's scales::breaks_log, ported with its MIT licence, or matplotlib's LogLocator.
 step on a log axis is a factor (LogStep).
 
 On an axis of whole numbers (an int column, or a categorical axis's positions), every
-algorithm keeps to whole-number steps of 1 or more: extended_wilkinson and wilkinson skip
+algorithm keeps to whole numbers, in steps of 1 or more: extended_wilkinson and wilkinson skip
 other candidates, heckbert, nelder and r_pretty move to their next whole step, matplotlib's
 MaxNLocator takes integer=True, and log axes drop breaks below 1.
 
@@ -77,7 +77,7 @@ def extended_wilkinson(
 ) -> np.ndarray:
     """Search steps q·j·10^z and label counts k for the best weighted sum of simplicity,
     coverage, density and legibility, pruning with each term's upper bound. With integer,
-    only whole-number steps are candidates."""
+    only labels at whole numbers, in whole-number steps, are candidates."""
     if dmax - dmin < EPS:
         return np.linspace(dmin, dmax, m)
     n = len(Q)
@@ -134,6 +134,8 @@ def extended_wilkinson(
                     max_start = math.ceil(dmin / step) * j
                     for start in range(min_start, max_start + 1):
                         lmin = start * (step / j)
+                        if integer and abs(lmin - round(lmin)) > 1e-9:
+                            continue
                         lmax = lmin + step * (k - 1)
                         score = (
                             w[0] * simplicity(i, j, lmin, lmax, step)
@@ -149,6 +151,8 @@ def extended_wilkinson(
             break
         j += 1
     lmin, lmax, step = best
+    if integer and best_score == -2.0:  # nothing beat the starting range, which isn't whole
+        return np.arange(math.floor(dmin), math.ceil(dmax) + 1, dtype=float)
     return np.arange(lmin, lmax + step / 2, step)
 
 
@@ -163,7 +167,8 @@ def wilkinson(
 ) -> np.ndarray:
     """For each label count from m/2 to 6m, the step from Q scoring best on granularity
     (closeness to m), roundness (early in Q, including zero) and coverage. With integer,
-    only whole-number steps are candidates."""
+    only whole-number steps are candidates, and coverage may be as low as a narrow axis's
+    whole numbers leave it."""
     steps = (10, *Q)
     best: tuple[float, float, float, float] | None = None  # score, lmin, lmax, step
     for k in range(max(m // 2, 2), math.ceil(6 * m) + 1):
@@ -184,6 +189,8 @@ def wilkinson(
                 score = granularity + roundness + covered
                 if best is None or score > best[0]:
                     best = (score, tmin, tmax, tdelta)
+    if best is None and integer and mincoverage > 0:
+        return wilkinson(dmin, dmax, m, Q, 0.0, integer)
     if best is None:
         raise ValueError(f"wilkinson: no labelling covers {dmin}..{dmax}")
     _, lmin, lmax, step = best

@@ -642,6 +642,20 @@ class _Page:
 SECTION, NAV, NAME = r'section\[id="(.*)"\]', r'nav\[data-under="(.*)"\]', r'\[data-path="(.*)"\]'
 
 
+def test_a_pages_tab_bars_stay_in_view_and_switching_leaves_the_page_where_it_is():
+    from forgegraph.drawing.page import _SCRIPT, _STYLE
+
+    bars = re.search(r"\.tabbars \{ display: none;(.*?)\}", _STYLE, re.S)
+    assert bars is not None
+    assert "position: sticky" in bars.group(1)
+    assert "top: 0" in bars.group(1)
+    assert "background: %(background)s" in bars.group(1)
+    assert "z-index: 2" in bars.group(1)  # over the readouts, at 1
+    assert re.search(r"\.tabs > input \{ position: fixed;", _STYLE)  # choosing one doesn't scroll
+    assert "event.preventDefault()" in _SCRIPT and "history.pushState" in _SCRIPT
+    assert "scrollMarginTop" in _SCRIPT  # a link from elsewhere stops below the tab bars
+
+
 def test_a_pages_tabs_switch_without_its_scripts(project):
     """The page's style shows one tab, the one its hidden choices pick; a group's tabs keep the
     name chosen below it, or show its first; and each tab's own choices show it, as the
@@ -819,7 +833,7 @@ def test_each_tabs_points_have_readouts_within_its_image(project):
     drawn = sum(len(s.x) for ax in layout.tabs[0].figure.axes for s in _series_of(ax))
     assert len(data["marks"]) == drawn > 0
     assert all(0 <= m[0] <= 1 and 0 <= m[1] <= 1 for m in data["marks"])
-    assert data["names"] == ["current_density", "cell_voltage", "cell", "power_density"]
+    assert data["names"] == ["current_density", "cell_voltage", "cell", "run", "power_density"]
 
 
 @pytest.mark.slow

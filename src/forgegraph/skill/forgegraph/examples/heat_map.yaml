@@ -1,0 +1,32 @@
+name: heat_map
+version: 0
+description: A heat map of a plate's spectra, one row for each sample, colored by absorbance.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: A plate of UV-Vis spectra
+    data:
+        file: heat_map.parquet
+        preprocessing: None
+    arrangement:
+        base_axis: y
+    axis:
+        x:
+            title: Wavelength (nm)
+        y:
+            data:
+                column: Sample
+                type: categorical
+            title: Sample
+    series:
+        Wavelength (nm):
+            color: Normalized absorbance
+            color_scale: continuous
+            marker:
+                shape: grid_cell
+            line:
+                show: false

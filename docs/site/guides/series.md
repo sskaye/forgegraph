@@ -20,7 +20,7 @@ Each series chooses its marks: `line.show`, `marker.show` and `bar.show`. By def
 
 - **Lines** join the points in order of x, or in the order of the rows with `line.connect_order: data`. `line.interpolate` draws them straight, in steps, or as a smooth curve.
 - **Missing values:** with `line.missing_values: drop`, a line joins across a row missing its x or y; with `gap`, the line breaks there. Either way, the lint counts the rows left out.
-- **Markers** take the theme's shapes and fills, and `marker.size` sets their size.
+- **Markers** take the theme's shapes and fills, and `marker.size` sets their size. `marker.shape: grid_cell` instead fills the grid the points lie on, which makes a heat map: see the [gallery](../gallery.md#a-heat-map).
 - **Bars** stand on the x-axis, from 0, or from 1 on a log axis, and `bar.width` sets how much of the space between neighboring bars they fill.
 
 The durability test draws lines without markers:

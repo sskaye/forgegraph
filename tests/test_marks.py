@@ -11,6 +11,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.collections import PathCollection, QuadMesh
 
 import forgegraph as fg
 from forgegraph.drawing.key import KEY, keys
@@ -420,3 +421,148 @@ def test_series_opacity_fades_lines_markers_and_bars():
     assert lines and {ln.get_alpha() for ln in lines} == {0.4}
     [key] = keys(g.axes)
     assert 0.4 in {a.get_alpha() for a in key.artists}  # the key's samples look like the series
+
+
+# --- marker.shape grid_cell -------------------------------------------------------------------
+
+
+def _grid(n_x: int = 6, n_y: int = 4) -> pd.DataFrame:
+    x, y = np.meshgrid(np.arange(n_x, dtype=float) * 3 + 350, np.arange(n_y, dtype=float))
+    return pd.DataFrame({"wl": x.ravel(), "row": y.ravel(), "a": np.linspace(0, 1, n_x * n_y)})
+
+
+def _cells(data: pd.DataFrame | None = None, **settings: Any) -> fg.Graph:
+    series = {
+        "row": {
+            "color": "a",
+            "color_scale": "continuous",
+            "marker": {"shape": "grid_cell"},
+            "line": {"show": False},
+            **settings.pop("series", {}),
+        }
+    }
+    d = fg.graphspec("t", "xy", settings={"axis.x.data.column": "wl", "series": series, **settings})
+    return fg.render(d, _grid() if data is None else data)
+
+
+def _mesh(g: fg.Graph) -> QuadMesh:
+    return next(c for c in g.axes.collections if isinstance(c, QuadMesh))
+
+
+def test_cells_fill_the_grid_with_one_image_and_reach_the_plots_edges():
+    g = _cells()
+    assert [c for c in g.axes.collections if isinstance(c, QuadMesh)] and not [
+        c for c in g.axes.collections if isinstance(c, PathCollection)
+    ]
+    assert _mesh(g).get_rasterized()
+    assert g.axes.get_xlim() == (348.5, 366.5)
+    assert g.axes.get_ylim() == (-0.5, 3.5)
+
+
+def test_cells_take_the_color_scale_and_show_the_color_bar():
+    g = _cells()
+    faces = np.asarray(_mesh(g).get_array())
+    assert faces.shape[:2] == (4, 6)
+    assert tuple(faces[0, 0]) != tuple(faces[-1, -1])
+    assert len(g.figure.axes[0].child_axes) == 1
+
+
+def test_an_irregular_grid_has_cells_to_halfway_and_a_missing_cell_is_empty():
+    df = pd.DataFrame(
+        {"wl": [1.0, 2.0, 4.0, 1.0], "row": [0.0, 0.0, 0.0, 1.0], "a": [0.0, 0.3, 0.6, 1.0]}
+    )
+    g = _cells(df)
+    assert list(np.asarray(_mesh(g).get_coordinates())[0, :, 0]) == [0.5, 1.5, 3.0, 5.0]
+    assert np.asarray(_mesh(g).get_array())[1, 1, 3] == 0.0
+
+
+def test_a_cell_on_a_log_axis_reaches_halfway_in_log_terms():
+    df = pd.DataFrame({"wl": [1.0, 100.0], "row": [0.0, 0.0], "a": [0.0, 1.0]})
+    g = _cells(df, **{"axis.x.scale": "log"})
+    assert list(np.asarray(_mesh(g).get_coordinates())[0, :, 0]) == pytest.approx(
+        [0.1, 10.0, 1000.0]
+    )
+
+
+def test_set_limits_stay_where_they_are():
+    g = _cells(None, **{"axis.x.min": 340.0})
+    assert g.axes.get_xlim() == (340.0, 366.5)
+
+
+def test_cells_take_a_categorical_axis():
+    df = pd.DataFrame(
+        {"s": ["a", "a", "b", "b"], "wl": [1.0, 2.0, 1.0, 2.0], "v": [0.0, 1.0, 2.0, 3.0]}
+    )
+    settings = {
+        "arrangement.base_axis": "y",
+        "axis.y.data.column": "s",
+        "axis.y.data.type": "categorical",
+        "series": {
+            "wl": {
+                "color": "v",
+                "color_scale": "continuous",
+                "marker": {"shape": "grid_cell"},
+                "line": {"show": False},
+            }
+        },
+    }
+    g = fg.render(fg.graphspec("t", "xy", settings=settings), df)
+    assert np.asarray(_mesh(g).get_array()).shape[:2] == (2, 2)
+    assert g.axes.get_ylim() == (-0.5, 1.5)
+
+
+def test_cells_can_be_colored_by_group():
+    df = _grid().assign(group=lambda d: np.where(d["wl"] < 355, "low", "high"))
+    g = _cells(
+        df,
+        series={"color": "group", "color_scale": "auto"},
+        **{"legend.method": "key", "legend.key.inside": False},
+    )
+    colors = np.asarray(_mesh(g).get_array())
+    assert len({tuple(c) for c in colors.reshape(-1, 4)}) == 2
+    [key] = keys(g.axes)
+    assert key.outside
+
+
+def test_a_key_or_label_inside_the_plot_keeps_clear_of_cells():
+    df = _grid().assign(group=lambda d: np.where(d["wl"] < 355, "low", "high"))
+    with pytest.raises(fg.SpecError, match="covers the data"):
+        _cells(df, series={"color": "group", "color_scale": "auto"}, **{"legend.method": "key"})
+
+
+def test_several_rows_in_a_cell_are_an_error():
+    df = pd.concat([_grid(), _grid().head(1)])
+    with pytest.raises(
+        fg.SpecError, match=r"series\.row\.marker\.shape: grid_cell, but several rows share"
+    ):
+        _cells(df)
+
+
+@pytest.mark.parametrize(
+    ("settings", "message"),
+    [
+        (
+            {"series": {"line": {"show": True}}},
+            r"grid_cell fills a grid, so set series\.row\.line\.show",
+        ),
+        (
+            {"series": {"bar": {"show": True}}},
+            r"grid_cell fills a grid, so set series\.row\.bar\.show",
+        ),
+        (
+            {"series": {"marker": {"shape": "grid_cell", "size": 0.2}}},
+            r"series\.row\.marker\.size: a cell's size comes from the grid",
+        ),
+        ({"arrangement.stacking": "sum"}, r"arrangement\.stacking: sum, but"),
+        ({"arrangement.offset": "side_by_side"}, r"arrangement\.offset: side_by_side, but"),
+    ],
+)
+def test_what_cells_cant_be_drawn_with_is_an_error(settings, message):
+    with pytest.raises(fg.SpecError, match=message):
+        _cells(**settings)
+
+
+def test_a_column_named_cell_is_only_a_column():
+    df = pd.DataFrame({"t": [0.0, 1.0, 0.0, 1.0], "v": [1.0, 2.0, 3.0, 4.0], "cell": list("AABB")})
+    g = fg.xy(df, "t", "v", parameters={"series.marker.shape": "cell"})
+    assert not [c for c in g.axes.collections if isinstance(c, QuadMesh)]

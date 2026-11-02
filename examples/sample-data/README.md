@@ -32,6 +32,7 @@ cp -R examples/sample-data ~/forgegraph-trial
 | tips.csv | seaborn's tips | Mostly categories: day, time, sex, smoker, party size |
 | growth.csv | ChickWeight | 50 animals on 4 diets; some series end early; **diet is a number** (1–4) |
 | seaice.csv | seaborn's seaice | Daily dates; a month of missing values |
+| plate_spectra.csv | UV-Vis spectra of a plate | 60 samples at 76 wavelengths, in four families, for a heat map |
 | economics.csv | ggplot2's economics | Several monthly series in different units |
 | lab_export.xlsx | an instrument export | Summary sheet first; title rows above the header; a units row; `-` and `n/a` for missing; an Average row and "End of report" under the data |
 | lab_runs.xlsx | a LIMS run log | One row per instrument run over 15 weeks; title rows above the header; statuses typed inconsistently; runs still in progress; a total under the data; an Instruments sheet |

@@ -324,6 +324,31 @@ def fuel_cells() -> tuple[pd.DataFrame, pd.DataFrame]:
     )
 
 
+def plate_spectra() -> pd.DataFrame:
+    """UV-Vis spectra of a plate of 60 samples in four families, each with its own bands."""
+    rng = np.random.default_rng(11)
+    wavelengths = np.arange(350.0, 801.0, 6.0)
+    families = [(420, 35, None), (520, 45, (380, 0.3)), (610, 40, (430, 0.5)), (470, 60, None)]
+    rows = []
+    for family, (centre, width, second) in enumerate(families):
+        for k in range(15):
+            at = centre + rng.normal(0, 6) + k * 0.7
+            y = np.exp(-0.5 * ((wavelengths - at) / (width * rng.normal(1, 0.08))) ** 2)
+            if second is not None:
+                y += second[1] * np.exp(-0.5 * ((wavelengths - second[0]) / 30) ** 2)
+            y = np.clip(y + rng.normal(0.02, 0.008, len(wavelengths)), 0, None)
+            rows.append(
+                pd.DataFrame(
+                    {
+                        "Wavelength (nm)": wavelengths,
+                        "Sample": f"S{family * 15 + k + 1:02d}",
+                        "Normalized absorbance": np.round(y / y.max(), 4),
+                    }
+                )
+            )
+    return pd.concat(rows, ignore_index=True)
+
+
 def geyser() -> pd.DataFrame:
     """Eruption length and the wait before it: two clusters."""
     rng = np.random.default_rng(21)
@@ -552,6 +577,7 @@ def main() -> None:
     durability, polarization = fuel_cells()
     durability.to_csv(OUT / "cell_durability.csv", index=False)
     polarization.to_csv(OUT / "cell_polarization.csv", index=False)
+    plate_spectra().to_csv(OUT / "plate_spectra.csv", index=False)
     geyser().to_csv(OUT / "geyser.csv", index=False)
     tips().to_csv(OUT / "tips.csv", index=False)
     growth().to_csv(OUT / "growth.csv", index=False)

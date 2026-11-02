@@ -46,6 +46,7 @@ Every command takes `--help`.
 - [examples/xy.yaml](examples/xy.yaml): an xy graph, one line per group.
 - [examples/bars.yaml](examples/bars.yaml): each group's peak value as a bar, with its value.
 - [examples/layers.yaml](examples/layers.yaml): the mean of each group's runs with error bars, a reference line and a note.
+- [examples/heat_map.yaml](examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).
 - [examples/figure.layout.yaml](examples/figure.layout.yaml): a layout of xy.yaml above bars.yaml.
 - [examples/figure.schedule.yaml](examples/figure.schedule.yaml): figure.layout.yaml rendered every weekday at 06:00.
 

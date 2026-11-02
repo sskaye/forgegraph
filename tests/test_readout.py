@@ -271,6 +271,31 @@ def test_an_axis_without_ticks_still_reads_out_its_values(tmp_path):
     ]
 
 
+def test_a_cell_reads_out_anywhere_on_it(tmp_path):
+    df = pd.DataFrame(
+        {"wl": [1.0, 2.0, 1.0, 2.0], "row": [0.0, 0.0, 1.0, 1.0], "a": [0.1, 0.2, 0.3, 0.4]}
+    )
+    series = {
+        "row": {
+            "color": "a",
+            "color_scale": "continuous",
+            "marker": {"shape": "grid_cell"},
+            "line": {"show": False},
+        }
+    }
+    g = fg.render(
+        fg.graphspec("t", "xy", settings={"axis.x.data.column": "wl", "series": series}), df
+    )
+    [data] = readouts(g, tmp_path)
+    assert len(data["marks"]) == 4
+    assert all(m[3] is not None for m in data["marks"])
+    assert sorted(line[2][1] for line in lines(data)) == ["0.1", "0.2", "0.3", "0.4"]
+    (left, top, right, bottom) = data["marks"][0][3]
+    assert left < data["marks"][0][0] < right and top < data["marks"][0][1] < bottom
+    widths = {round(m[3][2] - m[3][0], 3) for m in data["marks"]}
+    assert len(widths) == 1
+
+
 def test_one_series_has_no_series_line(tmp_path):
     df = pd.DataFrame({"t": [0.0, 1.0], "v": [1.0, 2.0]})
     assert [len(line) for line in lines(readouts(graph(df, "t", "v"), tmp_path)[0])] == [2, 2]

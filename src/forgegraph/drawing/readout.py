@@ -40,6 +40,7 @@ from matplotlib.dates import num2date
 from matplotlib.figure import Figure
 
 from forgegraph.drawing.axes import number_text
+from forgegraph.drawing.marks import CELL
 from forgegraph.drawing.markup import to_html
 from forgegraph.drawing.style import unset
 from forgegraph.fonts import font_file
@@ -115,7 +116,9 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
         lines = _lines(ax, s, d)
         look = _look(s, to_hex(paper, keep_alpha=False), border)
         rings = s.ring if isinstance(s.ring, list) else [s.ring] * len(s.x)
-        if s.line is not None and (s.shows("marker") or s.shows("line")):
+        if s.marker == CELL and d.drawn.cells is not None and s.shows("marker"):
+            out += _cell_marks(ax, s, d, lines, look, rings, to_pt, height)
+        elif s.line is not None and (s.shows("marker") or s.shows("line")):
             radius = s.look.marker_size / 2 if s.shows("marker") else 0.0
             px, py = (s.x, s.y) if r.base == "x" else (s.y, s.x)
             at = s.line.get_transform().transform(
@@ -134,6 +137,32 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
                 top, bottom = height - box.y1 * to_pt, height - box.y0 * to_pt
                 centre = ((left + right) / 2, (top + bottom) / 2)
                 out.append(Mark(*centre, 0.0, (left, top, right, bottom), rings[i], look, lines[i]))
+    return out
+
+
+def _cell_marks(
+    ax: Axes,
+    s: Any,
+    d: _Drawing,
+    lines: list[tuple[tuple[str, str], ...]],
+    look: Look,
+    rings: list[str],
+    to_pt: float,
+    height: float,
+) -> list[Mark]:
+    """A series' cells, each read out anywhere on it, as a bar is."""
+    cells = d.drawn.cells
+    across = ax.transData.transform(np.c_[cells.x, np.ones(len(cells.x))])[:, 0] * to_pt
+    up = ax.transData.transform(np.c_[np.ones(len(cells.y)), cells.y])[:, 1] * to_pt
+    px, py = (s.x, s.y) if d.drawn.roles.base == "x" else (s.y, s.x)
+    columns = np.searchsorted(cells.x, np.asarray(px, dtype=float)) - 1
+    rows = np.searchsorted(cells.y, np.asarray(py, dtype=float)) - 1
+    out = []
+    for i, (column, row) in enumerate(zip(columns, rows, strict=True)):
+        left, right = float(across[column]), float(across[column + 1])
+        top, bottom = float(height - up[row + 1]), float(height - up[row])
+        centre = ((left + right) / 2, (top + bottom) / 2)
+        out.append(Mark(*centre, 0.0, (left, top, right, bottom), rings[i], look, lines[i]))
     return out
 
 

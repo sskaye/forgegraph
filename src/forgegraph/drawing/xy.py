@@ -1055,15 +1055,15 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     """Name the series (legend.method), explain styles, then place reference lines' labels at
     auto and notes inside the plot, all after the figure's size is final. Keys go first, since
-    they need a corner and a label or a note has six places. Anything that can't be placed
-    cleanly is an error, never a fallback. What an earlier label() placed is taken away first,
-    to place it again after the layout changed."""
+    they need a corner and a label or a note has six places; direct labels go after the
+    reference lines' labels, which they can move around. Anything that can't be placed cleanly
+    is an error, never a fallback. What an earlier label() placed is taken away first, to place
+    it again after the layout changed."""
     labelling.unplace(ax)
     layers.unplace_notes(ax)
     axis_data.check_fit(ax, gt, style)
-    _name_series(ax, drawn, gt, style)
-    after = [line for line in drawn.ref_lines if layers.placed_after_keys(line)]
-    layers.label_lines(ax, after, gt, style, drawn.lines, keys=True)
+    if not _name_series(ax, drawn, gt, style):
+        _label_lines_after_keys(ax, drawn, gt, style)
     layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)
     for line in drawn.ref_lines:
         if line.function is not None:
@@ -1088,7 +1088,15 @@ def _legend_column(listed: list[Listed]) -> str | None:
     return None if one is None or one == SERIES else one
 
 
-def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
+def _label_lines_after_keys(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
+    """Place the reference lines' labels at auto, clear of the keys placed so far."""
+    after = [line for line in drawn.ref_lines if layers.placed_after_keys(line)]
+    layers.label_lines(ax, after, gt, style, drawn.lines, keys=True)
+
+
+def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
+    """Name the series and explain their styles; True if the reference lines' labels at auto
+    were placed on the way, as they are before direct labels."""
     groups = drawn.label_groups
     with_lines = drawn.lines  # whether lines are obstacles: labels.Obstacles.of
     taken: list = []
@@ -1140,10 +1148,10 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     y_title = drawn.y_title
     if method == "none" or not groups or ([g.name for g in groups] == [y_title]):
         drawn.labelling = "none"  # one series named by the y-axis title already
-        return
+        return False
     if _on_its_axis(gt, _legend_column(drawn.listed), drawn):
         drawn.labelling = "none"
-        return
+        return False
     allowed = [m for m in style.theme["legend.methods"] if m not in ("auto", "none")]
     if any(s.shows("bar") for s in drawn.listed):  # names beside bars would need rules
         if method == "direct":
@@ -1154,9 +1162,14 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     entries = [Entry(g.name, g.handle) for g in groups]
     blocked = ""
     for m in tries:
-        if m == "direct" and labelling.interior(ax, groups, style):
-            drawn.labelling = "direct"
-            return
+        if m == "direct":
+            before = list(ax.texts)
+            _label_lines_after_keys(ax, drawn, gt, style)
+            if labelling.interior(ax, groups, style):
+                drawn.labelling = "direct"
+                return True
+            for placed in [t for t in ax.texts if t not in before]:
+                placed.remove()  # a key comes next, and they go after it
         if m == "key":
             one_key(len(drawn.style_keys) + 1)
             leg = labelling.legend(
@@ -1171,7 +1184,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             )
             if leg is not None:
                 drawn.labelling = "key"
-                return
+                return False
             blocked = labelling.in_the_way(
                 ax, entries, style, legend_title, taken=taken, lines=with_lines, **where
             )

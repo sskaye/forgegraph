@@ -21,6 +21,7 @@ Direct labels follow six rules, using the theme's legend.direct parameters:
 from __future__ import annotations
 
 import itertools
+import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -145,13 +146,15 @@ def _overlap(a: tuple, b: tuple, pad: float) -> bool:
     )
 
 
-def _drawn_points(ax: Axes, lines: bool) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """(dense line samples, marker centres) of everything drawn but keys, in display px: with
-    lines, along every line drawn with a line style. A bar is sampled across its whole
-    width."""
+def _drawn_points(
+    ax: Axes, lines: bool, ignore: Line2D | None = None
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    """(dense line samples, marker centres) of everything drawn but keys and the line to
+    ignore, in display px: with lines, along every line drawn with a line style. A bar is
+    sampled across its whole width."""
     dense, centres = [], []
     for line in ax.get_lines():
-        if line.get_gid() == KEY:  # a key's own samples aren't data
+        if line.get_gid() == KEY or line is ignore:  # a key's own samples aren't data
             continue
         raw = line.get_transform().transform(np.asarray(line.get_xydata(), dtype=float))
         xy = raw[np.isfinite(raw).all(axis=1)]  # dates as numbers
@@ -184,13 +187,22 @@ class Obstacles:
     boxes: list[tuple[str, Bbox | None]] = field(default_factory=list)  # what each is, its box
 
     @classmethod
-    def of(cls, ax: Axes, *, lines: bool, keys: bool, renderer: Any = None) -> Obstacles:
+    def of(
+        cls,
+        ax: Axes,
+        *,
+        lines: bool,
+        keys: bool,
+        renderer: Any = None,
+        ignore: Line2D | None = None,
+    ) -> Obstacles:
         """What's drawn inside the plot: every marker and bar; with lines, every line drawn
         with a line style (the series' lines are drawn only when shown, so when no series
         shows its line, reference lines and error-bar stems don't count either); the
         plot's text (value labels, notes, a reference line's label, direct labels); with
-        keys, the keys' frames. A key's own lines and text never count."""
-        dense, centres = _drawn_points(ax, lines)
+        keys, the keys' frames. A key's own lines and text never count, nor the line to
+        ignore: a box around a label set along a sloped line holds some of its own line."""
+        dense, centres = _drawn_points(ax, lines, ignore)
         texts = [
             (t, t.get_window_extent(renderer))
             for t in ax.texts
@@ -222,6 +234,25 @@ class Obstacles:
     def clear(self, box: Bbox, pad: float = 0.0) -> bool:
         """Whether box runs into nothing here (see hits)."""
         return not self.hits(box, pad)
+
+    def clear_of_text_along(self, label: Text, pad: float = 0.0) -> bool:
+        """Whether a turned label runs into nothing here: by the rectangle it fills for the
+        data, as the upright box around it holds a lot more, and by that box for the rest."""
+        box = label.get_window_extent()
+        angle = math.radians(label.get_rotation())
+        turn = np.array([[math.cos(angle), math.sin(angle)], [-math.sin(angle), math.cos(angle)]])
+        centre = np.array([(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2])
+        rotation = label.get_rotation()
+        label.set_rotation(0)
+        flat = label.get_window_extent()
+        label.set_rotation(rotation)
+        half = (flat.width / 2 + pad, flat.height / 2 + pad)
+        frame = (-half[0], -half[1], half[0], half[1])
+        for points in [*self.dense, *self.centres]:
+            if len(points) and not _rect_dist((points - centre) @ turn.T, frame) > 0:
+                return False
+        rest = Obstacles([], [], self.texts, self.boxes)
+        return not rest.hits(box, 0.0)
 
 
 def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = True) -> bool:
@@ -396,11 +427,22 @@ def keys_clear(ax: Axes, lines: bool) -> bool:
     return all(box_clear(ax, k.bbox(), lines) for k in keys_of(ax) if not k.outside)
 
 
-def box_clear(ax: Axes, bbox: Bbox, lines: bool, keys: bool = False) -> bool:
+def box_clear(
+    ax: Axes, bbox: Bbox, lines: bool, keys: bool = False, ignore: Line2D | None = None
+) -> bool:
     """Whether a box, in display px, keeps 2 pt clear of what's drawn inside the plot, and
     off its other text (with keys, its keys too): see Obstacles.of."""
     pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-    return Obstacles.of(ax, lines=lines, keys=keys).clear(bbox, pad)
+    return Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore).clear(bbox, pad)
+
+
+def label_clear(
+    ax: Axes, label: Text, lines: bool, keys: bool = False, ignore: Line2D | None = None
+) -> bool:
+    """box_clear for a label turned along its line, which keeps clear of its own line by its
+    gap."""
+    pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
+    return Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore).clear_of_text_along(label, pad)
 
 
 def unplace(ax: Axes) -> None:
@@ -436,7 +478,7 @@ def _with_more_room(
     key: Key,
     lines: bool,
     positions: tuple[str, ...],
-    used: set[str],
+    used: set[str | None],
     extendable: tuple[str, ...],
     most: float,
 ) -> bool:

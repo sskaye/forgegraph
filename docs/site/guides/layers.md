@@ -6,7 +6,9 @@ Layers are drawn over a graph: reference lines and bands, error bars, and notes.
 
 A `reference` layer draws a line across the plot at a value: horizontal with `axis: y`, vertical with `axis: x`. `line_1.value` is a number, a date, or a column, and a column's rows are combined by `line_1.aggregation`, so a line can sit at the data's mean, median, a percentile and so on. `offset` adds a distance to that, such as three standard deviations.
 
-A second line, `line_2`, makes the layer a band, filled between the two lines. The savings rate has a band one standard deviation either side of its mean, drawn without its lines, and a second layer with a line at the mean:
+A line can also be an equation, in place of a value, such as `equation: x` for a line of y = x on a parity plot. With `axis: y`, an equation gives y in terms of x, and with `axis: x`, x in terms of y. It may use numbers, that letter, `+`, `-`, `*`, `/`, `^` and parentheses, as in `2x^2 - 3x + 1`, and it may be a curve. The line runs across the plot without widening an axis, and its label lies along it. `label.text: value` writes the equation, as in y = 2x. A label that can't find a clear place beside the data can go beyond the plot, with `label.inside: false`.
+
+A second line, `line_2`, makes the layer a band, filled between the two lines, which can be equations: `x - 10` and `x + 10` make a tolerance band around y = x. The savings rate has a band one standard deviation either side of its mean, drawn without its lines, and a second layer with a line at the mean:
 
 ```yaml
 --8<-- "docs/examples/savings.yaml"

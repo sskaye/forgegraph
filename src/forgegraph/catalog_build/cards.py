@@ -14,7 +14,7 @@ graph type's or layer type's definition's), its range and the baseline's data:
    axis's column or a layer's, any other.
 3. A font family: each bundled family but d. A number or date format (a value format, or
    text for a parameter whose name ends in format): FORMATS.
-4. Other text in its range: SAMPLE_TEXT.
+4. A line's equation: SAMPLE_EQUATIONS. Other text in its range: SAMPLE_TEXT.
 5. A hex color in its range: SAMPLE_COLOR.
 6. A number with a numeric default: 2d, then d/2 (rounded down for a whole number; for
    d = 0, just 1), each within the range's interval. A figure size defaulting to auto: the
@@ -65,6 +65,7 @@ EXEMPT = {"format": ("output.", "provenance."), "graph_type": ("layer.types",)}
 SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # each from the other
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
 SAMPLE_TEXT = "Sample text"
+SAMPLE_EQUATIONS = ("1.3 + 0.1x", "1.4 + 0.05x^2")
 SAMPLE_COLOR = "#D55E00"
 NUMBERS = ("int ≥ 0", "int > 0", "float", "float ≥ 0", "float > 0")
 
@@ -141,6 +142,8 @@ def candidates(p: Parameter, d: Any, scene: Scene, layer: str = "") -> list[Any]
         out += [f for f in bundled_families() if f != d]
     if "value format" in rng.types:
         out += FORMATS
+    elif p.path.endswith("equation"):
+        out += SAMPLE_EQUATIONS
     elif "text" in rng.types:
         out += FORMATS if p.path.endswith("format") else (SAMPLE_TEXT,)
     if "hex color" in rng.types:

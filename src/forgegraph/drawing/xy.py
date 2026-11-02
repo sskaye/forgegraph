@@ -660,7 +660,7 @@ def _series(
             key = key if isinstance(key, tuple) else (key,)
             values = dict(zip([*s.grouping, "__bench__"], key, strict=True))
             if cats is not None and x in values:
-                values[x] = cats[round(float(values[x]))]
+                values[x] = cats[round(float(cast(Any, values[x])))]
             rows = cast(pd.DataFrame, group)
             if s.values["line.connect_order"] == "x":
                 rows = rows.sort_values(by=x, kind="stable")
@@ -1050,6 +1050,9 @@ def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     after = [line for line in drawn.ref_lines if layers.placed_after_keys(line)]
     layers.label_lines(ax, after, gt, style, drawn.lines, keys=True)
     layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)
+    for line in drawn.ref_lines:
+        if line.function is not None:
+            line.end("start")  # with the limits final, an error if it's not in the plot
 
 
 def _on_its_axis(gt: dict[str, Any], column: str | None, drawn: Drawn) -> bool:
@@ -1160,7 +1163,8 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
     if method == "auto":
         raise DrawError(
             f"legend.method: auto, but no labelling method fits ({', '.join(tries)} tried"
-            f"{': ' + blocked if blocked else ''}); put the key outside (legend.key.inside: false), widen the format, draw fewer series, "
+            f"{': ' + blocked if blocked else ''}); put the key outside "
+            "(legend.key.inside: false), widen the format, draw fewer series, "
             "or set axis.x.min/max or axis.y.min/max to leave room for a key"
         )
     other = [m for m in allowed if m != method]

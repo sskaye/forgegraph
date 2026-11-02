@@ -15,7 +15,9 @@
   text and the keys, which go first, since they need a corner and a label has six places. A
   chosen position that covers something is an error; one past the plot's edge widens an
   automatic axis. It's placed before the keys, which keep clear of it. With label.inside
-  false, the label is beyond the plot area at the line's start or end.
+  false, the label is beyond the plot area at the line's start or end. A line can instead be
+  an equation (drawing/equation.py), which runs across the plot without widening an axis, with
+  its label along it.
 - **error_bar**: a bar on each mark along an axis, a number or a column's distance below and
   above it. With the series aggregated (its aggregation), the distances can be an aggregate
   of the rows each mark stands for, times its multiplier: such as their standard deviation,
@@ -42,7 +44,7 @@ from matplotlib.axes import Axes
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import labels, limits, marks
+from forgegraph.drawing import equation, labels, limits, marks
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.key import keys
@@ -75,6 +77,9 @@ LABEL_ORDER = [
     "center_above",
     "center_below",
 ]
+# Where auto also tries a label along a line from an equation, which often runs through the data:
+# a fraction of the way along it, on either side
+ALONG_THE_LINE = [f"{i / 8}_{side}" for i in (7, 1, 5, 3, 6, 2) for side in ("above", "below")]
 LINES = ("line_1", "line_2")  # a reference layer's lines
 
 
@@ -97,6 +102,8 @@ class RefLine:
     kind: str = "decimal"  # its axis's type
     points: tuple[np.ndarray, np.ndarray] | None = None  # (base, value) of a following line
     placed_outside: bool = False  # its label is beyond the plot area, laid out already
+    function: equation.Function | None = None  # of a line from an equation, drawn as artist
+    artist: equation.EquationLine | None = None
 
     @property
     def path(self) -> str:
@@ -105,6 +112,16 @@ class RefLine:
     def end(self, along: str) -> tuple[float | None, float]:
         """Where a label at the line's start, center or end is: the place along the base axis
         (None for a straight line, which runs across the plot) and the value."""
+        if self.artist is not None:
+            assert self.function is not None
+            places, values = equation.in_view(
+                cast(Axes, self.artist.axes), self.axis, self.function
+            )
+            if not len(places):
+                raise DrawError(f"{self.path}.equation: no part of the line is inside the plot")
+            named = {"start": 0.0, "center": 0.5, "end": 1.0}
+            i = round((named[along] if along in named else float(along)) * (len(places) - 1))
+            return float(places[i]), float(values[i])
         if self.points is None:
             return None, self.at
         base, value = self.points
@@ -310,18 +327,39 @@ def reference_lines(
                 groups.append((_each_row_once(cast(pd.DataFrame, rows)), members[0].color))
         else:
             groups.append((_each_row_once(frame), ""))
-        listed = [w for w in LINES if not unset(layer[f"{w}.value"])]
+        listed = [
+            w for w in LINES if not (unset(layer[f"{w}.value"]) and unset(layer[f"{w}.equation"]))
+        ]
         if not listed:
             raise DrawError(f"{where}: set line_1.value, line_2.value, or both")
+        functions = {w: _line_function(layer, w, kinds) for w in listed}
         for rows, color in groups:
-            found = {w: _line_values(layer, w, rows, roles, kinds) for w in listed}
+            found = {
+                w: (float("nan"), None)
+                if functions[w] is not None
+                else _line_values(layer, w, rows, roles, kinds)
+                for w in listed
+            }
             if len(found) == 2:
-                _band(ax, layer, found, color, style, roles)
+                _band(ax, layer, found, functions, color, style, roles)
             for w, (at, points) in found.items():
                 own = look(style, layer, w)
                 line = own.line("layer.reference.line")
                 line_color = color or line.color
-                if points is None:
+                function, artist = functions[w], None
+                if function is not None:
+                    artist = equation.EquationLine(
+                        ax,
+                        axis,
+                        function,
+                        color=line_color,
+                        linewidth=line.width,
+                        linestyle=line.style,
+                        zorder=1.5,
+                        gid=REFERENCE,
+                    )
+                    ax.add_line(artist)
+                elif points is None:
                     draw_line = ax.axhline if axis == "y" else ax.axvline
                     draw_line(at, color=line_color, linewidth=line.width, linestyle=line.style,
                               zorder=1.5, gid=REFERENCE)  # fmt: skip
@@ -345,15 +383,46 @@ def reference_lines(
                         str(layer[f"{w}.label.format"]),
                         kinds[axis],
                         points,
+                        function=function,
+                        artist=artist,
                     )
                 )
     return drawn
+
+
+def _line_function(
+    layer: dict[str, Any], which: str, kinds: dict[str, str]
+) -> equation.Function | None:
+    """The function of a line from an equation, or None for a line at a value. An equation
+    takes nothing that's about a value in the data."""
+    text = layer[f"{which}.equation"]
+    if unset(text):
+        return None
+    path = f"layers.{layer['name']}.{which}"
+    axis, other = layer["axis"], "x" if layer["axis"] == "y" else "y"
+    if not unset(layer[f"{which}.value"]):
+        raise DrawError(f"{path}: set value or equation, not both")
+    for part in ("aggregation", "offset"):
+        if _style_value(layer, which, part)[0] is not None:
+            raise DrawError(f"{path}.{part}.function: applies only when value is a column")
+    if layer[f"{which}.scope"] != "all":
+        raise DrawError(f"{path}.scope: applies only when value is a column")
+    if layer["per_series"]:
+        raise DrawError(f"layers.{layer['name']}.per_series: an equation has one line")
+    for name in (axis, other):
+        if kinds.get(name) not in ("decimal", "integer"):
+            raise DrawError(f"{path}.equation: axis.{name} isn't numbers, so an equation can't run")
+    try:
+        return equation.parse(str(text), other)
+    except equation.EquationError as e:
+        raise DrawError(f"{path}.equation: can't read '{text}': {e}") from None
 
 
 def _band(
     ax: Axes,
     layer: dict[str, Any],
     found: dict[str, tuple[float, tuple[np.ndarray, np.ndarray] | None]],
+    functions: dict[str, equation.Function | None],
     color: str,
     style: Style,
     roles: Any,
@@ -372,6 +441,27 @@ def _band(
     face = color if fill == "series" else fill
     alpha = float(own.theme["layer.reference.fill.opacity"])
     (a, pa), (b, pb) = found["line_1"], found["line_2"]
+    if any(functions.values()):
+        if pa is not None or pb is not None:
+            raise DrawError(
+                f"layers.{layer['name']}: a band can't join an equation and a line that follows "
+                "the data"
+            )
+        low = functions["line_1"] or equation.constant(a)
+        high = functions["line_2"] or equation.constant(b)
+        fill = equation.EquationBand(
+            ax,
+            layer["axis"],
+            low,
+            high,
+            facecolor=face,
+            alpha=alpha,
+            linewidth=0,
+            zorder=1.4,
+            gid=REFERENCE,
+        )
+        ax.add_collection(fill, autolim=False)
+        return
     if pa is None and pb is None:
         span = ax.axhspan if layer["axis"] == "y" else ax.axvspan
         span(min(a, b), max(a, b), facecolor=face, alpha=alpha, linewidth=0, zorder=1.4,
@@ -395,6 +485,9 @@ def _line_label(layer: dict[str, Any], which: str) -> tuple[str, bool]:
     text = layer[f"{which}.label.text"]
     if unset(text):
         return "", False
+    written = layer[f"{which}.equation"]
+    if text == "value" and not unset(written):
+        return markup(f"{layer['axis']} = {written}"), False
     how, multiplier, percentile = _style_value(layer, which, "aggregation")
     if text in ("aggregation", "aggregation_value"):
         if how is None:
@@ -421,6 +514,58 @@ def _label_line(ax: Axes, line: RefLine, text: str, position: str) -> Annotation
     gap = style.gap or 0.0
     sign = 1 if side == "above" else -1
     place, at = line.end(along)
+    colored = line.look.theme["layer.reference.label.color"] == "line"
+    if line.function is not None and not line.inside:  # beyond the edge where the line leaves
+        assert place is not None
+        spot = (place, at) if line.axis == "y" else (at, place)
+        (x, y), (left, right), (low, high) = spot, sorted(ax.get_xlim()), sorted(ax.get_ylim())
+        to_side = abs(x - (left if along == "start" else right)) < abs(
+            y - (low if along == "start" else high)
+        ) * (right - left) / (high - low)
+        on_right, on_top = x > (left + right) / 2, y > (low + high) / 2
+        offset = (gap if on_right else -gap, 0.0) if to_side else (0.0, gap if on_top else -gap)
+        return ax.annotate(
+            text,
+            spot,
+            xycoords="data",
+            xytext=offset,
+            textcoords="offset points",
+            ha=("left" if on_right else "right") if to_side else "center",
+            va="center" if to_side else ("bottom" if on_top else "top"),
+            fontproperties=style.font,
+            color=line.color if colored else style.color,
+            annotation_clip=False,
+            gid=REFERENCE,
+            zorder=4,
+        )
+    if line.function is not None:  # along the line, which may run either way across the plot
+        assert place is not None
+        degrees = equation.angle(ax, line.axis, place, line.function)
+        ahead = (math.cos(math.radians(degrees)), math.sin(math.radians(degrees)))
+        rising = line.axis == "y" or ahead[1] >= 0
+        inset = {"start": gap, "end": -gap}.get(along, 0.0) * (1 if rising else -1)
+        ha = {"start": "left", "end": "right"}.get(along, "center")
+        if not rising:
+            ha = {"left": "right", "center": "center", "right": "left"}[ha]
+        return ax.annotate(
+            text,
+            (place, at) if line.axis == "y" else (at, place),
+            xycoords="data",
+            xytext=(
+                inset * ahead[0] - sign * gap * ahead[1],
+                inset * ahead[1] + sign * gap * ahead[0],
+            ),
+            textcoords="offset points",
+            ha=ha,
+            va="bottom" if sign > 0 else "top",
+            rotation=degrees,
+            rotation_mode="anchor",
+            fontproperties=style.font,
+            color=line.color if colored else style.color,
+            annotation_clip=False,
+            gid=REFERENCE,
+            zorder=4,
+        )
     fraction = {"start": 0.0, "center": 0.5, "end": 1.0}[along]
     if line.inside:  # clear of the plot's frame, or of the point it starts or ends at
         inset = {"start": gap, "center": 0.0, "end": -gap}[along]
@@ -444,7 +589,6 @@ def _label_line(ax: Axes, line: RefLine, text: str, position: str) -> Annotation
         va = {"start": "bottom", "center": "center", "end": "top"}[along]
         if not line.inside:
             va = {"start": "top", "center": "center", "end": "bottom"}[along]
-    colored = line.look.theme["layer.reference.label.color"] == "line"
     return ax.annotate(
         text,
         xy,
@@ -531,10 +675,12 @@ def label_lines(
                 and box.y0 >= plot.y0 - 0.5
                 and box.y1 <= plot.y1 + 0.5
             )
-            found = (
-                "clear" if inside and labels.box_clear(ax, box, with_lines, keys=keys) else
-                "covers" if inside else "outside"
-            )  # fmt: skip
+            clear = (
+                labels.box_clear(ax, box, with_lines, keys=keys)
+                if line.artist is None
+                else labels.label_clear(ax, a, with_lines, keys=keys, ignore=line.artist)
+            )
+            found = "clear" if inside and clear else "covers" if inside else "outside"
             if found == "outside" and not auto and keep:  # past the plot's edge: widen to it
                 nonlocal widened
                 what = f"{line.path}: its label"
@@ -547,7 +693,7 @@ def label_lines(
             """Grow the axis along the line at its start or end until the label is clear."""
             along = position.split("_")[0]
             other, end = ("x" if line.axis == "y" else "y"), ("max" if along == "end" else "min")
-            if along == "center" or not unset(gt[f"axis.{other}.{end}"]):
+            if along not in ("start", "end") or not unset(gt[f"axis.{other}.{end}"]):
                 return False
             return labels.grow_until(
                 ax,
@@ -557,7 +703,9 @@ def label_lines(
                 most,
             )
 
-        tries = LABEL_ORDER if auto else [line.position]
+        tries = (
+            [*LABEL_ORDER, *(ALONG_THE_LINE if line.artist else [])] if auto else [line.position]
+        )
         if auto:  # the first clear position; past the edge counts as not clear
             found = next((f for p in tries if (f := attempt(p, keep=True)) == "clear"), "covers")
         else:
@@ -569,6 +717,7 @@ def label_lines(
                 f"{line.path}.label.position: auto, but no position beside the line is clear "
                 "of what's drawn; choose one and widen the axis, shorten the label, or widen "
                 "the format"
+                + (", or put it beyond the plot (label.inside: false)" if line.artist else "")
             )
         if found == "covers":
             others = ", ".join(p for p in LABEL_ORDER if p != line.position)

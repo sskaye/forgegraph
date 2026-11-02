@@ -194,3 +194,26 @@ def test_a_set_limit_stays_where_it_is_so_the_key_doesnt_fit():
 def test_no_extension_leaves_the_axis_alone():
     with pytest.raises(fg.SpecError, match="top_right covers the data"):
         _covered(**{"axis.max_extension": 0})
+
+
+def test_direct_labels_go_after_a_lines_label_at_auto():
+    df = pd.DataFrame(
+        {"x": [0.0, 1.0, 2.0, 3.0], "up": [1.0, 2.0, 3.0, 4.0], "down": [4.0, 3.0, 2.0, 1.0]}
+    )
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "x",
+            "axis.y.title": "v",
+            "legend.method": "direct",
+            "legend.key.title.text": "None",
+            "series": {"up": {}, "down": {}},
+        },
+    )
+    label = {"value": 2.5, "label": {"text": "Limit"}}
+    d["parameters"]["layers"] = {"t": {"type": "reference", "axis": "y", "line_1": label}}
+    g = fg.render(d, df)
+    written = [t.get_text() for t in g.axes.texts if t.get_text()]
+    assert written[0] == "Limit"
+    assert sorted(written) == ["Limit", "down", "up"]

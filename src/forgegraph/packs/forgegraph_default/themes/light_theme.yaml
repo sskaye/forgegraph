@@ -42,7 +42,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 count: 0          # [int ≥ 0]; The number of minor ticks between major ticks. If 0, there are none.
                 length: 0.15          # [float ≥ 0]; The minor tick length, × base size.
                 width: 0.05          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.
-        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.
+        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, keys, notes and line labels inside the plot area, × its range. If 0, it's never extended.
     plot_area:
         border:          # [line style]; The plot area's border.
             width: 0.08          # [float ≥ 0]; The width, × base size. If 0, no line is drawn.

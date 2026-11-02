@@ -8,7 +8,8 @@ gap to the name, the gap from the plot box, and the names' and title's text styl
 
 A `Key` is measured when it's made and drawn when it's placed: inside the plot box at one of
 POSITIONS (the labelling code tries the GraphSpec's legend.key.positions in order until the
-key is clear of the data), or outside it (place_outside): above the plot box, under the
+key is clear of the data), under or beside the keys already there, or outside it
+(place_outside): above the plot box, under the
 title; below the x-axis title; or to the plot box's right. Layout makes room for a key
 outside, which follows the plot box (and, below it, the x-axis title).
 """
@@ -85,12 +86,14 @@ class Key:
         self._place: Transform | None = None
         self._ax: Axes | None = None
 
-    def place(self, ax: Axes, position: str) -> None:
-        """Draw the key inside the plot box at a position, legend.key.gap.outer in from it."""
+    def place(self, ax: Axes, position: str, under: float = 0.0, beside: float = 0.0) -> None:
+        """Draw the key inside the plot box at a position, legend.key.gap.outer in from it;
+        moved along from its corner by under and beside (in points), past keys already there:
+        under is away from the top or bottom edge, and beside away from the left or right."""
         cx, cy, sx, sy = POSITIONS[position]
         inset = self.style.pt("legend.key.gap.outer")
-        left = {1: inset, 0: -self.width / 2, -1: -inset - self.width}[sx]  # from the anchor
-        top = {-1: -inset, 0: self.height / 2, 1: inset + self.height}[sy]
+        left = {1: inset + beside, 0: -self.width / 2, -1: -inset - self.width - beside}[sx]
+        top = {-1: -inset - under, 0: self.height / 2, 1: inset + self.height + under}[sy]
         self._draw(ax, position, (cx, cy), left, top, outside=False)
 
     def place_outside(self, ax: Axes, position: str) -> None:

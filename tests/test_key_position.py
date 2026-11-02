@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -81,3 +82,115 @@ def test_a_key_outside_leaves_less_room_for_the_bars():
         return max(b.width for b in g.axes.collections if isinstance(b, Bars))
 
     assert bar_width(outside) < bar_width(above)  # the key beside the plot narrows it
+
+
+# --- making room for a key inside the plot ----------------------------------------------------
+
+
+def _low_points(n: int = 170) -> pd.DataFrame:
+    """Points along the bottom of the plot, and one at the top left that sets the axis's top."""
+    rng = np.random.default_rng(3)
+    x, y = rng.uniform(-1, 1, n), np.clip(rng.exponential(0.25, n), 0, 1.2)
+    x[0], y[0] = -0.9, 5.0
+    return pd.DataFrame(
+        {
+            "x": x,
+            "y": y,
+            "Class": [f"Class {i % 7}" for i in range(n)],
+            "Kind": [f"K{i % 2}" for i in range(n)],
+        }
+    )
+
+
+def _with_lines(position: str = "auto", **parameters) -> fg.Graph:
+    settings = {
+        "axis.x.data.column": "x",
+        "legend.method": "key",
+        "series": {
+            "y": {"color": "Class", "line": {"show": False}, **parameters.pop("series", {})},
+        },
+        **parameters,
+    }
+    d = fg.graphspec("t", "xy", settings=settings)
+    d["parameters"]["layers"] = {
+        name: {
+            "type": "reference",
+            "axis": "x",
+            "line_1": {"value": at, "label": {"text": text, "position": position}},
+        }
+        for name, at, text in (("a", -0.45, "Lower limit"), ("b", 1.0, "Upper limit"))
+    }
+    return fg.render(d, _low_points())
+
+
+def _label(g: fg.Graph, words: str):
+    return next(t for t in g.axes.texts if t.get_text() == words).get_window_extent()
+
+
+def test_a_key_goes_before_labels_at_auto_which_keep_clear_of_it():
+    g = _with_lines()
+    [key] = keys(g.axes)
+    assert key.position == "top_right"
+    for words in ("Lower limit", "Upper limit"):
+        assert not key.bbox().overlaps(_label(g, words))
+
+
+def test_labels_at_chosen_positions_go_first_and_the_error_names_them():
+    with pytest.raises(fg.SpecError, match="top_right covers the label 'Upper limit'"):
+        _with_lines("end_below")
+
+
+def test_a_second_key_goes_beside_the_first_when_the_corners_are_used_up():
+    g = _with_lines(series={"marker": {"shape": "Kind"}})
+    first, second = keys(g.axes)
+    assert first.position == second.position == "top_right"
+    assert not first.bbox().overlaps(second.bbox())
+    assert second.bbox().x1 <= first.bbox().x0  # the two are too tall to stack here
+
+
+def _dots_across_the_top(n: int = 400) -> pd.DataFrame:
+    rng = np.random.default_rng(5)
+    x, y = rng.uniform(0, 10, n), rng.uniform(0, 10, n)
+    return pd.DataFrame({"x": x, "y": y, "g": [f"g{i % 2}" for i in range(n)]})
+
+
+def _covered(**parameters) -> fg.Graph:
+    return fg.xy(
+        _dots_across_the_top(),
+        "x",
+        "y",
+        color="g",
+        parameters={
+            "legend.method": "key",
+            "series.line.show": False,
+            "legend.key.positions": ["top_right"],
+            "axis.max_extension": 0.6,
+            **parameters,
+        },
+    )
+
+
+def test_the_axis_grows_for_a_key_by_as_little_as_it_takes():
+    g = _covered()
+    [key] = keys(g.axes)
+    _, top = g.axes.get_ylim()
+    assert 10 < top < 10 * 1.7
+    text.measure(g.figure)
+    centres = g.axes.transData.transform(_dots_across_the_top()[["x", "y"]].to_numpy())
+    box = key.bbox()
+    assert not (
+        (box.x0 < centres[:, 0])
+        & (centres[:, 0] < box.x1)
+        & (box.y0 < centres[:, 1])
+        & (centres[:, 1] < box.y1)
+    ).any()
+
+
+def test_a_set_limit_stays_where_it_is_so_the_key_doesnt_fit():
+    with pytest.raises(fg.SpecError, match="top_right covers the data"):
+        _covered(**{"axis.y.max": 10.0})
+
+
+def test_no_extension_leaves_the_axis_alone():
+    with pytest.raises(fg.SpecError, match="top_right covers the data"):
+        _covered(**{"axis.max_extension": 0})

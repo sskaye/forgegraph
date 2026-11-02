@@ -14,7 +14,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         file: None          # [None, text]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.
         preprocessing: None          # [None, text]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.
     axis:
-        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.
+        max_extension: 0.15          # [0-1]; The most an axis may be extended to fit direct labels, keys, notes and line labels inside the plot area, × its range. If 0, it's never extended.
         x:
             data:
                 column: "PLACEHOLDER"          # [None, column]; The column on this axis when it's arrangement.base_axis, which a GraphSpec must then set. Otherwise, it must be None.
@@ -90,7 +90,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         direct:
             max_relative_distance: 0.8          # [0-1]; The farthest a direct label may be from its series, ÷ its distance to the next nearest series.
         key:
-            positions: [top_right, top_left, bottom_right, bottom_left]          # [top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom]; The positions to try, in order. The key goes in the first one where it doesn't overlap the data.
+            positions: [top_right, top_left, bottom_right, bottom_left]          # [top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom]; The positions to try, in order. The key goes in the first one where it doesn't overlap the data. If there's none inside the plot, it goes beside a key there, or the y-axis is extended.
             inside: true          # [true, false]; Whether the key is inside the plot area. If false, top positions are above the plot area, bottom positions are below the x-axis title, and right positions are to its right.
             title:
                 text: column_name          # [None, column_name, text]; The title of every key. column_name uses the name of each key's column. Other text is allowed only when there is one key. If None, there is no title.

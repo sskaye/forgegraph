@@ -22,7 +22,7 @@ Shorten the text, place it inside the plot, or widen the format.
 
 A key covers a line or marker.
 
-List other positions in `legend.key.positions`, put the key outside the plot with `legend.key.inside: false`, or name the series directly with `legend.method: direct`.
+The error says what's in the way at each position. List other positions in `legend.key.positions`, let the axis extend further with a larger `axis.max_extension`, move a reference line's label by leaving its `position` at `auto`, put the key outside the plot with `legend.key.inside: false`, or name the series directly with `legend.method: direct`.
 
 ### too-many-groups
 

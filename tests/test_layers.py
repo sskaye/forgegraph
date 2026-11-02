@@ -16,6 +16,7 @@ from pack_helpers import doc as pack_doc
 from render_helpers import with_series
 
 import forgegraph as fg
+from forgegraph.drawing import equation
 from forgegraph.drawing.layers import ERROR_BAR, NOTE, REFERENCE, t_quantile
 from forgegraph.spec.explain import explain
 from forgegraph.spec.registry import builtin
@@ -923,3 +924,192 @@ def test_a_note_outside_at_the_top_sits_over_a_key_there():
     [key] = [k for k in keys(g.axes) if k.outside]
     assert box.y0 > key.bbox().y1
     assert g.axes.title.get_window_extent(renderer).y0 >= box.y1 - 0.01
+
+
+# --- a line from an equation ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "at", "expected"),
+    [
+        ("x", [1.0, 2.0], [1.0, 2.0]),
+        ("2x", [1.0, 2.0], [2.0, 4.0]),
+        ("x^2", [2.0, 3.0], [4.0, 9.0]),
+        ("2x^2 - 3x + 1", [1.0, 2.0], [0.0, 3.0]),
+        ("2(x + 1)", [1.0], [4.0]),
+        ("(x + 1)(x - 1)", [3.0], [8.0]),
+        ("x^-1", [2.0], [0.5]),
+        ("-x^2", [2.0], [-4.0]),
+        ("2^x^2", [2.0], [16.0]),
+        ("1/x", [4.0], [0.25]),
+        ("x * 3 / 2", [2.0], [3.0]),
+        ("3.5e2 x", [1.0], [350.0]),
+        (".5x", [1.0], [0.5]),
+        ("7", [1.0, 2.0], [7.0, 7.0]),
+    ],
+)
+def test_an_equation_is_worked_out(text, at, expected):
+    function = equation.parse(text, "x")
+    assert list(function(np.array(at))) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "text", ["", "y", "2x +", "x**2", "(x", "x)", "sin(x)", "__import__('os')", "x2", "X", "2 $ x"]
+)
+def test_an_equation_that_cant_be_read_is_an_error(text):
+    with pytest.raises(equation.EquationError):
+        equation.parse(text, "x")
+
+
+def test_where_an_equation_has_no_value_it_is_nan():
+    assert np.isnan(equation.parse("1/x", "x")(np.array([0.0])))[0]
+    assert np.isnan(equation.parse("x^0.5", "x")(np.array([-1.0])))[0]
+
+
+PARITY = pd.DataFrame({"a": [450.0, 500.0, 600.0, 700.0], "b": [455.0, 490.0, 610.0, 690.0]})
+
+
+def parity(layer: dict[str, Any], **settings: Any) -> fg.Graph:
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings=with_series(
+            {
+                "axis.x.data.column": "a",
+                "axis.y.data.column": "b",
+                "series.line.show": False,
+                **settings,
+            }
+        ),
+    )
+    d["parameters"]["layers"] = {"t": {"type": "reference", "axis": "y", **layer}}
+    return fg.render(d, PARITY)
+
+
+def _drawn_line(g: fg.Graph) -> equation.EquationLine:
+    return next(line for line in g.axes.get_lines() if isinstance(line, equation.EquationLine))
+
+
+def test_y_equals_x_runs_across_the_plot_without_widening_an_axis():
+    plain = parity({"line_1": {"value": 500.0}})
+    g = parity({"line_1": {"equation": "x"}})
+    assert g.axes.get_xlim() == plain.axes.get_xlim()
+    assert g.axes.get_ylim() == plain.axes.get_ylim()
+    xs, ys = _drawn_line(g).get_xydata().T
+    assert xs[0] == g.axes.get_xlim()[0] and xs[-1] == g.axes.get_xlim()[1]
+    assert np.allclose(xs, ys)
+
+
+def test_the_line_follows_the_axis_when_it_changes():
+    g = parity({"line_1": {"equation": "x"}})
+    g.axes.set_xlim(0, 2000)
+    xs, _ = _drawn_line(g).get_xydata().T
+    assert xs[-1] == 2000
+
+
+def test_on_log_axes_y_equals_x_is_straight():
+    g = parity({"line_1": {"equation": "x"}}, **{"axis.x.scale": "log", "axis.y.scale": "log"})
+    points = g.axes.transData.transform(_drawn_line(g).get_xydata())
+    points = points[np.isfinite(points).all(axis=1)]
+    slopes = np.diff(points[:, 1]) / np.diff(points[:, 0])
+    assert np.allclose(slopes, slopes[0])
+
+
+def test_a_band_between_two_equations_is_filled_at_draw():
+    g = parity({"line_1": {"equation": "x - 10"}, "line_2": {"equation": "x + 10"}})
+    [band] = [c for c in g.axes.collections if isinstance(c, equation.EquationBand)]
+    g.figure.canvas.draw()
+    assert len(band.get_paths()[0].vertices) > 100
+
+
+def test_a_band_can_join_an_equation_and_a_value():
+    g = parity({"line_1": {"equation": "x"}, "line_2": {"value": 700.0}})
+    assert [c for c in g.axes.collections if isinstance(c, equation.EquationBand)]
+
+
+def test_a_label_lies_along_its_line():
+    g = parity({"line_1": {"equation": "x", "label": {"text": "no change"}}})
+    [label] = [t for t in g.axes.texts if t.get_text() == "no change"]
+    assert 20 < label.get_rotation() < 70
+
+
+def test_a_labels_value_writes_the_equation():
+    g = parity(
+        {"line_1": {"equation": "2x", "label": {"text": "value", "position": "center_above"}}},
+        **{"axis.y.max": 1500.0},
+    )
+    assert [t.get_text() for t in g.axes.texts if t.get_gid() == "forgegraph-reference-line"] == [
+        "y = 2x"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("line", "message"),
+    [
+        ({"equation": "x", "value": 500.0}, r"line_1: set value or equation, not both"),
+        ({"equation": "y"}, r"line_1\.equation: can't read 'y': 'y' isn't understood"),
+        ({"equation": "x", "aggregation": {"function": "mean"}}, r"aggregation\.function: applies"),
+        ({"equation": "x", "offset": {"function": "mean"}}, r"offset\.function: applies"),
+        ({"equation": "x", "scope": "each"}, r"line_1\.scope: applies only"),
+        ({"equation": "x", "label": {"text": "aggregation"}}, r"line's value isn't an aggregate"),
+        ({"equation": "x + 10000"}, r"line_1\.equation: no part of the line is inside the plot"),
+    ],
+)
+def test_what_an_equation_doesnt_take_is_an_error(line, message):
+    with pytest.raises(fg.SpecError, match=message):
+        parity({"line_1": line})
+
+
+def test_a_label_can_go_beyond_the_plot_where_the_line_leaves_it():
+    label = {"text": "no change", "inside": False, "position": "end_above"}
+    g = parity({"line_1": {"equation": "x", "label": label}})
+    [text] = [t for t in g.axes.texts if t.get_text() == "no change"]
+    g.figure.canvas.draw()
+    box, plot = text.get_window_extent(), g.axes.get_window_extent()
+    assert box.y0 >= plot.y1 or box.x0 >= plot.x1
+    assert text.get_rotation() == 0
+
+
+def test_auto_finds_a_place_along_the_line_past_the_data_near_its_ends():
+    df = pd.DataFrame({"a": [100.0, 110.0, 120.0], "b": [100.0, 110.0, 120.0]})
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings=with_series(
+            {
+                "axis.x.data.column": "a",
+                "axis.y.data.column": "b",
+                "axis.x.min": 0.0,
+                "axis.x.max": 200.0,
+                "axis.y.min": 0.0,
+                "axis.y.max": 200.0,
+                "series.line.show": False,
+            }
+        ),
+    )
+    d["parameters"]["layers"] = {
+        "t": {
+            "type": "reference",
+            "axis": "y",
+            "line_1": {"equation": "x", "label": {"text": "same"}},
+        }
+    }
+    g = fg.render(d, df)
+    assert [t.get_text() for t in g.axes.texts if t.get_gid() == REFERENCE] == ["same"]
+
+
+def test_an_equation_for_each_series_is_an_error():
+    with pytest.raises(fg.SpecError, match=r"per_series: an equation has one line"):
+        parity({"per_series": True, "line_1": {"equation": "x"}})
+
+
+def test_an_equation_needs_two_numeric_axes():
+    df = pd.DataFrame({"name": ["a", "b"], "v": [1.0, 2.0]})
+    d = fg.graphspec(
+        "t", "xy", settings=with_series({"axis.x.data.column": "name", "axis.y.data.column": "v"})
+    )
+    d["parameters"]["layers"] = {
+        "t": {"type": "reference", "axis": "y", "line_1": {"equation": "x"}}
+    }
+    with pytest.raises(fg.SpecError, match=r"axis\.x isn't numbers"):
+        fg.render(d, df)

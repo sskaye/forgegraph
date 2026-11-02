@@ -31,7 +31,7 @@ ADDITIVES = pd.DataFrame(
 )
 
 
-def graph(df: pd.DataFrame, x: str, y: str | list[str], **settings: Any) -> fg.Graph:
+def graph(df: pd.DataFrame, x: str, y: str | list[str] | None, **settings: Any) -> fg.Graph:
     layers = settings.pop("layers", None)
     d = fg.graphspec(
         "t",

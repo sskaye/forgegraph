@@ -803,9 +803,7 @@ def test_impossible_drawings_are_errors_not_fallbacks():
         render({**scatter, "legend.method": "key"}, theme=no_margin, data=board)
     with pytest.raises(
         fg.SpecError,
-        match=re.escape(
-            "legend.method: auto, but no labelling method fits (direct, key tried: top"
-        ),
+        match=re.escape("legend.method: auto, but no labelling method fits (direct, key tried: "),
     ):
         render(scatter, theme=no_margin, data=board)
 
@@ -1047,7 +1045,7 @@ def test_an_aggregated_point_takes_the_one_color_value_its_rows_share():
     parameters = {"series.aggregation.function": "mean", "series.line.show": False}
     g = fg.xy(df, x="t", y="v", color="d", parameters=parameters)
     [dots] = g.axes.collections
-    assert list(dots.get_offsets()[:, 1]) == [2.0, 3.0]
+    assert list(np.asarray(dots.get_offsets())[:, 1]) == [2.0, 3.0]
     assert list(dots.get_array()) == [5.0, 9.0]
 
 

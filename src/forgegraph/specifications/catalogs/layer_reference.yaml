@@ -5,7 +5,7 @@ extends: None          # [None, catalog]; The catalog this one extends. Its base
 baseline: forgegraph_default/graphspec_example          # [graphspec]; The GraphSpec every card changes, without its own layers.
 settings: None          # The GraphSpec parameters every card sets so that the layer can be drawn. If there are none, this is None.
 layer:          # The parameters of the layer every card draws, which is named after its type. If None, the layer's defaults are used.
-    axis: y          # [x, y]; The axis the values are on. y draws horizontal lines.
+    axis: y          # [x, y]; The axis the values are on. y draws horizontal lines, and an equation then gives y in terms of x.
     line_1:
         value: 1.45          # [None, float, date, column]; A number, a date, or a column.
 
@@ -29,3 +29,5 @@ baselines:          # Generic scenarios, each the baseline with one or more chan
     percentile_offsets:          # [parameters and their values, or non-standard]; Lines at the median cell voltage, each offset by a fraction of a percentile, so each offset's percentile acts.
         layers.reference.line_1: {value: "Cell Voltage (V)", aggregation: {function: median}, offset: {function: percentile, percentile: 10, multiplier: 0.05}}
         layers.reference.line_2: {value: "Cell Voltage (V)", aggregation: {function: median}, offset: {function: percentile, percentile: 90, multiplier: -0.05}}
+    from_an_equation:          # [parameters and their values, or non-standard]; A line from an equation, so that its label can follow it.
+        layers.reference.line_1: {value: None, equation: "1.35 + 0.02x"}

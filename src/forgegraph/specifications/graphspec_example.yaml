@@ -115,11 +115,11 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
     layers:          # The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.
         target:
             type: reference          # [layer type]; The layer's type: one of the graph type's layer.types.
-            axis: y          # [x, y]; The axis the values are on. y draws horizontal lines.
+            axis: y          # [x, y]; The axis the values are on. y draws horizontal lines, and an equation then gives y in terms of x.
             line_1:
                 value: 1.2          # [None, float, date, column]; A number, a date, or a column.
                 label:
-                    text: Target 1.2 V          # [None, aggregation, value, aggregation_value, text]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.
+                    text: Target 1.2 V          # [None, aggregation, value, aggregation_value, text]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. With an equation, value writes e.g. y = 2x. Other text is written as given.
         conditions:
             type: note          # [layer type]; The layer's type: one of the graph type's layer.types.
             text: "60 °C, 1 atm, H₂/air"          # [text]; The note's text, in label markup. A line break starts a new line.

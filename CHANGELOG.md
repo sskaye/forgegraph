@@ -2,6 +2,28 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.7.0 (2026-11-02)
+
+### New Features
+
+- **Heat maps.** `marker.shape: grid_cell` makes each point fill its place in a grid, so an xy graph colored by a column of numbers becomes a heat map. The cells fit at any format, and an HTML page shows a cell's values when you point at it. There's an example in the gallery and in the skill.
+- **Reference lines from an equation.** A reference line can now be an equation instead of a value, such as `equation: x` for a y = x line on a parity plot, or `2x^2 - 3x + 1` for a curve. Two equations, such as `x - 10` and `x + 10`, make a tolerance band.
+- **No tick labels.** `tick.algorithm: none` draws no ticks or tick labels on an axis, for when there are too many names to fit and readers can point at a point to see its name.
+- **Tab bars stay in view.** On a layout's HTML page, the tabs now stay at the top of the window as you scroll, and switching tabs keeps your place on the page.
+
+### Changes
+
+- **More in the hover box.** On a graph of more than one series, the hover box now always names the series. It also shows each column a series is split by, so splitting a scatter by its sample's name shows that name on each point.
+- **More room for keys.** A reference line's label at `position: auto` now goes after the keys and keeps clear of them, so keys and labels may sit in different places than before. A second key can go under or beside the first, and the y-axis can grow by up to `axis.max_extension` to make room for a key. Some graphs that couldn't fit a key now draw, with a longer y-axis.
+- **Clearer key errors.** When a key doesn't fit, the error now says what's in the way at each position.
+
+### Bug Fixes
+
+- Coloring by the column on a categorical axis gave every point the first color and labelled the groups 0.0, 1.0 and 2.0. Each category now gets its own color, and the same goes for marker shapes and line styles. The axis already names the groups, so with `legend.method: auto` they aren't named again.
+- A categorical axis with exactly two categories had no tick labels. It now has one for each category.
+- An aggregated series colored by a column of numbers crashed with a message from matplotlib. If the rows behind a point share one value, the point now takes that color. If they don't, it's an error that says which column to change.
+- The hover box on an integer axis showed `2.0` where it now shows `2`.
+
 ## 0.6.1 (2026-10-31)
 
 ### Changes

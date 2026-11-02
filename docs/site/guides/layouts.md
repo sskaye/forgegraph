@@ -61,6 +61,8 @@ A layout's HTML page, or a GraphSpec's, shows each figure as an image that shrin
 **Readouts.** Pointing at a data point on the page, or tapping it, shows its values in a box above it, with a ring around the point:
 
 - each axis's title and the point's value, with its error bar and the error bar's aggregation where it has one, as in `8.0 ± 0.4 (95%CI)`;
-- then the series' color, marker shape and line style, each where it varies, as the key's title and the point's group.
+- then the series' color, marker shape and line style, each where it varies, as the key's title and the point's group;
+- then, with more than one series, the series' name;
+- then each column the series is split by, with the point's value. To name each point of a scatter, split the series by the column that holds its name, as in `split: measurement_id`.
 
-Markers, a line's points and bars respond; empty space, reference lines and notes don't. A number with an error bar is rounded to the error's last digit; one without has a decimal more than the tick labels. The page carries each figure's points and the font the readouts are written in, so it's larger than the image alone.
+Markers, a line's points and bars respond; empty space, reference lines and notes don't. A number with an error bar is rounded to the error's last digit; one without has a decimal more than the tick labels, except on an integer base axis, whose values are whole. The page carries each figure's points and the font the readouts are written in, so it's larger than the image alone.

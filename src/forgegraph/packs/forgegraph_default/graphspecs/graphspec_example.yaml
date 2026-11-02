@@ -56,7 +56,7 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
         "Cell Voltage (V)":
             column: name          # [name, column]; The column of values the series draws along the axis that isn't arrangement.base_axis. name uses the column with the series' name.
             aggregation:          # [aggregation style]; How rows at the same location are combined into one point. If its function is None, each row is drawn.
-            split: [Cell, Run]          # [None, columns]; Columns whose values split the series into separate lines, e.g. replicates.
+            split: [Cell, Run]          # [None, columns]; Columns whose values split the series into separate lines, e.g. replicates. An html page's readout shows each one.
             order: sorted          # [sorted, data]; The order of the series' groups: sorted, or data for the order in which they first appear.
             color: Cell          # [series, hex color, column]; The series' color. series takes the next palette color, and a column gives each of its values its own.
             color_scale: auto          # [auto, categorical, continuous]; For a color column: categorical uses the palette, continuous a color scale and color bar, and auto continuous for numbers.

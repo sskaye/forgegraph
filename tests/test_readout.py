@@ -261,6 +261,16 @@ def test_a_split_date_reads_out_as_an_iso_date(tmp_path):
     assert lines(readouts(g, tmp_path)[0])[1][2] == ("Made", "2026-03-04")
 
 
+def test_an_axis_without_ticks_still_reads_out_its_values(tmp_path):
+    df = pd.DataFrame({"name": ["a", "b"], "v": [0.012345, 1234.5]})
+    settings = {"axis.x.tick.algorithm": "none", "axis.y.tick.algorithm": "none"}
+    g = graph(df, "name", "v", **settings)
+    assert lines(readouts(g, tmp_path)[0]) == [
+        [("name", "a"), ("v", "0.01235")],
+        [("name", "b"), ("v", "1234")],
+    ]
+
+
 def test_one_series_has_no_series_line(tmp_path):
     df = pd.DataFrame({"t": [0.0, 1.0], "v": [1.0, 2.0]})
     assert [len(line) for line in lines(readouts(graph(df, "t", "v"), tmp_path)[0])] == [2, 2]

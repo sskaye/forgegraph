@@ -10,7 +10,7 @@ Every render lints the graph it drew and lists any issues, each under the name o
 
 Two texts' letters overlap, such as neighboring tick labels or a title and a key.
 
-Make room: fewer ticks (`tick.algorithm: manual` with a larger `tick.step`), a shorter label or tick label format, a wider format (`figure.width`), or rotated x tick labels, where the theme lets a GraphSpec set `axis.tick.label.x_rotation`.
+Make room: fewer ticks (`tick.algorithm: manual` with a larger `tick.step`), no tick labels at all (`tick.algorithm: none`, where readers identify a point from its readout on an HTML page), a shorter label or tick label format, a wider format (`figure.width`), or rotated x tick labels, where the theme lets a GraphSpec set `axis.tick.label.x_rotation`.
 
 ### clipped-text
 

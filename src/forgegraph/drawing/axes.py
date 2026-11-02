@@ -10,8 +10,8 @@
 - **Ticks** (tick.algorithm): auto, the theme's algorithm (a categorical axis's positions are
   whole numbers); all, a tick at every value; manual, a tick every tick.step: a number, a
   factor on a log axis (10: 10, 100, 1000), or a count and a unit on a date axis
-  ("2 week"). Ticks from all and manual are never thinned. Labels that run together
-  are an error with any algorithm (check_fit).
+  ("2 week"); none, no ticks or tick labels. Ticks from all and manual are never thinned.
+  Labels that run together are an error with any algorithm (check_fit).
 - **Dates** on either axis are drawn at matplotlib's day numbers (numbers): the data, its
   aggregates, layers' values and limits all become numbers the same way, on x as on y. A
   spec's limit or line value may be a date on a date axis (on_axis), or a day number.
@@ -37,7 +37,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.dates import date2num, num2date
 from matplotlib.text import Text
-from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator
+from matplotlib.ticker import FixedLocator, Formatter, Locator, MultipleLocator, NullLocator
 
 from forgegraph.drawing import limits
 from forgegraph.drawing import text as text_module
@@ -252,8 +252,17 @@ def number_text(
     if given != "auto":
         checked = number_format(str(given), path)
         return lambda v: format_number(float(v), checked)
+    if not any(t.get_text() for t in axis.get_ticklabels()):  # none to match: four figures
+        return lambda v: f"{float(v):.{_four_figures(float(v))}f}"
     places = _tick_decimals(axis) + extra
     return lambda v: f"{float(v):.{places}f}"
+
+
+def _four_figures(value: float) -> int:
+    """The decimal places that write a number to four significant figures, or whole."""
+    if value == 0 or not math.isfinite(value):
+        return 0
+    return max(0, 3 - math.floor(math.log10(abs(value))))
 
 
 def _tick_decimals(axis: Any) -> int:
@@ -363,7 +372,9 @@ def ticks_and_labels(
     order = str(t["axis.tick.label.date_order"])
     gap = style.pt(f"{prefix}.tick.label.gap")
     locator: Locator
-    if algorithm == "all":
+    if algorithm == "none":
+        locator = NullLocator()
+    elif algorithm == "all":
         locator = FixedLocator(sorted(set(float(v) for v in values if not np.isnan(v))))
     elif algorithm == "manual":
         parsed = parse_step(step, kind, f"{prefix}.tick.step")

@@ -87,6 +87,54 @@ def test_two_categories_each_get_a_tick_and_a_label():
     assert labels(g) == ["1", "2"]
 
 
+COMPOUNDS = pd.DataFrame(
+    {
+        "compound": [
+            f"A compound with a long descriptive name, number {i:03d}" for i in range(110)
+        ],
+        "value": np.linspace(0.0123, 1.5, 110),
+    }
+)
+
+
+def test_too_many_long_category_names_run_together():
+    with pytest.raises(fg.SpecError, match="their labels run together"):
+        graph(COMPOUNDS, "compound", "value", **{"axis.x.data.type": "categorical"})
+
+
+def test_algorithm_none_draws_no_ticks_or_labels_and_keeps_the_title():
+    settings = {"axis.x.data.type": "categorical", "axis.x.tick.algorithm": "none"}
+    g = graph(COMPOUNDS, "compound", "value", **settings)
+    assert ticks(g) == []
+    assert labels(g) == []
+    assert g.axes.get_xlabel() == "compound"
+    assert not g.axes.xaxis.get_minorticklocs().size
+
+
+@pytest.mark.parametrize("axis", ["x", "y"])
+@pytest.mark.parametrize("scale", ["linear", "log"])
+def test_algorithm_none_works_on_a_numeric_axis(axis, scale):
+    settings = {f"axis.{axis}.tick.algorithm": "none", f"axis.{axis}.scale": scale}
+    g = graph(MONTHS, "month", "passengers", **settings)
+    assert ticks(g, axis) == []
+    assert g.axes.xaxis.get_minorticklocs().size == 0 or axis == "y"
+
+
+def test_algorithm_none_works_with_bars():
+    settings = {"axis.x.tick.algorithm": "none", "series.bar.show": True, "series.line.show": False}
+    assert ticks(graph(MONTHS, "month", "passengers", **settings)) == []
+
+
+def test_a_step_is_still_only_for_manual():
+    with pytest.raises(fg.SpecError, match=r"tick\.step: applies only with tick\.algorithm manual"):
+        graph(
+            MONTHS,
+            "month",
+            "passengers",
+            **{"axis.x.tick.algorithm": "none", "axis.x.tick.step": 2},
+        )
+
+
 def test_integer_on_fractions_is_an_error():
     df = MONTHS.assign(month=MONTHS["month"] + 0.5)
     with pytest.raises(fg.SpecError, match="integer, but 'month' has values that aren't whole"):

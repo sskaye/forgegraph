@@ -18,7 +18,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         file: None          *# \[None, text\]; A Parquet file holding the DataFrame to draw: an absolute path, a path starting with ~, or a path relative to the folder of the file that sets it. If None, the DataFrame is passed through the Python API.*\
         preprocessing: None          *# \[None, text\]; Where the code that made the data is: a path, a URL or a note. It's recorded in provenance and never read. If None, it's not given.*\
     axis:\
-        max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
+        max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, keys, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
         x:\
             data:\
                 column: "PLACEHOLDER"          *# \[None, column\]; The column on this axis when it's arrangement.base_axis, which a GraphSpec must then set. Otherwise, it must be None.*\
@@ -31,7 +31,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             min: None          *# \[None, float, date\]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.*\
             max: None          *# \[None, float, date\]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.*\
             tick:\
-                algorithm: auto          *# \[auto, all, manual\]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step.*\
+                algorithm: auto          *# \[auto, all, manual, none\]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step. none draws no ticks or tick labels.*\
                 step: None          *# \[None, float > 0, text\]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.*\
                 label:\
                     format: auto          *# \[auto, format\]; The tick label format. auto chooses one from the values, and for dates, from the tick unit.*\
@@ -47,7 +47,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             min: None          *# \[None, float, date\]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.*\
             max: None          *# \[None, float, date\]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.*\
             tick:\
-                algorithm: auto          *# \[auto, all, manual\]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step.*\
+                algorithm: auto          *# \[auto, all, manual, none\]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step. none draws no ticks or tick labels.*\
                 step: None          *# \[None, float > 0, text\]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.*\
                 label:\
                     format: auto          *# \[auto, format\]; The tick label format. auto chooses one from the values, and for dates, from the tick unit.*\
@@ -61,7 +61,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         "SERIES_1":\
             column: name          *# \[name, column\]; The column of values the series draws along the axis that isn't arrangement.base_axis. name uses the column with the series' name.*\
             aggregation:          *# \[aggregation style\]; How rows at the same location are combined into one point. If its function is None, each row is drawn.*\
-            split: \[Cell, Run\]          *# \[None, columns\]; Columns whose values split the series into separate lines, e.g. replicates.*\
+            split: \[Cell, Run\]          *# \[None, columns\]; Columns whose values split the series into separate lines, e.g. replicates. An html page's readout shows each one.*\
             order: sorted          *# \[sorted, data\]; The order of the series' groups: sorted, or data for the order in which they first appear.*\
             color: Cell          *# \[series, hex color, column\]; The series' color. series takes the next palette color, and a column gives each of its values its own.*\
             color_scale: auto          *# \[auto, categorical, continuous\]; For a color column: categorical uses the palette, continuous a color scale and color bar, and auto continuous for numbers.*\
@@ -74,7 +74,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 missing_values: drop          *# \[drop, gap\]; What happens to rows missing x or y. drop joins the line across them, and gap breaks the line. Lint counts both in dropped-rows.*\
             marker:\
                 show: true          *# \[true, false\]; Whether to draw markers.*\
-                shape: first          *# \[first, series, circle, square, triangle_up, triangle_down, diamond, cross, plus, column\]; The marker shape. first is the theme's first marker shape, series takes the next one, and a column gives each of its values its own.*\
+                shape: first          *# \[first, series, circle, square, triangle_up, triangle_down, diamond, cross, plus, grid_cell, column\]; The marker shape. first is the theme's first marker shape, series takes the next one, and a column gives each of its values its own. grid_cell fills the grid the points lie on, for a heat map.*\
                 fill: first          *# \[first, series, filled, open, column\]; The marker fill. first is the theme's first marker fill, series takes the next one, and a column gives each of its values its own.*\
                 size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
             bar:\
@@ -94,7 +94,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         direct:\
             max_relative_distance: 0.8          *# \[0-1\]; The farthest a direct label may be from its series, ÷ its distance to the next nearest series.*\
         key:\
-            positions: \[top_right, top_left, bottom_right, bottom_left\]          *# \[top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom\]; The positions to try, in order. The key goes in the first one where it doesn't overlap the data.*\
+            positions: \[top_right, top_left, bottom_right, bottom_left\]          *# \[top_left, top_center, top_right, bottom_left, bottom_center, bottom_right, right_top, right_center, right_bottom\]; The positions to try, in order. The key goes in the first one where it doesn't overlap the data. If there's none inside the plot, it goes beside a key there, or the y-axis is extended.*\
             inside: true          *# \[true, false\]; Whether the key is inside the plot area. If false, top positions are above the plot area, bottom positions are below the x-axis title, and right positions are to its right.*\
             title:\
                 text: column_name          *# \[None, column_name, text\]; The title of every key. column_name uses the name of each key's column. Other text is allowed only when there is one key. If None, there is no title.*\
@@ -119,11 +119,11 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
     layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.*\
         target:\
             type: reference          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
-            axis: y          *# \[x, y\]; The axis the values are on. y draws horizontal lines.*\
+            axis: y          *# \[x, y\]; The axis the values are on. y draws horizontal lines, and an equation then gives y in terms of x.*\
             line_1:\
                 value: 1.2          *# \[None, float, date, column\]; A number, a date, or a column.*\
                 label:\
-                    text: Target 1.2 V          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. Other text is written as given.*\
+                    text: Target 1.2 V          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. With an equation, value writes e.g. y = 2x. Other text is written as given.*\
         conditions:\
             type: note          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
             text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*

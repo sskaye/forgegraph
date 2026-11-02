@@ -292,3 +292,65 @@ def test_xy_sets_a_series_parameter_on_every_series():
 def test_xy_reports_a_series_path_no_series_has():
     with pytest.raises(fg.SpecError, match=re.escape("series.nope: must be a series")):
         fg.xy(TWO, "t", "a", parameters={"series.nope": 1})
+
+
+CATEGORIES = pd.DataFrame({"Group": list("AABBCC"), "Value": [1.0, 1.2, 2.0, 2.2, 3.0, 3.1]})
+
+
+def by_its_axis(data: pd.DataFrame = CATEGORIES, **series: Any) -> fg.Graph:
+    settings = {
+        "arrangement.base_axis": "y",
+        "axis.y.data.column": "Group",
+        "axis.y.data.type": "categorical",
+        "axis.y.tick.algorithm": "all",
+    }
+    method = series.pop("method", "auto")
+    settings["legend.method"] = method
+    settings["series"] = {
+        "Value": {"line": {"show": False}, "aggregation": {"function": "mean"}, **series}
+    }
+    return fg.render(fg.graphspec("t", "xy", settings=settings), data)
+
+
+@pytest.mark.parametrize("base", ["x", "y"])
+def test_coloring_by_the_categorical_base_axis_gives_each_category_its_color(base):
+    settings = {
+        "arrangement.base_axis": base,
+        f"axis.{base}.data.column": "Group",
+        f"axis.{base}.data.type": "categorical",
+        f"axis.{base}.tick.algorithm": "all",
+        "series": {
+            "Value": {
+                "color": "Group",
+                "line": {"show": False},
+                "aggregation": {"function": "mean"},
+            }
+        },
+    }
+    g = fg.render(fg.graphspec("t", "xy", settings=settings), CATEGORIES)
+    colors = [to_hex(line.get_markerfacecolor()) for line in g.axes.get_lines()]
+    assert len(set(colors)) == 3
+
+
+def test_the_base_axis_names_its_own_groups_with_method_auto():
+    g = by_its_axis(color="Group")
+    assert not [t.get_text() for t in g.axes.texts if t.get_text()]
+    assert not keys(g.axes)
+
+
+def test_an_explicit_method_still_names_them_by_category():
+    g = by_its_axis(color="Group", method="direct")
+    assert sorted(t.get_text() for t in g.axes.texts if t.get_text()) == ["A", "B", "C"]
+
+
+def test_a_shape_by_the_categorical_base_axis_has_its_own_shape_and_no_key():
+    g = by_its_axis(marker={"shape": "Group"})
+    assert len({line.get_marker() for line in g.axes.get_lines()}) == 3
+    assert not keys(g.axes)
+
+
+def test_a_scale_by_a_categorical_base_axis_of_numbers_runs_over_its_values():
+    data = CATEGORIES.assign(Group=[10, 10, 20, 20, 40, 40])
+    g = by_its_axis(data, color="Group")
+    [dots] = [c for c in g.axes.collections if len(c.get_offsets()) == 3]
+    assert sorted(dots.get_array()) == [10, 20, 40]

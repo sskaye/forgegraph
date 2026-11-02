@@ -9,7 +9,7 @@ lines its readout shows, as (name, value) pairs of HTML:
   point's value, with its error bar's distances and their aggregation where it has one;
 - then its series' color, marker shape and line style, each only where it varies: the key's
   title, or with none, the column's name, and the point's group. Two that name the same
-  column share a line.
+  column share a line, and a column on a categorical base axis has its axis's line.
 
 A category is written as its label, and a date in its axis's date format. A number with an
 error bar is rounded to the error's significant digit, the error to one significant figure:
@@ -244,7 +244,8 @@ def _styling(s: Any, d: _Drawing) -> list[tuple[str, list[str]]]:
     a column, or the series when there's more than one."""
     gt, listed = d.gt, d.drawn.listed
     n = len(s.x)
-    seen: set[str] = set()
+    roles = d.drawn.roles
+    seen: set[str] = {roles.base_column} if d.drawn.kinds[roles.base] == "categorical" else set()
     out = []
     for by in STYLED:
         column = s.listed.by.get(by)

@@ -9,13 +9,17 @@ lines its readout shows, as (name, value) pairs of HTML:
   point's value, with its error bar's distances and their aggregation where it has one;
 - then its series' color, marker shape and line style, each only where it varies: the key's
   title, or with none, the column's name, and the point's group. Two that name the same
-  column share a line, and a column on a categorical base axis has its axis's line.
+  column share a line, and a column on a categorical base axis has its axis's line;
+- then, with more than one series, its series' name, however it's styled;
+- then each column it's split by, by its name, with the point's value. A point belongs to one
+  value of a column it's split by, and to no one value of any other, so no other column shows.
 
 A category is written as its label, and a date in its axis's date format. A number with an
 error bar is rounded to the error's significant digit, the error to one significant figure:
 8.0 ± 0.4. One without is written in the series' value_label.format for a value, or the
 axis's tick label format on the base axis; at auto, with one more decimal than the tick
-labels, which are rounded for reading along an axis, not for reading one value.
+labels, which are rounded for reading along an axis, not for reading one value. An integer
+base axis's values are whole, and have no more decimals than its tick labels.
 """
 
 from __future__ import annotations
@@ -23,11 +27,13 @@ from __future__ import annotations
 import html
 import math
 from dataclasses import dataclass
+from datetime import datetime, time
 from pathlib import Path
 from typing import Any
 from weakref import WeakKeyDictionary
 
 import numpy as np
+import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.colors import to_hex
 from matplotlib.dates import num2date
@@ -181,7 +187,8 @@ def _values(ax: Axes, s: Any, d: _Drawing, name: str, base: bool, values: Any) -
         else:
             write = number_text(gt, name, axis, given, path, kind=kind)
         return [html.escape(write(v)) if _finite(v) else "" for v in values]
-    write = number_text(gt, name, axis, given, path, extra=1, kind=kind)
+    extra = 0 if base and kind == "integer" else 1
+    write = number_text(gt, name, axis, given, path, extra=extra, kind=kind)
     lower, upper, words = s.errors.get(name, (None, None, None))
     out = []
     for i, v in enumerate(values):
@@ -241,7 +248,8 @@ def _fixed(value: float, places: int) -> str:
 
 def _styling(s: Any, d: _Drawing) -> list[tuple[str, list[str]]]:
     """The lines for the series' color, marker shape and line style, each where it varies:
-    a column, or the series when there's more than one."""
+    a column, or the series when there's more than one; then its name, if none of them gave
+    it, and the columns it's split by."""
     gt, listed = d.gt, d.drawn.listed
     n = len(s.x)
     roles = d.drawn.roles
@@ -262,9 +270,27 @@ def _styling(s: Any, d: _Drawing) -> list[tuple[str, list[str]]]:
             if s.values is not None and by == "color":
                 values = [f"{float(v):.4g}".replace("-", MINUS) for v in s.values]
             else:
-                values = [html.escape(str(s.groups.get(column, "")))] * n
+                values = [_group(s.groups.get(column, ""))] * n
         out.append(("" if title is None else title, values))
+    if len(listed) > 1 and SERIES not in seen:
+        key = gt["legend.key.title.text"]
+        title = None if unset(key) or key == COLUMN_NAME else to_html(str(key))
+        out.append(("" if title is None else title, [html.escape(str(s.listed.name))] * n))
+    split = s.listed.values["split"]
+    columns = [] if unset(split) else [split] if isinstance(split, str) else list(split)
+    for column in columns:
+        if column not in seen:
+            seen.add(column)
+            out.append((html.escape(column), [_group(s.groups.get(column, ""))] * n))
     return out
+
+
+def _group(value: Any) -> str:
+    """A group's value as a readout writes it: a date as an ISO date."""
+    if isinstance(value, pd.Timestamp | datetime):
+        fmt = "%Y-%m-%d" if value.time() == time() else "%Y-%m-%d %H:%M"
+        return value.strftime(fmt)
+    return html.escape(str(value))
 
 
 __all__ = ["Look", "Mark", "attach", "marks", "with_error"]

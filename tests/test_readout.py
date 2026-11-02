@@ -187,6 +187,80 @@ def test_a_color_by_the_categorical_base_axis_has_only_its_axis_line(tmp_path):
     ]
 
 
+def test_several_series_with_fixed_colors_each_read_out_their_name(tmp_path):
+    g = graph(
+        pd.DataFrame({"Sample": [1, 2], "A value": [386.0, 386.1], "B value": [415.0, 414.6]}),
+        "Sample",
+        None,
+        **{
+            "axis.x.data.type": "integer",
+            "axis.y.title": "Peak",
+            "series": {
+                "Species A": {"column": "A value", "color": "#0072B2", "line": {"show": False}},
+                "Species B": {"column": "B value", "color": "#009E73", "line": {"show": False}},
+            },
+        },
+    )
+    assert lines(readouts(g, tmp_path)[0])[3] == [
+        ("Sample", "2"),
+        ("Peak", "414.6"),
+        ("", "Species B"),
+    ]
+
+
+def test_several_series_colored_by_one_column_read_out_both(tmp_path):
+    df = pd.DataFrame({"t": [0.0, 1.0], "a": [1.0, 2.0], "b": [3.0, 4.0], "cell": ["A", "B"]})
+    g = graph(
+        df,
+        "t",
+        None,
+        **{
+            "axis.y.title": "v",
+            "series": {"a": {"color": "cell"}, "b": {"color": "cell"}},
+        },
+    )
+    assert lines(readouts(g, tmp_path)[0])[0][2:] == [("cell", "A"), ("", "a")]
+
+
+def test_an_integer_base_axis_reads_out_whole_numbers_and_its_values_keep_their_decimal(tmp_path):
+    df = pd.DataFrame({"n": [1, 2, 3], "v": [1, 2, 4]})
+    g = graph(df, "n", "v", **{"axis.x.data.type": "integer"})
+    assert [line[0][1] for line in lines(readouts(g, tmp_path)[0])] == ["1", "2", "3"]
+    assert "." in lines(readouts(g, tmp_path)[0])[0][1][1]
+
+
+def test_a_split_column_reads_out_its_value_on_each_point(tmp_path):
+    df = pd.DataFrame(
+        {
+            "x": [1.0, 2.0, 3.0],
+            "y": [4.0, 5.0, 6.0],
+            "Recipe": ["R1", "R1", "R2"],
+            "Ligand": ["L1", "L2", "L3"],
+            "Id": ["m1", "m2", "m3"],
+            "Other": ["o1", "o2", "o3"],
+        }
+    )
+    g = graph(
+        df,
+        "x",
+        "y",
+        **{"series.color": "Recipe", "series.split": ["Ligand", "Id", "Recipe"]},
+    )
+    assert sorted(line[2:] for line in lines(readouts(g, tmp_path)[0]))[1] == [
+        ("Recipe", "R1"),
+        ("Ligand", "L2"),
+        ("Id", "m2"),
+    ]
+
+
+def test_a_split_date_reads_out_as_an_iso_date(tmp_path):
+    df = pd.DataFrame(
+        {"x": [1.0, 2.0], "y": [4.0, 5.0], "Made": pd.to_datetime(["2026-01-02", "2026-03-04"])}
+    )
+    g = graph(df, "x", "y", **{"series.split": "Made"})
+    assert lines(readouts(g, tmp_path)[0])[1][2] == ("Made", "2026-03-04")
+
+
 def test_one_series_has_no_series_line(tmp_path):
     df = pd.DataFrame({"t": [0.0, 1.0], "v": [1.0, 2.0]})
     assert [len(line) for line in lines(readouts(graph(df, "t", "v"), tmp_path)[0])] == [2, 2]

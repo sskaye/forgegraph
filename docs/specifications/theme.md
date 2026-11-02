@@ -45,7 +45,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         y:\
             tick:\
                 label:          *# \[text style, look from axis.tick.label\]; The y-axis tick labels. Each parameter not set here is axis.tick.label's.*\
-        max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
+        max_extension: 0.15          *# \[0-1\]; The most an axis may be extended to fit direct labels, keys, notes and line labels inside the plot area, × its range. If 0, it's never extended.*\
     plot_area:\
         border:          *# \[line style\]; The plot area's border.*\
             sides: \[left, bottom, top, right\]          *# \[left, right, top, bottom, None\]; The sides that have a border. If None, there is no border.*\

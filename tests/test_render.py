@@ -1046,7 +1046,7 @@ def test_an_aggregated_point_takes_the_one_color_value_its_rows_share():
     g = fg.xy(df, x="t", y="v", color="d", parameters=parameters)
     [dots] = g.axes.collections
     assert list(np.asarray(dots.get_offsets())[:, 1]) == [2.0, 3.0]
-    assert list(dots.get_array()) == [5.0, 9.0]
+    assert list(np.asarray(dots.get_array())) == [5.0, 9.0]
 
 
 def test_an_aggregated_point_whose_rows_have_several_color_values_is_an_error():

@@ -80,7 +80,7 @@ MARKER_SHAPE = Dimension(
     "series.marker.shapes",
     "marker shapes",
     lambda s: [MARKERS[v] for v in s.theme["series.marker.shapes"]],
-    lambda v: MARKERS.get(v) if isinstance(v, str) else None,
+    lambda v: (marks.CELL if v == marks.CELL else MARKERS.get(v)) if isinstance(v, str) else None,
 )
 MARKER_FILL = Dimension(
     "marker_fill",
@@ -240,6 +240,7 @@ class Drawn:
     label_groups: list[labelling.Labelled] = field(default_factory=list)
     style_keys: list[StyleKey] = field(default_factory=list)
     y_title: str | None = None  # the value axis's title
+    cells: marks.Cells | None = None  # the grid a series with marker.shape grid_cell fills
 
     @property
     def lines(self) -> bool:
@@ -768,7 +769,7 @@ def draw(
         s.spacing = space
     for s, shifts in zip(drawn_series, marks.slots(drawn_series, gt), strict=True):
         s.shifts = shifts
-    drawn.label_groups, norm = _draw_marks(ax, drawn_series, style, r)
+    drawn.label_groups, norm = _draw_marks(ax, drawn_series, style, r, gt, drawn)
     layers.error_bars(ax, listed, drawn_series, frame, gt, style, r)
     lines = layers.reference_lines(ax, listed, drawn_series, frame, style, drawn.kinds, r)
     _axes(ax, drawn_series, lines, gt, style, drawn, r)
@@ -873,11 +874,11 @@ def _monotone(b: np.ndarray, v: np.ndarray) -> tuple[np.ndarray, np.ndarray, lis
 
 
 def _draw_marks(
-    ax: Axes, series: list[Series], style: Style, r: Roles
+    ax: Axes, series: list[Series], style: Style, r: Roles, gt: dict[str, Any], drawn: Drawn
 ) -> tuple[list[labelling.Labelled], Normalize | None]:
     """Each series' line, markers and bars (a numeric color column's markers on its color
-    scale); returns the names to label, with what's drawn under each, and the color scale's
-    range, if there is one."""
+    scale), and the grid of any that fill cells; returns the names to label, with what's drawn
+    under each, and the color scale's range, if there is one."""
     cmap, norm = style.colormap(), None
     if any(s.values is not None for s in series):
         all_values = np.concatenate([s.values for s in series if s.values is not None])
@@ -888,6 +889,7 @@ def _draw_marks(
     for s in series:
         look = s.look
         lines_shown, markers_shown = s.shows("line"), s.shows("marker")
+        cell = s.marker == marks.CELL
         line_color = s.color
         if s.values is not None and norm is not None:
             line_color = cmap(norm(float(np.nanmean(s.values))))
@@ -908,7 +910,7 @@ def _draw_marks(
             solid_joinstyle=cast(Any, look.line_join),
             dash_joinstyle=cast(Any, look.line_join),
             alpha=look.opacity,
-            marker=s.marker if markers_shown and s.values is None else "none",
+            marker=s.marker if markers_shown and s.values is None and not cell else "none",
             markevery=marked,
             markersize=look.marker_size,
             markerfacecolor="none" if open_marker else line_color,
@@ -919,11 +921,13 @@ def _draw_marks(
         line.set_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
         handle = s.line = line
         s.ring = to_hex(line_color)
+        if cell:  # the key's sample is a swatch of the cell
+            handle = Line2D([], [], color=line_color, linestyle="none", marker="s")
         if s.shows("bar"):
             bar = s.bars = marks.bars(ax, s, r.base, line_color)
             if not (lines_shown or markers_shown):
                 handle = bar  # the key's sample is a swatch of the bar
-        if s.values is not None and markers_shown and norm is not None:
+        if s.values is not None and markers_shown and norm is not None and not cell:
             dots = ax.scatter(
                 px,
                 py,
@@ -945,6 +949,10 @@ def _draw_marks(
             paths.setdefault(s.label, []).append(
                 np.c_[axis_data.numbers(lx), axis_data.numbers(ly)]
             )
+    filled = [(s, _as_xy(r, s.x, s.y)) for s in series if s.marker == marks.CELL]
+    if filled and any(s.shows("marker") for s, _ in filled):
+        logs = gt["axis.x.scale"] == "log", gt["axis.y.scale"] == "log"
+        drawn.cells = marks.draw_cells(ax, filled, cmap, norm, logs)
     groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
     return groups, norm
 
@@ -978,6 +986,13 @@ def _axes(
         else:
             ticks.minor_ticks(axis, style)
     _limits(ax, gt, drawn.kinds)
+    if drawn.cells is not None:
+        for name, edges in (("x", drawn.cells.x), ("y", drawn.cells.y)):
+            lo, hi = ax.get_xlim() if name == "x" else ax.get_ylim()
+            low = edges[0] if unset(gt[f"axis.{name}.min"]) else lo
+            high = edges[-1] if unset(gt[f"axis.{name}.max"]) else hi
+            if drawn.kinds[name] != "categorical":
+                (ax.set_xlim if name == "x" else ax.set_ylim)(low, high)
     with_bars = [s for s in series if s.shows("bar")]
     if with_bars and unset(gt[f"axis.{r.value}.min"]):  # bars stand on the axis
         log = gt[f"axis.{r.value}.scale"] == "log"
@@ -1224,7 +1239,7 @@ def _style_keys(
                 [],
                 color=ink,
                 linestyle=cast(Any, ls if lines else "none"),
-                marker=mk if markers else "none",
+                marker=("s" if mk == marks.CELL else mk) if markers else "none",
                 markersize=size,
                 markerfacecolor="none" if fill == "open" else ink,
                 markeredgecolor=ink,

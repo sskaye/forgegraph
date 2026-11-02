@@ -1019,7 +1019,7 @@ def test_a_band_between_two_equations_is_filled_at_draw():
     g = parity({"line_1": {"equation": "x - 10"}, "line_2": {"equation": "x + 10"}})
     [band] = [c for c in g.axes.collections if isinstance(c, equation.EquationBand)]
     g.figure.canvas.draw()
-    assert len(band.get_paths()[0].vertices) > 100
+    assert len(np.asarray(band.get_paths()[0].vertices)) > 100
 
 
 def test_a_band_can_join_an_equation_and_a_value():

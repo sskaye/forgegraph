@@ -36,7 +36,7 @@ from matplotlib.transforms import Bbox
 from forgegraph.drawing import limits, text
 from forgegraph.drawing.key import KEY, Entry, Key
 from forgegraph.drawing.key import keys as keys_of
-from forgegraph.drawing.marks import Bars
+from forgegraph.drawing.marks import CELL_POINTS, Bars
 from forgegraph.drawing.style import Style
 
 DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)]
@@ -165,6 +165,8 @@ def _drawn_points(
     for bars in ax.collections:
         if isinstance(bars, Bars):
             dense += [_bar_samples(box) for box in bars.rectangles()]
+        elif hasattr(bars, CELL_POINTS):  # the corners and centres of a filled grid
+            centres.append(ax.transData.transform(getattr(bars, CELL_POINTS)))
     return dense, centres
 
 
@@ -457,8 +459,7 @@ def _beside_a_key(
     ax: Axes, key: Key, taken: list[Key], lines: bool, positions: tuple[str, ...], gap: float
 ) -> bool:
     """Place the key under or beside the keys already at a position, if it's clear of them
-    and of what's drawn there. The center and right_center positions have no room to the side,
-    and right_center none below."""
+    and of what's drawn there. A position at the middle of a side isn't shared."""
     for position in positions:
         there = [k for k in taken if k.position == position]
         if not there or position.endswith("center"):

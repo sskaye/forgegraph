@@ -14,6 +14,18 @@ Polarization curves of three fuel cells, one line for each cell, named beside it
     --8<-- "docs/examples/polarization.yaml"
     ```
 
+## A heat map
+
+A plate of 60 UV-Vis spectra, one row for each sample, colored by absorbance. It's an xy graph whose markers fill the grid its points lie on, with `marker.shape: grid_cell`. Pointing at a cell on an HTML page shows its wavelength, sample and absorbance. Data: plate_spectra.csv.
+
+![A grid of colored cells, wavelength across and samples up, with four families of bands.](images/plate_spectra.png){ width="480" }
+
+??? example "GraphSpec"
+
+    ```yaml
+    --8<-- "docs/examples/plate_spectra.yaml"
+    ```
+
 ## Lines over time
 
 Each cell's voltage over a 200-hour durability test, as lines without markers. Data: cell_durability.csv.

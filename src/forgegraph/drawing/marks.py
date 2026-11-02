@@ -35,7 +35,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import RendererAgg
 from matplotlib.collections import PolyCollection
-from matplotlib.colors import to_rgb
+from matplotlib.colors import to_rgb, to_rgba
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
@@ -45,6 +45,9 @@ from forgegraph.drawing.style import Style, TextStyle, unset
 from forgegraph.drawing.text import measure
 
 BAR = "forgegraph-bar"  # each series' bars
+CELL = "grid_cell"  # marker.shape: a marker that fills the grid its points lie on
+CELLS = "forgegraph-cells"  # the grid drawn
+CELL_POINTS = "forgegraph_cell_points"  # the grid's corners and its cells' centres, in data terms
 VALUE_LABEL = "forgegraph-value-label"
 
 
@@ -62,6 +65,9 @@ def check(listed: list[Any], gt: dict[str, Any], value_axis: str, kind: str) -> 
     """Combinations of series settings that can't be drawn, once the value axis's type (kind)
     is known."""
     how = gt["arrangement.stacking"]
+    for s in listed:
+        if s.fixed.get("marker_shape") == CELL:
+            _check_cells(s, gt, how)
     if kind == "date":
         dates = f"axis.{value_axis} is dates"
         if how != "none":
@@ -434,6 +440,100 @@ def bars(ax: Axes, s: Any, base_axis: str, color: Any) -> Bars:
     if ends:
         ax.update_datalim(ends)
     return collection
+
+
+@dataclass(frozen=True)
+class Cells:
+    """The grid a series with marker.shape grid_cell fills: each axis's cell edges, in order."""
+
+    x: np.ndarray
+    y: np.ndarray
+
+    def box(self, x: float, y: float) -> tuple[float, float, float, float]:
+        """The cell around a point: its left, bottom, right and top, on the axes."""
+        i, j = np.searchsorted(self.x, x) - 1, np.searchsorted(self.y, y) - 1
+        return self.x[i], self.y[j], self.x[i + 1], self.y[j + 1]
+
+
+def _check_cells(s: Any, gt: dict[str, Any], how: str) -> None:
+    """What a series that fills cells can't be drawn with."""
+    shape = s.path("marker.shape")
+    if s.shows("line"):
+        raise DrawError(f"{shape}: grid_cell fills a grid, so set {s.path('line.show')} to false")
+    if s.shows("bar"):
+        raise DrawError(f"{shape}: grid_cell fills a grid, so set {s.path('bar.show')} to false")
+    if "marker.size" in s.values["look"]:
+        raise DrawError(f"{s.path('marker.size')}: a cell's size comes from the grid; leave it out")
+    if how != "none":
+        raise DrawError(
+            f"arrangement.stacking: {how}, but {shape} is grid_cell, which fills a grid"
+        )
+    if gt["arrangement.offset"] != "none":
+        raise DrawError(
+            f"arrangement.offset: side_by_side, but {shape} is grid_cell, which fills a grid"
+        )
+
+
+def _cell_edges(values: np.ndarray, log: bool) -> np.ndarray:
+    """Each cell's edges along an axis, from the distinct places on it: halfway to each
+    neighbor, on a log axis in log terms, and as far beyond the outer ones."""
+    places = np.unique(values[np.isfinite(values)])
+    if len(places) < 2:  # no neighbor: a cell as wide as a category
+        return places[0] * np.array([0.5, 2.0]) if log else places[0] + np.array([-0.5, 0.5])
+    at = np.log10(places) if log else places
+    middle = (at[1:] + at[:-1]) / 2
+    edges = np.r_[2 * at[0] - middle[0], middle, 2 * at[-1] - middle[-1]]
+    return 10.0**edges if log else edges
+
+
+def draw_cells(
+    ax: Axes,
+    filled: list[tuple[Any, tuple[Any, Any]]],
+    cmap: Any,
+    norm: Any,
+    logs: tuple[bool, bool],
+) -> Cells:
+    """Fill the grid the points of the series that fill cells (filled: each with its points,
+    as x and y) lie on, as one image, under the reference lines and bands. A cell is the one
+    point's color: a place with no point shows the plot, and two in a cell are an error."""
+    xs = np.concatenate([numbers(p[0]) for _, p in filled])
+    ys = np.concatenate([numbers(p[1]) for _, p in filled])
+    cells = Cells(_cell_edges(xs, logs[0]), _cell_edges(ys, logs[1]))
+    grid = np.zeros((len(cells.y) - 1, len(cells.x) - 1, 4))
+    used = np.zeros(grid.shape[:2], dtype=bool)
+    for s, (x, y) in filled:
+        rows = np.searchsorted(cells.y, numbers(y)) - 1
+        columns = np.searchsorted(cells.x, numbers(x)) - 1
+        if s.values is not None and norm is not None:
+            colors = cmap(norm(np.asarray(s.values, dtype=float)))
+        else:
+            colors = np.tile(to_rgba(s.color), (len(rows), 1))
+        colors = np.array(colors, dtype=float)
+        colors[:, 3] = s.look.opacity
+        shown = np.isfinite(numbers(y)) & np.isfinite(numbers(x))
+        for row, column, color in zip(rows[shown], columns[shown], colors[shown], strict=True):
+            if used[row, column]:
+                raise DrawError(
+                    f"{s.listed.path('marker.shape')}: grid_cell, but several rows share a "
+                    "cell, at "
+                    f"{(cells.x[column] + cells.x[column + 1]) / 2:g} and "
+                    f"{(cells.y[row] + cells.y[row + 1]) / 2:g}; combine them in the data"
+                )
+            used[row, column] = True
+            grid[row, column] = color
+    mesh = ax.pcolormesh(
+        cells.x, cells.y, grid, shading="flat", rasterized=True, linewidth=0, zorder=1.0, gid=CELLS
+    )
+    gx, gy = np.meshgrid(cells.x, cells.y)
+    middle_x, middle_y = np.meshgrid(
+        (cells.x[1:] + cells.x[:-1]) / 2, (cells.y[1:] + cells.y[:-1]) / 2
+    )
+    setattr(
+        mesh,
+        CELL_POINTS,
+        np.r_[np.c_[gx.ravel(), gy.ravel()], np.c_[middle_x[used], middle_y[used]]],
+    )
+    return cells
 
 
 def check_room(ax: Axes, series: list[Any], gt: dict[str, Any], base_axis: str) -> None:

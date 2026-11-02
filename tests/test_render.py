@@ -798,15 +798,14 @@ def test_impossible_drawings_are_errors_not_fallbacks():
     }
     with pytest.raises(
         fg.SpecError,
-        match=re.escape(
-            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
-            "is taken or covers data; use auto, or direct"
-        ),
+        match=re.escape("legend.method: key doesn't fit this graph: top_right covers the data; "),
     ):
         render({**scatter, "legend.method": "key"}, theme=no_margin, data=board)
     with pytest.raises(
         fg.SpecError,
-        match=re.escape("legend.method: auto, but no labelling method fits (direct, key tried)"),
+        match=re.escape(
+            "legend.method: auto, but no labelling method fits (direct, key tried: top"
+        ),
     ):
         render(scatter, theme=no_margin, data=board)
 
@@ -926,8 +925,8 @@ def test_a_key_that_doesnt_fit_says_why():
     with pytest.raises(
         fg.SpecError,
         match=re.escape(
-            "legend.method: key doesn't fit this graph: every position in legend.key.positions "
-            "is taken or covers data (the style key for basal took right_top)"
+            "legend.method: key doesn't fit this graph: right_top is taken by another key "
+            "(the style key for basal took right_top)"
         ),
     ):
         render(

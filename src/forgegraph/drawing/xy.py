@@ -1032,18 +1032,23 @@ def place(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bool:
     r = cast(Roles, drawn.roles)  # draw() set it
     marks.check_room(ax, drawn.series, gt, r.base)
     widened = marks.value_labels(ax, drawn.series, gt, r.base, drawn.kinds[r.value])
-    return layers.label_lines(ax, drawn.ref_lines, gt, style, drawn.lines) or widened
+    layers.unplace_labels(ax)
+    first = [line for line in drawn.ref_lines if not layers.placed_after_keys(line)]
+    return layers.label_lines(ax, first, gt, style, drawn.lines) or widened
 
 
 def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
-    """Name the series (legend.method), explain styles, then place notes inside the plot, all
-    after the figure's size is final. Keys go first, since they need a corner and a note has
-    six places. Anything that can't be placed cleanly is an error, never a fallback. What an
-    earlier label() placed is taken away first, to place it again after the layout changed."""
+    """Name the series (legend.method), explain styles, then place reference lines' labels at
+    auto and notes inside the plot, all after the figure's size is final. Keys go first, since
+    they need a corner and a label or a note has six places. Anything that can't be placed
+    cleanly is an error, never a fallback. What an earlier label() placed is taken away first,
+    to place it again after the layout changed."""
     labelling.unplace(ax)
     layers.unplace_notes(ax)
     axis_data.check_fit(ax, gt, style)
     _name_series(ax, drawn, gt, style)
+    after = [line for line in drawn.ref_lines if layers.placed_after_keys(line)]
+    layers.label_lines(ax, after, gt, style, drawn.lines, keys=True)
     layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)
 
 
@@ -1073,6 +1078,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         "positions": tuple(gt["legend.key.positions"]),
         "inside": bool(gt["legend.key.inside"]),
     }
+    extendable = tuple(end for end in ("max", "min") if unset(gt[f"axis.y.{end}"]))
     title = gt["legend.key.title.text"]
     one_title = not (unset(title) or title == COLUMN_NAME)  # a text: it can title one key
 
@@ -1092,13 +1098,24 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             style_key.title,
             taken=taken,
             lines=with_lines,
+            extendable=extendable,
             **where,
         )
         if key is None:
+            blocked = labelling.in_the_way(
+                ax,
+                style_key.entries,
+                style,
+                style_key.title,
+                taken=taken,
+                lines=with_lines,
+                **where,
+            )
             raise DrawError(
                 f"style key for {style_key.named}: no position in legend.key.positions is free "
-                "and clear of data; add positions, put keys outside (legend.key.inside: false), "
-                "widen the format or set the plot's limits to leave room"
+                f"and clear ({blocked}); add positions, put keys outside "
+                "(legend.key.inside: false), widen the format or set the plot's limits to leave "
+                "room"
             )
         taken.append(key)
     method = gt["legend.method"]
@@ -1116,6 +1133,8 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
         allowed = [m for m in allowed if m != "direct"]
     tries = allowed if method == "auto" else [method]
     legend_title = _title(title, _legend_column(drawn.listed))
+    entries = [Entry(g.name, g.handle) for g in groups]
+    blocked = ""
     for m in tries:
         if m == "direct" and labelling.interior(ax, groups, style):
             drawn.labelling = "direct"
@@ -1124,20 +1143,24 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             one_key(len(drawn.style_keys) + 1)
             leg = labelling.legend(
                 ax,
-                [Entry(g.name, g.handle) for g in groups],
+                entries,
                 style,
                 legend_title,
                 taken=taken,
                 lines=with_lines,
+                extendable=extendable,
                 **where,
             )
             if leg is not None:
                 drawn.labelling = "key"
                 return
+            blocked = labelling.in_the_way(
+                ax, entries, style, legend_title, taken=taken, lines=with_lines, **where
+            )
     if method == "auto":
         raise DrawError(
-            f"legend.method: auto, but no labelling method fits ({', '.join(tries)} tried); "
-            "put the key outside (legend.key.inside: false), widen the format, draw fewer series, "
+            f"legend.method: auto, but no labelling method fits ({', '.join(tries)} tried"
+            f"{': ' + blocked if blocked else ''}); put the key outside (legend.key.inside: false), widen the format, draw fewer series, "
             "or set axis.x.min/max or axis.y.min/max to leave room for a key"
         )
     other = [m for m in allowed if m != method]
@@ -1155,9 +1178,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> No
             f"the style key for {k.named} took {key.position}"
             for k, key in zip(drawn.style_keys, taken, strict=True)
         )
-        why = ": every position in legend.key.positions is taken or covers data" + (
-            f" ({took})" if took else ""
-        )
+        why = f": {blocked}" + (f" ({took})" if took else "")
     raise DrawError(f"legend.method: {method} doesn't fit this graph{why}; {hint}")
 
 

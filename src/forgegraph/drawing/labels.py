@@ -389,6 +389,13 @@ def _clear_of_data(ax: Axes, key: Key, lines: bool) -> bool:
     return box_clear(ax, key.bbox(), lines)
 
 
+def keys_clear(ax: Axes, lines: bool) -> bool:
+    """Whether every key placed inside the plot is still clear of what's drawn: extending an
+    axis moves the data under them."""
+    text.measure(ax.figure)
+    return all(box_clear(ax, k.bbox(), lines) for k in keys_of(ax) if not k.outside)
+
+
 def box_clear(ax: Axes, bbox: Bbox, lines: bool, keys: bool = False) -> bool:
     """Whether a box, in display px, keeps 2 pt clear of what's drawn inside the plot, and
     off its other text (with keys, its keys too): see Obstacles.of."""
@@ -404,6 +411,57 @@ def unplace(ax: Axes) -> None:
         t.remove()
 
 
+def _beside_a_key(
+    ax: Axes, key: Key, taken: list[Key], lines: bool, positions: tuple[str, ...], gap: float
+) -> bool:
+    """Place the key under or beside the keys already at a position, if it's clear of them
+    and of what's drawn there. The center and right_center positions have no room to the side,
+    and right_center none below."""
+    for position in positions:
+        there = [k for k in taken if k.position == position]
+        if not there or position.endswith("center"):
+            continue
+        for along in ("under", "beside"):
+            size = (k.height if along == "under" else k.width for k in there)
+            key.place(ax, position, **{along: sum(s + gap for s in size)})
+            text.measure(ax.figure)
+            if box_clear(ax, key.bbox(), lines, keys=True):
+                return True
+            key.remove()
+    return False
+
+
+def _with_more_room(
+    ax: Axes,
+    key: Key,
+    lines: bool,
+    positions: tuple[str, ...],
+    used: set[str],
+    extendable: tuple[str, ...],
+    most: float,
+) -> bool:
+    """Place the key at the first position where extending the y-axis, at that end, by as
+    little as it takes and up to most, clears it and keeps the other keys clear. An axis that
+    bars stand on isn't extended below them."""
+    bars = any(isinstance(c, Bars) for c in ax.collections)
+    for position in positions:
+        end = "max" if position.startswith("top") else "min"
+        vertical = position.startswith(("top", "bottom"))
+        if position in used or not vertical or end not in extendable or (bars and end == "min"):
+            continue
+
+        def fits(position: str = position) -> bool:
+            key.place(ax, position)
+            clear = _clear_of_data(ax, key, lines) and keys_clear(ax, lines)
+            key.remove()
+            return clear
+
+        if grow_until(ax, "y", end, fits, most):
+            key.place(ax, position)
+            return True
+    return False
+
+
 def legend(
     ax: Axes,
     entries: list[Entry],
@@ -414,10 +472,13 @@ def legend(
     lines: bool = True,
     positions: tuple[str, ...] = ("top_right", "top_left", "bottom_right", "bottom_left"),
     inside: bool = True,
+    extendable: tuple[str, ...] = (),
 ) -> Key | None:
     """A key at the first free position of `positions`: inside the plot box, the first whose
-    frame no line or marker passes through; outside it, the first not taken (layout makes
-    room). None if there's no such position. Keys already placed (`taken`) keep theirs."""
+    frame no line or marker passes through, then under or beside a key there, then the first
+    that extending the y-axis (at its `extendable` ends) makes clear; outside it, the first
+    not taken (layout makes room). None if there's no such position. Keys already placed
+    (`taken`) keep theirs."""
     used = {k.position for k in taken or []}
     key = Key(entries, title, style)
     for position in positions:
@@ -430,4 +491,41 @@ def legend(
         if _clear_of_data(ax, key, lines):
             return key
         key.remove()
+    if not inside:
+        return None
+    gap = style.pt("legend.key.gap.outer")
+    if _beside_a_key(ax, key, taken or [], lines, positions, gap):
+        return key
+    most = float(style.theme["axis.max_extension"])
+    if _with_more_room(ax, key, lines, positions, used, extendable, most):
+        return key
     return None
+
+
+def in_the_way(
+    ax: Axes,
+    entries: list[Entry],
+    style: Style,
+    title: str | None,
+    *,
+    taken: list[Key] | None = None,
+    lines: bool = True,
+    positions: tuple[str, ...] = (),
+    inside: bool = True,
+) -> str:
+    """What stops a key that legend() couldn't place, at each position, for an error."""
+    used = {k.position for k in taken or []}
+    key = Key(entries, title, style)
+    pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
+    found = []
+    for position in positions:
+        if position in used or not inside:
+            found.append(f"{position} is taken by another key")
+            continue
+        key.place(ax, position)
+        text.measure(ax.figure)
+        hits = Obstacles.of(ax, lines=lines, keys=False).hits(key.bbox(), pad)
+        key.remove()
+        names = [h if h.startswith("the ") else f"the label {h}" for h in hits]
+        found.append(f"{position} covers {' and '.join(names)}")
+    return "; ".join(found)

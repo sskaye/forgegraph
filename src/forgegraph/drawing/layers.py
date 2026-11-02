@@ -11,10 +11,11 @@
   error. A date column's aggregate is a date, on a date axis
   only. A line outside the data widens an automatic axis; outside a set limit, it's an
   error. Its label, placed after layout, sits at one end or the middle, beside the line:
-  auto takes the first position (LABEL_ORDER) inside the plot and clear of the data and
-  other text. A chosen position that covers something is an error; one past the plot's edge
-  widens an automatic axis. With label.inside false, the label is beyond the plot area at
-  the line's start or end.
+  auto takes the first position (LABEL_ORDER) inside the plot and clear of the data, other
+  text and the keys, which go first, since they need a corner and a label has six places. A
+  chosen position that covers something is an error; one past the plot's edge widens an
+  automatic axis. It's placed before the keys, which keep clear of it. With label.inside
+  false, the label is beyond the plot area at the line's start or end.
 - **error_bar**: a bar on each mark along an axis, a number or a column's distance below and
   above it. With the series aggregated (its aggregation), the distances can be an aggregate
   of the rows each mark stands for, times its multiplier: such as their standard deviation,
@@ -469,16 +470,30 @@ def _line_text(ax: Axes, gt: dict[str, Any], line: RefLine, at: float) -> str:
     return number_text(gt, line.axis, axis, line.fmt, path, extra=1, kind=line.kind)(at)
 
 
-def label_lines(
-    ax: Axes, lines: list[RefLine], gt: dict[str, Any], style: Style, with_lines: bool
-) -> bool:
-    """Place each line's label once the figure is laid out (again on every pass): clear of
-    what's drawn, or, at a chosen position past the plot's edge, with an automatic axis
-    widened to take it; with label.inside false, beyond the plot area, the first time with
-    the figure to be laid out again around it. Returns True if the figure must be laid out
-    again."""
+def unplace_labels(ax: Axes) -> None:
+    """Take away the lines' labels placed in ax, to place them again."""
     for a in [t for t in ax.texts if t.get_gid() == REFERENCE]:
         a.remove()
+
+
+def placed_after_keys(line: RefLine) -> bool:
+    """Whether a line's label is placed after the keys: one at auto, inside the plot."""
+    return line.position == "auto" and line.inside
+
+
+def label_lines(
+    ax: Axes,
+    lines: list[RefLine],
+    gt: dict[str, Any],
+    style: Style,
+    with_lines: bool,
+    keys: bool = False,
+) -> bool:
+    """Place each line's label once the figure is laid out (again on every pass): clear of
+    what's drawn, and with keys, of the keys; or, at a chosen position past the plot's edge,
+    with an automatic axis widened to take it; with label.inside false, beyond the plot area,
+    the first time with the figure to be laid out again around it. Returns True if the figure
+    must be laid out again."""
     widened = False
     most = float(style.theme["axis.max_extension"])
     for line in lines:
@@ -517,7 +532,7 @@ def label_lines(
                 and box.y1 <= plot.y1 + 0.5
             )
             found = (
-                "clear" if inside and labels.box_clear(ax, box, with_lines) else
+                "clear" if inside and labels.box_clear(ax, box, with_lines, keys=keys) else
                 "covers" if inside else "outside"
             )  # fmt: skip
             if found == "outside" and not auto and keep:  # past the plot's edge: widen to it
@@ -535,7 +550,11 @@ def label_lines(
             if along == "center" or not unset(gt[f"axis.{other}.{end}"]):
                 return False
             return labels.grow_until(
-                ax, other, end, lambda: attempt(position, False) == "clear", most
+                ax,
+                other,
+                end,
+                lambda: attempt(position, False) == "clear" and labels.keys_clear(ax, with_lines),
+                most,
             )
 
         tries = LABEL_ORDER if auto else [line.position]

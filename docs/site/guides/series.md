@@ -85,7 +85,7 @@ A categorical axis keeps the order of its categories in the data, or sorts them 
 `legend.method` chooses how a graph names its series, from the methods its theme allows:
 
 - **direct:** each name beside its own series, touching no line, marker or other name.
-- **key:** a key at the first of `legend.key.positions` that covers no data. With `legend.key.inside: false`, the key is outside the plot area.
+- **key:** a key at the first of `legend.key.positions` that covers no data. If there's none, a second key goes under or beside the first, and otherwise the y-axis is extended by up to `axis.max_extension` to make room. With `legend.key.inside: false`, the key is outside the plot area.
 - **none:** no names, where the theme allows it. The built-in theme doesn't.
 - **auto**, the default, tries the theme's methods in order and uses the first that fits.
 

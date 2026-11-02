@@ -622,6 +622,22 @@ def _points(rows: pd.DataFrame, x: str, s: Listed) -> tuple[np.ndarray, np.ndarr
     return axis_data.numbers(points.index), np.asarray(points, dtype=float) * multiplier
 
 
+def _scale_values(rows: pd.DataFrame, x: str, s: Listed, column: str) -> np.ndarray:
+    """A drawn series' values on the color scale, one per point: with an aggregation, a
+    point's rows must share one."""
+    values = pd.Series(np.asarray(_col(rows, column), dtype=float), index=rows.index)
+    if s.aggregation is None:
+        return np.asarray(values, dtype=float)
+    at = values.groupby(_col(rows, x), sort=False, dropna=False)
+    if bool((at.nunique() > 1).any()):
+        raise DrawError(
+            f"{s.path('color')}: {column} has several values at one point, so a point drawn from "
+            f"them with {s.path('aggregation.function')} has no one color; leave out the "
+            "aggregation, or color by a column with one value at each point"
+        )
+    return np.asarray(at.first(), dtype=float)
+
+
 def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]) -> list[Series]:
     """One series per group of each listed series' rows, styled by its groups; the benchmark
     last, on top."""
@@ -680,9 +696,7 @@ def _series(frame: pd.DataFrame, r: Roles, enc: _Encodings, listed: list[Listed]
                     label,
                     _look(s.style, False),
                     s,
-                    values=np.asarray(_col(rows, str(color_col)), dtype=float)
-                    if s.numeric_color
-                    else None,
+                    values=_scale_values(rows, x, s, str(color_col)) if s.numeric_color else None,
                     order=(position, *(index.get(dim.by, 0) for dim in DIMENSIONS)),
                 )
             d.rows, d.place_column = rows.index, x

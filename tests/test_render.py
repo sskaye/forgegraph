@@ -1039,3 +1039,23 @@ def test_drawing_settings_are_checked_once_per_style(monkeypatch):
         with isolated(g.style):
             pass
     assert checked == []
+
+
+def test_an_aggregated_point_takes_the_one_color_value_its_rows_share():
+    df = pd.DataFrame(
+        {"t": [1, 1, 2, 2], "v": [1.0, 3.0, 2.0, 4.0], "d": [5.0, 5.0, 9.0, 9.0]},
+    )
+    parameters = {"series.aggregation.function": "mean", "series.line.show": False}
+    g = fg.xy(df, x="t", y="v", color="d", parameters=parameters)
+    [dots] = g.axes.collections
+    assert list(dots.get_offsets()[:, 1]) == [2.0, 3.0]
+    assert list(dots.get_array()) == [5.0, 9.0]
+
+
+def test_an_aggregated_point_whose_rows_have_several_color_values_is_an_error():
+    df = pd.DataFrame(
+        {"t": [1, 1, 2, 2], "v": [1.0, 3.0, 2.0, 4.0], "d": [5.0, 6.0, 7.0, 8.0]},
+    )
+    parameters = {"series.aggregation.function": "mean", "series.line.show": False}
+    with pytest.raises(fg.SpecError, match=r"series\.v\.color: d has several values at one point"):
+        fg.xy(df, x="t", y="v", color="d", parameters=parameters)

@@ -102,7 +102,10 @@ def _low_points(n: int = 170) -> pd.DataFrame:
     )
 
 
-def _with_lines(position: str = "auto", **parameters) -> fg.Graph:
+LIMITS = (("a", -0.45, "Lower limit"), ("b", 0.2, "Upper limit"))
+
+
+def _with_lines(position: str = "auto", lines=LIMITS, **parameters) -> fg.Graph:
     settings = {
         "axis.x.data.column": "x",
         "legend.method": "key",
@@ -118,7 +121,7 @@ def _with_lines(position: str = "auto", **parameters) -> fg.Graph:
             "axis": "x",
             "line_1": {"value": at, "label": {"text": text, "position": position}},
         }
-        for name, at, text in (("a", -0.45, "Lower limit"), ("b", 1.0, "Upper limit"))
+        for name, at, text in lines
     }
     return fg.render(d, _low_points())
 
@@ -137,11 +140,11 @@ def test_a_key_goes_before_labels_at_auto_which_keep_clear_of_it():
 
 def test_labels_at_chosen_positions_go_first_and_the_error_names_them():
     with pytest.raises(fg.SpecError, match="top_right covers the label 'Upper limit'"):
-        _with_lines("end_below")
+        _with_lines("end_above")
 
 
 def test_a_second_key_goes_beside_the_first_when_the_corners_are_used_up():
-    g = _with_lines(series={"marker": {"shape": "Kind"}})
+    g = _with_lines(lines=(), series={"marker": {"shape": "Kind"}})
     first, second = keys(g.axes)
     assert first.position == second.position == "top_right"
     assert not first.bbox().overlaps(second.bbox())
@@ -217,3 +220,38 @@ def test_direct_labels_go_after_a_lines_label_at_auto():
     written = [t.get_text() for t in g.axes.texts if t.get_text()]
     assert written[0] == "Limit"
     assert sorted(written) == ["Limit", "down", "up"]
+
+
+def test_a_key_and_a_note_keep_clear_of_a_band_and_its_lines_in_a_scatter():
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame({"x": np.arange(60.0), "y": rng.uniform(0, 60, 60)})
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "x",
+            "axis.max_extension": 1.0,
+            "legend.method": "key",
+            "legend.key.positions": ["top_left"],
+            "series": {
+                "y": {"color": "g", "line": {"show": False}},
+            },
+        },
+    )
+    df["g"] = np.where(df["x"] < 30, "a", "b")
+    d["parameters"]["layers"] = {
+        "band": {
+            "type": "reference",
+            "axis": "y",
+            "line_1": {"value": 59.0},
+            "line_2": {"value": 81.0},
+        },
+        "excluded": {"type": "note", "text": "3 items excluded", "position": "top_right"},
+    }
+    g = fg.render(d, df)
+    [key] = keys(g.axes)
+    band_top = g.axes.transData.transform((0, 81.0))[1]
+    text.measure(g.figure)
+    assert key.bbox().y0 > band_top
+    [note] = [t for t in g.axes.texts if t.get_text() == "3 items excluded"]
+    assert note.get_window_extent().y0 > band_top

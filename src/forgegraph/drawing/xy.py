@@ -27,7 +27,7 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 
 from forgegraph.drawing import axes as axis_data
-from forgegraph.drawing import colorbar, layers, limits, marks, readout, spacing, ticks
+from forgegraph.drawing import colorbar, layers, limits, marks, owners, readout, spacing, ticks
 from forgegraph.drawing import labels as labelling
 from forgegraph.drawing.axes import natural
 from forgegraph.drawing.errors import DrawError
@@ -929,12 +929,13 @@ def _draw_marks(
             zorder=look.line_z,
         )
         line.set_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
-        handle = s.line = line
+        handle = s.line = owners.tag(line, owners.name("series", s.listed.name))
         s.ring = to_hex(line_color)
         if cell:  # the key's sample is a swatch of the cell
             handle = Line2D([], [], color=line_color, linestyle="none", marker="s")
         if s.shows("bar"):
             bar = s.bars = marks.bars(ax, s, r.base, line_color)
+            owners.tag(bar, owners.name("series", s.listed.name))
             if not (lines_shown or markers_shown):
                 handle = bar  # the key's sample is a swatch of the bar
         if s.values is not None and markers_shown and norm is not None and not cell:
@@ -954,6 +955,7 @@ def _draw_marks(
                 zorder=2.5,
             )
             dots.set_offset_transform(marks.shifted(ax, r.base, s.shifts, s.spacing))
+            owners.tag(dots, owners.name("series", s.listed.name))
             s.ring = [to_hex(cmap(norm(float(v)))) for v in s.values]
         if s.label is not None:
             handles.setdefault(s.label, handle)
@@ -964,7 +966,9 @@ def _draw_marks(
     filled = [(s, _as_xy(r, s.x, s.y)) for s in series if s.marker == marks.CELL]
     if filled and any(s.shows("marker") for s, _ in filled):
         logs = gt["axis.x.scale"] == "log", gt["axis.y.scale"] == "log"
+        before = owners.children(ax)
         drawn.cells = marks.draw_cells(ax, filled, cmap, norm, logs)
+        owners.tag_new(ax, before, owners.name("cells"))
     groups = [labelling.Labelled(n, colors[n], paths[n], handles[n]) for n in handles]
     return groups, norm
 

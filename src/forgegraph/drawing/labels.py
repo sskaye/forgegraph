@@ -34,7 +34,7 @@ from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator, Locator
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import limits, text
+from forgegraph.drawing import limits, owners, text
 from forgegraph.drawing.key import KEY, Entry, Key
 from forgegraph.drawing.key import keys as keys_of
 from forgegraph.drawing.marks import CELL_POINTS, Bars
@@ -379,7 +379,7 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
         x0, y0, _, _ = best[k].box  # where the letters go: the text starts and sits before them
         e = label_edges[k]
         ax_x, ax_y = inverse.transform((x0 - e.left * px, y0 + e.bottom * px))
-        ax.text(
+        label = ax.text(
             ax_x,
             ax_y,
             g.name,
@@ -390,6 +390,7 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
             fontproperties=prop,
             gid=SERIES_LABEL,
         )
+        owners.tag(label, getattr(g.handle, owners.OWNER, None))
     return True
 
 

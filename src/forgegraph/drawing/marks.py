@@ -39,7 +39,7 @@ from matplotlib.colors import to_rgb, to_rgba
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
-from forgegraph.drawing import limits
+from forgegraph.drawing import limits, owners
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style, TextStyle, unset
@@ -595,6 +595,7 @@ def value_labels(
     how = gt["arrangement.stacking"]
     vertical = base_axis == "x"  # values run up the y axis
     made: list[Annotation] = []
+    who: list[Any] = [None]  # the series whose labels are being placed
 
     def put(
         place: float,
@@ -635,9 +636,12 @@ def value_labels(
             zorder=4,
         )
         made.append(a)
+        if who[0] is not None:  # a stack's total belongs to no one series
+            owners.tag(a, owners.name("series", who[0].listed.name))
         return a
 
     for s in shown:
+        who[0] = s
         st, shifts = s.stack, s.shifts
         width = widths(s)
         look = s.style.text(f"series.{'benchmark.' if s.benchmark else ''}value_label")
@@ -670,6 +674,7 @@ def value_labels(
                         "fit inside its bar; use auto or outside, or widen the bars in the theme"
                     )
             put(place, top, text, off, "beyond", ink, sign, look)
+    who[0] = None
     if total:
         look = style.text("series.value_label")
         ink = str(look.color)

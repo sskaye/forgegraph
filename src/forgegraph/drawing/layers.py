@@ -47,7 +47,7 @@ from matplotlib.lines import Line2D
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
-from forgegraph.drawing import equation, labels, limits, marks
+from forgegraph.drawing import equation, labels, limits, marks, owners
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.key import keys
@@ -333,6 +333,7 @@ def reference_lines(
     for name, entry in layers.items():
         if entry["type"] != "reference":
             continue
+        before = owners.children(ax)
         layer = {**entry, "name": name}
         where = f"layers.{name}"
         axis = layer["axis"]
@@ -429,6 +430,7 @@ def reference_lines(
                         drawn=drawn_line,
                     )
                 )
+        owners.tag_new(ax, before, owners.name("layer", name))
     return drawn
 
 
@@ -552,6 +554,11 @@ def _line_label(layer: dict[str, Any], which: str) -> tuple[str, bool]:
 
 
 def _label_line(ax: Axes, line: RefLine, text: str, position: str) -> Annotation:
+    """A line's label at a position, marked as its layer's (owners)."""
+    return owners.tag(_line_label_at(ax, line, text, position), owners.name("layer", line.name))
+
+
+def _line_label_at(ax: Axes, line: RefLine, text: str, position: str) -> Annotation:
     """A line's label at a position: inside the plot area beside the line, or with inside
     false, beyond the plot area at the line's start or end."""
     along, side = position.split("_")
@@ -905,7 +912,9 @@ def error_bars(
                 )
             places = numbers(s.x if along_value else s.y)
             shifted = marks.shifted(ax, roles.base, s.shifts, s.spacing)
+            before = owners.children(ax)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
+            owners.tag_new(ax, before, owners.name("series", s.listed.name))
 
 
 _SPREADS = {
@@ -1070,6 +1079,7 @@ def notes_outside(ax: Axes, layers: dict[str, dict[str, Any]], style: Style) -> 
             "bottom" if top else "top",
             own,
         )
+        owners.tag(note, owners.name("layer", name))
         if top:
             setattr(note, TOP_NOTE, gap)
 
@@ -1171,6 +1181,9 @@ def notes_inside(
                 break
         if box is not None:
             placed.append(box)
+            for t in ax.texts:
+                if t.get_gid() == NOTE:
+                    owners.tag(t, owners.name("layer", name))
         else:
             what = "any position" if layer["position"] == "auto" else layer["position"]
             raise DrawError(

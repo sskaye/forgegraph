@@ -9,6 +9,7 @@ what it saves (architecture D10, D13).
 from __future__ import annotations
 
 import warnings
+from contextlib import nullcontext
 from typing import Any, cast
 
 import numpy as np
@@ -20,7 +21,7 @@ from matplotlib.text import Text
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D, ScaledTranslation
 
-from forgegraph.drawing import export
+from forgegraph.drawing import export, owners
 from forgegraph.drawing.style import MM_PER_INCH, Style, isolated
 
 WATERMARK = "forgegraph-watermark"
@@ -92,15 +93,16 @@ class GraphCanvas(FigureCanvasAgg):
         super().draw()
 
     def print_figure(self, filename: Any, *args: Any, **kwargs: Any) -> Any:
-        graph = getattr(self.figure, "graph", None)
-        if graph is None:
-            return super().print_figure(filename, *args, **kwargs)
-        record = graph.record()  # inspects the figure first, so the record and image agree
-        with graph.saving(), warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="Unknown infodict keyword")  # pdf's key
-            kind = export.kind_of(filename, kwargs.get("format"))
-            kwargs = export.with_record(kind, kwargs, record)
-            return super().print_figure(filename, *args, **kwargs)
+        kind = export.kind_of(filename, kwargs.get("format"))
+        with owners.named_ids(self.figure) if kind == "svg" else nullcontext():
+            graph = getattr(self.figure, "graph", None)
+            if graph is None:
+                return super().print_figure(filename, *args, **kwargs)
+            record = graph.record()  # inspects the figure first, so the record and image agree
+            with graph.saving(), warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Unknown infodict keyword")  # pdf's
+                kwargs = export.with_record(kind, kwargs, record)
+                return super().print_figure(filename, *args, **kwargs)
 
 
 def canvas_figure(width: float, height: float) -> GraphFigure:

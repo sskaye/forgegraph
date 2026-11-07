@@ -14,6 +14,7 @@ from forgegraph.catalog_build.cards import DENSITY, Change, Drawings, card
 from forgegraph.catalog_build.examples import draw, png
 from forgegraph.catalog_build.files import Catalog, read
 from forgegraph.catalog_build.page import CSS_DPI
+from forgegraph.spec.layers import CONTROLS
 from forgegraph.spec.parameters import graph_type_files
 from forgegraph.spec.registry import builtin
 
@@ -22,7 +23,7 @@ pytestmark = pytest.mark.slow  # the full suite only (pytest --full)
 FILES = [("theme", n) for n in sorted(builtin().docs["theme"])]
 FILES += [("format", n) for n in sorted(builtin().docs["format"])]
 FILES += [("graph_type", n) for n in graph_type_files()]
-FILES += [("layer", n) for n in sorted(builtin().docs["layer"])]
+FILES += [("layer", n) for n in sorted(builtin().docs["layer"]) if n not in CONTROLS]
 CASES = [(k, n, p.path) for k, n in FILES for p, _ in read(k, n, builtin()).cards]
 _DRAWINGS: dict[tuple[str, str], tuple[Catalog, Drawings]] = {}  # this worker's, by catalog
 _BEFORE: dict[str, bytes] = {}  # each start's drawing

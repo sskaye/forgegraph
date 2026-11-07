@@ -126,7 +126,13 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                     text: Target 1.2 V          *# \[None, aggregation, value, aggregation_value, text\]; aggregation writes e.g. Mean, value e.g. 14.9, and aggregation_value e.g. Mean: 14.9. With an equation, value writes e.g. y = 2x. Other text is written as given.*\
         conditions:\
             type: note          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
-            text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*
+            text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*\
+        metric:\
+            type: choice          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
+            label: Metric          *# \[None, text\]; The text before the control, e.g. Metric. If None, there is none.*\
+            views:          *# The views, each under the name the control shows. A GraphSpec lists two or more, and the page opens on the first.*\
+                Voltage: {}          *# \[parameters and their values\]; What the view changes, e.g. a series' column and the y-axis title. {} changes nothing.*\
+                Power: {series.SERIES_1.column: Power Density (mW/cm²), axis.y.title: Power density (mW/cm²)}          *# \[parameters and their values\]; A series' column and the y-axis title.*
 
 <!-- forgemark-comments
 - id: 1

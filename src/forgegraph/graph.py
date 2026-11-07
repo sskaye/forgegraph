@@ -3,7 +3,7 @@ returns."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
 from typing import Any
@@ -22,9 +22,10 @@ from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
 from forgegraph.drawing.readout import marks
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
+from forgegraph.fonts import font_file
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
-from forgegraph.spec.loaded import load_document
+from forgegraph.spec.loaded import Loaded, load_document
 from forgegraph.spec.parameters import (
     NONE,
     PARAMETERS,
@@ -39,6 +40,7 @@ from forgegraph.spec.resolve import Values, chain
 from forgegraph.spec.series import look_definitions, theme_for
 from forgegraph.spec.tags import from_json, var
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
+from forgegraph.spec.views import Control, applied, combinations, controls
 
 GRAPH_TYPES = {"xy": xy_type}  # each graph type's drawing module, by the root of its extends chain
 
@@ -66,6 +68,10 @@ class Graph(Inspected, Saved):
     _drawing: list[lint.Issue] = field(default_factory=list)  # found while drawing
     _font_problems: list[str] = field(default_factory=list)
     _prepared: Prepared = field(kw_only=True, repr=False, compare=False)  # what it was drawn from
+    # Its choice layers' controls, and every view by the names chosen, one for each control:
+    # this graph is the first; the others are drawn for its HTML page (spec/views.py).
+    controls: list[Control] = field(default_factory=list)
+    views: dict[tuple[str, ...], Graph] = field(default_factory=dict, repr=False)
 
     def mark(self) -> None:
         """Draw the watermark over the plot box, once: the figure has been found changed."""
@@ -79,7 +85,20 @@ class Graph(Inspected, Saved):
             figure = lint.figure_issues(self.figure, self._font_problems)
         plot = self._prepared.plot_issues(self.axes, self._drawing)
         self.issues = lint.ordered(figure, plot)
+        if self.views:
+            self.issues = self._with_views([g.check() for g in self._others()])
         return self.issues
+
+    def _others(self) -> list[Graph]:
+        return [g for g in self.views.values() if g is not self]
+
+    def _with_views(self, others: list[list[lint.Issue]]) -> list[lint.Issue]:
+        """Its own issues, then each other view's, each naming its view."""
+        out = []
+        for names, issues in zip(self.views, [self.issues, *others], strict=True):
+            label = " / ".join(names)
+            out += [lint.Issue(i.check, f"view '{label}': {i.message}") for i in issues]
+        return out
 
     @property
     def warnings(self) -> list[str]:
@@ -128,22 +147,40 @@ class Graph(Inspected, Saved):
                 path = stem.with_name(f"{stem.name}.{kind}")
                 if kind == "html":
                     image = export.svg(self.figure, dpi)
-                    shown = [page.Shown(None, None, image, marks=tuple(marks(self.figure)))]
+                    shown = page.Shown(None, None, image, marks=tuple(marks(self.figure)))
+                    shown = self._with_view_images(shown, dpi)
                     title = str(self.spec.get("name", stem.name))
                     background = self.style.theme["background.color"]
                     out.append(
                         page.write(
                             path,
                             title,
-                            shown,
+                            [shown],
                             self.record(),
                             "transparent" if unset(background) else str(background),
+                            bar=controls_look(self.style) if self.controls else None,
                             freshness=self.freshness,
+                            controls=page_controls(self.controls),
                         )
                     )
                 else:
                     out.append(export.save(self.figure, path, dpi))
         return out
+
+    def _with_view_images(self, shown: page.Shown, dpi: int) -> page.Shown:
+        """The figure on a page, with every view's image if it has views."""
+        if not self.views:
+            return shown
+        viewed = []
+        for names, g in self.views.items():
+            if g is self:
+                svg, found = shown.svg, shown.marks
+            else:
+                with isolated(g.style), g.inspected_once():
+                    svg, found = export.svg(g.figure, dpi), tuple(marks(g.figure))
+            choices = tuple(zip((c.name for c in self.controls), names, strict=True))
+            viewed.append(page.Viewed(choices, svg, found))
+        return replace(shown, views=tuple(viewed))
 
     def _name(self) -> str:
         return str(self.spec.get("name", "graph"))
@@ -164,6 +201,7 @@ class Prepared:
     style: Style
     specs: dict[str, Any]  # each spec used, by kind: its name and version
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
+    controls: list[Control] = field(default_factory=list)  # its choice layers' (spec/views.py)
 
     @cached_property
     def values(self) -> dict[str, dict[str, Any]]:
@@ -224,13 +262,17 @@ def prepare(
     data: pd.DataFrame | None = None,
     registry: Registry | None = None,
     format: Values | None = None,
+    view: dict[str, Any] | None = None,
 ) -> Prepared:
     """Check and resolve a GraphSpec, given as a file path or a document, and read its data:
     `data` if given, otherwise the Parquet file its data.file names. With `format` (resolved
-    format values, as from a layout), those replace the format's."""
+    format values, as from a layout), those replace the format's. With `view` (changes by
+    dotted path, from its choice layers' views), it's the GraphSpec with those changes."""
     loaded = load_document("graphspec", spec, registry)
+    if view is not None:
+        loaded = _viewed(loaded, view)
     doc, reg = loaded.doc, loaded.reg
-    problems = validate("graphspec", doc, reg)
+    problems = validate("graphspec", doc, reg, views=view is None)
     if problems:
         raise SpecError(problems)
     problems = named_problems("graphspec", doc, reg)
@@ -249,7 +291,19 @@ def prepare(
     nonstandard = sorted(packs_used("graphspec", doc, reg) & reg.nonstandard)
     use_fonts("graphspec", doc, reg)
     specs = used(values, reg)
-    return Prepared(doc, explained, frame, data_record, module, style, specs, nonstandard)
+    listed = controls(doc, reg)
+    return Prepared(doc, explained, frame, data_record, module, style, specs, nonstandard, listed)
+
+
+def _viewed(loaded: Loaded, change: dict[str, Any]) -> Loaded:
+    """The GraphSpec with a view's changes, checked against its registry, holding it in
+    place of the GraphSpec it changes."""
+    doc = applied(loaded.doc, change)
+    reg = loaded.reg.copy()
+    name = loaded.doc.get("name")
+    if isinstance(name, str) and reg.docs["graphspec"].get(name) is loaded.doc:
+        reg.docs["graphspec"][name] = doc
+    return Loaded(loaded.kind, doc, reg, loaded.folder)
 
 
 def render(
@@ -263,8 +317,26 @@ def render(
     checked against `registry` if given, otherwise against the configs found from the
     GraphSpec file's folder (or, for a document, the working folder). A footnote is written
     small at the bottom right, below everything else (a scheduled run's "data as of"
-    stamp)."""
+    stamp). With choice layers, every view is drawn (spec/views.py): the Graph is the first,
+    holding the others for its HTML page."""
     p = prepare(spec, data, registry)
+    if not p.controls:
+        return _draw(p, footnote)
+    graphs: dict[tuple[str, ...], Graph] = {}
+    for names, change in combinations(p.controls):
+        try:
+            graphs[names] = _draw(prepare(spec, data, registry, view=change), footnote)
+        except SpecError as e:
+            label = " / ".join(names)
+            raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+    first = next(iter(graphs.values()))
+    first.controls, first.views = p.controls, graphs
+    first.issues = first._with_views([g.issues for g in first._others()])
+    return first
+
+
+def _draw(p: Prepared, footnote: str | None) -> Graph:
+    """Draw a prepared GraphSpec into a figure of its own."""
     module, style, gt = p.module, p.style, p.values["graph_type"]
     with isolated(style), lint.font_messages() as font_problems:
         fig, ax = new_figure(style)
@@ -294,7 +366,7 @@ def _call(function: Any, *args: Any) -> Any:
     return function(*args)
 
 
-def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | None]]:
+def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | str | None, float | str | None]]:
     """Each axis's set min and max (None where automatic), for lint: as drawn, a date as its
     day number (axes.value_number)."""
     return {a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max"))) for a in "xy"}
@@ -411,3 +483,26 @@ def load(path: str | Path) -> dict[str, Any] | None:
     if record is None:
         return None
     return {k: from_json(v) if k in ("graphspec", "layout") else v for k, v in record.items()}
+
+
+def controls_look(style: Style) -> page.TabBar:
+    """The look of a graph page's controls: the theme's general text, left-aligned."""
+    t = style.theme
+    family, weight = str(t["text.font"]), style.weight("text.weight")
+    return page.TabBar(
+        family,
+        style.pt("text.size"),
+        weight,
+        str(t["text.color"]),
+        style.pt("text.gap"),
+        "left",
+        font_file(family, weight),
+        "none",
+        0.0,
+        "none",
+    )
+
+
+def page_controls(listed: list[Control]) -> tuple[page.Control, ...]:
+    """Choice layers' controls, as a page shows them."""
+    return tuple(page.Control(c.name, c.label, c.kind, c.names) for c in listed)

@@ -71,7 +71,12 @@ HEADER = ("name", "version", "description", "extends", PARAMETERS)
 LAYER_HEADER = ("name", "version", "description", "parameters")
 # Categories keyed by names a file chooses: a GraphSpec's layers and series, a layout's tabs,
 # and a graph type's series, defined by its one entry (series_definitions).
-COLLECTIONS = {"graphspec": ("layers", "series"), "layout": ("tabs",), "graph_type": ("series",)}
+COLLECTIONS = {
+    "graphspec": ("layers", "series"),
+    "layout": ("tabs",),
+    "graph_type": ("series",),
+    "layer": ("views",),  # a choice layer's (spec/views.py)
+}
 NAMES = {"graphspec": ("graph_type", "theme", "format"), "layout": ("format",)}  # specs it names
 NONE = "None"
 STEP = re.compile(r"^\s*(\d+)\s+(sec|min|hour|day|week|month|year)\s*$")  # a date tick step
@@ -771,7 +776,10 @@ def read_file(kind: str, path: Path) -> tuple[dict[str, Parameter], dict[str, Pa
             if k != "parameters"
         }
         found = _parameters(
-            _walk("", data[PARAMETERS], False, path), data[PARAMETERS], path, looks=False
+            _walk("", data[PARAMETERS], False, path, skip=COLLECTIONS[kind]),
+            data[PARAMETERS],
+            path,
+            looks=False,
         )
         return header, {p.path: p for p in found}
     header = {

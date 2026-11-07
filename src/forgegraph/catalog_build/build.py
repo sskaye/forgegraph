@@ -19,6 +19,7 @@ from forgegraph.catalog_build.cards import Drawings, place, show
 from forgegraph.catalog_build.files import Catalog, read
 from forgegraph.catalog_build.page import CSS_DPI, Card, Instance, Kind, Row, open_commented, page
 from forgegraph.packs import Pack
+from forgegraph.spec.layers import CONTROLS
 from forgegraph.spec.parameters import DEFAULT, NONE, Parameter, graph_type_files
 from forgegraph.spec.registry import Registry, builtin
 from forgegraph.spec.resolve import Values, resolve
@@ -88,6 +89,7 @@ TYPES = {
     "float > 0": "float > 0",
     "floats > 0": "[floats > 0]",
     "date": "date",
+    "IQR rule": "IQR rule, e.g. 3IQR",
     "hex color": "hex color code",
     "hex colors": "[hex color codes]",
     "two hex colors": "[two hex color codes]",
@@ -194,7 +196,7 @@ def kinds(pack: Pack | None = None) -> list[Kind]:
         if kind == "graph_type":
             names = list(graph_type_files())
         elif kind == "layer":
-            names = sorted(reg.docs["layer"])
+            names = sorted(n for n in reg.docs["layer"] if n not in CONTROLS)  # no images
         else:
             names = own[kind]
         if not names:

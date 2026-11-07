@@ -730,7 +730,7 @@ def test_the_tab_bar_takes_tab_bar_label_and_line(project):
     css = _page_style(text)
     base = 10  # the auto format's base size
     assert '@font-face { font-family: "Roboto"; font-weight: 700;' in css
-    assert f"font-size: {base:g}pt; font-weight: 700;\n  color: #AA0000;" in css
+    assert f"font-size: {base:g}pt;\n  font-weight: 700; color: #AA0000;" in css
     assert "justify-content: flex-end;" in css
     assert f"border-bottom: {0.1 * base:g}pt dashed #00AA00;" in css
     assert '[data-path="one"] { border-bottom-color: #AA0000; }' in text
@@ -742,7 +742,7 @@ def test_the_tab_bar_takes_the_first_tiles_theme_text_and_line_by_default(projec
         project / "out" / "fig"
     )
     css = _page_style(page.read_text())
-    assert "font-weight: 400;\n  color: #000000;" in css and "justify-content: center;" in css
+    assert "font-weight: 400; color: #000000;" in css and "justify-content: center;" in css
     assert "border-bottom: 0.7pt solid #000000;" in css  # the theme's line, times base size 10
 
 

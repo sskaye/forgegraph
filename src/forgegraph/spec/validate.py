@@ -55,16 +55,18 @@ from forgegraph.spec.resolve import (
 from forgegraph.spec.schedule import Cadence, CadenceError
 from forgegraph.spec.series import resolve_series, series_problems
 from forgegraph.spec.tags import UNSET, status_at
+from forgegraph.spec.views import view_problems
 
 # Graph-type parameters set together or not at all; the catalog's cards keep them so too.
 TIES = (("benchmark.data_column", "benchmark.value"),)
 
 
-def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
+def validate(kind: str, doc: Any, reg: Registry | None = None, views: bool = True) -> list[str]:
     """Every problem with a file of `kind`, as '<location>: <what's wrong>'. Each step runs
     only if the ones before found nothing: the header, each listed parameter, then (with
     extends None) every parameter listed, then the kind's own rules and what the configs
-    allow."""
+    allow, then a GraphSpec's views, each checked as the GraphSpec it makes (views=False
+    skips them: a view being checked)."""
     reg = reg or builtin()
     if not isinstance(doc, dict):
         return ["(document): must be a mapping of fields"]
@@ -102,6 +104,8 @@ def validate(kind: str, doc: Any, reg: Registry | None = None) -> list[str]:
     errors += permission_problems(kind, doc, reg)
     if kind == "format":
         errors += _format_size(doc, reg)
+    if kind == "graphspec" and views and not errors:
+        errors += view_problems(doc, reg)
     return errors
 
 

@@ -130,10 +130,12 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         metric:\
             type: choice          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
             label: Metric          *# \[None, text\]; The text before the control, e.g. Metric. If None, there is none.*\
+            position: right          *# \[top, bottom, right\]; Where the control is on the HTML page: above the figure, below it, or to its right, with the label above it.*\
             views:          *# The views, each under the name the control shows. A GraphSpec lists two or more, and the page opens on the first.*\
                 Voltage: {}          *# \[parameters and their values\]; What the view changes, e.g. a series' column and the y-axis title. {} changes nothing.*\
                 Power: {series.SERIES_1.column: Power Density (mW/cm²), axis.y.title: Power density (mW/cm²)}          *# \[parameters and their values\]; A series' column and the y-axis title.*\
         hide:\
             type: toggle          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
+            label: Show          *# \[None, text\]; The text before the checkboxes, e.g. Show. If None, there is none.*\
+            position: right          *# \[top, bottom, right\]; Where the checkboxes are on the HTML page: above the figure, below it, or to its right, under the label.*\
             items: \[series, target\]          *# \[series, layers, text\]; What can be hidden: series for all series, layers for all layers, or those named.*
-

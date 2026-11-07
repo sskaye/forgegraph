@@ -392,7 +392,15 @@ def _kinds(frame: pd.DataFrame, r: Roles, gt: dict[str, Any], drawn: Drawn) -> d
     return kind
 
 
-NOT_DATES = ("sum", "stddev", "stderr", "ci")  # aggregates that dates can't have
+NOT_DATES = (
+    "sum",
+    "stddev",
+    "stderr",
+    "ci",
+    "geom_mean",
+    "geom_stddev",
+    "geom_ci",
+)  # aggregates that dates can't have
 
 
 def _drawable_rows(

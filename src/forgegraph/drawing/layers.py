@@ -70,6 +70,9 @@ NAMES = {
     "stddev": "Std dev",
     "stderr": "Std error",
     "ci": "95 % CI",
+    "geom_mean": "Geometric mean",
+    "geom_stddev": "Geometric SD",
+    "geom_ci": "Geometric 95 % CI",
 }
 POSITIONS = ["top_left", "top_center", "top_right", "bottom_left", "bottom_center", "bottom_right"]
 LABEL_ORDER = [
@@ -178,6 +181,10 @@ def spread(values: np.ndarray, how: str) -> float:
 
 
 AGGREGATES = {"mean": np.mean, "median": np.median, "sum": np.sum, "min": np.min, "max": np.max}
+# Worked on the values' logs and turned back: the geometric mean, and the geometric SD and the
+# 95 % CI of the geometric mean as factors, exp(s) and exp(t * s / sqrt(n)), which multiply and
+# divide where the others add and subtract: as an offset, or as an error bar's distances.
+FACTORS = ("geom_stddev", "geom_ci")
 
 
 def combine(values: np.ndarray, how: str, percentile: float = 50) -> float:
@@ -185,6 +192,16 @@ def combine(values: np.ndarray, how: str, percentile: float = 50) -> float:
     v = values[np.isfinite(values)]
     if not len(v):
         return float("nan")
+    if how.startswith("geom_"):
+        if bool((v <= 0).any()):
+            raise DrawError(
+                f"{how}: the values must be above 0, as it's worked on their logs; use mean, "
+                "stddev or ci for values that can be 0 or below"
+            )
+        logs = np.log(v)
+        if how == "geom_mean":
+            return float(np.exp(logs.mean()))
+        return float(np.exp(spread(logs, "stddev" if how == "geom_stddev" else "ci")))
     if how in ("stddev", "stderr", "ci"):
         return spread(v, how)
     if how == "percentile":
@@ -273,7 +290,7 @@ def _line_values(
         assert how is not None
         at = multiplier * combine(values, how, percentile)
         if off is not None:
-            at += off_multiplier * combine(values, off, off_percentile)
+            at = _offset(at, combine(values, off, off_percentile), off, off_multiplier)
         return at, None
     keep = np.isfinite(values) & np.isfinite(base)
     base, values = base[keep], values[keep]
@@ -285,13 +302,19 @@ def _line_values(
         line = np.array([multiplier * combine(values[base == p], how, percentile) for p in places])
     if off is not None:
         at_each = np.unique(base) if how is None else places
-        spreads = {
-            marks.key(p): off_multiplier * combine(values[base == p], off, off_percentile)
-            for p in at_each
-        }
+        spreads = {marks.key(p): combine(values[base == p], off, off_percentile) for p in at_each}
         if how is None or layer[f"{which}.scope"] == "each":
-            line = line + np.array([spreads[marks.key(p)] for p in places])
+            each = np.array([spreads[marks.key(p)] for p in places])
+            line = _offset(line, each, off, off_multiplier)
     return float("nan"), (places, line)
+
+
+def _offset(at: Any, spread_: Any, how: str, multiplier: float) -> Any:
+    """A value moved by its offset: plus multiplier times the spread, or for a geometric spread,
+    a factor, times the factor to the power of multiplier."""
+    if how in FACTORS:
+        return at * np.power(spread_, multiplier)
+    return at + multiplier * spread_
 
 
 def reference_lines(
@@ -517,7 +540,10 @@ def _line_label(layer: dict[str, Any], which: str) -> tuple[str, bool]:
         name = _named(how, multiplier, percentile)
         off, off_multiplier, off_percentile = _style_value(layer, which, "offset")
         if off is not None:
-            sign = "−" if off_multiplier < 0 else "+"  # noqa: RUF001
+            if off in FACTORS:
+                sign = "÷" if off_multiplier < 0 else "×"  # noqa: RUF001
+            else:
+                sign = "−" if off_multiplier < 0 else "+"  # noqa: RUF001
             name += f" {sign} {_named(off, abs(off_multiplier), off_percentile).lower()}"
         return (name, False) if text == "aggregation" else (f"{name}: ", True)
     if text == "value":
@@ -855,14 +881,20 @@ def error_bars(
                             "set value.aggregation.function to its spread"
                         )
                     given = Y_VALUE if along_value else s.place_column
+                geometric = not unset(how) and how in FACTORS
                 distances[end] = _distances(
                     given,
-                    (how, multiplier, percentile),
+                    (how, 1.0 if geometric else multiplier, percentile),
                     s,
                     frame,
                     aggregated,
                     f"{where}.value.{end}",
                 )
+            if not unset(how) and how in FACTORS:  # factors: each side its own distance
+                for end, side in (("lower", -1), ("upper", 1)):
+                    if isinstance(layer[f"value.{end}"], str):
+                        moved = centres * np.power(distances[end], side * multiplier)
+                        distances[end] = np.abs(moved - centres)
             low = centres - distances["lower"]
             high = centres + distances["upper"]
             words = None if unset(how) else spread_words(str(how), multiplier, percentile)
@@ -876,7 +908,13 @@ def error_bars(
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
 
 
-_SPREADS = {"ci": "95%CI", "stddev": "SD", "stderr": "SE"}
+_SPREADS = {
+    "ci": "95%CI",
+    "stddev": "SD",
+    "stderr": "SE",
+    "geom_stddev": "geometric SD",
+    "geom_ci": "geometric 95%CI",
+}
 
 
 def spread_words(how: str, multiplier: float, percentile: float) -> str:

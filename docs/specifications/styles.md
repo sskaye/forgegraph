@@ -7,6 +7,6 @@ version: 0          *# \[int ≥ 0\]; The version number of the specif
 description: Styles that graph types and layers share. A category marked with a style has its parameters, with these defaults, and lists only those it changes.          *# \[text\]; The description of the specification.*\
  \
 aggregation_style:          *# How a column's rows are combined into one number. Marked \[aggregation style\].*\
-    function: None          *# \[None, mean, median, sum, min, max, percentile, stddev, stderr, ci\]; The aggregate. ci is half the 95 % confidence interval of the mean. If None, each row's value is used.*\
+    function: None          *# \[None, mean, median, sum, min, max, percentile, stddev, stderr, ci, geom_mean, geom_stddev, geom_ci\]; The aggregate. ci is half the 95 % confidence interval of the mean. geom\_ functions work on the logs of values above 0; geom_stddev and geom_ci are factors, which multiply as an offset or error bar. If None, each row's value is used.*\
     multiplier: 1          *# \[float\]; The number the aggregate is multiplied by, e.g. 2 for twice the standard deviation.*\
     percentile: 50          *# \[0-100\]; The percentile when function is percentile.*

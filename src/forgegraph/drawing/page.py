@@ -39,6 +39,11 @@ general text). The page's style shows the image of the views chosen, so the cont
 where its scripts don't run; a control a tab doesn't use is hidden while it's showing. In a
 browser too old for the style, there are no controls, and each figure shows its first view.
 
+A graph with a toggle layer (spec/toggles.py) is a stack of images (drawing/toggles.py), and
+the page shows a button for each item, with the controls; the style hides an image when one
+of its items' buttons is off, and the readouts of a hidden series' points. A layout's items
+of the same name share one button.
+
 Each figure's data points have readouts (drawing/readout.py): pointing at a point, or tapping
 it, shows its values in a box above it, with a ring around the point. The page carries each
 figure's points beside its image, as JSON, with a script that finds the point under the
@@ -57,6 +62,7 @@ from pathlib import Path
 from typing import Any
 
 from forgegraph.drawing.readout import Look, Mark
+from forgegraph.drawing.toggles import Slice
 
 SCRIPT_ID = "forgegraph"
 STALE_ID = "forgegraph-stale"
@@ -128,6 +134,7 @@ class Shown:
     path: tuple[str, ...] = ()
     marks: tuple[Mark, ...] = ()  # its data points, for their readouts
     views: tuple[Viewed, ...] = ()  # with choice layers, every view's image, the first first
+    slices: tuple[Slice, ...] = ()  # with toggles, its images to stack (drawing/toggles.py)
 
 
 @dataclass(frozen=True)
@@ -138,6 +145,15 @@ class Viewed:
     choices: tuple[tuple[str, str], ...]
     svg: bytes
     marks: tuple[Mark, ...] = ()
+    slices: tuple[Slice, ...] = ()  # with toggles, its images to stack
+
+
+@dataclass(frozen=True)
+class Toggle:
+    """A toggle's button on a page: its item's name, and whether it's hidden at first."""
+
+    name: str
+    hidden: bool = False
 
 
 @dataclass(frozen=True)
@@ -181,12 +197,21 @@ h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
 .control select { font: inherit; color: inherit; }
 .control label { cursor: pointer; }
 .control input { margin: 0 0.3em 0 0; }
+.toggle { position: relative; cursor: pointer; padding: 0.1em 0.6em; border: 1px solid;
+  border-radius: 0.3em; }
+.toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle:has(input:not(:checked)) { opacity: 0.4; }
+.toggle:has(input:focus-visible) { outline: 2px solid; outline-offset: 1px; }
+.stack { position: relative; }
+.slice { position: absolute; top: 0; left: 0; pointer-events: none; }
+.slice[data-hidden] { display: none; }
 .view { display: none; }
 .view[data-first] { display: block; }
 @supports selector(:has(a)) {
   .tabbars { display: block; }
   .controls { display: flex; }
   main .view[data-first] { display: none; }
+  main .slice[data-hidden] { display: block; }
   .tabbars nav:not([data-under=""]) { display: none; }
   .tabs section { display: none; margin-top: 0; }
   .tabs h2 { display: none; }
@@ -289,7 +314,7 @@ function index(marks) {
   });
   return {cells: cells, boxes: boxes, reach: reach};
 }
-function hit(marks, found, x, y, width, height) {
+function hit(marks, found, x, y, width, height, on) {
   var best = -1, nearest = Infinity, reach = found.reach * width + 6;
   var across = Math.ceil(reach / width * 64), down = Math.ceil(reach / height * 64);
   var cx = Math.floor(x * 64), cy = Math.floor(y * 64), i, j, k, cell;
@@ -298,6 +323,7 @@ function hit(marks, found, x, y, width, height) {
       cell = found.cells[i + "," + j] || [];
       for (k = 0; k < cell.length; k++) {
         var m = marks[cell[k]], dx = (m[0] - x) * width, dy = (m[1] - y) * height;
+        if (on && !on(m)) continue;
         var d = Math.sqrt(dx * dx + dy * dy);
         if (d <= (m[2] > 0 ? m[2] * width + 3 : 6) && d < nearest) {
           best = cell[k];
@@ -308,6 +334,7 @@ function hit(marks, found, x, y, width, height) {
   }
   if (best >= 0) return best;
   for (k = 0; k < found.boxes.length; k++) {
+    if (on && !on(marks[found.boxes[k]])) continue;
     var box = marks[found.boxes[k]][3];
     if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) return found.boxes[k];
   }
@@ -328,6 +355,9 @@ _READOUT_SCRIPT = (
     figure.appendChild(ring);
     figure.appendChild(tip);
     function hide() { tip.hidden = ring.hidden = true; }
+    function shown(m) {  // a point of a series switched off has no readout
+      return !(m.length > 7 && m[7] >= 0 && !document.getElementById("toggle" + m[7]).checked);
+    }
     function show(event) {
       if (data === null) {
         data = JSON.parse(source.textContent);
@@ -335,7 +365,7 @@ _READOUT_SCRIPT = (
       }
       var shape = image.getBoundingClientRect(), width = shape.width, height = shape.height;
       var k = hit(data.marks, found, (event.clientX - shape.left) / width,
-        (event.clientY - shape.top) / height, width, height);
+        (event.clientY - shape.top) / height, width, height, shown);
       if (k < 0) { hide(); return; }
       var m = data.marks[k], look = data.looks[m[5]], x = m[0] * width, y = m[1] * height;
       tip.textContent = "";
@@ -467,13 +497,15 @@ def write(
     framed: bool = False,
     freshness: Freshness | None = None,
     controls: tuple[Control, ...] = (),
+    toggles: tuple[Toggle, ...] = (),
 ) -> Path:
     """Write the page. background: behind the figures; bar: the tab bar's look, for several
     tabs or for controls; framed: the figures are cropped to their border, so the tab bar's
     line is its top; freshness: a scheduled run's, for the stale banner; controls: the
-    choice layers' controls, for figures with views."""
+    choice layers' controls, for figures with views; toggles: the toggle layers' buttons,
+    for figures in slices."""
     tabbed = len(shown) > 1
-    if (tabbed or controls) and bar is None:
+    if (tabbed or controls or toggles) and bar is None:
         raise ValueError("a page of several tabs, or with controls, needs its tab bar's look")
     width = max(size(v.svg)[0] for s in shown for v in _figures(s))
     parts = [
@@ -490,7 +522,7 @@ def write(
     look = {"background": background, "width": f"{width:g}pt", "under": "0" if framed else "12px"}
     look.update(_bar_look(bar) if bar is not None else _NO_BAR)
     parts.append(f"<style>{_STYLE % look}</style>")
-    readouts = [[_readouts(v) for v in _figures(s)] for s in shown]
+    readouts = [[_readouts(v, toggles) for v in _figures(s)] for s in shown]
     if any(any(r) for r in readouts):
         faces = {
             (m.look.family, m.look.weight): m.look
@@ -501,11 +533,13 @@ def write(
         if bar is not None:
             faces.pop((bar.family, bar.weight), None)  # the tab bar's face is already there
         parts.append(f"<style>{''.join(_face(k) for k in faces.values())}{_READOUT_STYLE}</style>")
-    choices, rules = _tab_choices(shown, look["color"], controls) if tabbed else ([], "")
+    choices, rules = _tab_choices(shown, look["color"], controls, toggles) if tabbed else ([], "")
     if tabbed:
         parts.append(f"<style>{rules}</style>")
     if controls:
         parts.append(f"<style>{_view_rules(shown, controls)}</style>")
+    if toggles:
+        parts.append(f"<style>{_toggle_rules(toggles)}</style>")
     parts += ["</head>", "<body>", '<main class="tabs">' if tabbed else "<main>", *choices]
     if freshness is not None:
         data = json.dumps(
@@ -519,9 +553,10 @@ def write(
         parts.append(f'<script type="application/json" id="{STALE_ID}-data">{data}</script>')
         parts.append(f'<script id="{STALE_ID}-script">{_STALE % {"id": STALE_ID}}</script>')
     if tabbed:
-        parts += ['<div class="tabbars">', *_tab_bars(shown), *_controls(controls), "</div>"]
+        bars = [*_tab_bars(shown), *_controls(controls, toggles)]
+        parts += ['<div class="tabbars">', *bars, "</div>"]
     else:
-        parts += _controls(controls)
+        parts += _controls(controls, toggles)
     for s, found in zip(shown, readouts, strict=True):
         alt = html.escape(f"{title}: {s.name}" if tabbed else title)
         heading = f"<h2>{html.escape(str(s.name))}</h2>" if tabbed else ""
@@ -535,12 +570,15 @@ def write(
             if s.views:
                 name += html.escape(" (" + ", ".join(n for _, n in s.views[i].choices) + ")")
             figure = f'<img alt="{name}" src="data:image/svg+xml;base64,{image}">'
+            if v.slices:
+                figure = _stack(v.slices, name, toggles)
             if data is not None:
                 figure = (
                     f"{figure}<script "
                     f'type="application/json" class="{READOUTS}">{_json(data)}</script>'
                 )
             classes = ["figure"] if data is not None else []
+            classes += ["stack"] if v.slices else []
             attributes = ""
             if s.views:
                 classes.append("view")
@@ -576,9 +614,10 @@ def _view_key(v: Viewed, controls: tuple[Control, ...]) -> str:
     return " ".join(f"{by_name[c][0]}-{by_name[c][1].views.index(n)}" for c, n in v.choices)
 
 
-def _controls(controls: tuple[Control, ...]) -> list[str]:
-    """The controls: each a dropdown, or radio buttons, after its label."""
-    if not controls:
+def _controls(controls: tuple[Control, ...], toggles: tuple[Toggle, ...] = ()) -> list[str]:
+    """The controls: each a dropdown, or radio buttons, after its label; then the toggles'
+    buttons."""
+    if not controls and not toggles:
         return []
     out = ['<div class="controls">']
     for i, c in enumerate(controls):
@@ -602,6 +641,15 @@ def _controls(controls: tuple[Control, ...]) -> list[str]:
             out.append(f'<select id="{cid}">')
             out += [f'<option value="{j}">{html.escape(v)}</option>' for j, v in enumerate(c.views)]
             out.append("</select>")
+        out.append("</span>")
+    if toggles:
+        out.append('<span class="control toggles" role="group" aria-label="Show">')
+        for i, t in enumerate(toggles):
+            checked = "" if t.hidden else " checked"
+            out.append(
+                f'<label class="toggle" data-toggle="{i}"><input type="checkbox" '
+                f'id="toggle{i}"{checked}>{html.escape(t.name)}</label>'
+            )
         out.append("</span>")
     out.append("</div>")
     return out
@@ -627,7 +675,34 @@ def _view_rules(shown: list[Shown], controls: tuple[Control, ...]) -> str:
     return "\n".join(["@supports selector(:has(a)) {", *rules.values(), "}"])
 
 
-def _readouts(s: Shown | Viewed) -> dict[str, Any] | None:
+def _stack(slices: tuple[Slice, ...], alt: str, toggles: tuple[Toggle, ...]) -> str:
+    """A figure's images, stacked: the first sets its size, and each later one lies over it,
+    marked with its items' numbers, and as hidden if one of them is at first."""
+    number = {t.name: i for i, t in enumerate(toggles)}
+    hidden = {t.name for t in toggles if t.hidden}
+    out = []
+    for i, part in enumerate(slices):
+        image = base64.b64encode(part.svg).decode("ascii")
+        if i == 0:
+            out.append(f'<img alt="{alt}" src="data:image/svg+xml;base64,{image}">')
+            continue
+        items = " ".join(str(number[n]) for n in sorted(part.items, key=number.__getitem__))
+        marks = f' data-items="{items}"' if items else ""
+        marks += " data-hidden" if part.items & hidden else ""
+        out.append(f'<img class="slice" alt=""{marks} src="data:image/svg+xml;base64,{image}">')
+    return "".join(out)
+
+
+def _toggle_rules(toggles: tuple[Toggle, ...]) -> str:
+    """The rules that hide each image whose items include one switched off."""
+    rules = [
+        f'  main:has(#toggle{i}:not(:checked)) .slice[data-items~="{i}"] {{ display: none; }}'
+        for i in range(len(toggles))
+    ]
+    return "\n".join(["@supports selector(:has(a)) {", *rules, "}"])
+
+
+def _readouts(s: Shown | Viewed, toggles: tuple[Toggle, ...] = ()) -> dict[str, Any] | None:
     """A figure's points for the page's script, in fractions of its image as shown (its SVG's
     view box): each [x, y, the marker's radius as a fraction of the width, the bar's box
     (left, top, right, bottom) or null, its ring's color, its look, and its lines, each
@@ -652,7 +727,10 @@ def _readouts(s: Shown | Viewed) -> dict[str, Any] | None:
         lines = [[names.setdefault(n, len(names)) if n else -1, v] for n, v in m.lines]
         ring = rings.setdefault(m.ring, len(rings))
         look = looks.setdefault(m.look, len(looks))
-        marks.append([_f(x), _f(y), _f(m.radius / width), box, ring, look, lines])
+        mark = [_f(x), _f(y), _f(m.radius / width), box, ring, look, lines]
+        if toggles:  # the number of its item's toggle, or -1
+            mark.append(next((i for i, t in enumerate(toggles) if t.name == m.item), -1))
+        marks.append(mark)
     return {
         "looks": [
             {
@@ -719,7 +797,10 @@ def _children(shown: list[Shown]) -> dict[tuple[str, ...], list[tuple[str, ...]]
 
 
 def _tab_choices(
-    shown: list[Shown], color: str, controls: tuple[Control, ...] = ()
+    shown: list[Shown],
+    color: str,
+    controls: tuple[Control, ...] = (),
+    toggles: tuple[Toggle, ...] = (),
 ) -> tuple[list[str], str]:
     """The hidden choices, the first tab's checked, and the rules that show what they pick:
     at each level, the tab of the chosen name, or the group's first when it has none. The
@@ -775,6 +856,16 @@ def _tab_choices(
                 f'  .tabs{picked(s.path)} .control[data-control="{u.removeprefix("view")}"] '
                 "{ display: inline-flex; }"
                 for u in used
+            ]
+    if toggles:
+        number = {t.name: i for i, t in enumerate(toggles)}
+        rules.append("  .controls .toggle { display: none; }")
+        for s in shown:
+            parts = [*s.slices, *(p for v in s.views for p in v.slices)]
+            used = sorted({number[n] for p in parts for n in p.items})
+            rules += [
+                f'  .tabs{picked(s.path)} .toggle[data-toggle="{i}"] {{ display: inline-block; }}'
+                for i in used
             ]
     return inputs, "\n".join(["@supports selector(:has(a)) {", *rules, "}"])
 

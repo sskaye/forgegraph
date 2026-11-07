@@ -27,6 +27,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from forgegraph.drawing import export, lint, page
+from forgegraph.drawing import toggles as toggled
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import GraphFigure, TileAxes, canvas_figure, inches, watermark
 from forgegraph.drawing.layout import (
@@ -39,11 +40,12 @@ from forgegraph.drawing.layout import (
     footnote_room,
     place_footnote,
 )
-from forgegraph.drawing.readout import marks
+from forgegraph.drawing.readout import Mark, marks
 from forgegraph.drawing.style import LineStyle, Style, isolated
+from forgegraph.drawing.toggles import Slice
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import WEIGHTS, font_file, font_weights
-from forgegraph.graph import Graph, Prepared, page_controls, prepare, render
+from forgegraph.graph import Graph, Prepared, owned_items, page_controls, prepare, render
 from forgegraph.layouts.separators import (
     apply_separators,
     backgrounds,
@@ -186,25 +188,46 @@ class TabFigure(Inspected):
             out += [lint.Issue(i.check, f"view '{label}': {i.message}") for i in issues]
         return out
 
-    def viewed(self, svg: bytes, dpi: int, framed: float | None) -> page.Shown:
-        """The tab on a page: its image, and every view's if it has views. framed: the
+    def owned(self) -> dict[Any, dict[str, str]]:
+        """For each tile with a toggle layer, its Axes' toggled owners' items."""
+        out: dict[Any, dict[str, str]] = {}
+        for tile in self.tiles.values():
+            out.update(owned_items(tile.axes, tile.prepared.toggles))
+        return out
+
+    def on_page(
+        self, dpi: int, framed: float | None
+    ) -> tuple[bytes, tuple[Mark, ...], tuple[Slice, ...]]:
+        """The tab as a page shows it: its SVG, its data points and, with toggle layers, its
+        images to stack. framed: the border's width, to crop each image to it."""
+
+        def crop(svg: bytes) -> bytes:
+            return svg if framed is None else _framed(self, svg, framed)
+
+        owned = self.owned()
+        cut = toggled.slices(self.figure, toggled.member_of(owned), dpi) if owned else []
+        return (
+            crop(export.svg(self.figure, dpi)),
+            tuple(marks(self.figure, owned)),
+            tuple(Slice(c.items, crop(c.svg)) for c in cut),
+        )
+
+    def viewed(self, dpi: int, framed: float | None) -> page.Shown:
+        """The tab on a page: its images, and every view's if it has views. framed: the
         border's width, to crop each image to it."""
-
-        def image(t: TabFigure) -> bytes:
-            out = export.svg(t.figure, dpi)
-            return out if framed is None else _framed(t, out, framed)
-
-        shown = page.Shown(self.name, self.link, svg, self.path, tuple(marks(self.figure)))
+        svg, found, cut = self.on_page(dpi, framed)
+        shown = page.Shown(self.name, self.link, svg, self.path, found, slices=cut)
         if not self.views:
             return shown
         viewed = []
         for names, t in self.views.items():
             if t is self:
-                svg_, found = shown.svg, shown.marks
+                svg_, found_, cut_ = svg, found, cut
             else:
                 with t.inspected_once():
-                    svg_, found = image(t), tuple(marks(t.figure))
-            viewed.append(page.Viewed(tuple(zip(self.controls, names, strict=True)), svg_, found))
+                    svg_, found_, cut_ = t.on_page(dpi, framed)
+            choices = tuple(zip(self.controls, names, strict=True))
+            viewed.append(page.Viewed(choices, svg_, found_, cut_))
         return replace(shown, views=tuple(viewed))
 
     def record(self) -> dict[str, Any] | None:
@@ -226,6 +249,7 @@ class Layout(Saved):
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     _own_packs: list[str] = field(default_factory=list)  # the layout's own and its format's
     controls: list[Control] = field(default_factory=list)  # its tiles' choice layers', by name
+    toggles: tuple[page.Toggle, ...] = ()  # its tiles' toggle layers' items, by name
 
     @property
     def issues(self) -> list[lint.Issue]:
@@ -316,10 +340,7 @@ class Layout(Saved):
             with self.tabs[0].saving():
                 shown = []
                 for t in self.tabs:
-                    svg = export.svg(t.figure, dpi)
-                    viewed = t.viewed(
-                        _framed(t, svg, border) if framed else svg, dpi, border if framed else None
-                    )
+                    viewed = t.viewed(dpi, border if framed else None)
                     if one:
                         viewed = replace(viewed, name=None, slug=None, path=())
                     shown.append(viewed)
@@ -331,10 +352,13 @@ class Layout(Saved):
                     shown,
                     self.record(),
                     "transparent" if color == "none" else color,
-                    _tab_bar(self.values, first, base, bar) if not one or self.controls else None,
+                    _tab_bar(self.values, first, base, bar)
+                    if not one or self.controls or self.toggles
+                    else None,
                     framed,
                     self.freshness,
                     page_controls(self.controls),
+                    self.toggles,
                 )
             )
         elif kind == "pdf":  # in its settings: a PDF embeds its fonts as it closes
@@ -560,6 +584,7 @@ def render_layout(
     if problems:
         raise SpecError(problems)
     layout.controls = _shared(listed, prepared)
+    layout.toggles = _shared_toggles(listed, prepared)
     for tab in listed:
         drawing = (files[_key(tab)], data, reg, fmt)
         layout.tabs.append(_draw_views(layout, tab, prepared[_key(tab)], drawing, footnote))
@@ -589,6 +614,32 @@ def _shared(listed: list[Tab], prepared: dict[str, dict[str, Prepared]]) -> list
     if problems:
         raise SpecError(problems)
     return [c for c, _ in found.values()]
+
+
+def _shared_toggles(
+    listed: list[Tab], prepared: dict[str, dict[str, Prepared]]
+) -> tuple[page.Toggle, ...]:
+    """The page's toggles: the tiles' toggle layers' items, one button for each name. Items
+    of the same name must be hidden at first in every tile, or in none."""
+    found: dict[str, tuple[bool, str]] = {}
+    problems = []
+    for tab in listed:
+        for name, p in prepared[_key(tab)].items():
+            t = p.toggles
+            for item in t.names if t is not None else ():
+                hidden = t is not None and item in t.hidden
+                if item not in found:
+                    found[item] = (hidden, _where(tab, name))
+                elif found[item][0] != hidden:
+                    problems.append(
+                        f"{_where(tab, name)}: layers.{cast(Any, t).name}: '{item}' is "
+                        f"{'hidden' if hidden else 'shown'} at first, and not in "
+                        f"{found[item][1]}; items of the same name share one button, so they "
+                        "start hidden in every tile or in none"
+                    )
+    if problems:
+        raise SpecError(problems)
+    return tuple(page.Toggle(item, hidden) for item, (hidden, _) in found.items())
 
 
 def _draw_views(
@@ -684,6 +735,11 @@ def _draw_tab(
         prepared[p.name].finish(drawn[p.name])
         tiles[p.name] = Tile(p.name, str(tab.tiles[p.name]), prepared[p.name], p.ax, drawn[p.name])
     result = TabFigure(layout, tab.name, tab.slug, tab.link, tab.path, fig, tiles, grid)
+    for tile in tiles.values():  # files show the page's opening state
+        t = tile.prepared.toggles
+        if t is not None and t.hidden:
+            owned = owned_items(tile.axes, t)
+            toggled.hide(fig, toggled.member_of(owned), t.hidden)
     used = {p for prep in prepared.values() for p in prep.nonstandard_packs}
     result.seal(fig, font_problems, sorted({*layout._own_packs, *used}))
     return result

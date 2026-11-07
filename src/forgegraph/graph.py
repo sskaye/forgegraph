@@ -13,13 +13,14 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from forgegraph.data import read_data
-from forgegraph.drawing import export, lint, page
+from forgegraph.drawing import export, lint, owners, page
+from forgegraph.drawing import toggles as toggled
 from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.axes import value_number
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
 from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
-from forgegraph.drawing.readout import marks
+from forgegraph.drawing.readout import Mark, marks
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import font_file
@@ -39,6 +40,7 @@ from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
 from forgegraph.spec.series import look_definitions, theme_for
 from forgegraph.spec.tags import from_json, var
+from forgegraph.spec.toggles import Toggles, toggles
 from forgegraph.spec.validate import drawing_problems, named_problems, validate
 from forgegraph.spec.views import Control, applied, combinations, controls
 
@@ -106,6 +108,11 @@ class Graph(Inspected, Saved):
         return [i.message for i in self.issues]
 
     @property
+    def toggles(self) -> Toggles | None:
+        """Its toggle layer's items (spec/toggles.py), or None."""
+        return self._prepared.toggles
+
+    @property
     def data_records(self) -> list[DataRecord]:
         """What was read and drawn (as a layout's are, by tile)."""
         return [self.data]
@@ -146,8 +153,8 @@ class Graph(Inspected, Saved):
             for kind in kinds:
                 path = stem.with_name(f"{stem.name}.{kind}")
                 if kind == "html":
-                    image = export.svg(self.figure, dpi)
-                    shown = page.Shown(None, None, image, marks=tuple(marks(self.figure)))
+                    image, found, cut = self._on_page(dpi)
+                    shown = page.Shown(None, None, image, marks=found, slices=cut)
                     shown = self._with_view_images(shown, dpi)
                     title = str(self.spec.get("name", stem.name))
                     background = self.style.theme["background.color"]
@@ -158,9 +165,10 @@ class Graph(Inspected, Saved):
                             [shown],
                             self.record(),
                             "transparent" if unset(background) else str(background),
-                            bar=controls_look(self.style) if self.controls else None,
+                            bar=controls_look(self.style) if self.controls or cut else None,
                             freshness=self.freshness,
                             controls=page_controls(self.controls),
+                            toggles=page_toggles([self.toggles]),
                         )
                     )
                 else:
@@ -174,13 +182,21 @@ class Graph(Inspected, Saved):
         viewed = []
         for names, g in self.views.items():
             if g is self:
-                svg, found = shown.svg, shown.marks
+                svg, found, cut = shown.svg, shown.marks, shown.slices
             else:
                 with isolated(g.style), g.inspected_once():
-                    svg, found = export.svg(g.figure, dpi), tuple(marks(g.figure))
+                    svg, found, cut = g._on_page(dpi)
             choices = tuple(zip((c.name for c in self.controls), names, strict=True))
-            viewed.append(page.Viewed(choices, svg, found))
+            viewed.append(page.Viewed(choices, svg, found, cut))
         return replace(shown, views=tuple(viewed))
+
+    def _on_page(self, dpi: int) -> tuple[bytes, tuple[Mark, ...], tuple[toggled.Slice, ...]]:
+        """The figure as a page shows it: its SVG, its data points and, with a toggle
+        layer, its images to stack."""
+        owned = owned_items(self.axes, self._prepared.toggles)
+        found = tuple(marks(self.figure, owned))
+        cut = toggled.slices(self.figure, toggled.member_of(owned), dpi) if owned else []
+        return export.svg(self.figure, dpi), found, tuple(cut)
 
     def _name(self) -> str:
         return str(self.spec.get("name", "graph"))
@@ -202,6 +218,7 @@ class Prepared:
     specs: dict[str, Any]  # each spec used, by kind: its name and version
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     controls: list[Control] = field(default_factory=list)  # its choice layers' (spec/views.py)
+    toggles: Toggles | None = None  # its toggle layer's items (spec/toggles.py)
 
     @cached_property
     def values(self) -> dict[str, dict[str, Any]]:
@@ -292,7 +309,9 @@ def prepare(
     use_fonts("graphspec", doc, reg)
     specs = used(values, reg)
     listed = controls(doc, reg)
-    return Prepared(doc, explained, frame, data_record, module, style, specs, nonstandard, listed)
+    p = Prepared(doc, explained, frame, data_record, module, style, specs, nonstandard, listed)
+    p.toggles = toggles(doc, reg)
+    return p
 
 
 def _viewed(loaded: Loaded, change: dict[str, Any]) -> Loaded:
@@ -356,6 +375,9 @@ def _draw(p: Prepared, footnote: str | None) -> Graph:
     )
     graph.style_keys = [k.column for k in drawn.style_keys]
     graph._drawing = list(drawn.warnings)
+    if p.toggles is not None and p.toggles.hidden:  # files show the page's opening state
+        owned = owned_items(ax, p.toggles)
+        toggled.hide(fig, toggled.member_of(owned), p.toggles.hidden)
     graph.seal(fig, font_problems, p.nonstandard_packs)
     return graph
 
@@ -506,3 +528,20 @@ def controls_look(style: Style) -> page.TabBar:
 def page_controls(listed: list[Control]) -> tuple[page.Control, ...]:
     """Choice layers' controls, as a page shows them."""
     return tuple(page.Control(c.name, c.label, c.kind, c.names) for c in listed)
+
+
+def owned_items(ax: Axes, listed: Toggles | None) -> dict[Any, dict[str, str]]:
+    """For an Axes with a toggle layer, each toggled owner's item (drawing/toggles.py)."""
+    if listed is None:
+        return {}
+    return {ax: {owners.name(kind, name): name for name, kind in listed.items}}
+
+
+def page_toggles(listed: list[Toggles | None]) -> tuple[page.Toggle, ...]:
+    """Toggle layers' buttons, as a page shows them: one for each item's name."""
+    out: dict[str, page.Toggle] = {}
+    for t in listed:
+        if t is not None:
+            for name in t.names:
+                out.setdefault(name, page.Toggle(name, name in t.hidden))
+    return tuple(out.values())

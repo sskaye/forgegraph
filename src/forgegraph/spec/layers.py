@@ -36,7 +36,7 @@ from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
 from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
 
-CONTROLS = ("choice",)  # layer types drawn as controls on an HTML page, not in the figure
+CONTROLS = ("choice", "toggle")  # layer types drawn as controls on an HTML page, not in the figure
 VIEW_LIMITS = ("specifications", "data", "output", "provenance")  # categories a view can't set
 
 
@@ -220,7 +220,7 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
         defs, looks = definitions("layer", str(kind)), look_paths(str(kind))
         theme_defs = definitions("theme")
         own = {k: v for k, v in entry.items() if k != "type"}
-        if kind in CONTROLS:
+        if kind == "choice":
             errors += _views_problems(where, own.pop("views", None), doc, reg)
         for path, value in flatten(own).items():
             p = defs.get(path) or (theme_defs[looks[path]] if path in looks else None)
@@ -259,5 +259,5 @@ def _views_problems(where: str, views: Any, doc: dict[str, Any], reg: Registry) 
             if top in VIEW_LIMITS:
                 errors.append(f"{where}.{name}.{path}: a view can't set {top}")
             elif top == "layers" and rest.partition(".")[0] in choices:
-                errors.append(f"{where}.{name}.{path}: a view can't set a choice layer")
+                errors.append(f"{where}.{name}.{path}: a view can't set a choice or toggle layer")
     return errors

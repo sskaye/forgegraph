@@ -1,6 +1,6 @@
 # Layers
 
-Layers are drawn over a graph: reference lines and bands, error bars, and notes. A choice layer adds a control to the graph's HTML page instead. A GraphSpec lists its layers under `layers`, each under a name it chooses, with its `type`. They're drawn in the order they're listed. The [layer specifications](../reference/specifications/layer_reference.md) list every parameter.
+Layers are drawn over a graph: reference lines and bands, error bars, and notes. Choice and toggle layers add controls to the graph's HTML page instead. A GraphSpec lists its layers under `layers`, each under a name it chooses, with its `type`. They're drawn in the order they're listed. The [layer specifications](../reference/specifications/layer_reference.md) list every parameter.
 
 ## Reference lines and bands
 
@@ -68,6 +68,21 @@ A `choice` layer draws nothing on the graph. It lists views, and the graph's HTM
 - A view can't change the data, the specifications, output or provenance. Each view is checked as the GraphSpec it makes, so a view can set a parameter only where the GraphSpec could.
 - Two choice layers, such as one for each axis, draw every combination of their views: four views each make 16 images. The page's size, and the time it takes to draw, grow with the number of images. Two choice layers can't set the same parameter.
 - In a layout, choice layers of the same name in several tiles share one control, which switches every tile that has it. Their views need the same names, in the same order.
+
+## Toggles
+
+A `toggle` layer adds a button to the graph's HTML page for each of its `items`, which shows or hides it: `series` for every series, `layers` for every layer, or series and layers by name. `hidden` lists those hidden when the page opens, and png, pdf and svg files leave them out too.
+
+```yaml
+--8<-- "docs/examples/economy_toggles.yaml"
+```
+
+[Open its HTML page](../pages/economy_toggles.html) to show the mean, or hide a series.
+
+- The graph is drawn once, with everything shown, so the axes don't change when an item is hidden, and the key keeps its entries.
+- A hidden series loses its lines, markers, bars, error bars, value labels, direct label and readouts. A hidden layer loses its lines, fill and label.
+- The page cuts the figure into images laid over each other, in the order the figure draws them, so it grows with the number of items. With choice layers, each view has its own.
+- A GraphSpec has at most one toggle layer. In a layout, the items of the same name in tiles with toggle layers share one button, so they start hidden in every tile or in none.
 
 ## The layers' look
 

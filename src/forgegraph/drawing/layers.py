@@ -926,6 +926,7 @@ def error_bars(
             before = owners.children(ax)
             _draw_bars(ax, places, low, high, axis, s.color, style, shifted, t)
             owners.tag_new(ax, before, owners.name("series", s.listed.name))
+            owners.tag_new(ax, before, owners.name("layer", name), also=True)
 
 
 _SPREADS = {

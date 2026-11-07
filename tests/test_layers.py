@@ -4,6 +4,7 @@ the reference lines, error bars and notes they draw."""
 from __future__ import annotations
 
 import copy
+import math
 import re
 from typing import Any
 
@@ -1152,3 +1153,78 @@ def test_an_auto_label_with_no_room_says_what_is_in_the_way_and_what_to_do():
     )
     assert "trying them one at a time won't find another" in message
     assert message.endswith("or leave the label out with label.text: None")
+
+
+# --- geometric aggregates --------------------------------------------------------------------
+
+RATIOS = pd.DataFrame({"x": [1.0] * 4 + [2.0] * 4, "y": [1.0, 2.0, 4.0, 8.0, 2.0, 4.0, 8.0, 16.0]})
+
+
+def _ratios(layers: dict[str, Any] | None = None, **settings: Any) -> fg.Graph:
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings=with_series(
+            {
+                "axis.x.data.column": "x",
+                "axis.y.data.column": "y",
+                "series.aggregation.function": "geom_mean",
+                "series.line.show": False,
+                **settings,
+            }
+        ),
+    )
+    if layers:
+        d["parameters"]["layers"] = layers
+    return fg.render(d, RATIOS)
+
+
+def test_the_geometric_mean_is_worked_on_the_logs():
+    g = _ratios()
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_marker() not in ("None", "none")]
+    assert list(np.asarray(line.get_ydata(), dtype=float)) == pytest.approx(
+        [math.sqrt(8.0), math.sqrt(32.0)]
+    )
+
+
+def test_a_geometric_error_bar_multiplies_and_divides():
+    g = _ratios(
+        {"spread": {"type": "error_bar", "value": {"aggregation": {"function": "geom_stddev"}}}}
+    )
+    stems = [ln for ln in layer_lines(g, ERROR_BAR) if len(ln.get_ydata()) > 2]
+    low, high = (float(v) for v in np.asarray(stems[0].get_ydata())[:2])
+    factor = math.exp(np.std(np.log([1.0, 2.0, 4.0, 8.0]), ddof=1))
+    assert (low, high) == pytest.approx((math.sqrt(8.0) / factor, math.sqrt(8.0) * factor))
+
+
+def test_a_geometric_offset_moves_a_line_by_a_factor():
+    line = {
+        "value": "y",
+        "aggregation": {"function": "geom_mean"},
+        "offset": {"function": "geom_stddev", "multiplier": -1},
+        "label": {"text": "aggregation"},
+    }
+    g = _ratios({"t": {"type": "reference", "axis": "y", "line_1": line}})
+    [drawn] = layer_lines(g, REFERENCE)
+    logs = np.log(RATIOS["y"].to_numpy())
+    expected = math.exp(logs.mean()) / math.exp(np.std(logs, ddof=1))
+    assert float(np.asarray(drawn.get_ydata())[0]) == pytest.approx(expected)
+    assert layer_texts(g, REFERENCE) == ["Geometric mean ÷ geometric sd"]
+
+
+def test_a_geometric_function_needs_values_above_zero():
+    with pytest.raises(fg.SpecError, match="geom_mean: the values must be above 0"):
+        fg.render(
+            fg.graphspec(
+                "t",
+                "xy",
+                settings=with_series(
+                    {
+                        "axis.x.data.column": "x",
+                        "axis.y.data.column": "y",
+                        "series.aggregation.function": "geom_mean",
+                    }
+                ),
+            ),
+            RATIOS.assign(y=RATIOS["y"] - 1),
+        )

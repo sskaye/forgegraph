@@ -47,7 +47,7 @@ A series' rows can be split into groups by a column. Each of `color`, `line.styl
 
 ## Combining rows
 
-`aggregation` combines the rows at each x into one point: their mean, median, sum, minimum, maximum, a percentile, standard deviation, standard error, or half the 95 % confidence interval of the mean (`ci`). `multiplier` scales the result, and `percentile` sets which percentile.
+`aggregation` combines the rows at each x into one point: their mean, median, sum, minimum, maximum, a percentile, standard deviation, standard error, or half the 95 % confidence interval of the mean (`ci`). `multiplier` scales the result, and `percentile` sets which percentile. For positive values that vary by a factor, such as ratios or concentrations, `geom_mean` is the geometric mean, worked on the values' logs. `geom_stddev` and `geom_ci` are the geometric standard deviation and the 95 % confidence interval of the geometric mean: as a reference line's offset or an error bar, they multiply and divide, so an error bar's two sides differ.
 
 ```yaml
             aggregation:

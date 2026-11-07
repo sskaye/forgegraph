@@ -415,3 +415,25 @@ def test_the_script_finds_points_quickly_among_many():
     pointers = [(m[0], m[1]) for m in marks[:50]]
     found = _hits(marks, pointers)
     assert all(marks[k][:2] == list(p) for k, p in zip(found, pointers, strict=True))
+
+
+def test_points_and_bars_beyond_a_set_limit_have_no_readout(tmp_path):
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [1.0, 5.0, 9.0]})
+    g = graph(df, "x", "y", **{"axis.y.max": 4.0, "series.line.show": False})
+    [data] = readouts(g, tmp_path)
+    assert len(data["marks"]) == 1  # the two points above the limit aren't drawn
+    bars = graph(
+        pd.DataFrame({"c": ["a", "b"], "v": [2.0, 9.0]}),
+        "c",
+        "v",
+        **{
+            "axis.y.max": 4.0,
+            "series.bar.show": True,
+            "series.line.show": False,
+            "series.marker.show": False,
+        },
+    )
+    [data] = readouts(bars, tmp_path)
+    boxes = [m[3] for m in data["marks"]]
+    assert len(boxes) == 2
+    assert all(0 <= b[1] <= 1 for b in boxes)  # the tall bar is cut at the plot's top

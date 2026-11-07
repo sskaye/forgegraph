@@ -1008,7 +1008,7 @@ def _axes(
         ends = ends[~np.isnan(ends)]
         if len(ends) and not limits.outside(ends, floor, max(ends.max(), floor), log)[0].any():
             put(floor, get()[1])
-    layers.include(ax, lines, gt)
+    layers.include(ax, lines, gt, drawn.warnings)
 
 
 def _decorate(

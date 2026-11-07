@@ -161,9 +161,9 @@ def test_skill_examples_render(tmp_path):
         assert result.exit_code == 0, result.output
     copy = tmp_path / "examples"
     shutil.copytree(Path(str(examples)), copy)
-    ran = cli("job", "run", str(copy / "figure.schedule.yaml"))
+    ran = cli("job", "run", str(copy / "cells.schedule.yaml"))
     assert ran["status"]["cadence"] == "Mon\u2013Fri at 06:00"
-    assert (copy / "figure.png").exists()
+    assert list(copy.glob("cells-*.png"))  # a file per tab
 
 
 def test_catalog_lists_one_kind(project):

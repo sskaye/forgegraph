@@ -20,6 +20,8 @@ _spec.loader.exec_module(docs_site)
 def test_every_example_draws_and_every_linked_image_is_built():
     built = set(docs_site.example_images())  # raises on an example that isn't clean
     for spec in docs_site.EXAMPLES.glob("*.yaml"):
+        if spec.name.endswith(".schedule.yaml"):
+            continue  # runs a layout; draws nothing of its own
         name = spec.name.removesuffix(".yaml").removesuffix(".layout")
         assert any(Path(p).stem.startswith(name) for p in built), f"{spec.name} drew nothing"
     for page in SITE.rglob("*.md"):

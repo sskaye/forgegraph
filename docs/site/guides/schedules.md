@@ -4,10 +4,10 @@ A **schedule** re-renders GraphSpecs and layouts on a cadence, so a dashboard ke
 
 ## A schedule file
 
-This one, from the agent skill's examples, renders a layout every weekday at 06:00:
+This one, which the agent skill also uses as its example, renders a layout every weekday at 06:00:
 
 ```yaml
---8<-- "src/forgegraph/skill/forgegraph/examples/figure.schedule.yaml"
+--8<-- "docs/examples/cells.schedule.yaml"
 ```
 
 - **targets.files** are the GraphSpec and layout files rendered on each run, as paths from the schedule's folder. `targets.output_folder` saves their outputs elsewhere; by default, each is saved beside its file.
@@ -20,7 +20,7 @@ A schedule usually extends the built-in pack's `schedule`, or a pack's own, such
 ## Running it
 
 ```bash
-forgegraph job run figure.schedule.yaml
+forgegraph job run cells.schedule.yaml
 ```
 
 `job run` runs the schedule once: it renders every target, writes the status file, and runs on_failure or on_success. A target that fails is recorded, and the others still render; the command exits with 1 if any failed.
@@ -28,7 +28,7 @@ forgegraph job run figure.schedule.yaml
 ForgeGraph doesn't schedule the command itself. Whatever schedules commands where you work runs it at the schedule's times: cron, launchd, systemd, Task Scheduler, a GitHub Actions workflow, or an agent's scheduled task. For the schedule above, a cron line is:
 
 ```text
-0 6 * * 1-5 forgegraph job run /path/to/figure.schedule.yaml
+0 6 * * 1-5 forgegraph job run /path/to/cells.schedule.yaml
 ```
 
 Each run renders the data files as they are; keeping them current is up to you. On macOS, a background job that writes into a cloud-synced folder needs Full Disk Access.

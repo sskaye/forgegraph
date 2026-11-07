@@ -1,0 +1,42 @@
+name: tips_stacked
+version: 0
+description: The total of the bills on each day, stacked by lunch and dinner, with each day's total written above.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Bills by day
+    data:
+        file: tips.parquet
+        preprocessing: examples/sample-data/tips.csv, unchanged
+    axis:
+        x:
+            data:
+                column: day
+                order:
+                    method: value
+                    direction: descending
+            title: None
+        y:
+            title: Total of the bills ($)
+    arrangement:
+        stacking: sum
+        total:
+            show: true
+    legend:
+        key:
+            inside: false
+    series:
+        total_bill:
+            aggregation:
+                function: sum
+            color: time
+            line:
+                show: false
+            marker:
+                show: false
+            bar:
+                show: true

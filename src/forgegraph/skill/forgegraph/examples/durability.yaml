@@ -1,0 +1,26 @@
+name: durability
+version: 0
+description: Each cell's voltage over a 200-hour durability test, as lines without markers.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Durability test
+    data:
+        file: cell_durability.parquet
+        preprocessing: examples/sample-data/cell_durability.csv, unchanged
+    axis:
+        x:
+            data:
+                column: hours
+            title: Time (h)
+        y:
+            title: Voltage (V)
+    series:
+        voltage_v:
+            color: cell
+            marker:
+                show: false

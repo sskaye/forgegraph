@@ -114,7 +114,7 @@ def write() -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Copy the skill's examples from the docs.")
     parser.add_argument("--check", action="store_true", help="exit 1 if the copies differ")
     if parser.parse_args().check:
         if problems := stale():

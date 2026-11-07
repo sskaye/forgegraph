@@ -25,7 +25,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 from matplotlib.transforms import Affine2D, Bbox, ScaledTranslation, Transform
 
-from forgegraph.drawing import text
+from forgegraph.drawing import owners, text
 from forgegraph.drawing.marks import Bars
 from forgegraph.drawing.style import Style
 
@@ -84,6 +84,7 @@ class Key:
         self.outside = False
         self._shift = Affine2D()  # below the plot box: down past the x-axis title (follow)
         self._place: Transform | None = None
+        self._owner = owners.name("key")  # whose artists _add marks (owners)
         self._ax: Axes | None = None
 
     def place(self, ax: Axes, position: str, under: float = 0.0, beside: float = 0.0) -> None:
@@ -133,6 +134,7 @@ class Key:
         outside: bool,
     ) -> None:
         self.remove()
+        self._owner = owners.name("key")
         fig = ax.figure
         to_display = (
             Affine2D().translate(left, top)
@@ -183,6 +185,7 @@ class Key:
         row_gap = self.style.pt("legend.key.gap.row")
         align = self.names.alignment or "left"
         for entry, e in zip(self.entries, self.name_edges, strict=True):
+            self._owner = owners.name("key", entry.name)
             baseline = y - self.row.top
             centre = baseline + self.row.middle
             h = entry.handle
@@ -256,6 +259,7 @@ class Key:
     def _add(self, ax: Axes, artist: Any) -> None:
         artist.set_clip_on(False)
         artist.set_gid(KEY)
+        owners.tag(artist, self._owner)
         ax.add_artist(artist)  # not add_line or add_patch: a key mustn't change the data limits
         self.artists.append(artist)
 

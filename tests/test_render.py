@@ -1085,3 +1085,36 @@ def test_a_title_wraps_onto_up_to_max_wrap_more_lines():
     title = _titled(2).axes.get_title()
     assert title.replace("\n", " ") == LONG_TITLE
     assert 2 <= len(title.split("\n")) <= 3
+
+
+def test_an_svg_names_each_series_and_layer_and_leaves_the_drawings_own_ids_alone():
+    from forgegraph.drawing import export
+
+    df = pd.DataFrame({"x": np.arange(6.0), "0": [1.0, 2, 3, 2, 1, 2], "0.1": [2.0, 3, 4, 3, 2, 3]})
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "x",
+            "axis.y.title": "v",
+            "legend.method": "key",
+            "legend.key.title.text": NONE,
+            "series": {"0": {}, "0.1": {"value_label": {"show": True}}},
+        },
+    )
+    d["parameters"]["layers"] = {
+        "baseline 2": {
+            "type": "reference",
+            "axis": "y",
+            "line_1": {"value": 0.5},
+            "line_2": {"value": 1.0, "label": {"text": "Band"}},
+        },
+        "spread": {"type": "error_bar", "value": {"lower": 0.2, "upper": 0.2}},
+    }
+    g = fg.render(d, df)
+    gids = [a.get_gid() for a in g.figure.findobj()]
+    svg = export.svg(g.figure, 72).decode()
+    owners_ = {re.sub(r"-\d+$", "", i) for i in re.findall(r'id="(fg-[^"]+)"', svg)}
+    assert {"fg-series-0", "fg-series-0.1", "fg-layer-baseline_2", "fg-key-0.1"} <= owners_
+    assert len(re.findall(r'id="fg-series-0\.1-', svg)) >= 3  # line, error bars, value labels
+    assert [a.get_gid() for a in g.figure.findobj()] == gids

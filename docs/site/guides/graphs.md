@@ -29,7 +29,7 @@ Every parameter, with its default, the values it allows and its description, is 
 forgegraph render polarization.yaml
 ```
 
-`render` saves the graph in each file type its format lists, beside the GraphSpec, and reports the lint. `--out` saves it elsewhere, and a suffix there picks one file type: `--out curves.svg`.
+`render` saves the graph in each file type its format lists, beside the GraphSpec, and reports the lint. `--out` saves it elsewhere, and a suffix there picks one file type: `--out curves.svg`. In an SVG, each part of a series or a layer has an id that names it, such as `fg-series-Cell_A-1` for a series' line or `fg-layer-target-1` for a reference line, so a page can style or hide a whole series by the start of its ids.
 
 The format's file types, size and resolution can be set in the GraphSpec too, where the format allows it. The built-in formats allow all of them:
 

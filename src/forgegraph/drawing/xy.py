@@ -1065,7 +1065,7 @@ def label(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> None:
     it again after the layout changed."""
     labelling.unplace(ax)
     layers.unplace_notes(ax)
-    axis_data.check_fit(ax, gt, style)
+    axis_data.check_fit(ax, gt, style, drawn.kinds)
     if not _name_series(ax, drawn, gt, style):
         _label_lines_after_keys(ax, drawn, gt, style)
     layers.notes_inside(ax, drawn.layers, gt, style, drawn.lines)

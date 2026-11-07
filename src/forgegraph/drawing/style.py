@@ -16,13 +16,14 @@ from typing import Any
 import matplotlib
 from matplotlib.colors import Colormap, LinearSegmentedColormap, to_rgb
 from matplotlib.font_manager import FontProperties
+from matplotlib.markers import MarkerStyle
 
 from forgegraph.drawing import text
 from forgegraph.fonts import WEIGHTS, register_fonts
 from forgegraph.spec.parameters import is_none
 
 MM_PER_INCH = 25.4
-MARKERS = {
+MARKERS: dict[str, Any] = {
     "circle": "o",
     "square": "s",
     "triangle_up": "^",
@@ -31,6 +32,19 @@ MARKERS = {
     "cross": "x",
     "plus": "+",
 }
+
+
+def made_of_lines(marker: Any) -> bool:
+    """Whether a marker is drawn as lines, with nothing to fill, such as a cross: it's drawn in
+    its series' color at its line width, as its outline is all there is."""
+    if marker in (None, "none", "None", ""):
+        return False
+    try:
+        return not MarkerStyle(marker).is_filled()
+    except ValueError:  # not one of matplotlib's markers, such as grid_cell
+        return False
+
+
 LINE_STYLES = {"solid": "-", "dashed": "--", "dotted": ":", "dashdot": "-."}
 COLOR_SCALES = {
     "viridis": "viridis",

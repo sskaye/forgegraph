@@ -354,3 +354,19 @@ def test_a_scale_by_a_categorical_base_axis_of_numbers_runs_over_its_values():
     g = by_its_axis(data, color="Group")
     [dots] = [c for c in g.axes.collections if len(np.asarray(c.get_offsets())) == 3]
     assert sorted(np.asarray(dots.get_array())) == [10, 20, 40]
+
+
+@pytest.mark.parametrize("shape", ["cross", "plus"])
+def test_a_marker_made_of_lines_is_drawn_in_its_series_color_at_its_line_width(shape):
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [1.0, 2.0]})
+    g = fg.xy(df, "x", "y", parameters={"series.marker.shape": shape, "series.line.show": False})
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_marker() not in ("None", "none")]
+    assert to_hex(line.get_markeredgecolor()) == to_hex(line.get_color())
+    assert line.get_markeredgewidth() == pytest.approx(g.style.pt("series.line.width"))
+
+
+def test_a_filled_marker_keeps_its_outline():
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [1.0, 2.0]})
+    g = fg.xy(df, "x", "y", parameters={"series.line.show": False})
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_marker() not in ("None", "none")]
+    assert to_hex(line.get_markeredgecolor()) == "#000000"

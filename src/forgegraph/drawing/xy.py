@@ -35,7 +35,7 @@ from forgegraph.drawing.key import Entry
 from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
-from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, unset
+from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, made_of_lines, unset
 from forgegraph.spec.parameters import as_date
 
 SERIES = "__forgegraph_series__"  # the series a long-form row belongs to
@@ -895,6 +895,8 @@ def _draw_marks(
             line_color = cmap(norm(float(np.nanmean(s.values))))
         open_marker = s.fill == "open"
         rim, rim_width = look.edge, look.edge_width
+        if made_of_lines(s.marker):  # its outline is all there is: in its color, as a line
+            open_marker, rim, rim_width = True, "none", look.line_width
         px, py = _as_xy(r, s.x, s.y)
         how = s.listed.values["line.interpolate"] if lines_shown else "linear"
         where = s.listed.path("line.interpolate")
@@ -936,8 +938,10 @@ def _draw_marks(
                 norm=norm,
                 marker=s.marker,
                 s=look.marker_size**2,
-                edgecolors="none" if look.edge == "none" else look.edge,
-                linewidths=look.edge_width,
+                edgecolors="face"
+                if made_of_lines(s.marker)
+                else ("none" if look.edge == "none" else look.edge),
+                linewidths=look.line_width if made_of_lines(s.marker) else look.edge_width,
                 alpha=look.opacity,
                 zorder=2.5,
             )
@@ -1256,6 +1260,9 @@ def _style_keys(
                 markersize=size,
                 markerfacecolor="none" if fill == "open" else ink,
                 markeredgecolor=ink,
+                markeredgewidth=users[0].style.pt("series.line.width")
+                if made_of_lines(mk)
+                else None,
             )
             entries.append(Entry(literal(str(value)), handle))
         name = "series" if column == SERIES else column

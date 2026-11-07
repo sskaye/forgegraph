@@ -412,6 +412,14 @@ def layout(fig: Figure, ax: Axes, style: Style) -> Grid:
     try:
         grid = arrange(fig, [["graph"]], placed, 0.0, width, height, foot=footnote_room(fig))
     except LayoutError:  # a graph alone has no tiles to name
+        room = (fig.get_size_inches()[0] - 2 * MARGIN_IN) * fig.dpi
+        with isolated(style):
+            title = spacing.title_too_wide(ax, style, room)
+        if title:
+            raise LayoutError(
+                f"text.title: too long for the figure: {title}; shorten it, give it line breaks, "
+                "or let it wrap with the theme's title.max_wrap"
+            ) from None
         raise LayoutError(
             "size: too small for the titles, tick labels and keys around the plot box; "
             "make the format larger or its base font smaller"

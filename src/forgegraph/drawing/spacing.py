@@ -143,6 +143,46 @@ def _box_height(box: text.Box) -> float:
     return box.top + box.bottom
 
 
+WHOLE_TITLE = "_forgegraph_whole_title"  # the title as written, before any wrapping
+
+
+def _wrap_title(ax: Axes, style: Style) -> None:
+    """Wrap a title wider than the plot box at its spaces, onto up to title.max_wrap more
+    lines; rewrapped from the title as written on every layout pass, as the box settles."""
+    most = int(style.theme.get("title.max_wrap", 0) or 0)
+    whole = getattr(ax, WHOLE_TITLE, None)
+    if whole is None:
+        whole = ax.get_title()
+        setattr(ax, WHOLE_TITLE, whole)
+    if most <= 0 or not whole.strip() or " " not in whole:
+        return
+    prop, dpi = title_font(style), ax.figure.dpi  # type: ignore[union-attr]
+    room = ax.get_window_extent().width
+
+    def width(words: str) -> float:
+        return text.extent(words, prop, dpi)[0]
+
+    lines: list[str] = []
+    for word in whole.split(" "):
+        if lines and width(f"{lines[-1]} {word}") <= room:
+            lines[-1] = f"{lines[-1]} {word}"
+        else:
+            lines.append(word)
+    ax.set_title("\n".join(lines) if 1 < len(lines) <= most + 1 else whole)
+
+
+def title_too_wide(ax: Axes, style: Style, room: float) -> str:
+    """A description of the title for an error, if it's wider than room (in px)."""
+    whole = getattr(ax, WHOLE_TITLE, None) or ax.get_title()
+    if not whole.strip():
+        return ""
+    dpi = ax.figure.dpi  # type: ignore[union-attr]
+    wide = text.extent(whole.split("\n")[0], title_font(style), dpi)[0]
+    if wide <= room:
+        return ""
+    return f"the title is {wide * 72 / dpi:.0f} pt wide, and the figure {room * 72 / dpi:.0f} pt"
+
+
 def _title_pad(ax: Axes, style: Style) -> None:
     """Pad the title so its baseline sits title.gap above what's under it: descenders hang
     into the gap, so titles beside each other share a baseline whatever their letters.
@@ -203,6 +243,7 @@ def apply(ax: Axes, style: Style) -> None:
             _tick_pad(axis, style, path)
             _axis_title_pad(axis, style, gap, path)
         _centre_y_labels(each.yaxis, style, "axis.y.tick.label" if each is ax else TICK_LABEL)
+    _wrap_title(ax, style)
     _title_pad(ax, style)
     for k in keys(ax):  # a key below the plot box follows the x-axis title
         k.follow(ax)

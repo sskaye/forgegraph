@@ -13,6 +13,7 @@ from matplotlib.colors import to_hex
 from matplotlib.lines import Line2D
 from pack_helpers import BUILT_IN
 from pack_helpers import doc as pack_doc
+from render_helpers import render
 
 import forgegraph as fg
 from forgegraph.drawing.key import KEY, keys
@@ -370,3 +371,31 @@ def test_a_filled_marker_keeps_its_outline():
     g = fg.xy(df, "x", "y", parameters={"series.line.show": False})
     [line] = [ln for ln in g.axes.get_lines() if ln.get_marker() not in ("None", "none")]
     assert to_hex(line.get_markeredgecolor()) == "#000000"
+
+
+@pytest.mark.parametrize(("shape", "filled"), [("star", True), ("asterisk", False)])
+def test_star_and_asterisk_shapes(shape, filled):
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [1.0, 2.0]})
+    g = fg.xy(df, "x", "y", parameters={"series.marker.shape": shape, "series.line.show": False})
+    [line] = [ln for ln in g.axes.get_lines() if ln.get_marker() not in ("None", "none")]
+    assert (to_hex(line.get_markeredgecolor()) == "#000000") is filled
+
+
+def test_a_theme_can_give_its_groups_stars_and_asterisks():
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [1.0, 2.0], "g": ["a", "b"]})
+    theme = {"series.marker.shapes": ["star", "asterisk"]}
+    g = render(
+        {
+            "axis.x.data.column": "x",
+            "benchmark.data_column": "None",
+            "benchmark.value": "None",
+            "series": {"y": {"marker": {"shape": "g"}, "line": {"show": False}}},
+        },
+        theme=theme,
+        data=df,
+    )
+    drawn = {str(ln.get_marker()) for ln in g.axes.get_lines()} - {"None", "none"}
+    assert drawn == {
+        "*",
+        "(6, 2, 0)",
+    }

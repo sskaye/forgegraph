@@ -62,7 +62,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         line:          *# \[line style\]; The series lines.*\
             styles: \[solid, dashed, dotted, dashdot\]          *# \[solid, dashed, dotted, dashdot\]; The line styles given to the series, or to the values of a series' line.style column.*\
         marker:\
-            shapes: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
+            shapes: \[circle, square, triangle_up, diamond, triangle_down, cross\]          *# \[circle, square, triangle_up, triangle_down, diamond, cross, plus, star, asterisk\]; The marker shapes given to the series, or to the values of a series' marker.shape column.*\
             fills: \[filled, open\]          *# \[filled, open\]; The marker fills given to the series, or to the values of a series' marker.fill column. open draws only the outline.*\
             size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
             edge:          *# \[line style\]; The outline of filled markers. Open markers are outlined at its width, in their series' color.*\

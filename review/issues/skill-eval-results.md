@@ -4,7 +4,7 @@ The 70 cases: the 61 earlier ones and the nine in [skill-evals.md](skill-evals.m
 
 | Cases | Opus | Sonnet | Haiku |
 | --- | --- | --- | --- |
-| 1–62, earlier <!-- fmc:1 -->(61 cases)<!-- /fmc:1 --> | 60 of 61 | 52 of 61 | 54 of 61 |
+| 1–62, earlier (61 cases) | 60 of 61 | 52 of 61 | 54 of 61 |
 | 63–71, new (9 cases) | 9 of 9 | 8 of 9 | 7 of 9 |
 | All | 69 of 70 | 60 of 70 | 61 of 70 |
 | Phase 9, round 2 (62 cases) | 61 of 62 | 56 of 62 | 50 of 62 |
@@ -75,22 +75,3 @@ Nothing failed because of the new examples: the agents read them (`cat .claude/s
    Recommendation: 1. Opus and Sonnet found it unaided, and the skill stays short.
 3. **The skill change.** With these results, the examples taken from the documentation and the Layers line can merge as they are.
 
-<!-- forgemark-comments
-- id: 1
-  anchor_text: "(61 cases)"
-  context_before: "Cases Opus Sonnet Haiku 1–62, earlier"
-  context_after: "60 of 61 52 of 61 54 of 61 63–71, new (9 cases) 9 of 9 8 of 9 7 of 9 All 69 of"
-  author: Steven
-  timestamp: "2026-11-07T23:09:10.204Z"
-  resolved: false
-  body: |-
-    Why is 1-62 = 61 cases? Also why is there 1 less case than round 9?
-    
-    Please add a second table with the same rows/columns, but where not looking after the last render is a pass. I want to see failures other than that.
-  replies:
-    - author: Claude
-      timestamp: 2026-11-07T23:10:02Z
-      body: |
-        1. The numbers run to 62, but there's no case 61. It was "a theme from the forgegraph_base_2 pack", and it went in 0.4.0 (#61) with that pack, when the built-in packs became forgegraph_default alone. That's also the one case fewer than phase 9. I've added a sentence under the table saying so.
-        2. Added the second table: a run whose only failure is not looking after its last render counts as a pass. Opus 70 of 70, Sonnet 69 of 70, Haiku 65 of 70; phase 9 round 2 on the same basis was 62, 60 and 55 of 62. What's left is Sonnet's weeks as text (51), and Haiku's swapped axes (3), unasked theme (17) and its own HTML pages (49, 65, 68).
--->

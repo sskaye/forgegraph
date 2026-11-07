@@ -9,9 +9,11 @@
   drawn in (color, line style, marker shape and fill), from the rows drawn in it, so split's
   lines share one, in its color; series colored on a scale have no color each, so that's an
   error. A date column's aggregate is a date, on a date axis
-  only. A line outside the data widens an automatic axis; outside a set limit, it's an
-  error. Its label, placed after layout, sits at one end or the middle, beside the line:
-  auto takes the first position (LABEL_ORDER) inside the plot and clear of the data, other
+  only. A line outside the data widens an automatic axis. A line beyond a set limit isn't
+  drawn, nor its label, and the part of a band or of a line that follows the data beyond one
+  is cut off at it; lint says so (outside-limits). Its label, placed after layout, sits at
+  one end or the middle, beside the line: auto takes the first position (LABEL_ORDER)
+  inside the plot and clear of the data, other
   text and the keys, which go first, since they need a corner and a label has six places. A
   chosen position that covers something is an error; one past the plot's edge widens an
   automatic axis. It's placed before the keys, which keep clear of it. With label.inside
@@ -41,6 +43,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox
 
@@ -104,6 +107,8 @@ class RefLine:
     placed_outside: bool = False  # its label is beyond the plot area, laid out already
     function: equation.Function | None = None  # of a line from an equation, drawn as artist
     artist: equation.EquationLine | None = None
+    drawn: Line2D | None = None  # the line drawn at a value or through points
+    hidden: bool = False  # beyond a set limit, so not drawn, and without its label
 
     @property
     def path(self) -> str:
@@ -346,7 +351,7 @@ def reference_lines(
                 own = look(style, layer, w)
                 line = own.line("layer.reference.line")
                 line_color = color or line.color
-                function, artist = functions[w], None
+                function, artist, drawn_line = functions[w], None, None
                 if function is not None:
                     artist = equation.EquationLine(
                         ax,
@@ -361,12 +366,25 @@ def reference_lines(
                     ax.add_line(artist)
                 elif points is None:
                     draw_line = ax.axhline if axis == "y" else ax.axvline
-                    draw_line(at, color=line_color, linewidth=line.width, linestyle=line.style,
-                              zorder=1.5, gid=REFERENCE)  # fmt: skip
+                    drawn_line = draw_line(
+                        at,
+                        color=line_color,
+                        linewidth=line.width,
+                        linestyle=line.style,
+                        zorder=1.5,
+                        gid=REFERENCE,
+                    )
                 else:
                     xs, ys = points if roles.base == "x" else points[::-1]
-                    ax.plot(xs, ys, color=line_color, linewidth=line.width, linestyle=line.style,
-                            zorder=1.5, gid=REFERENCE)  # fmt: skip
+                    (drawn_line,) = ax.plot(
+                        xs,
+                        ys,
+                        color=line_color,
+                        linewidth=line.width,
+                        linestyle=line.style,
+                        zorder=1.5,
+                        gid=REFERENCE,
+                    )
                 label, with_value = _line_label(layer, w)
                 drawn.append(
                     RefLine(
@@ -385,6 +403,7 @@ def reference_lines(
                         points,
                         function=function,
                         artist=artist,
+                        drawn=drawn_line,
                     )
                 )
     return drawn
@@ -641,7 +660,7 @@ def label_lines(
     widened = False
     most = float(style.theme["axis.max_extension"])
     for line in lines:
-        if not (line.label or line.with_value):
+        if line.hidden or not (line.label or line.with_value):
             continue
         gap = (line.look.text("layer.reference.label").gap or 0.0) * ax.figure.dpi / 72  # type: ignore[union-attr]
         auto = line.position == "auto"
@@ -748,8 +767,12 @@ def label_lines(
     return widened
 
 
-def include(ax: Axes, lines: list[RefLine], gt: dict[str, Any]) -> None:
-    """Widen automatic limits to every reference line; outside a set limit, an error."""
+def include(ax: Axes, lines: list[RefLine], gt: dict[str, Any], found: list[Any]) -> None:
+    """Widen automatic limits to every reference line. Beyond a set limit, a line isn't drawn,
+    nor its label, and a line that follows the data is cut off at it; each is a lint issue
+    in found."""
+    from forgegraph.drawing.lint import Issue  # lint reads this module's ids
+
     for line in lines:
         axis = line.axis
         values = line.values()
@@ -759,19 +782,30 @@ def include(ax: Axes, lines: list[RefLine], gt: dict[str, Any]) -> None:
         get = ax.get_ylim if axis == "y" else ax.get_xlim
         put = ax.set_ylim if axis == "y" else ax.set_xlim
         lo, hi = get()
-        low, high = float(values.min()), float(values.max())
         log = (ax.get_yscale() if axis == "y" else ax.get_xscale()) == "log"
-        below = limits.outside(low, lo, hi, log)[0]
-        above = limits.outside(high, lo, hi, log)[1]
-        if not (below or above):
-            continue
-        end = "min" if below else "max"
-        if not unset(gt[f"axis.{axis}.{end}"]):
-            at = low if below else high
-            raise DrawError(
-                f"{line.path}: the line at {at:g} is outside axis.{axis}.{end}; move the line "
-                "or the limit"
+        below, above = limits.outside(values, lo, hi, log)
+        fixed = {e: not unset(gt[f"axis.{axis}.{e}"]) for e in ("min", "max")}
+        beyond = (below & fixed["min"]) | (above & fixed["max"])
+        if beyond.any():
+            side = " and ".join(
+                f"{'below' if e == 'min' else 'above'} axis.{axis}.{e}"
+                for e, out in (("min", below), ("max", above))
+                if fixed[e] and out.any()
             )
+            if beyond.all():
+                line.hidden = True
+                if line.drawn is not None:
+                    line.drawn.set_visible(False)
+                what = f"{line.path} at {values[0]:g}" if len(values) == 1 else line.path
+                found.append(Issue("outside-limits", f"{what} is {side}, so it isn't drawn"))
+            else:
+                found.append(
+                    Issue("outside-limits", f"part of {line.path} is {side}, so it isn't drawn")
+                )
+        inside = values[~beyond]
+        if not len(inside) or not (below | above)[~beyond].any():
+            continue
+        low, high = float(inside.min()), float(inside.max())
         margin = (hi - lo) * 0.05 if hi > lo else abs(low) * 0.05 or 1.0
         put(min(lo, low - margin), max(hi, high + margin))
 

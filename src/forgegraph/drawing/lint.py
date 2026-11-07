@@ -10,7 +10,8 @@ drawing. Each issue names its check:
   they repeat;
 - log-axis-values: values of 0 or below on a log axis, which can't be drawn;
 - outside-limits: points outside an axis's fixed minimum or maximum, so not drawn (past it
-  by more than float noise: drawing.limits);
+  by more than float noise: drawing.limits), and reference lines or parts of bands beyond
+  one, found as they're drawn (drawing.layers.include);
 - small-text: text smaller than MIN_TEXT_PT, too small to read at the figure's size;
 - font-fallback: a font or a letter the theme's font doesn't have, drawn with another or not
   at all;

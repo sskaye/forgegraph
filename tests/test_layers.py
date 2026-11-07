@@ -142,13 +142,25 @@ def test_a_reference_line_at_a_value_with_its_label():
     assert layer_texts(g, REFERENCE) == ["Aim"]
 
 
-def test_a_line_outside_the_data_widens_the_axis_or_is_an_error():
+def test_a_line_outside_the_data_widens_the_axis_or_beyond_a_set_limit_isnt_drawn():
     g = graph({"t": {"type": "reference", "axis": "y", "line_1": {"value": 50}}})
     assert g.axes.get_ylim()[1] > 50
-    with pytest.raises(fg.SpecError, match=re.escape("the line at 50 is outside axis.y.max")):
-        graph(
-            {"t": {"type": "reference", "axis": "y", "line_1": {"value": 50}}}, **{"axis.y.max": 40}
-        )
+    line = {"value": 50, "label": {"text": "Aim"}}
+    g = graph({"t": {"type": "reference", "axis": "y", "line_1": line}}, **{"axis.y.max": 40})
+    assert g.axes.get_ylim()[1] == 40
+    assert not [ln for ln in layer_lines(g, REFERENCE) if ln.get_visible()]
+    assert layer_texts(g, REFERENCE) == []
+    assert [i.message for i in g.issues if i.check == "outside-limits"] == [
+        "layers.t.line_1 at 50 is above axis.y.max, so it isn't drawn"
+    ]
+
+
+def test_a_band_reaching_past_a_set_limit_is_cut_off_at_it():
+    band = {"type": "reference", "axis": "y", "line_1": {"value": 10}, "line_2": {"value": 50}}
+    g = graph({"b": band}, **{"axis.y.max": 40})
+    assert g.axes.get_ylim()[1] == 40
+    assert len([ln for ln in layer_lines(g, REFERENCE) if ln.get_visible()]) == 1
+    assert any(i.check == "outside-limits" for i in g.issues)
 
 
 def test_a_line_at_a_limit_but_for_float_noise_is_at_it():
@@ -157,8 +169,8 @@ def test_a_line_at_a_limit_but_for_float_noise_is_at_it():
     tall = RATES.assign(rate=RATES["rate"] * 100 / 30)  # max 100; 1.1 * 100 is 110.00000000000001
     g = graph({"t": at_most}, tall, **{"axis.y.max": 110})
     assert g.axes.get_ylim()[1] == 110
-    with pytest.raises(fg.SpecError, match=re.escape("is outside axis.y.max")):
-        graph({"t": at_most}, tall, **{"axis.y.max": 109.99})
+    g = graph({"t": at_most}, tall, **{"axis.y.max": 109.99})
+    assert not [ln for ln in layer_lines(g, REFERENCE) if ln.get_visible()]
 
 
 def test_a_line_at_an_aggregate():

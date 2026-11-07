@@ -38,7 +38,7 @@ Use a linear scale, or leave those values out.
 
 ### outside-limits
 
-Points lie beyond an axis's fixed `min` or `max`, so they aren't drawn.
+Points, or a reference line or part of a band, lie beyond an axis's fixed `min` or `max`, so they aren't drawn.
 
 Widen the limits, or set them to None so the axis fits the data.
 

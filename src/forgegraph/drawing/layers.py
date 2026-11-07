@@ -689,6 +689,23 @@ def label_lines(
                 a.remove()
             return found
 
+        def in_the_way(position: str, line: RefLine = line) -> str:
+            """What stops the label at a position, for an error."""
+            a = _label_line(ax, line, words(position), position)
+            measure(ax.figure)
+            box, plot = a.get_window_extent(), ax.get_window_extent()
+            pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
+            hits = labels.Obstacles.of(ax, lines=with_lines, keys=keys, ignore=line.artist).hits(
+                box, pad
+            )
+            a.remove()
+            if not (box.x0 >= plot.x0 - 0.5 and box.x1 <= plot.x1 + 0.5):
+                return f"{position} runs past the plot's edge"
+            if not (box.y0 >= plot.y0 - 0.5 and box.y1 <= plot.y1 + 0.5):
+                return f"{position} runs past the plot's edge"
+            names = [h if h.startswith("the ") else f"the label {h}" for h in hits]
+            return f"{position} covers {' and '.join(names) or 'what is drawn'}"
+
         def room(position: str, line: RefLine = line) -> bool:
             """Grow the axis along the line at its start or end until the label is clear."""
             along = position.split("_")[0]
@@ -713,11 +730,14 @@ def label_lines(
         if found == "covers" and any(room(p) and attempt(p, keep=True) == "clear" for p in tries):
             continue
         if found == "covers" and auto:
+            blocked = "; ".join(in_the_way(p) for p in LABEL_ORDER)
+            along = " or along the line" if line.artist else ""
             raise DrawError(
-                f"{line.path}.label.position: auto, but no position beside the line is clear "
-                "of what's drawn; choose one and widen the axis, shorten the label, or widen "
-                "the format"
-                + (", or put it beyond the plot (label.inside: false)" if line.artist else "")
+                f"{line.path}.label.position: auto, but none of the six positions beside the "
+                f"line{along} is clear ({blocked}); trying them one at a time won't find another. "
+                "Make room (widen the axis or the format, or shorten the label), "
+                + ("put it beyond the plot (label.inside: false), " if line.artist else "")
+                + "or leave the label out with label.text: None"
             )
         if found == "covers":
             others = ", ".join(p for p in LABEL_ORDER if p != line.position)

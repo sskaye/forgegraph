@@ -3,8 +3,9 @@ returns."""
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,13 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from forgegraph.data import read_data
-from forgegraph.drawing import export, lint, owners, page
+from forgegraph.drawing import export, key, lint, owners, page
 from forgegraph.drawing import toggles as toggled
 from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.axes import value_number
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
+from forgegraph.drawing.key import keys
 from forgegraph.drawing.layout import Plot, Room, add_footnote, finish, layout, rooms_of, widest
 from forgegraph.drawing.readout import Mark, marks
 from forgegraph.drawing.style import Style, isolated, unset
@@ -26,6 +28,7 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import font_file
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
+from forgegraph.spec.layers import look_paths
 from forgegraph.spec.loaded import Loaded, load_document
 from forgegraph.spec.parameters import (
     NONE,
@@ -74,6 +77,8 @@ class Graph(Inspected, Saved):
     # this graph is the first; the others are drawn for its HTML page (spec/views.py).
     controls: list[Control] = field(default_factory=list)
     views: dict[tuple[str, ...], Graph] = field(default_factory=dict, repr=False)
+    _footnote: str | None = None  # as drawn, to draw it again for its page (_on_page)
+    _floor: Room | None = None
 
     def mark(self) -> None:
         """Draw the watermark over the plot box, once: the figure has been found changed."""
@@ -153,8 +158,8 @@ class Graph(Inspected, Saved):
             for kind in kinds:
                 path = stem.with_name(f"{stem.name}.{kind}")
                 if kind == "html":
-                    image, found, cut = self._on_page(dpi)
-                    shown = page.Shown(None, None, image, marks=found, slices=cut)
+                    image, found, cut, boxes = self._on_page(dpi)
+                    shown = page.Shown(None, None, image, marks=found, slices=cut, boxes=boxes)
                     shown = self._with_view_images(shown, dpi)
                     title = str(self.spec.get("name", stem.name))
                     background = self.style.theme["background.color"]
@@ -165,10 +170,9 @@ class Graph(Inspected, Saved):
                             [shown],
                             self.record(),
                             "transparent" if unset(background) else str(background),
-                            bar=controls_look(self.style) if self.controls or cut else None,
                             freshness=self.freshness,
-                            controls=page_controls(self.controls),
-                            toggles=page_toggles([self.toggles]),
+                            controls=page_controls(self.controls, self.style),
+                            toggles=page_toggles([(self.toggles, self.style)], [shown]),
                         )
                     )
                 else:
@@ -182,21 +186,30 @@ class Graph(Inspected, Saved):
         viewed = []
         for names, g in self.views.items():
             if g is self:
-                svg, found, cut = shown.svg, shown.marks, shown.slices
+                svg, found, cut, boxes = shown.svg, shown.marks, shown.slices, shown.boxes
             else:
                 with isolated(g.style), g.inspected_once():
-                    svg, found, cut = g._on_page(dpi)
+                    svg, found, cut, boxes = g._on_page(dpi)
             choices = tuple(zip((c.name for c in self.controls), names, strict=True))
-            viewed.append(page.Viewed(choices, svg, found, cut))
+            viewed.append(page.Viewed(choices, svg, found, cut, boxes))
         return replace(shown, views=tuple(viewed))
 
-    def _on_page(self, dpi: int) -> tuple[bytes, tuple[Mark, ...], tuple[toggled.Slice, ...]]:
+    def _on_page(self, dpi: int) -> OnPage:
         """The figure as a page shows it: its SVG, its data points and, with a toggle
-        layer, its images to stack."""
-        owned = owned_items(self.axes, self._prepared.toggles)
-        found = tuple(marks(self.figure, owned))
-        cut = toggled.slices(self.figure, toggled.member_of(owned), dpi) if owned else []
-        return export.svg(self.figure, dpi), found, tuple(cut)
+        layer, its images to stack and the checkboxes in its key. A key naming toggled
+        series needs room for their checkboxes, so the page's figure is then drawn again,
+        with that room (drawing/key.py boxed)."""
+        shown = self
+        boxed = keyed_owners(self.axes, self.toggles)
+        if boxed:
+            with lint.font_messages():
+                shown = _draw(self._prepared, self._footnote, self._floor, boxed)
+        owned = owned_items(shown.axes, self.toggles)
+        found = tuple(marks(shown.figure, owned))
+        with shown.inspected_once() if shown is not self else nullcontext():  # self's is held
+            cut = toggled.slices(shown.figure, toggled.member_of(owned), dpi) if owned else []
+            svg = export.svg(shown.figure, dpi)
+        return svg, found, tuple(cut), key_boxes(shown.figure, owned)
 
     def _name(self) -> str:
         return str(self.spec.get("name", "graph"))
@@ -373,9 +386,15 @@ def _draw_views(
     return out
 
 
-def _draw(p: Prepared, footnote: str | None, floor: Room | None = None) -> Graph:
+def _draw(
+    p: Prepared,
+    footnote: str | None,
+    floor: Room | None = None,
+    boxed: frozenset[str] = frozenset(),
+) -> Graph:
     """Draw a prepared GraphSpec into a figure of its own; floor: the least room around its
-    plot box (drawing/layout.arrange)."""
+    plot box (drawing/layout.arrange); boxed: the owners whose key entries get room for a
+    checkbox (drawing/key.py)."""
     module, style, gt = p.module, p.style, p.values["graph_type"]
     with isolated(style), lint.font_messages() as font_problems:
         fig, ax = new_figure(style)
@@ -383,7 +402,7 @@ def _draw(p: Prepared, footnote: str | None, floor: Room | None = None) -> Graph
         if footnote:
             add_footnote(fig, footnote, style)
         try:
-            plot = Plot(ax, module, drawn, gt, style, _call)
+            plot = Plot(ax, module, drawn, gt, style, partial(_call, boxed))
             finish([plot], lambda: layout(fig, ax, style, floor))
         except LayoutError as e:
             raise SpecError([str(e)]) from None
@@ -395,6 +414,7 @@ def _draw(p: Prepared, footnote: str | None, floor: Room | None = None) -> Graph
     )
     graph.style_keys = [k.column for k in drawn.style_keys]
     graph._drawing = list(drawn.warnings)
+    graph._footnote, graph._floor = footnote, floor
     if p.toggles is not None and p.toggles.hidden:  # files show the page's opening state
         owned = owned_items(ax, p.toggles)
         toggled.hide(fig, toggled.member_of(owned), p.toggles.hidden)
@@ -402,10 +422,11 @@ def _draw(p: Prepared, footnote: str | None, floor: Room | None = None) -> Graph
     return graph
 
 
-def _call(function: Any, *args: Any) -> Any:
+def _call(boxed: frozenset[str], function: Any, *args: Any) -> Any:
     """Call a graph type's function on a graph alone: render's settings and its handling of
-    errors already apply."""
-    return function(*args)
+    errors already apply; keys leave room for checkboxes for boxed (drawing/key.py)."""
+    with key.boxed(boxed):
+        return function(*args)
 
 
 def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | str | None, float | str | None]]:
@@ -527,27 +548,63 @@ def load(path: str | Path) -> dict[str, Any] | None:
     return {k: from_json(v) if k in ("graphspec", "layout") else v for k, v in record.items()}
 
 
-def controls_look(style: Style) -> page.TabBar:
-    """The look of a graph page's controls: the theme's general text, left-aligned."""
-    t = style.theme
-    family, weight = str(t["text.font"]), style.weight("text.weight")
-    return page.TabBar(
+OnPage = tuple[bytes, tuple[Mark, ...], tuple[toggled.Slice, ...], tuple[page.KeyBox, ...]]
+
+
+def control_text(style: Style, kind: str, look: tuple[tuple[str, Any], ...]) -> page.Text:
+    """A choice or toggle layer's text on a page: the theme's layer.<kind>, with what the
+    layer sets for itself."""
+    paths = look_paths(kind)
+    s = Style({**style.theme, **{paths[p]: v for p, v in look}}, style.format, style.fixed)
+    at = f"layer.{kind}"
+    family, weight = str(s.theme[f"{at}.font"]), s.weight(f"{at}.weight")
+    return page.Text(
         family,
-        style.pt("text.size"),
+        s.pt(f"{at}.size"),
         weight,
-        str(t["text.color"]),
-        style.pt("text.gap"),
-        "left",
+        str(s.theme[f"{at}.color"]),
+        s.pt(f"{at}.gap"),
+        str(s.theme[f"{at}.alignment"]),
         font_file(family, weight),
-        "none",
-        0.0,
-        "none",
     )
 
 
-def page_controls(listed: list[Control]) -> tuple[page.Control, ...]:
-    """Choice layers' controls, as a page shows them."""
-    return tuple(page.Control(c.name, c.label, c.kind, c.names) for c in listed)
+def page_controls(listed: list[Control], style: Style) -> tuple[page.Control, ...]:
+    """Choice layers' controls, as a page shows them, in their text from style's theme."""
+    return tuple(
+        page.Control(
+            c.name, c.label, c.kind, c.names, c.position, control_text(style, "choice", c.look)
+        )
+        for c in listed
+    )
+
+
+def keyed_owners(ax: Axes, listed: Toggles | None) -> frozenset[str]:
+    """The toggled series' owners that a key in ax names, each in one entry of its own."""
+    if listed is None:
+        return frozenset()
+    toggled_series = {owners.name("series", n) for n, kind in listed.items if kind == "series"}
+    out = set()
+    for k in keys(ax):
+        found = [owners.of(e.handle)[:1] for e in k.entries]
+        out |= {o[0] for o in found if o and o[0] in toggled_series and found.count(o) == 1}
+    return frozenset(out)
+
+
+def key_boxes(fig: Figure, owned: dict[Any, dict[str, str]]) -> tuple[page.KeyBox, ...]:
+    """The checkboxes the figure's keys left room for, each its item's, in points from the
+    figure's top left."""
+    to_pt = 72 / fig.dpi
+    height = fig.get_size_inches()[1] * 72
+    out = []
+    for ax, table in owned.items():
+        for k in keys(ax):
+            for owner, x, y, side in k.boxes():
+                if owner in table:
+                    out.append(
+                        page.KeyBox(table[owner], x * to_pt, height - y * to_pt, side * to_pt)
+                    )
+    return tuple(out)
 
 
 def owned_items(ax: Axes, listed: Toggles | None) -> dict[Any, dict[str, str]]:
@@ -557,11 +614,19 @@ def owned_items(ax: Axes, listed: Toggles | None) -> dict[Any, dict[str, str]]:
     return {ax: {owners.name(kind, name): name for name, kind in listed.items}}
 
 
-def page_toggles(listed: list[Toggles | None]) -> tuple[page.Toggle, ...]:
-    """Toggle layers' checkboxes, as a page shows them: one for each item's name."""
-    out: dict[str, page.Toggle] = {}
-    for t in listed:
-        if t is not None:
-            for name in t.names:
-                out.setdefault(name, page.Toggle(name, name in t.hidden))
-    return tuple(out.values())
+def page_toggles(
+    listed: list[tuple[Toggles | None, Style]], shown: list[page.Shown]
+) -> page.Toggles | None:
+    """Toggle layers' checkboxes, as a page shows them: one for each item's name, in a key
+    where a figure's key has a box for it, and the first layer's label, position and text."""
+    found = [(t, s) for t, s in listed if t is not None]
+    if not found:
+        return None
+    boxed = {b.item for s in shown for v in (s, *s.views) for b in v.boxes}
+    items: dict[str, page.Toggle] = {}
+    for t, _ in found:
+        for name in t.names:
+            items.setdefault(name, page.Toggle(name, name in t.hidden, name in boxed))
+    first, style = found[0]
+    text = control_text(style, "toggle", first.look)
+    return page.Toggles(tuple(items.values()), first.label, first.position, text)

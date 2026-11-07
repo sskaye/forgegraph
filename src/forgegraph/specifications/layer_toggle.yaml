@@ -2,6 +2,8 @@ name: toggle          # [text]; The name of the layer type.
 version: 0          # [int ≥ 0]; The version number of the specification.
 description: Checkboxes on an HTML page that show or hide series and layers, each drawn ahead of time.          # [text]; The description of the layer type.
 
-parameters:
+parameters:          # [text style, look from layer.toggle]; The checkboxes.
+    label: None          # [None, text]; The text before the checkboxes, e.g. Show. If None, there is none.
+    position: right          # [top, bottom, right]; Where the checkboxes are on the HTML page: above the figure, below it, or to its right, under the label.
     items: [series]          # [series, layers, text]; What can be hidden: series for all series, layers for all layers, or those named.
     hidden: None          # [None, texts]; The series and layers hidden when the page opens. If None, everything is shown.

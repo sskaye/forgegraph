@@ -12,10 +12,17 @@ key is clear of the data), under or beside the keys already there, or outside it
 (place_outside): above the plot box, under the
 title; below the x-axis title; or to the plot box's right. Layout makes room for a key
 outside, which follows the plot box (and, below it, the x-axis title).
+
+An HTML page whose toggle layer lists series named in a key draws the figure again with
+room in the key for a checkbox before each such entry's sample (boxed): the page lays a
+checkbox there (drawing/page.py KeyBox). Files are drawn without it.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -44,6 +51,20 @@ POSITIONS = {
 }
 
 
+_BOXED: ContextVar[frozenset[str]] = ContextVar("boxed", default=frozenset())
+
+
+@contextmanager
+def boxed(owned: frozenset[str]) -> Iterator[None]:
+    """While drawing, keys leave room for a checkbox before the entry of each of these
+    owners (drawing/owners.py) that's the only entry it has."""
+    token = _BOXED.set(owned)
+    try:
+        yield
+    finally:
+        _BOXED.reset(token)
+
+
 @dataclass(frozen=True)
 class Entry:
     name: str
@@ -64,11 +85,18 @@ class Key:
         self.sample_gap = style.pt("legend.key.sample.gap")
         names = [e.name for e in entries]
         self.row = text.row(names, self.font)
+        owned = [owners.of(e.handle)[:1] for e in entries]
+        boxed = _BOXED.get()
+        self.boxed = [  # each entry's owner, if it gets a checkbox
+            o[0] if o and o[0] in boxed and owned.count(o) == 1 else None for o in owned
+        ]
+        self.box = 0.75 * self.row.height if any(self.boxed) else 0.0  # its side, in points
+        self.box_room = self.box + self.sample_gap if self.box else 0.0
         self.name_edges = [text.edges(n, self.font) for n in names]
         self.title_edges = text.edges(title, self.title_font) if title else None
         names_w = max((e.width for e in self.name_edges), default=0.0)
         self.names_w = names_w
-        content_w = self.sample + self.sample_gap + names_w
+        content_w = self.box_room + self.sample + self.sample_gap + names_w
         if self.title_edges is not None:
             content_w = max(content_w, self.title_edges.width)
         self.content_w = content_w
@@ -86,6 +114,7 @@ class Key:
         self._place: Transform | None = None
         self._owner = owners.name("key")  # whose artists _add marks (owners)
         self._ax: Axes | None = None
+        self._boxes: list[tuple[str, float, float]] = []  # owner, and centre in key points
 
     def place(self, ax: Axes, position: str, under: float = 0.0, beside: float = 0.0) -> None:
         """Draw the key inside the plot box at a position, legend.key.gap.outer in from it;
@@ -184,17 +213,21 @@ class Key:
             y -= e.height + (self.heading.gap or 0.0)
         row_gap = self.style.pt("legend.key.gap.row")
         align = self.names.alignment or "left"
-        for entry, e in zip(self.entries, self.name_edges, strict=True):
+        self._boxes = []
+        left = self.pad + self.box_room  # the samples' left, after any checkboxes
+        for entry, e, box in zip(self.entries, self.name_edges, self.boxed, strict=True):
             self._owner = owners.name("key", entry.name)
             baseline = y - self.row.top
             centre = baseline + self.row.middle
+            if box is not None:
+                self._boxes.append((box, self.pad + self.box / 2, centre))
             h = entry.handle
             if isinstance(h, Bars):  # a swatch of the bar, no taller than the name beside it
                 tall = min(h.width, self.row.height)
                 self._add(
                     ax,
                     Rectangle(
-                        (self.pad, centre - tall / 2),
+                        (left, centre - tall / 2),
                         self.sample,
                         tall,
                         transform=to_display,
@@ -205,12 +238,12 @@ class Key:
                     ),
                 )
             else:
-                self._sample(ax, h, centre, to_display)
+                self._sample(ax, h, centre, to_display, left)
             shift = {"left": 0.0, "center": 0.5, "right": 1.0}[align] * (self.names_w - e.width)
             self._add(
                 ax,
                 Text(
-                    self.pad + self.sample + self.sample_gap + shift - e.left,
+                    left + self.sample + self.sample_gap + shift - e.left,
                     baseline,
                     entry.name,
                     fontproperties=self.font,
@@ -222,12 +255,14 @@ class Key:
             )
             y = baseline - self.row.bottom - row_gap
 
-    def _sample(self, ax: Axes, h: Line2D, centre: float, to_display: Transform) -> None:
-        """A line sample in the handle's style, with its marker at the middle."""
+    def _sample(
+        self, ax: Axes, h: Line2D, centre: float, to_display: Transform, left: float
+    ) -> None:
+        """A line sample in the handle's style, from left, with its marker at the middle."""
         self._add(
             ax,
             Line2D(
-                [self.pad, self.pad + self.sample],
+                [left, left + self.sample],
                 [centre, centre],
                 transform=to_display,
                 color=h.get_color(),
@@ -243,7 +278,7 @@ class Key:
             self._add(
                 ax,
                 Line2D(
-                    [self.pad + self.sample / 2],
+                    [left + self.sample / 2],
                     [centre],
                     transform=to_display,
                     linestyle="none",
@@ -262,6 +297,16 @@ class Key:
         owners.tag(artist, self._owner)
         ax.add_artist(artist)  # not add_line or add_patch: a key mustn't change the data limits
         self.artists.append(artist)
+
+    def boxes(self) -> list[tuple[str, float, float, float]]:
+        """The checkboxes it left room for (boxed): each one's owner, and its centre and
+        side, in display pixels."""
+        assert self._place is not None, "place the key first"
+        out = []
+        for owner, x, y in self._boxes:
+            (cx, cy), (ex, _) = self._place.transform([(x, y), (x + self.box, y)])
+            out.append((owner, float(cx), float(cy), float(abs(ex - cx))))
+        return out
 
     def bbox(self) -> Bbox:
         """The key's frame (drawn or not), in display pixels."""

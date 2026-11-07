@@ -64,7 +64,9 @@ COLORS = 64  # palette size: plenty for a graph's few colors and their anti-alia
 EXEMPT = {  # parameters no card can show
     "format": ("output.", "provenance."),
     "graph_type": ("layer.types",),
-    "theme": ("title.max_wrap",),  # it changes only a title too wide to draw with its default, 0
+    # title.max_wrap changes only a title too wide to draw with its default, 0; layer.choice
+    # and layer.toggle are on an HTML page, not in the figure
+    "theme": ("title.max_wrap", "layer.choice.", "layer.toggle."),
 }
 SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # each from the other
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates

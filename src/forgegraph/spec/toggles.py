@@ -32,6 +32,9 @@ class Toggles:
     name: str  # the layer's
     items: tuple[tuple[str, str], ...]
     hidden: tuple[str, ...]
+    label: str | None = None  # the text before the checkboxes
+    position: str = "right"  # top, bottom or right of the figure
+    look: tuple[tuple[str, Any], ...] = ()  # the theme parameters it sets for its text
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -88,4 +91,7 @@ def _resolved(doc: dict[str, Any], reg: Registry) -> tuple[Toggles | None, list[
             )
     if problems:
         return None, problems
-    return Toggles(name, tuple(items.items()), tuple(hidden)), []
+    label = None if is_none(values["label"]) else str(values["label"])
+    look = tuple(values["look"].items())
+    found = Toggles(name, tuple(items.items()), tuple(hidden), label, str(values["position"]), look)
+    return found, []

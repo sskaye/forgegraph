@@ -11,13 +11,16 @@ from typing import Any
 
 import pandas as pd
 import pytest
-from pack_helpers import needs_node
-from test_views import _layout, _tile, metric, problems
+from pack_helpers import dump, graphspec_file, needs_node
+from ruamel.yaml import YAML
+from test_views import _layout, _pixels, _tile, metric, problems
 
 import forgegraph as fg
 from forgegraph.drawing import owners
+from forgegraph.drawing.key import keys
 from forgegraph.drawing.page import _READOUT_SCRIPT, READOUTS
 from forgegraph.drawing.toggles import drawn, member_of, slices
+from forgegraph.spec.tags import with_tags
 
 LINES = pd.DataFrame(
     {"x": [0.0, 1.0, 2.0, 3.0], "up": [1.0, 1.2, 1.4, 1.6], "down": [1.6, 1.4, 1.2, 1.0]}
@@ -132,9 +135,10 @@ def test_a_page_has_a_button_for_each_item_and_hides_its_images(tmp_path):
     g = fg.render(doc(items=["series", "band"], hidden=["band"]), LINES)
     [path] = g.save(tmp_path / "g.html")
     page = path.read_text()
-    button = '<label class="toggle" data-toggle="0"><input type="checkbox" id="toggle0" checked>'
-    assert f"{button}up</label>" in page
-    assert '<input type="checkbox" id="toggle2">band</label>' in page  # hidden at first
+    kept = '<div class="kept"><input type="checkbox" id="toggle0" checked aria-label="up">'
+    assert kept in page  # up and down are in the key: their boxes there stand for these
+    assert re.search(r'<label class="keybox" for="toggle1" title="down" style="left: [\d.]+%', page)
+    assert '<input type="checkbox" id="toggle2">band</label>' in page  # in the list, hidden
     items = re.findall(r'<img class="slice" alt=""( data-items="[^"]*")?( data-hidden)?', page)
     assert (' data-items="2"', " data-hidden") in items
     assert (' data-items="0"', "") in items and (' data-items="1"', "") in items
@@ -154,7 +158,7 @@ def test_each_view_has_its_own_images(tmp_path):
     d["parameters"]["layers"]["s"] = metric("radio", Linear={}, Log={"axis.y.scale": "log"})
     [path] = fg.render(d, LINES).save(tmp_path / "g.html")
     page = path.read_text()
-    views = re.findall(r'<div class="figure stack view" data-view="[^"]+"', page)
+    views = re.findall(r'<div class="figure stack boxed view" data-view="[^"]+"', page)
     assert len(views) == 2
     assert page.count('data-items="0"') == page.count('data-items="1"') >= 2
 
@@ -187,10 +191,10 @@ def test_items_of_the_same_name_in_a_layout_share_one_button(tmp_path, monkeypat
         "Plain": {"grid": {"areas": [["c"]]}, "tiles": {"c": "c.yaml"}},
     }
     layout = fg.layout(_layout(tmp_path, tabs))
-    assert [t.name for t in layout.toggles] == ["cell_voltage"]
+    assert [n for t, _ in layout.toggles for n in t.names] == ["cell_voltage"] * 2
     [path] = layout.save(tmp_path / "fig.html")
     page = path.read_text()
-    assert page.count('class="toggle"') == 1
+    assert page.count('id="toggle0"') == 1
     both = re.search(r'<section id="both".*?</section>', page, re.S)
     plain = re.search(r'<section id="plain".*?</section>', page, re.S)
     assert both and plain
@@ -210,3 +214,69 @@ def test_items_sharing_a_button_start_hidden_in_every_tile_or_none(tmp_path, mon
         "tabs.Both.tiles.a (a.yaml); items of the same name share one checkbox, so they start "
         "hidden in every tile or in none"
     ]
+
+
+def test_a_keys_checkboxes_are_on_the_page_only():
+    g = fg.render(doc(items=["series"]), LINES)
+    plain = fg.render(doc(items=["band"]), LINES)  # no series of the key toggled
+    [k] = keys(g.axes)
+    assert k.box == 0  # files' keys have no room for checkboxes
+    assert _pixels(g) == _pixels(plain)
+    _, _, _, boxes = g._on_page(72)
+    assert [b.item for b in boxes] == ["up", "down"]
+
+
+def test_the_list_and_controls_go_where_their_position_says(tmp_path):
+    d = doc(items=["band"], label="Show", position="top")
+    d["parameters"]["layers"]["s"] = metric(Linear={}, Log={"axis.y.scale": "log"})
+    page = fg.render(d, LINES).save(tmp_path / "g.html")[0].read_text()
+    top, rest = page.split('<div class="body right">')
+    assert '<div class="controls top">' in top and "Show" in top  # the toggles, on top
+    assert '<div class="controls right">' in rest and '<select id="view0">' in rest
+    d = doc(items=["band"], position="bottom")
+    page = fg.render(d, LINES).save(tmp_path / "h.html")[0].read_text()
+    assert '<div class="body">' in page and page.index("controls bottom") > page.index("<img")
+
+
+def test_the_controls_text_is_the_themes_or_the_layers_own(tmp_path):
+    d = doc(items=["band"], size=1.5, color="#AA0000")
+    g = fg.render(d, LINES)
+    page = g.save(tmp_path / "g.html")[0].read_text()
+    assert f"font-size: {1.5 * g.style.base:g}pt" in page and "color: #AA0000" in page
+    assert '"Roboto"' in page and "--align: flex-start" in page  # the theme's, left
+
+
+def test_toggle_layers_sharing_checkboxes_need_one_position(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _tile(tmp_path, "a", {"t": {"type": "toggle"}})
+    _tile(tmp_path, "b", {"t": {"type": "toggle", "position": "top"}})
+    tabs = {"Both": {"grid": {"areas": [["a", "b"]]}, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}
+    with pytest.raises(fg.SpecError) as e:
+        fg.layout(_layout(tmp_path, tabs))
+    assert e.value.problems == [
+        "tabs.Both.tiles.b (b.yaml): layers.t.position: top, and right in tabs.Both.tiles.a "
+        "(a.yaml); toggle layers share one list of checkboxes, so they need the same position"
+    ]
+
+
+def test_a_tiles_key_gets_checkboxes_in_a_layout(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    settings = {
+        "axis.x.data.column": "current_density",
+        "axis.y.data.column": ["cell_voltage", "ir_free_voltage"],
+        "axis.y.title": "V",
+        "legend.method": "key",
+        "legend.key.title.text": "None",
+        "legend.key.inside": False,
+        "legend.key.positions": ["right_top"],
+    }
+    for name, layers in (("a", {"t": {"type": "toggle"}}), ("b", {})):
+        path = graphspec_file(tmp_path, name, settings=settings)
+        d = with_tags(YAML()).load(path.read_text(encoding="utf-8"))
+        d["parameters"]["layers"] = layers
+        dump(d, path)
+    tabs = {"Both": {"grid": {"areas": [["a", "b"]]}, "tiles": {"a": "a.yaml", "b": "b.yaml"}}}
+    layout = fg.layout(_layout(tmp_path, tabs))
+    page = layout.save(tmp_path / "fig.html")[0].read_text()
+    boxes = re.findall(r'<label class="keybox" for="toggle(\d)" title="([^"]+)"', page)
+    assert boxes == [("0", "cell_voltage"), ("1", "ir_free_voltage")]  # tile a's key only

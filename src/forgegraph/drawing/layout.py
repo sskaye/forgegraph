@@ -41,7 +41,7 @@ from forgegraph.drawing import limits, spacing, text
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import WATERMARK, inches
 from forgegraph.drawing.key import KEY, keys
-from forgegraph.drawing.labels import Obstacles
+from forgegraph.drawing.labels import GROWN, Obstacles
 from forgegraph.drawing.markup import literal
 from forgegraph.drawing.style import Style, isolated
 from forgegraph.spec.layout import Area
@@ -438,11 +438,13 @@ class Plot:
 def finish[T](plots: Sequence[Plot], lay_out: Callable[[], T]) -> T:
     """Lay the figure out with lay_out, place what needs each plot's final size (value
     labels may widen an axis, so lay out and place again while anything moved, up to
-    PLACE_PASSES times), then label each plot. A key outside a plot box needs room, so if
-    there is one, all of that again, laid out around it; then check that no key outside
+    PLACE_PASSES times), then label each plot. A key outside a plot box needs room, and an
+    axis grown for a key, note or label has more tick labels, which may be wider, so if
+    there is either, all of that again, laid out around them; then check that no key outside
     runs into anything. Returns what the last lay_out returned."""
     laid_out = _place_and_label(plots, lay_out)
-    if any(k.outside for p in plots for k in keys(p.ax)):
+    grown = any(getattr(p.ax, GROWN, False) for p in plots)
+    if grown or any(k.outside for p in plots for k in keys(p.ax)):
         laid_out = _place_and_label(plots, lay_out)
         for p in plots:
             p.call(check_outside, p.ax)

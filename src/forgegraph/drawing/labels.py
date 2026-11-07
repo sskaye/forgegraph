@@ -24,14 +24,14 @@ import itertools
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
 from matplotlib.text import Text
-from matplotlib.ticker import FixedLocator
+from matplotlib.ticker import FixedLocator, Locator
 from matplotlib.transforms import Bbox
 
 from forgegraph.drawing import limits, text
@@ -39,10 +39,12 @@ from forgegraph.drawing.key import KEY, Entry, Key
 from forgegraph.drawing.key import keys as keys_of
 from forgegraph.drawing.marks import CELL_POINTS, Bars
 from forgegraph.drawing.style import Style
+from forgegraph.drawing.ticks import target
 
 DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)]
 REACHES = (1.0, 1.6, 2.4, 3.4)  # a label's distance from its anchor, in offsets
 SERIES_LABEL = "forgegraph-series-label"
+GROWN = "_forgegraph_grown"  # set on an axes whose axis grew to make room, after layout
 REFERENCE_GID = "forgegraph-reference-line"  # drawing/layers.py's REFERENCE; it imports this module
 
 
@@ -403,8 +405,9 @@ def interior(ax: Axes, groups: list[Labelled], style: Style) -> bool:
 
 def grow_until(ax: Axes, axis: str, end: str, fits: Callable[[], bool], most: float) -> bool:
     """Extend an axis at one end (min or max) by as little as it takes, to 1/64 of most (a
-    fraction of its range), until fits(); keep its ticks, since the extra room is for labels.
-    False, with the axis as it was, if even most doesn't do it."""
+    fraction of its range), until fits(). Its ticks continue at the same step into the part
+    added (continued), so they don't stop partway up the axis. False, with the axis as it
+    was, if even most doesn't do it."""
     if most <= 0:
         return False
     which = ax.xaxis if axis == "x" else ax.yaxis
@@ -413,7 +416,8 @@ def grow_until(ax: Axes, axis: str, end: str, fits: Callable[[], bool], most: fl
     lo, hi = get()
     locator = which.get_major_locator()
     ticks = np.asarray(which.get_majorticklocs(), dtype=float)  # a date axis's are a list
-    which.set_major_locator(FixedLocator(list(ticks[limits.in_view(which, ticks)])))
+    shown = list(ticks[limits.in_view(which, ticks)])
+    which.set_major_locator(continued(which, shown, log, locator))
 
     def extend(fraction: float) -> None:
         if log:
@@ -437,7 +441,64 @@ def grow_until(ax: Axes, axis: str, end: str, fits: Callable[[], bool], most: fl
         else:
             failed = middle
     extend(fitted)
+    setattr(ax, GROWN, True)  # its tick labels may be wider now: drawing/layout.finish
     return True
+
+
+class _Continued(Locator):
+    """Ticks at an axis's present step, from one of its ticks, across whatever the axis
+    covers: times a factor on a log axis. Where that's more ticks than the axis's length
+    takes (ticks.target), the axis's own locator chooses them across all of it instead."""
+
+    def __init__(self, start: float, step: float, log: bool, own: Locator) -> None:
+        self.start, self.step, self.log, self.own = start, step, log, own
+
+    def __call__(self) -> Any:
+        lo, hi = sorted(cast(Any, self.axis).get_view_interval())
+        values = self.tick_values(lo, hi)
+        if len(values) > max(target(self.axis), 2):
+            self.own.set_axis(self.axis)
+            return self.own()
+        return values
+
+    def tick_values(self, vmin: float, vmax: float) -> Any:
+        lo, hi = sorted((vmin, vmax))
+        if self.log:
+            k = np.arange(
+                math.floor(math.log(lo / self.start, self.step)),
+                math.ceil(math.log(hi / self.start, self.step)) + 1,
+            )
+            values = self.start * self.step**k
+        else:
+            k = np.arange(
+                math.floor((lo - self.start) / self.step),
+                math.ceil((hi - self.start) / self.step) + 1,
+            )
+            values = self.start + k * self.step
+            values = np.round(values, max(0, 3 - math.floor(math.log10(abs(self.step)))))
+        return values[limits.inside(values, lo, hi, self.log)]
+
+
+def continued(which: Any, ticks: list[float], log: bool, own: Locator) -> Locator:
+    """A locator that carries an axis's evenly spaced ticks on across a wider range, or keeps
+    them as they are where they aren't evenly spaced (a date axis's months) or the axis is
+    categorical, whose positions past the last category have nothing to label."""
+    if len(ticks) < 2 or _categorical(which.get_major_formatter()):
+        return FixedLocator(ticks)
+    values = np.asarray(ticks, dtype=float)
+    steps = values[1:] / values[:-1] if log else np.diff(values)
+    if not np.allclose(steps, steps[0], rtol=1e-6) or steps[0] == (1 if log else 0):
+        return FixedLocator(ticks)
+    return _Continued(float(values[0]), float(steps[0]), log, own)
+
+
+def _categorical(formatter: Any) -> bool:
+    """Whether an axis's labels are its categories', through any wrapping."""
+    while formatter is not None:
+        if type(formatter).__name__ == "CategoryLabels":
+            return True
+        formatter = getattr(formatter, "inner", None)
+    return False
 
 
 def _clear_of_data(ax: Axes, key: Key, lines: bool) -> bool:

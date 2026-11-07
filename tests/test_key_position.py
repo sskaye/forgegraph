@@ -255,3 +255,38 @@ def test_a_key_and_a_note_keep_clear_of_a_band_and_its_lines_in_a_scatter():
     assert key.bbox().y0 > band_top
     [note] = [t for t in g.axes.texts if t.get_text() == "3 items excluded"]
     assert note.get_window_extent().y0 > band_top
+
+
+def test_ticks_continue_into_the_part_of_an_axis_extended_for_a_key():
+    g = _covered()
+    ticks = [float(v) for v in g.axes.get_yticks() if v <= g.axes.get_ylim()[1]]
+    assert max(ticks) > 10  # the axis grew past the data's 10, and its ticks go on
+    steps = np.diff(ticks)
+    assert np.allclose(steps, steps[0])
+
+
+def test_an_axis_grown_a_long_way_chooses_its_ticks_again_and_is_laid_out_around_them():
+    rng = np.random.default_rng(2)
+    df = pd.DataFrame(
+        {
+            "x": rng.uniform(0, 10, 300),
+            "y": rng.uniform(0, 95, 300),
+            "g": [f"g{i % 3}" for i in range(300)],
+        }
+    )
+    g = fg.xy(
+        df,
+        "x",
+        "y",
+        color="g",
+        parameters={
+            "legend.method": "key",
+            "series.line.show": False,
+            "legend.key.positions": ["top_right"],
+            "axis.max_extension": 0.6,
+            "axis.y.title": "A rather long y-axis title",
+        },
+    )
+    ticks = [float(v) for v in g.axes.get_yticks() if v <= g.axes.get_ylim()[1]]
+    assert ticks[-1] > 100 and np.allclose(np.diff(ticks), ticks[1] - ticks[0])
+    assert not [i for i in g.issues if i.check == "clipped-text"]

@@ -219,6 +219,31 @@ def _measure(fig: Figure, placed: Sequence[Placed]) -> dict[str, Room]:
     return {p.name: room(p.ax, renderer) for p in placed}
 
 
+def _at_least(rooms: dict[str, Room], floor: dict[str, Room] | None) -> dict[str, Room]:
+    """Each tile's room, at least its floor on each side."""
+    if not floor:
+        return rooms
+    return {
+        n: cast(Room, tuple(max(a, b) for a, b in zip(r, floor.get(n, r), strict=True)))
+        for n, r in rooms.items()
+    }
+
+
+def rooms_of(fig: Figure, tiles: dict[str, tuple[Axes, Style]]) -> dict[str, Room]:
+    """The room each tile's plot box needs on each side, as the figure is drawn now."""
+    placed = [Placed(n, Area(0, 0), ax, style) for n, (ax, style) in tiles.items()]
+    return _measure(fig, placed)
+
+
+def widest(found: Sequence[dict[str, Room]]) -> dict[str, Room]:
+    """The most room each tile needed on each side, in any of found."""
+    out: dict[str, Room] = {}
+    for rooms in found:
+        for n, r in rooms.items():
+            out[n] = cast(Room, tuple(max(a, b) for a, b in zip(r, out.get(n, r), strict=True)))
+    return out
+
+
 def _margins(
     placed: Sequence[Placed], rooms: dict[str, Room], count: int, across: bool
 ) -> tuple[list[float], list[float]]:
@@ -369,10 +394,13 @@ def arrange(
     row_heights: list[float] | None = None,
     edge: float = MARGIN_IN,
     foot: float = 0.0,
+    floor: dict[str, Room] | None = None,
 ) -> Grid:
     """Lay the tiles out on the grid until nothing moves (see the module's description).
     Sizes are in inches; width or height None is auto; edge is the space between the outer
-    tiles and the figure's edges, foot the room below the last row for the footnote.
+    tiles and the figure's edges, foot the room below the last row for the footnote; floor,
+    the least room each tile takes on each side, so that a graph's views, each needing its
+    own, share one plot box (graph.render).
 
     It has settled when a pass changes the figure's size by under 0.001 in and moves every
     plot box by under 0.0001 of the figure. Tick labels can keep it from settling,
@@ -384,7 +412,7 @@ def arrange(
     both = dict(last)
     sizes = (gap, width, height, column_widths, row_heights, edge, foot)
     for _ in range(PASSES):
-        rooms = _measure(fig, placed)
+        rooms = _at_least(_measure(fig, placed), floor)
         settled, grid = _put(fig, areas, placed, rooms, *sizes)
         if settled:
             break
@@ -401,16 +429,20 @@ def arrange(
     return grid
 
 
-def layout(fig: Figure, ax: Axes, style: Style) -> Grid:
+def layout(fig: Figure, ax: Axes, style: Style, floor: Room | None = None) -> Grid:
     """Size the figure and place one graph's plot box from what's drawn around it, as a grid
     of one tile MARGIN_IN from the figure's edges, with room for its footnote below: with
     both of the format's sizes given, the plot box takes the space left; with one auto, it
-    keeps the theme's plot_area.aspect_ratio and the figure is fitted around it."""
+    keeps the theme's plot_area.aspect_ratio and the figure is fitted around it. floor: the
+    least room on each side (arrange)."""
     width = inches(style.format["figure.width"])
     height = inches(style.format["figure.height"])
     placed = [Placed("graph", Area(0, 0), ax, style)]
     try:
-        grid = arrange(fig, [["graph"]], placed, 0.0, width, height, foot=footnote_room(fig))
+        floors = {"graph": floor} if floor is not None else None
+        grid = arrange(
+            fig, [["graph"]], placed, 0.0, width, height, foot=footnote_room(fig), floor=floors
+        )
     except LayoutError:  # a graph alone has no tiles to name
         room = (fig.get_size_inches()[0] - 2 * MARGIN_IN) * fig.dpi
         with isolated(style):

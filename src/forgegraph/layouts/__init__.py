@@ -34,11 +34,14 @@ from forgegraph.drawing.layout import (
     Grid,
     Placed,
     Plot,
+    Room,
     add_footnote,
     arrange,
     finish,
     footnote_room,
     place_footnote,
+    rooms_of,
+    widest,
 )
 from forgegraph.drawing.readout import Mark, marks
 from forgegraph.drawing.style import LineStyle, Style, isolated
@@ -656,7 +659,7 @@ def _draw_views(
     used = [c for c in layout.controls if any(c.name in _names(p) for p in prepared.values())]
     if not used:
         return _draw_tab(layout, tab, prepared, footnote)
-    drawn: dict[tuple[str, ...], TabFigure] = {}
+    viewed: dict[tuple[str, ...], dict[str, Prepared]] = {}
     for picked in itertools.product(*(c.names for c in used)):
         chosen = dict(zip((c.name for c in used), picked, strict=True))
         tiles = {}
@@ -671,11 +674,28 @@ def _draw_views(
                 tiles[name] = prepare(files[name], data.get(name), reg, format=fmt, view=change)
             except SpecError as e:
                 raise SpecError([f"{_where(tab, name)}: {m}" for m in e.problems]) from None
-        try:
-            drawn[picked] = _draw_tab(layout, tab, tiles, footnote)
-        except SpecError as e:
-            label = " / ".join(picked)
-            raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+        viewed[picked] = tiles
+
+    def draw(floor: dict[str, Room] | None) -> dict[tuple[str, ...], TabFigure]:
+        out = {}
+        for picked, tiles in viewed.items():
+            try:
+                out[picked] = _draw_tab(layout, tab, tiles, footnote, floor)
+            except SpecError as e:
+                label = " / ".join(picked)
+                raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+        return out
+
+    # As a graph's views do (graph.render): drawn again, each tile in every view takes the
+    # most room it needed in any, so the tiles stay put as the views switch.
+    drawn = draw(None)
+    floor = widest(
+        [
+            rooms_of(t.figure, {n: (tile.axes, tile.style) for n, tile in t.tiles.items()})
+            for t in drawn.values()
+        ]
+    )
+    drawn = draw(floor)
     first = next(iter(drawn.values()))
     first.controls, first.views = tuple(c.name for c in used), drawn
     first.issues = first.with_views([t.issues for t in first.others()])
@@ -687,7 +707,11 @@ def _names(p: Prepared) -> set[str]:
 
 
 def _draw_tab(
-    layout: Layout, tab: Tab, prepared: dict[str, Prepared], footnote: str | None = None
+    layout: Layout,
+    tab: Tab,
+    prepared: dict[str, Prepared],
+    footnote: str | None = None,
+    floor: dict[str, Room] | None = None,
 ) -> TabFigure:
     fmt = layout.format
     width, height = inches(fmt["figure.width"]), inches(fmt["figure.height"])
@@ -724,7 +748,7 @@ def _draw_tab(
             for p in placed
         ]
         try:
-            grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes))
+            grid = finish(plots, lambda: arrange(fig, tab.areas, placed, *sizes, floor=floor))
         except LayoutError as e:
             raise SpecError([f"{tab.where}: {e}"]) from None
         backgrounds(fig, grid, placed, float(layout.values["separators.corner_radius"]) * base)

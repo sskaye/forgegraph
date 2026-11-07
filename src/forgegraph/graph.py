@@ -19,7 +19,7 @@ from forgegraph.drawing import xy as xy_type
 from forgegraph.drawing.axes import value_number
 from forgegraph.drawing.errors import LayoutError
 from forgegraph.drawing.figure import new_figure, watermark
-from forgegraph.drawing.layout import Plot, add_footnote, finish, layout
+from forgegraph.drawing.layout import Plot, Room, add_footnote, finish, layout, rooms_of, widest
 from forgegraph.drawing.readout import Mark, marks
 from forgegraph.drawing.style import Style, isolated, unset
 from forgegraph.drawn import Inspected, Saved, SpecError
@@ -341,21 +341,41 @@ def render(
     p = prepare(spec, data, registry)
     if not p.controls:
         return _draw(p, footnote)
-    graphs: dict[tuple[str, ...], Graph] = {}
+    viewed = {}
     for names, change in combinations(p.controls):
         try:
-            graphs[names] = _draw(prepare(spec, data, registry, view=change), footnote)
+            viewed[names] = prepare(spec, data, registry, view=change)
         except SpecError as e:
             label = " / ".join(names)
             raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+    graphs = _draw_views(viewed, footnote)
+    # Each view laid out alone takes the room its own tick labels and keys need, so its plot
+    # box moves as the views switch: drawn again, every view takes the most any one needed.
+    floor = widest([rooms_of(g.figure, {"graph": (g.axes, g.style)}) for g in graphs.values()])
+    graphs = _draw_views(viewed, footnote, floor["graph"])
     first = next(iter(graphs.values()))
     first.controls, first.views = p.controls, graphs
     first.issues = first._with_views([g.issues for g in first._others()])
     return first
 
 
-def _draw(p: Prepared, footnote: str | None) -> Graph:
-    """Draw a prepared GraphSpec into a figure of its own."""
+def _draw_views(
+    viewed: dict[tuple[str, ...], Prepared], footnote: str | None, floor: Room | None = None
+) -> dict[tuple[str, ...], Graph]:
+    """Draw each view, naming it in any problem."""
+    out = {}
+    for names, p in viewed.items():
+        try:
+            out[names] = _draw(p, footnote, floor)
+        except SpecError as e:
+            label = " / ".join(names)
+            raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+    return out
+
+
+def _draw(p: Prepared, footnote: str | None, floor: Room | None = None) -> Graph:
+    """Draw a prepared GraphSpec into a figure of its own; floor: the least room around its
+    plot box (drawing/layout.arrange)."""
     module, style, gt = p.module, p.style, p.values["graph_type"]
     with isolated(style), lint.font_messages() as font_problems:
         fig, ax = new_figure(style)
@@ -364,7 +384,7 @@ def _draw(p: Prepared, footnote: str | None) -> Graph:
             add_footnote(fig, footnote, style)
         try:
             plot = Plot(ax, module, drawn, gt, style, _call)
-            finish([plot], lambda: layout(fig, ax, style))
+            finish([plot], lambda: layout(fig, ax, style, floor))
         except LayoutError as e:
             raise SpecError([str(e)]) from None
         except module.DrawError as e:

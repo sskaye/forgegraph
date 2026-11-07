@@ -1,0 +1,47 @@
+name: passenger_toggles
+version: 0
+description: Airline passengers in March, July and November of each year, each month and July's mean shown or hidden on the HTML page.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Airline passengers by month
+    data:
+        file: air_passengers_by_month.parquet
+        preprocessing: examples/sample-data/air_passengers_by_month.csv, unchanged
+    axis:
+        x:
+            data:
+                column: Year
+            title: None
+        y:
+            title: Passengers (thousands)
+    series:
+        July:
+            column: Jul
+        March:
+            column: Mar
+        November:
+            column: Nov
+    legend:
+        method: direct
+        key:
+            title:
+                text: None
+    layers:
+        mean:
+            type: reference
+            axis: y
+            line_1:
+                value: Jul
+                aggregation:
+                    function: mean
+                label:
+                    text: aggregation_value
+        show:
+            type: toggle
+            items: [series, mean]
+            hidden: [mean]

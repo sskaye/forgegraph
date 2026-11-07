@@ -21,7 +21,7 @@ The skill's examples are now copies of the documentation's, so every earlier cas
 Two checks the runner doesn't have yet:
 
 1. `views: n`: the final GraphSpec draws n views (every combination of its choice layers' views).
-2. `shared_control: true`: the final layout's page has one control that switches every tile, from choice layers of the same name in each tile.
+2. `layout: {shared_control: true}`: the final layout has a control every tile shares, from choice layers of the same name in each tile. It's part of the layout check.
 
 Every other check below is one the runner already has. A case's HTML page is checked with `files: ["*.html"]`.
 
@@ -61,7 +61,7 @@ Every other check below is one the runner already has. A case's HTML page is che
 
 - **Request:** "I need a two-panel web page from penguins.csv: bill length vs. body mass on the left and flipper length vs. body mass on the right. One dropdown should change how both panels are colored, by species, island or sex."
 - **A good result:** a layout of two tiles, each with a choice layer of the same name and the same three views, sharing one control.
-- **Checks:** `files: ["*.html"]`, `layout: {tiles: 2}`, `shared_control: true`.
+- **Checks:** `graph`, `files: ["*.html"]`, `layout: {tiles: 2, shared_control: true}`.
 
 ### 69. An axis capped by an IQR rule
 

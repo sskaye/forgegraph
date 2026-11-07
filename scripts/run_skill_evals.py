@@ -389,6 +389,14 @@ def _layout_checks(want: dict[str, Any], ws: Path, allowed: list[str]) -> list[C
         a, b = want["widths"]
         ok = got is not None and len(got) == 2 and abs(got[0] / got[1] - a / b) < 0.05
         checks.append(Check(f"column widths {a}:{b}", ok, str(got)))
+    if want.get("shared_control"):
+        tiles = [tile for t in drawn.tabs for tile in t.tiles.values()]
+        shared = [
+            c.name
+            for c in drawn.controls
+            if all(c.name in {x.name for x in tile.prepared.controls} for tile in tiles)
+        ]
+        checks.append(Check("a control every tile shares", bool(shared), ", ".join(shared)))
     extra = [i for i in drawn.issues if i.check not in allowed]
     checks.append(
         Check(
@@ -595,7 +603,9 @@ def _spec_checks(expect: dict[str, Any], project: Project) -> list[Check]:
     return checks
 
 
-DATA_CHECKS = ("lines", "rows_plotted", "x_dates", "x_between", "y_above", "only", "tick_labels")
+DATA_CHECKS = (
+    "lines", "rows_plotted", "x_dates", "x_between", "y_above", "only", "tick_labels", "views",
+)  # fmt: skip
 
 
 def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
@@ -618,6 +628,11 @@ def _data_checks(expect: dict[str, Any], project: Project) -> list[Check]:
                     series >= expect["lines"],
                     problem or f"{series} drawn",
                 )
+            )
+        if "views" in expect:
+            views = None if graph is None else len(graph.views) or 1
+            checks.append(
+                Check(f"{expect['views']} views", views == expect["views"], problem or str(views))
             )
         if "rows_plotted" in expect:
             rows = None if graph is None else graph.data.rows_plotted

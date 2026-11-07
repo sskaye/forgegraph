@@ -1,4 +1,4 @@
-# Skill evals: the cases in the skill-evals.md review pages of phases 4, 5, 8 and 9, each scored
+# Skill evals: the cases in the skill-evals.md review pages of phases 4, 5, 8 and 9 and 0.8.0, each scored
 # by scripts/run_skill_evals.py. A case's folder holds its `data` files from examples/sample-data;
 # its `turns` are sent one after another in one conversation, the last one followed by
 # `closing`.
@@ -35,9 +35,11 @@
 #   layers: [{param: v}]   for each, the final GraphSpec has a layer, under any name, whose
 #                          resolved parameters match (type included; v as for values)
 #   tick_labels: {x: [..]} the final graph's tick labels on that axis, in order
-#   layout: {tabs: n, tiles: n, span: true, blank: true, widths: [a, b]}
+#   views: n               the final graph draws n views (its choice layers' combinations)
+#   layout: {tabs: n, tiles: n, span: true, blank: true, widths: [a, b], shared_control: true}
 #                          the final .layout.yaml draws, with these tabs and tiles, a tile
-#                          spanning cells, a blank cell, column widths in this ratio; and its
+#                          spanning cells, a blank cell, column widths in this ratio, a control
+#                          every tile shares (a choice layer of one name in each); and its
 #                          lint is clean (except `lint`)
 #   nonstandard: true      an image is recorded as non-standard: drawn on a blank canvas
 #   nonstandard_pack: true an image is recorded as drawn with a pack the main config doesn't
@@ -717,3 +719,98 @@ cases:
     expect:
       graph: true
       nonstandard: true
+
+  - id: penguins-measure-dropdown
+    data: [penguins.csv]
+    turns: ["Please make an HTML page of penguin bill length vs. body mass from penguins.csv, colored by species, with a dropdown that lets the reader swap bill length for bill depth or flipper length."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      files: ["*.html"]
+      layers:
+        - {type: choice, control: dropdown}
+      views: 3
+
+  - id: co2-scale-radio
+    data: [co2_monthly.csv]
+    turns: ["I'd like the CO₂ record from co2_monthly.csv as a web page, with two radio buttons above the graph: one for a linear y-axis and one for a log y-axis."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      files: ["*.html"]
+      layers:
+        - {type: choice, control: radio, position: top}
+      views: 2
+
+  - id: iris-axes-chosen
+    data: [iris.csv]
+    turns: ["From iris.csv, make an interactive HTML plot where readers can pick any of the four measurements for the x-axis and for the y-axis, with the points colored by species."]
+    expect:
+      graph: true
+      lint: []
+      files: ["*.html"]
+      layers:
+        - {type: choice}
+      views: 16
+
+  - id: passengers-month-checkboxes
+    data: [air_passengers_by_month.csv]
+    turns: ["Plot monthly airline passengers from air_passengers_by_month.csv, one line per month, and put checkboxes on the HTML page so readers can turn individual months on and off."]
+    expect:
+      graph: true
+      lint: []
+      files: ["*.html"]
+      lines: 12
+      layers:
+        - {type: toggle, items: {contains: series}}
+
+  - id: savings-mean-hidden
+    data: [economics.csv]
+    turns: ["Could you plot the personal savings rate (psavert) by date from economics.csv as a web page? Add a line at its mean, and let readers show or hide that line with a checkbox, hidden when the page opens."]
+    expect:
+      graph: true
+      lint: []
+      files: ["*.html"]
+      layers:
+        - {type: reference, line_1.aggregation.function: mean}
+        - {type: toggle, hidden: {matches: "."}}
+
+  - id: penguins-shared-dropdown
+    data: [penguins.csv]
+    turns: ["I need a two-panel web page from penguins.csv: bill length vs. body mass on the left and flipper length vs. body mass on the right. One dropdown should change how both panels are colored, by species, island or sex."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      files: ["*.html"]
+      layout: {tiles: 2, shared_control: true}
+
+  - id: diamonds-iqr-cap
+    data: [diamonds.csv]
+    turns: ["Plot price vs. carat from diamonds.csv. A few extreme prices squash the plot, so cap the y-axis at 3 interquartile ranges above the upper quartile."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        graph_type:axis.y.max: {matches: "^3(\\.0)?IQR$"}
+
+  - id: diamonds-geometric
+    data: [diamonds.csv]
+    turns: ["Using diamonds.csv, make a bar chart of the geometric mean price for each cut, with error bars showing the geometric 95% confidence interval."]
+    expect:
+      graph: true
+      lint: []
+      values:
+        series:aggregation.function: geom_mean
+        series:bar.show: true
+      layers:
+        - {type: error_bar, value.aggregation.function: geom_ci}
+
+  - id: seaice-long-title
+    data: [seaice.csv]
+    turns: ["Can you graph sea-ice extent over time from seaice.csv with the title 'Daily Arctic sea-ice extent, 1978 to the present, from the NSIDC Sea Ice Index (synthetic look-alike)'? Let the title run onto a second line if it doesn't fit."]
+    expect:
+      graph: true
+      lint: [dropped-rows]
+      values:
+        theme:title.max_wrap: {in: [1, 2, 3]}
+        graphspec:text.title: {matches: "NSIDC"}

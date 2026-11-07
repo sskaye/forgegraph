@@ -150,7 +150,7 @@ class Viewed:
 
 @dataclass(frozen=True)
 class Toggle:
-    """A toggle's button on a page: its item's name, and whether it's hidden at first."""
+    """A toggle's checkbox on a page: its item's name, and whether it's hidden at first."""
 
     name: str
     hidden: bool = False
@@ -499,7 +499,7 @@ def write(
     """Write the page. background: behind the figures; bar: the tab bar's look, for several
     tabs or for controls; framed: the figures are cropped to their border, so the tab bar's
     line is its top; freshness: a scheduled run's, for the stale banner; controls: the
-    choice layers' controls, for figures with views; toggles: the toggle layers' buttons,
+    choice layers' controls, for figures with views; toggles: the toggle layers' checkboxes,
     for figures in slices."""
     tabbed = len(shown) > 1
     if (tabbed or controls or toggles) and bar is None:
@@ -613,7 +613,7 @@ def _view_key(v: Viewed, controls: tuple[Control, ...]) -> str:
 
 def _controls(controls: tuple[Control, ...], toggles: tuple[Toggle, ...] = ()) -> list[str]:
     """The controls: each a dropdown, or radio buttons, after its label; then the toggles'
-    buttons."""
+    checkboxes."""
     if not controls and not toggles:
         return []
     out = ['<div class="controls">']

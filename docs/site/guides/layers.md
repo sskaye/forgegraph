@@ -71,7 +71,7 @@ A `choice` layer draws nothing on the graph. It lists views, and the graph's HTM
 
 ## Toggles
 
-A `toggle` layer adds a button to the graph's HTML page for each of its `items`, which shows or hides it: `series` for every series, `layers` for every layer, or series and layers by name. `hidden` lists those hidden when the page opens, and png, pdf and svg files leave them out too.
+A `toggle` layer adds a checkbox to the graph's HTML page for each of its `items`, which shows the item when it's checked: `series` for every series, `layers` for every layer, or series and layers by name. `hidden` lists those hidden when the page opens, and png, pdf and svg files leave them out too.
 
 ```yaml
 --8<-- "docs/examples/passenger_toggles.yaml"
@@ -82,7 +82,7 @@ A `toggle` layer adds a button to the graph's HTML page for each of its `items`,
 - The graph is drawn once, with everything shown, so the axes don't change when an item is hidden, and the key keeps its entries.
 - A hidden series loses its lines, markers, bars, error bars, value labels, direct label and readouts. A hidden layer loses its lines, fill and label.
 - The page cuts the figure into images laid over each other, in the order the figure draws them, so it grows with the number of items. With choice layers, each view has its own.
-- A GraphSpec has at most one toggle layer. In a layout, the items of the same name in tiles with toggle layers share one button, so they start hidden in every tile or in none.
+- A GraphSpec has at most one toggle layer. In a layout, the items of the same name in tiles with toggle layers share one checkbox, so they start hidden in every tile or in none.
 
 ## The layers' look
 

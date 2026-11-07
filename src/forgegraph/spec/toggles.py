@@ -8,7 +8,7 @@ one toggle layer.
 The figure is drawn once, with everything shown, so its axes, keys and labels are placed as
 usual (drawing/toggles.py). A hidden series loses its marks, error bars, value labels and
 direct label, and a hidden layer its lines, fill and label; a key's entries stay. In a
-layout, the items of the same name in tiles with toggle layers share one button.
+layout, the items of the same name in tiles with toggle layers share one checkbox.
 """
 
 from __future__ import annotations

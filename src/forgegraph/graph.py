@@ -558,7 +558,7 @@ def owned_items(ax: Axes, listed: Toggles | None) -> dict[Any, dict[str, str]]:
 
 
 def page_toggles(listed: list[Toggles | None]) -> tuple[page.Toggle, ...]:
-    """Toggle layers' buttons, as a page shows them: one for each item's name."""
+    """Toggle layers' checkboxes, as a page shows them: one for each item's name."""
     out: dict[str, page.Toggle] = {}
     for t in listed:
         if t is not None:

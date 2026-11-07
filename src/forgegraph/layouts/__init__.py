@@ -622,7 +622,7 @@ def _shared(listed: list[Tab], prepared: dict[str, dict[str, Prepared]]) -> list
 def _shared_toggles(
     listed: list[Tab], prepared: dict[str, dict[str, Prepared]]
 ) -> tuple[page.Toggle, ...]:
-    """The page's toggles: the tiles' toggle layers' items, one button for each name. Items
+    """The page's toggles: the tiles' toggle layers' items, one checkbox for each name. Items
     of the same name must be hidden at first in every tile, or in none."""
     found: dict[str, tuple[bool, str]] = {}
     problems = []
@@ -637,7 +637,7 @@ def _shared_toggles(
                     problems.append(
                         f"{_where(tab, name)}: layers.{cast(Any, t).name}: '{item}' is "
                         f"{'hidden' if hidden else 'shown'} at first, and not in "
-                        f"{found[item][1]}; items of the same name share one button, so they "
+                        f"{found[item][1]}; items of the same name share one checkbox, so they "
                         "start hidden in every tile or in none"
                     )
     if problems:

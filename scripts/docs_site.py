@@ -269,7 +269,8 @@ def example_images() -> dict[str, bytes]:
             for dataset in _datasets(spec):
                 frame = pd.read_csv(SAMPLE_DATA / f"{dataset}.csv")
                 PREPARE.get(dataset, lambda d: d)(frame).to_parquet(work / f"{dataset}.parquet")
-        for spec in [*sorted(work.glob("*.yaml")), *LAYOUTS]:
+        listed = [s for s in sorted(work.glob("*.yaml")) if not s.name.endswith(".schedule.yaml")]
+        for spec in [*listed, *LAYOUTS]:
             layout = spec.name.endswith(".layout.yaml")
             drawn = fg.layout(spec) if layout else fg.render(spec)
             problems = [i for i in drawn.issues if i.check != "dropped-rows"]

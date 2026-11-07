@@ -1,6 +1,6 @@
 """Write the example GraphSpecs' data, into each built-in pack's graphspecs/ (polarization,
-fanned, reinforced and dated .parquet), and the skill's examples/xy.parquet (the polarization
-data) and examples/heat_map.parquet (a plate of spectra).
+fanned, reinforced and dated .parquet). The skill's examples, and their data, are copied from
+the documentation's (scripts/skill_examples.py).
 
 uv run python scripts/build_example_data.py
 
@@ -24,29 +24,6 @@ import pandas as pd
 
 PACKAGE = Path(__file__).parents[1] / "src" / "forgegraph"
 PACKS = sorted(p for p in (PACKAGE / "packs").iterdir() if (p / "pack.yaml").is_file())
-SKILL_EXAMPLES = PACKAGE / "skill" / "forgegraph" / "examples"
-
-
-def plate() -> pd.DataFrame:
-    """Spectra of 24 samples in two families, at 31 wavelengths."""
-    rng = np.random.default_rng(1)
-    wavelengths = np.arange(350.0, 801.0, 15.0)
-    rows = []
-    for family, centre in enumerate((450, 600)):
-        for k in range(12):
-            at = centre + rng.normal(0, 8)
-            y = np.exp(-0.5 * ((wavelengths - at) / 50) ** 2) + rng.normal(0.02, 0.01, 31)
-            sample = f"S{family * 12 + k + 1:02d}"
-            rows.append(
-                pd.DataFrame(
-                    {
-                        "Wavelength (nm)": wavelengths,
-                        "Sample": sample,
-                        "Normalized absorbance": np.round(np.clip(y, 0, None) / y.max(), 3),
-                    }
-                )
-            )
-    return pd.concat(rows, ignore_index=True)
 
 
 def polarization() -> pd.DataFrame:
@@ -119,11 +96,7 @@ if __name__ == "__main__":
         for pack in PACKS
         for name, frame in frames.items()
     ]
-    for out, frame in (
-        *written,
-        (SKILL_EXAMPLES / "xy.parquet", polarization()),
-        (SKILL_EXAMPLES / "heat_map.parquet", plate()),
-    ):
+    for out, frame in written:
         out.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(out, index=False)
         print(f"wrote {out.relative_to(Path.cwd())}")

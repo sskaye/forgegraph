@@ -56,7 +56,7 @@ Tabs that hold tabs look like this, with a tab bar for each level on the HTML pa
 
 ## The HTML page
 
-A layout's HTML page, or a GraphSpec's, shows each figure as an image that shrinks to fit a narrow window. On a layout of several tabs, the tab names sit above the figures, in `tab_bar.label`'s look, with `tab_bar.line` under them; by default, they follow the first tile's theme. The tabs work where the page's scripts don't run. Where they run, each tab also has its own link, such as `#by-instrument`. The tab names stay at the top of the window as the page scrolls, and switching tabs leaves the page where it is, so the same tile stays in view. A tile's [choice layers](layers.md#views) add their controls under the tab names, and a control shows only on the tabs that use it.
+A layout's HTML page, or a GraphSpec's, shows each figure as an image that shrinks to fit a narrow window. On a layout of several tabs, the tab names sit above the figures, in `tab_bar.label`'s look, with `tab_bar.line` under them; by default, they follow the first tile's theme. The tabs work where the page's scripts don't run. Where they run, each tab also has its own link, such as `#by-instrument`. The tab names stay at the top of the window as the page scrolls, and switching tabs leaves the page where it is, so the same tile stays in view. A tile's [choice](layers.md#views) and [toggle](layers.md#toggles) layers add their controls under the tab names, and a control shows only on the tabs that use it.
 
 **Readouts.** Pointing at a data point on the page, or tapping it, shows its values in a box above it, with a ring around the point:
 

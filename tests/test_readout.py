@@ -96,9 +96,9 @@ def test_a_value_without_an_error_bar_has_a_decimal_more_than_the_tick_labels(
     g = graph(df, "t", "v")
     ticks: list[str] = []
 
-    def saved(fig: Any) -> list[Any]:  # the tick labels as the page's image has them
+    def saved(fig: Any, *items: Any) -> list[Any]:  # the tick labels as the page's image has them
         ticks.extend(t.get_text() for t in fig.axes[0].get_yticklabels())
-        return marks(fig)
+        return marks(fig, *items)
 
     monkeypatch.setattr(graph_module, "marks", saved)
     [data] = readouts(g, tmp_path)

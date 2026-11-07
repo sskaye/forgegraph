@@ -40,6 +40,7 @@ from matplotlib.colors import to_hex
 from matplotlib.dates import num2date
 from matplotlib.figure import Figure
 
+from forgegraph.drawing import owners
 from forgegraph.drawing.axes import number_text
 from forgegraph.drawing.marks import CELL
 from forgegraph.drawing.markup import to_html
@@ -83,6 +84,7 @@ class Mark:
     ring: str
     look: Look
     lines: tuple[tuple[str, str], ...]
+    item: str | None = None  # the toggle item it belongs to (drawing/toggles.py), if any
 
 
 @dataclass
@@ -99,9 +101,16 @@ def attach(ax: Axes, drawn: Any, gt: dict[str, Any]) -> None:
     _DRAWINGS[ax] = _Drawing(drawn, gt)
 
 
-def marks(fig: Figure) -> list[Mark]:
-    """Every data point in the figure's graphs, as it is drawn now."""
-    return [m for ax in fig.axes if ax in _DRAWINGS for m in _of(ax, _DRAWINGS[ax])]
+def marks(fig: Figure, items: dict[Any, dict[str, str]] | None = None) -> list[Mark]:
+    """Every data point in the figure's graphs, as it is drawn now. items: for each Axes
+    with toggles, each toggled owner's item (drawing/toggles.py), which a point's series
+    belongs to."""
+    out = []
+    for ax in fig.axes:
+        if ax in _DRAWINGS:
+            owned = (items or {}).get(ax, {})
+            out += [replace(m, item=owned.get(m.item or "")) for m in _of(ax, _DRAWINGS[ax])]
+    return out
 
 
 def _of(ax: Axes, d: _Drawing) -> list[Mark]:
@@ -121,6 +130,7 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
     )
     out = []
     for s in d.drawn.series:
+        start = len(out)  # its marks carry its owner as their item, until marks() maps it
         lines = _lines(ax, s, d)
         look = _look(s, to_hex(paper, keep_alpha=False), border)
         rings = s.ring if isinstance(s.ring, list) else [s.ring] * len(s.x)
@@ -144,6 +154,7 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
                 top, bottom = height - box.y1 * to_pt, height - box.y0 * to_pt
                 centre = ((left + right) / 2, (top + bottom) / 2)
                 out.append(Mark(*centre, 0.0, (left, top, right, bottom), rings[i], look, lines[i]))
+        out[start:] = [replace(m, item=owners.name("series", s.listed.name)) for m in out[start:]]
     return [m for m in (_cut(m, inside) for m in out) if m is not None]
 
 

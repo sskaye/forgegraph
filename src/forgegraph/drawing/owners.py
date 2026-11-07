@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from typing import Any
 
 OWNER = "_forgegraph_owner"
+ALSO = "_forgegraph_also"  # a second owner (tag_new)
 
 
 def name(kind: str, of: Any = None) -> str:
@@ -34,11 +35,20 @@ def tag(artist: Any, owner: str | None) -> Any:
     return artist
 
 
-def tag_new(ax: Any, before: set[int], owner: str) -> None:
-    """Mark every artist drawn in ax since before (the ids of its children then)."""
+def tag_new(ax: Any, before: set[int], owner: str, also: bool = False) -> None:
+    """Mark every artist drawn in ax since before (the ids of its children then); also: as
+    a second owner, as an error bar has its series and its layer."""
     for artist in ax.get_children():
         if id(artist) not in before:
-            tag(artist, owner)
+            if also:
+                setattr(artist, ALSO, owner)
+            else:
+                tag(artist, owner)
+
+
+def of(artist: Any) -> tuple[str, ...]:
+    """An artist's owners: its own, and a second one if it has one."""
+    return tuple(getattr(artist, a) for a in (OWNER, ALSO) if hasattr(artist, a))
 
 
 def children(ax: Any) -> set[int]:

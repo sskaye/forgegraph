@@ -83,7 +83,7 @@ def test_two_choice_layers_cant_set_the_same_parameter_or_each_other():
         "layers can't set the same parameter"
     ]
     assert problems({"m": metric(A={}, B={"layers.n.label": "x"}), "n": metric()}) == [
-        "layers.m.views.B.layers.n.label: a view can't set a choice layer"
+        "layers.m.views.B.layers.n.label: a view can't set a choice or toggle layer"
     ]
 
 

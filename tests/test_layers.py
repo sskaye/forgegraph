@@ -68,7 +68,7 @@ def test_layers_are_checked_against_their_type():
         "layers.t.txt: unknown parameter of note; did you mean 'text'?"
     ]
     assert validate("graphspec", doc({"t": {"axis": "y"}})) == [
-        "layers.t.type: required: one of reference, note, error_bar, choice"
+        "layers.t.type: required: one of reference, note, error_bar, choice, toggle"
     ]
     assert validate("graphspec", doc({"t": {"type": "note", "position": "middle"}}))[0].startswith(
         "layers.t.position: must be one of: auto, top_left"

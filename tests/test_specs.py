@@ -401,6 +401,8 @@ SAMPLES = {
 def test_type_words(kind, p):
     if p.path in CHECKED_TOGETHER:
         pytest.skip("its values depend on the cadence's other parameters")
+    if kind == "layer:toggle":
+        pytest.skip("it names the GraphSpec's series and layers (test_views.py)")
     others = set(p.range.types)
     for t in p.range.types:
         good, bad = FONTS if p.path.endswith("font") else SAMPLES[t]

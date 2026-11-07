@@ -55,6 +55,7 @@ from forgegraph.spec.resolve import (
 from forgegraph.spec.schedule import Cadence, CadenceError
 from forgegraph.spec.series import resolve_series, series_problems
 from forgegraph.spec.tags import UNSET, status_at
+from forgegraph.spec.toggles import toggle_problems
 from forgegraph.spec.views import view_problems
 
 # Graph-type parameters set together or not at all; the catalog's cards keep them so too.
@@ -104,6 +105,8 @@ def validate(kind: str, doc: Any, reg: Registry | None = None, views: bool = Tru
     errors += permission_problems(kind, doc, reg)
     if kind == "format":
         errors += _format_size(doc, reg)
+    if kind == "graphspec" and not errors:
+        errors += toggle_problems(doc, reg)
     if kind == "graphspec" and views and not errors:
         errors += view_problems(doc, reg)
     return errors

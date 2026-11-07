@@ -3,7 +3,7 @@
 A choice layer (layer_choice.yaml) lists two or more views by name, each a set of GraphSpec
 parameters and their values, written as dotted paths (series.Voltage.column) or as nested
 categories; {} changes nothing. A view can't set specifications, data, output or provenance,
-nor a choice layer's own parameters (VIEW_LIMITS); anything else is checked as the GraphSpec
+nor a choice or toggle layer's parameters (VIEW_LIMITS); anything else is checked as the GraphSpec
 with the view's changes would be, so a view can set a parameter only where the GraphSpec
 could. Two choice layers can't set the same parameter.
 
@@ -21,7 +21,7 @@ import itertools
 from dataclasses import dataclass
 from typing import Any
 
-from forgegraph.spec.layers import CONTROLS, resolve_layers, with_defaults
+from forgegraph.spec.layers import resolve_layers, with_defaults
 from forgegraph.spec.parameters import PARAMETERS, flatten, is_none
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.tags import Tagged
@@ -46,7 +46,7 @@ def controls(doc: dict[str, Any], reg: Registry) -> list[Control]:
     """The GraphSpec's choice layers, in drawing order."""
     out = []
     for name, r in resolve_layers(doc, reg).items():
-        if r.value.get("type") not in CONTROLS:
+        if r.value.get("type") != "choice":
             continue
         values = with_defaults(r.value)
         views = r.value.get("views")

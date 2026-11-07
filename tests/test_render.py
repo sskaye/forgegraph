@@ -1056,3 +1056,32 @@ def test_an_aggregated_point_whose_rows_have_several_color_values_is_an_error():
     parameters = {"series.aggregation.function": "mean", "series.line.show": False}
     with pytest.raises(fg.SpecError, match=r"series\.v\.color: d has several values at one point"):
         fg.xy(df, x="t", y="v", color="d", parameters=parameters)
+
+
+LONG_TITLE = (
+    "V@100mA vs local Baseline 2 vs Delta V vs local Baseline 2, normalised, averaged, "
+    "ACI-SUBSTRATE-3 (Al 1060)"
+)
+
+
+def _titled(wrap: int | None = None) -> fg.Graph:
+    df = pd.DataFrame({"x": np.arange(10.0), "y": np.arange(10.0)})
+    settings = {
+        "axis.x.data.column": "x",
+        "benchmark.data_column": NONE,
+        "benchmark.value": NONE,
+        "text.title": LONG_TITLE,
+        "series": {"y": {}},
+    }
+    return render(settings, theme=None if wrap is None else {"title.max_wrap": wrap}, data=df)
+
+
+def test_a_title_too_long_for_the_figure_is_an_error_that_names_it():
+    with pytest.raises(fg.SpecError, match=r"text\.title: too long for the figure: the title is"):
+        _titled()
+
+
+def test_a_title_wraps_onto_up_to_max_wrap_more_lines():
+    title = _titled(2).axes.get_title()
+    assert title.replace("\n", " ") == LONG_TITLE
+    assert 2 <= len(title.split("\n")) <= 3

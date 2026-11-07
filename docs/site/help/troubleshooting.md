@@ -116,6 +116,14 @@ titel: unknown category; did you mean 'title'?
 
 A misspelled or misplaced parameter, with the nearest one ForgeGraph knows. The [specifications](../reference/specifications/index.md) list every parameter in its place.
 
+### A title too long for the figure
+
+```text
+text.title: too long for the figure: the title is 631 pt wide, and the figure 419 pt; ...
+```
+
+Shorten the title, put line breaks in it, or let a theme wrap it: `title.max_wrap` is how many more lines a title may take. It's 0, no wrapping, in the built-in theme.
+
 ### No way to name the series
 
 ```text

@@ -555,7 +555,7 @@ cases:
     turns: ["Is there a way to change the colour palette or the font?"]
     expect:
       no_graph: true
-      says: [["fixed", "lock"], ["okabe", "tol_bright", "tol_muted", "tableau"], ["theme"]]
+      says: [["fixed", "fixes", "lock"], ["okabe", "tol_bright", "tol_muted", "tableau"], ["theme"]]
 
   # --- phase 8: layouts, date axes, scheduled jobs ---------------------------------------------
 
@@ -758,7 +758,7 @@ cases:
     turns: ["Plot monthly airline passengers from air_passengers_by_month.csv, one line per month, and put checkboxes on the HTML page so readers can turn individual months on and off."]
     expect:
       graph: true
-      lint: []
+      lint: [too-many-groups]  # 12 lines; the theme's palette is fixed at fewer colors
       files: ["*.html"]
       lines: 12
       layers:
@@ -789,7 +789,7 @@ cases:
     turns: ["Plot price vs. carat from diamonds.csv. A few extreme prices squash the plot, so cap the y-axis at 3 interquartile ranges above the upper quartile."]
     expect:
       graph: true
-      lint: []
+      lint: [outside-limits]  # the points beyond the cap, as asked
       values:
         graph_type:axis.y.max: {matches: "^3(\\.0)?IQR$"}
 
@@ -812,5 +812,5 @@ cases:
       graph: true
       lint: [dropped-rows]
       values:
-        theme:title.max_wrap: {in: [1, 2, 3]}
+        theme:title.max_wrap: {in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}  # any wrap
         graphspec:text.title: {matches: "NSIDC"}

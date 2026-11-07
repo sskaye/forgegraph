@@ -2,6 +2,32 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.8.0 (2026-11-07)
+
+### New Features
+
+- **Controls on the HTML page.** Two new layers add controls to a graph's web page. A `choice` layer lists views, such as other columns for a series or a log axis, and readers switch between them with a dropdown or radio buttons. A `toggle` layer adds checkboxes that show or hide series and layers; a series named in a key gets its checkbox in the key. Every view is drawn ahead of time, so the page needs no server, and the graph keeps its size and position as you switch. The controls go to the right of the graph, or above or below it, and the theme sets their text. In a layout, controls of the same name in different panels work together. Saved images show the first view, without the items hidden at first.
+- **Axis limits that leave out outliers.** An axis's `min` or `max` can be `3IQR`, which ends the axis 3 interquartile ranges beyond the quartile, so a few extreme values don't squash the rest of the data.
+- **Geometric statistics.** `geom_mean`, `geom_stddev` and `geom_ci` work wherever the other statistics do: combining points, error bars and reference lines. They suit values that vary by a factor, such as concentrations, and their error bars are longer above the point than below it.
+- **Star and asterisk markers.**
+- **Long titles can wrap.** A theme's `title.max_wrap` lets a title run onto more lines. By default a title doesn't wrap, and one that's too long now gives an error that names it.
+- **Named parts in SVG files.** In an SVG, each series' and layer's parts have ids that start with its name, such as `fg-series-Voltage-1`, so a web page can find them.
+
+### Changes
+
+- **Fewer tick labels when they'd run together.** Automatic ticks on a number axis now space out until their labels fit.
+- **Ticks on an extended axis.** When an axis grows to make room for a key, note or label, its ticks carry on into the new part.
+- **Keys and notes keep clear of reference lines and bands.** Keys, notes and reference labels no longer sit on a reference line, a band, or the edge of a large marker. The axis grows to make room, or the error says what's in the way. Some graphs will place their key differently.
+- **Reference lines past a set limit.** A reference line or band beyond an axis limit you've set is now left out, and lint says so, rather than stopping the graph.
+- **Clearer label errors.** When a reference label at `position: auto` has no room, the error says what's in the way at each place it tried.
+- **The agent skill** knows about the new controls, and its examples are now the ones in the documentation.
+
+### Bug Fixes
+
+- Points and bars beyond a set axis limit still had a hover box on the HTML page. Only what's drawn inside the plot has one now.
+- Cross and plus markers were drawn in black instead of their series' color.
+- After an axis grew to fit a key, a new top tick label could run off the figure.
+
 ## 0.7.0 (2026-11-02)
 
 ### New Features

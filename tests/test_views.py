@@ -127,6 +127,15 @@ def test_the_graph_is_its_first_view_and_holds_the_others():
     assert g.views[("Voltage",)].axes.get_ylabel() == "cell_voltage"
 
 
+def test_every_view_has_the_same_figure_and_plot_box():
+    wide = {"series.cell_voltage.column": "power_density", "axis.y.title": "Power density"}
+    df = polarization().assign(power_density=lambda d: d["power_density"] * 1000)
+    g = fg.render(doc({"m": metric(Voltage={}, Power=wide)}), df)
+    boxes = {v.axes.get_position().bounds for v in g.views.values()}
+    sizes = {tuple(v.figure.get_size_inches()) for v in g.views.values()}
+    assert len(boxes) == 1 and len(sizes) == 1  # though the power ticks are wider
+
+
 def test_lint_names_each_view():
     g = fg.render(doc({"m": metric()}), polarization())
     assert g.warnings  # a row left out, in each view drawn with it

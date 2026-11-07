@@ -74,10 +74,10 @@ A `choice` layer draws nothing on the graph. It lists views, and the graph's HTM
 A `toggle` layer adds a button to the graph's HTML page for each of its `items`, which shows or hides it: `series` for every series, `layers` for every layer, or series and layers by name. `hidden` lists those hidden when the page opens, and png, pdf and svg files leave them out too.
 
 ```yaml
---8<-- "docs/examples/economy_toggles.yaml"
+--8<-- "docs/examples/passenger_toggles.yaml"
 ```
 
-[Open its HTML page](../pages/economy_toggles.html) to show the mean, or hide a series.
+[Open its HTML page](../pages/passenger_toggles.html) to show July's mean, or hide a month.
 
 - The graph is drawn once, with everything shown, so the axes don't change when an item is hidden, and the key keeps its entries.
 - A hidden series loses its lines, markers, bars, error bars, value labels, direct label and readouts. A hidden layer loses its lines, fill and label.

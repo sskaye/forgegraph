@@ -40,9 +40,9 @@ where its scripts don't run; a control a tab doesn't use is hidden while it's sh
 browser too old for the style, there are no controls, and each figure shows its first view.
 
 A graph with a toggle layer (spec/toggles.py) is a stack of images (drawing/toggles.py), and
-the page shows a button for each item, with the controls; the style hides an image when one
-of its items' buttons is off, and the readouts of a hidden series' points. A layout's items
-of the same name share one button.
+the page shows a checkbox for each item, with the controls; the style hides an image when
+one of its items' boxes is unchecked, and the readouts of a hidden series' points. A
+layout's items of the same name share one checkbox.
 
 Each figure's data points have readouts (drawing/readout.py): pointing at a point, or tapping
 it, shows its values in a box above it, with a ring around the point. The page carries each
@@ -197,11 +197,8 @@ h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
 .control select { font: inherit; color: inherit; }
 .control label { cursor: pointer; }
 .control input { margin: 0 0.3em 0 0; }
-.toggle { position: relative; cursor: pointer; padding: 0.1em 0.6em; border: 1px solid;
-  border-radius: 0.3em; }
-.toggle input { position: absolute; opacity: 0; pointer-events: none; }
-.toggle:has(input:not(:checked)) { opacity: 0.4; }
-.toggle:has(input:focus-visible) { outline: 2px solid; outline-offset: 1px; }
+.toggle { display: inline-flex; align-items: center; gap: 0.35em; cursor: pointer; }
+.toggle input { margin: 0; }
 .stack { position: relative; }
 .slice { position: absolute; top: 0; left: 0; pointer-events: none; }
 .slice[data-hidden] { display: none; }
@@ -864,7 +861,7 @@ def _tab_choices(
             parts = [*s.slices, *(p for v in s.views for p in v.slices)]
             used = sorted({number[n] for p in parts for n in p.items})
             rules += [
-                f'  .tabs{picked(s.path)} .toggle[data-toggle="{i}"] {{ display: inline-block; }}'
+                f'  .tabs{picked(s.path)} .toggle[data-toggle="{i}"] {{ display: inline-flex; }}'
                 for i in used
             ]
     return inputs, "\n".join(["@supports selector(:has(a)) {", *rules, "}"])

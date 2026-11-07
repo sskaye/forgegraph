@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
+from matplotlib.path import Path
 from matplotlib.text import Text
 from matplotlib.ticker import FixedLocator
 from matplotlib.transforms import Bbox
@@ -42,6 +43,7 @@ from forgegraph.drawing.style import Style
 DIRECTIONS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)]
 REACHES = (1.0, 1.6, 2.4, 3.4)  # a label's distance from its anchor, in offsets
 SERIES_LABEL = "forgegraph-series-label"
+REFERENCE_GID = "forgegraph-reference-line"  # drawing/layers.py's REFERENCE; it imports this module
 
 
 @dataclass
@@ -150,15 +152,19 @@ def _drawn_points(
     ax: Axes, lines: bool, ignore: Line2D | None = None
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """(dense line samples, marker centres) of everything drawn but keys and the line to
-    ignore, in display px: with lines, along every line drawn with a line style. A bar is
-    sampled across its whole width."""
+    ignore, in display px: along every line drawn with a line style, a series' or a layer's.
+    A bar is sampled across its whole width, and a reference band across its fill. lines is
+    kept for callers, and no longer changes what counts."""
+    del lines
     dense, centres = [], []
     for line in ax.get_lines():
         if line.get_gid() == KEY or line is ignore:  # a key's own samples aren't data
             continue
+        if not line.get_visible():
+            continue
         raw = line.get_transform().transform(np.asarray(line.get_xydata(), dtype=float))
         xy = raw[np.isfinite(raw).all(axis=1)]  # dates as numbers
-        if line.get_linestyle() not in ("None", "none", " ", "") and lines:
+        if line.get_linestyle() not in ("None", "none", " ", ""):
             dense.append(_densify(xy, 1.5))
         if line.get_marker() not in ("None", "none", None, ""):
             centres.append(xy)
@@ -167,7 +173,25 @@ def _drawn_points(
             dense += [_bar_samples(box) for box in bars.rectangles()]
         elif hasattr(bars, CELL_POINTS):  # the corners and centres of a filled grid
             centres.append(ax.transData.transform(getattr(bars, CELL_POINTS)))
+        elif bars.get_gid() == REFERENCE_GID and bars.get_visible():  # a band's fill
+            dense += [
+                _fill_samples(ax, p.transformed(bars.get_transform())) for p in bars.get_paths()
+            ]
+    for patch in ax.patches:
+        if patch.get_gid() == REFERENCE_GID and patch.get_visible():  # a band from axhspan
+            dense.append(_fill_samples(ax, patch.get_path().transformed(patch.get_transform())))
     return dense, centres
+
+
+def _fill_samples(ax: Axes, path: Path) -> np.ndarray:
+    """Points 3 px apart filling a filled shape, as far as it's inside the plot."""
+    box = path.get_extents().intersection(path.get_extents(), ax.bbox)
+    if box is None or box.width <= 0 or box.height <= 0:
+        return np.empty((0, 2))
+    xs = np.linspace(box.x0, box.x1, max(2, int(box.width / 3) + 1))
+    ys = np.linspace(box.y0, box.y1, max(2, int(box.height / 3) + 1))
+    grid = np.c_[[a.ravel() for a in np.meshgrid(xs, ys)]].T
+    return grid[path.contains_points(grid, radius=1.0)]
 
 
 def _bar_samples(box: Bbox) -> np.ndarray:
@@ -198,9 +222,8 @@ class Obstacles:
         renderer: Any = None,
         ignore: Line2D | None = None,
     ) -> Obstacles:
-        """What's drawn inside the plot: every marker and bar; with lines, every line drawn
-        with a line style (the series' lines are drawn only when shown, so when no series
-        shows its line, reference lines and error-bar stems don't count either); the
+        """What's drawn inside the plot: every marker and bar, every line drawn with a line
+        style (a series', a reference line, an error bar's stem) and a band's fill; the
         plot's text (value labels, notes, a reference line's label, direct labels); with
         keys, the keys' frames. A key's own lines and text never count, nor the line to
         ignore: a box around a label set along a sloped line holds some of its own line."""

@@ -73,7 +73,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
                 missing_values: drop          *# \[drop, gap\]; What happens to rows missing x or y. drop joins the line across them, and gap breaks the line. Lint counts both in dropped-rows.*\
             marker:\
                 show: true          *# \[true, false\]; Whether to draw markers.*\
-                shape: first          *# \[first, series, circle, square, triangle_up, triangle_down, diamond, cross, plus, grid_cell, column\]; The marker shape. first is the theme's first marker shape, series takes the next one, and a column gives each of its values its own. grid_cell fills the grid the points lie on, for a heat map.*\
+                shape: first          *# \[first, series, circle, square, triangle_up, triangle_down, diamond, cross, plus, star, asterisk, grid_cell, column\]; The marker shape. first is the theme's first marker shape, series takes the next one, and a column gives each of its values its own. grid_cell fills the grid the points lie on, for a heat map.*\
                 fill: first          *# \[first, series, filled, open, column\]; The marker fill. first is the theme's first marker fill, series takes the next one, and a column gives each of its values its own.*\
                 size: 0.5          *# \[float > 0\]; The marker size, × base size.*\
             bar:\

@@ -31,6 +31,8 @@ MARKERS: dict[str, Any] = {
     "diamond": "D",
     "cross": "x",
     "plus": "+",
+    "star": "*",  # five points, filled
+    "asterisk": (6, 2, 0),  # six arms, made of lines
 }
 
 

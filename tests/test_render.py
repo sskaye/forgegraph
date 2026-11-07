@@ -958,7 +958,7 @@ def test_log_axis_labels_are_plain_or_powers_never_both():
 
 
 @pytest.mark.slow
-def test_extending_the_x_axis_for_labels_adds_no_ticks():
+def test_extending_the_x_axis_for_labels_continues_its_ticks():
     from forgegraph.catalog_build.cards import Change
     from forgegraph.catalog_build.examples import draw
 
@@ -970,7 +970,7 @@ def test_extending_the_x_axis_for_labels_adds_no_ticks():
     )
     assert g.labelling == "direct"
     ticks = [t for t in g.axes.get_xticks() if t <= g.axes.get_xlim()[1]]
-    assert max(ticks) <= 100  # the data ends at 100; the room beyond holds labels only
+    assert ticks == [0, 20, 40, 60, 80, 100, 120]  # the data ends at 100; the ticks go on (#133)
 
 
 def test_direct_labels_can_widen_a_date_axis(monkeypatch):

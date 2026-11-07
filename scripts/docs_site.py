@@ -60,6 +60,7 @@ ORDER = [
     "layer_error_bar",
     "layer_note",
     "layer_reference",
+    "layer_toggle",
     "theme",
     "styles",
     "format",

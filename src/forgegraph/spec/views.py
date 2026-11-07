@@ -30,12 +30,16 @@ from forgegraph.spec.tags import Tagged
 @dataclass(frozen=True)
 class Control:
     """A choice layer, as its page control shows it: the layer's name, the text before the
-    control, dropdown or radio, and each view's name and changes ({dotted path: value})."""
+    control, dropdown or radio, and each view's name and changes ({dotted path: value});
+    where it is on the page (top, bottom or right), and the theme parameters it sets for
+    its text (spec/layers.py look_paths)."""
 
     name: str
     label: str | None
     kind: str
     views: tuple[tuple[str, dict[str, Any]], ...]
+    position: str = "right"
+    look: tuple[tuple[str, Any], ...] = ()
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -57,6 +61,8 @@ def controls(doc: dict[str, Any], reg: Registry) -> list[Control]:
                 None if is_none(label) else str(label),
                 str(values["control"]),
                 tuple((str(v), changes(c)) for v, c in (views or {}).items()),
+                str(values["position"]),
+                tuple(values["look"].items()),
             )
         )
     return out

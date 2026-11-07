@@ -236,8 +236,8 @@ def test_choice_layers_of_the_same_name_in_a_layout_share_one_control(tmp_path, 
     page = path.read_text()
     assert page.count('class="control"') == 1 and 'id="view0-1"' in page  # radio: a's
     shown = '.tabs:not(:has(#tab1-plain:checked)) .control[data-control="0"]'  # on Both only
-    assert f"{shown} {{ display: inline-flex; }}" in page
-    assert "  .controls .control { display: none; }" in page
+    assert f"{shown} {{ display: flex; }}" in page
+    assert "  .controls .control[data-control] { display: none; }" in page
 
 
 def test_choice_layers_sharing_a_control_need_the_same_views(tmp_path, monkeypatch):

@@ -14,8 +14,8 @@ it first checks whether it's still as ForgeGraph left it, and watermarks every t
 from __future__ import annotations
 
 import itertools
-from collections.abc import Iterator
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from functools import partial
 from pathlib import Path
@@ -26,7 +26,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from forgegraph.drawing import export, lint, page
+from forgegraph.drawing import export, key, lint, page
 from forgegraph.drawing import toggles as toggled
 from forgegraph.drawing.errors import DrawError, LayoutError
 from forgegraph.drawing.figure import GraphFigure, TileAxes, canvas_figure, inches, watermark
@@ -43,12 +43,23 @@ from forgegraph.drawing.layout import (
     rooms_of,
     widest,
 )
-from forgegraph.drawing.readout import Mark, marks
+from forgegraph.drawing.readout import marks
 from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawing.toggles import Slice
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import WEIGHTS, font_file, font_weights
-from forgegraph.graph import Graph, Prepared, owned_items, page_controls, prepare, render
+from forgegraph.graph import (
+    Graph,
+    OnPage,
+    Prepared,
+    key_boxes,
+    keyed_owners,
+    owned_items,
+    page_controls,
+    page_toggles,
+    prepare,
+    render,
+)
 from forgegraph.layouts.separators import (
     apply_separators,
     backgrounds,
@@ -64,6 +75,7 @@ from forgegraph.spec.provenance import DataRecord, TileRecord, graph_fields, rec
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, Values, resolve
 from forgegraph.spec.tags import to_json
+from forgegraph.spec.toggles import Toggles
 from forgegraph.spec.validate import named_problems, validate
 from forgegraph.spec.views import Control
 
@@ -149,6 +161,10 @@ class TabFigure(Inspected):
     # chosen, one for each: this tab is the first; the others are drawn for the HTML page.
     controls: tuple[str, ...] = ()
     views: dict[tuple[str, ...], TabFigure] = field(default_factory=dict, repr=False)
+    # Draws it again, with room in its tiles' keys for checkboxes (on_page)
+    _redraw: Callable[[dict[str, frozenset[str]]], TabFigure] | None = field(
+        default=None, repr=False
+    )
 
     @property
     def style(self) -> Style:
@@ -198,39 +214,47 @@ class TabFigure(Inspected):
             out.update(owned_items(tile.axes, tile.prepared.toggles))
         return out
 
-    def on_page(
-        self, dpi: int, framed: float | None
-    ) -> tuple[bytes, tuple[Mark, ...], tuple[Slice, ...]]:
+    def on_page(self, dpi: int, framed: float | None) -> OnPage:
         """The tab as a page shows it: its SVG, its data points and, with toggle layers, its
-        images to stack. framed: the border's width, to crop each image to it."""
+        images to stack and the checkboxes in its keys. A key naming a tile's toggled series
+        needs room for their checkboxes, so the page's figure is then drawn again, with that
+        room (graph.Graph._on_page). framed: the border's width, to crop each image to it."""
+        shown = self
+        boxed = {n: keyed_owners(t.axes, t.prepared.toggles) for n, t in self.tiles.items()}
+        if any(boxed.values()) and self._redraw is not None:
+            with lint.font_messages():
+                shown = self._redraw(boxed)
 
         def crop(svg: bytes) -> bytes:
-            return svg if framed is None else _framed(self, svg, framed)
+            return svg if framed is None else _framed(shown, svg, framed)
 
-        owned = self.owned()
-        cut = toggled.slices(self.figure, toggled.member_of(owned), dpi) if owned else []
+        owned = shown.owned()
+        with shown.inspected_once() if shown is not self else nullcontext():  # self's is held
+            cut = toggled.slices(shown.figure, toggled.member_of(owned), dpi) if owned else []
+            svg = crop(export.svg(shown.figure, dpi))
         return (
-            crop(export.svg(self.figure, dpi)),
-            tuple(marks(self.figure, owned)),
+            svg,
+            tuple(marks(shown.figure, owned)),
             tuple(Slice(c.items, crop(c.svg)) for c in cut),
+            key_boxes(shown.figure, owned),
         )
 
     def viewed(self, dpi: int, framed: float | None) -> page.Shown:
         """The tab on a page: its images, and every view's if it has views. framed: the
         border's width, to crop each image to it."""
-        svg, found, cut = self.on_page(dpi, framed)
-        shown = page.Shown(self.name, self.link, svg, self.path, found, slices=cut)
+        svg, found, cut, boxes = self.on_page(dpi, framed)
+        shown = page.Shown(self.name, self.link, svg, self.path, found, slices=cut, boxes=boxes)
         if not self.views:
             return shown
         viewed = []
         for names, t in self.views.items():
             if t is self:
-                svg_, found_, cut_ = svg, found, cut
+                here = (svg, found, cut, boxes)
             else:
                 with t.inspected_once():
-                    svg_, found_, cut_ = t.on_page(dpi, framed)
+                    here = t.on_page(dpi, framed)
             choices = tuple(zip(self.controls, names, strict=True))
-            viewed.append(page.Viewed(choices, svg_, found_, cut_))
+            viewed.append(page.Viewed(choices, *here))
         return replace(shown, views=tuple(viewed))
 
     def record(self) -> dict[str, Any] | None:
@@ -252,7 +276,9 @@ class Layout(Saved):
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     _own_packs: list[str] = field(default_factory=list)  # the layout's own and its format's
     controls: list[Control] = field(default_factory=list)  # its tiles' choice layers', by name
-    toggles: tuple[page.Toggle, ...] = ()  # its tiles' toggle layers' items, by name
+    toggles: list[tuple[Toggles, Style]] = field(default_factory=list)  # its tiles', each
+    # with its tile's style
+    _styles: dict[str, Style] = field(default_factory=dict)  # each control's first tile's
 
     @property
     def issues(self) -> list[lint.Issue]:
@@ -355,13 +381,11 @@ class Layout(Saved):
                     shown,
                     self.record(),
                     "transparent" if color == "none" else color,
-                    _tab_bar(self.values, first, base, bar)
-                    if not one or self.controls or self.toggles
-                    else None,
+                    _tab_bar(self.values, first, base, bar) if not one else None,
                     framed,
                     self.freshness,
-                    page_controls(self.controls),
-                    self.toggles,
+                    tuple(page_controls([c], self._styles[c.name])[0] for c in self.controls),
+                    page_toggles(list(self.toggles), shown),
                 )
             )
         elif kind == "pdf":  # in its settings: a PDF embeds its fonts as it closes
@@ -586,7 +610,9 @@ def render_layout(
                 problems += [f"{_where(tab, name)}: {p}" for p in e.problems]
     if problems:
         raise SpecError(problems)
-    layout.controls = _shared(listed, prepared)
+    shared = _shared(listed, prepared)
+    layout.controls = [c for c, _ in shared]
+    layout._styles = {c.name: style for c, style in shared}
     layout.toggles = _shared_toggles(listed, prepared)
     for tab in listed:
         drawing = (files[_key(tab)], data, reg, fmt)
@@ -595,18 +621,27 @@ def render_layout(
     return layout
 
 
-def _shared(listed: list[Tab], prepared: dict[str, dict[str, Prepared]]) -> list[Control]:
-    """The page's controls: the tiles' choice layers, one for each name. Those of the same
-    name must have the same views, in the same order."""
-    found: dict[str, tuple[Control, str]] = {}
+def _shared(
+    listed: list[Tab], prepared: dict[str, dict[str, Prepared]]
+) -> list[tuple[Control, Style]]:
+    """The page's controls, each with its first tile's style: the tiles' choice layers, one
+    for each name. Those of the same name must have the same views, in the same order, and
+    the same position."""
+    found: dict[str, tuple[Control, str, Style]] = {}
     problems = []
     for tab in listed:
         for name, p in prepared[_key(tab)].items():
             for c in p.controls:
                 if c.name not in found:
-                    found[c.name] = (c, _where(tab, name))
+                    found[c.name] = (c, _where(tab, name), p.style)
                     continue
-                first, where = found[c.name]
+                first, where, _ = found[c.name]
+                if c.position != first.position:
+                    problems.append(
+                        f"{_where(tab, name)}: layers.{c.name}.position: {c.position}, and "
+                        f"{first.position} in {where}; choice layers of the same name share "
+                        "one control, so they need the same position"
+                    )
                 if c.names != first.names:
                     problems.append(
                         f"{_where(tab, name)}: layers.{c.name}: its views ({', '.join(c.names)}) "
@@ -616,19 +651,32 @@ def _shared(listed: list[Tab], prepared: dict[str, dict[str, Prepared]]) -> list
                     )
     if problems:
         raise SpecError(problems)
-    return [c for c, _ in found.values()]
+    return [(c, style) for c, _, style in found.values()]
 
 
 def _shared_toggles(
     listed: list[Tab], prepared: dict[str, dict[str, Prepared]]
-) -> tuple[page.Toggle, ...]:
-    """The page's toggles: the tiles' toggle layers' items, one checkbox for each name. Items
-    of the same name must be hidden at first in every tile, or in none."""
+) -> list[tuple[Toggles, Style]]:
+    """The page's toggles: the tiles' toggle layers, each with its tile's style, sharing one
+    checkbox for each item's name and one list. Items of the same name must be hidden at
+    first in every tile, or in none, and the layers must have the same position."""
     found: dict[str, tuple[bool, str]] = {}
+    layers: list[tuple[Toggles, Style]] = []
     problems = []
+    first: tuple[str, str] | None = None  # the first layer's position, and where it is
     for tab in listed:
         for name, p in prepared[_key(tab)].items():
             t = p.toggles
+            if t is not None:
+                layers.append((t, p.style))
+                if first is None:
+                    first = (t.position, _where(tab, name))
+                elif t.position != first[0]:
+                    problems.append(
+                        f"{_where(tab, name)}: layers.{t.name}.position: {t.position}, and "
+                        f"{first[0]} in {first[1]}; toggle layers share one list of checkboxes, "
+                        "so they need the same position"
+                    )
             for item in t.names if t is not None else ():
                 hidden = t is not None and item in t.hidden
                 if item not in found:
@@ -642,7 +690,7 @@ def _shared_toggles(
                     )
     if problems:
         raise SpecError(problems)
-    return tuple(page.Toggle(item, hidden) for item, (hidden, _) in found.items())
+    return layers
 
 
 def _draw_views(
@@ -712,6 +760,7 @@ def _draw_tab(
     prepared: dict[str, Prepared],
     footnote: str | None = None,
     floor: dict[str, Room] | None = None,
+    boxed: dict[str, frozenset[str]] | None = None,
 ) -> TabFigure:
     fmt = layout.format
     width, height = inches(fmt["figure.width"]), inches(fmt["figure.height"])
@@ -743,7 +792,7 @@ def _draw_tab(
                 drawn[p.name],
                 prepared[p.name].values["graph_type"],
                 p.style,
-                partial(_tile_call, tab, p),
+                partial(_tile_call, tab, p, (boxed or {}).get(p.name, frozenset())),
             )
             for p in placed
         ]
@@ -759,6 +808,7 @@ def _draw_tab(
         prepared[p.name].finish(drawn[p.name])
         tiles[p.name] = Tile(p.name, str(tab.tiles[p.name]), prepared[p.name], p.ax, drawn[p.name])
     result = TabFigure(layout, tab.name, tab.slug, tab.link, tab.path, fig, tiles, grid)
+    result._redraw = partial(_draw_tab, layout, tab, prepared, footnote, floor)
     for tile in tiles.values():  # files show the page's opening state
         t = tile.prepared.toggles
         if t is not None and t.hidden:
@@ -779,10 +829,10 @@ def _key(tab: Tab) -> str:
     return tab.where.removeprefix("tabs.")
 
 
-def _tile_call(tab: Tab, tile: Placed, function: Any, *args: Any) -> Any:
+def _tile_call(tab: Tab, tile: Placed, boxed: frozenset[str], function: Any, *args: Any) -> Any:
     """Call a graph type's function on a tile, in the tile's settings, naming the tile in any
-    error."""
-    with isolated(tile.style):
+    error; its keys leave room for checkboxes for boxed (drawing/key.py)."""
+    with isolated(tile.style), key.boxed(boxed):
         try:
             return function(*args)
         except DrawError as e:

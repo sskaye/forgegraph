@@ -43,5 +43,6 @@ parameters: !var
                     text: aggregation_value
         show:
             type: toggle
+            label: Show
             items: [series, mean]
             hidden: [mean]

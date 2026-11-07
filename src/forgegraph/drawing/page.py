@@ -135,6 +135,7 @@ class Shown:
     marks: tuple[Mark, ...] = ()  # its data points, for their readouts
     views: tuple[Viewed, ...] = ()  # with choice layers, every view's image, the first first
     slices: tuple[Slice, ...] = ()  # with toggles, its images to stack (drawing/toggles.py)
+    boxes: tuple[KeyBox, ...] = ()  # with toggles, the checkboxes in its keys
 
 
 @dataclass(frozen=True)
@@ -146,14 +147,53 @@ class Viewed:
     svg: bytes
     marks: tuple[Mark, ...] = ()
     slices: tuple[Slice, ...] = ()  # with toggles, its images to stack
+    boxes: tuple[KeyBox, ...] = ()  # with toggles, the checkboxes in its keys
+
+
+@dataclass(frozen=True)
+class Text:
+    """A control's text on a page: its font (family, size in points, weight number, color),
+    the gap between its label and the rest in points, its alignment, and the font's file."""
+
+    family: str
+    size: float
+    weight: int
+    color: str
+    gap: float
+    alignment: str
+    font: Path
 
 
 @dataclass(frozen=True)
 class Toggle:
-    """A toggle's checkbox on a page: its item's name, and whether it's hidden at first."""
+    """A toggle's checkbox on a page: its item's name, whether it's hidden at first, and
+    whether its checkboxes are in the figures' keys (KeyBox) rather than in the list."""
 
     name: str
     hidden: bool = False
+    in_key: bool = False
+
+
+@dataclass(frozen=True)
+class Toggles:
+    """A page's toggle checkboxes: each item's, the text before the list, where the list is
+    (top, bottom or right), and its text."""
+
+    items: tuple[Toggle, ...]
+    label: str | None = None
+    position: str = "right"
+    text: Text | None = None
+
+
+@dataclass(frozen=True)
+class KeyBox:
+    """A checkbox in a figure's key, for a toggle item: its centre and side, in points from
+    the figure's top left."""
+
+    item: str
+    x: float
+    y: float
+    side: float
 
 
 @dataclass(frozen=True)
@@ -165,6 +205,8 @@ class Control:
     label: str | None
     kind: str
     views: tuple[str, ...]
+    position: str = "right"  # top, bottom or right of the figures
+    text: Text | None = None
 
 
 _STYLE = """
@@ -172,7 +214,10 @@ html { background: %(background)s; }
 body { margin: 0; padding: 16px; font: 15px/1.4 system-ui, -apple-system, "Segoe UI",
   Roboto, sans-serif; color: #333333; }
 %(font_face)s
-main { max-width: %(width)s; }
+main { max-width: %(main)s; }
+.figures { max-width: %(width)s; flex: 1 1 auto; min-width: 0; }
+.body.right { display: flex; align-items: flex-start; gap: 24px; }
+@media (max-width: 640px) { .body.right { flex-direction: column; } }
 img { display: block; width: 100%%; height: auto; }
 .tabbars { display: none; margin-bottom: %(under)s; position: sticky; top: 0; z-index: 2;
   background: %(background)s; }
@@ -181,7 +226,7 @@ img { display: block; width: 100%%; height: auto; }
   pointer-events: none; }
 nav { display: flex; flex-wrap: wrap; justify-content: %(justify)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
-nav a, nav label, h2, .controls { font-family: %(family)s; font-size: %(size)s;
+nav a, nav label, h2 { font-family: %(family)s; font-size: %(size)s;
   font-weight: %(weight)s; color: %(color)s; }
 nav a, nav label { padding: %(gap)s; text-decoration: none; cursor: pointer;
   border-bottom: 3px solid transparent; margin-bottom: -%(rule_width)s; }
@@ -190,15 +235,27 @@ nav a, nav label { padding: %(gap)s; text-decoration: none; cursor: pointer;
 section + section { margin-top: 24px; }
 h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
-.controls { display: none; flex-wrap: wrap; align-items: center; gap: %(gap)s 1.5em;
-  justify-content: %(justify)s; margin-bottom: 12px; }
-.tabbars .controls { margin: %(gap)s 0 0; }
-.control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25em 0.75em; }
+.controls { display: none; flex-wrap: wrap; align-items: center; gap: 0.6em 1.5em;
+  margin-bottom: 12px; }
+.tabbars .controls { margin: 0.6em 0 0; }
+.controls.bottom { margin: 12px 0 0; }
+.controls.right { flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 1.2em;
+  margin: 0; }
+.control { display: flex; align-items: center; gap: var(--gap); }
+.controls.right .control { flex-direction: column; align-items: var(--align); }
+.options { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 0.9em; }
+.controls.right .options { flex-direction: column; align-items: var(--align); }
 .control select { font: inherit; color: inherit; }
 .control label { cursor: pointer; }
-.control input { margin: 0 0.3em 0 0; }
-.toggle { display: inline-flex; align-items: center; gap: 0.35em; cursor: pointer; }
-.toggle input { margin: 0; }
+.control input { margin: 0 0.35em 0 0; accent-color: currentColor; }
+.toggle { display: inline-flex; align-items: center; cursor: pointer; }
+.toggle input { width: 0.9em; height: 0.9em; accent-color: currentColor; }
+.kept input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0;
+  pointer-events: none; }
+.boxed { position: relative; }
+.keybox { position: absolute; aspect-ratio: 1; transform: translate(-50%%, -50%%);
+  box-sizing: border-box; border: 1px solid var(--on); border-radius: 15%%;
+  background: #FFFFFF; cursor: pointer; }
 .stack { position: relative; }
 .slice { position: absolute; top: 0; left: 0; pointer-events: none; }
 .slice[data-hidden] { display: none; }
@@ -494,17 +551,19 @@ def write(
     framed: bool = False,
     freshness: Freshness | None = None,
     controls: tuple[Control, ...] = (),
-    toggles: tuple[Toggle, ...] = (),
+    toggles: Toggles | None = None,
 ) -> Path:
     """Write the page. background: behind the figures; bar: the tab bar's look, for several
-    tabs or for controls; framed: the figures are cropped to their border, so the tab bar's
-    line is its top; freshness: a scheduled run's, for the stale banner; controls: the
-    choice layers' controls, for figures with views; toggles: the toggle layers' checkboxes,
-    for figures in slices."""
+    tabs; framed: the figures are cropped to their border, so the tab bar's line is its top;
+    freshness: a scheduled run's, for the stale banner; controls: the choice layers'
+    controls, for figures with views; toggles: the toggle layers' checkboxes, for figures in
+    slices."""
     tabbed = len(shown) > 1
-    if (tabbed or controls or toggles) and bar is None:
-        raise ValueError("a page of several tabs, or with controls, needs its tab bar's look")
+    if tabbed and bar is None:
+        raise ValueError("a page of several tabs needs its tab bar's look")
+    items = toggles.items if toggles is not None else ()
     width = max(size(v.svg)[0] for s in shown for v in _figures(s))
+    right = _controls(controls, toggles, "right")
     parts = [
         "<!doctype html>",
         '<html lang="en">',
@@ -516,28 +575,45 @@ def write(
     ]
     if record is not None:
         parts.append(f'<script type="application/json" id="{SCRIPT_ID}">{_json(record)}</script>')
-    look = {"background": background, "width": f"{width:g}pt", "under": "0" if framed else "12px"}
+    look = {
+        "background": background,
+        "width": f"{width:g}pt",
+        "main": "none" if right else f"{width:g}pt",
+        "under": "0" if framed else "12px",
+    }
     look.update(_bar_look(bar) if bar is not None else _NO_BAR)
     parts.append(f"<style>{_STYLE % look}</style>")
-    readouts = [[_readouts(v, toggles) for v in _figures(s)] for s in shown]
+    readouts = [[_readouts(v, items) for v in _figures(s)] for s in shown]
+    faces: dict[tuple[str, int], Path] = {}
     if any(any(r) for r in readouts):
-        faces = {
-            (m.look.family, m.look.weight): m.look
-            for s in shown
-            for v in _figures(s)
-            for m in v.marks
-        }
-        if bar is not None:
-            faces.pop((bar.family, bar.weight), None)  # the tab bar's face is already there
-        parts.append(f"<style>{''.join(_face(k) for k in faces.values())}{_READOUT_STYLE}</style>")
-    choices, rules = _tab_choices(shown, look["color"], controls, toggles) if tabbed else ([], "")
+        for s in shown:
+            for v in _figures(s):
+                faces.update({(m.look.family, m.look.weight): m.look.font for m in v.marks})
+    texts = [c.text for c in controls] + [toggles.text if toggles is not None else None]
+    faces.update({(t.family, t.weight): t.font for t in texts if t is not None})
+    if bar is not None:
+        faces.pop((bar.family, bar.weight), None)  # the tab bar's face is already there
+    if faces:
+        parts.append(f"<style>{''.join(_font_face(*k, f) for k, f in faces.items())}</style>")
+    if any(any(r) for r in readouts):
+        parts.append(f"<style>{_READOUT_STYLE}</style>")
+    choices, rules = _tab_choices(shown, look["color"], controls, items) if tabbed else ([], "")
     if tabbed:
         parts.append(f"<style>{rules}</style>")
     if controls:
         parts.append(f"<style>{_view_rules(shown, controls)}</style>")
-    if toggles:
-        parts.append(f"<style>{_toggle_rules(toggles)}</style>")
+    if items:
+        on = toggles.text.color if toggles is not None and toggles.text else "#333333"
+        parts.append(f"<style>{_toggle_rules(items, on)}</style>")
     parts += ["</head>", "<body>", '<main class="tabs">' if tabbed else "<main>", *choices]
+    kept = [
+        f'<input type="checkbox" id="toggle{i}"{"" if t.hidden else " checked"} '
+        f'aria-label="{html.escape(t.name)}">'
+        for i, t in enumerate(items)
+        if t.in_key
+    ]
+    if kept:  # the checkboxes the keys' boxes stand for
+        parts.append(f'<div class="kept">{"".join(kept)}</div>')
     if freshness is not None:
         data = json.dumps(
             {
@@ -550,10 +626,12 @@ def write(
         parts.append(f'<script type="application/json" id="{STALE_ID}-data">{data}</script>')
         parts.append(f'<script id="{STALE_ID}-script">{_STALE % {"id": STALE_ID}}</script>')
     if tabbed:
-        bars = [*_tab_bars(shown), *_controls(controls, toggles)]
+        bars = [*_tab_bars(shown), *_controls(controls, toggles, "top")]
         parts += ['<div class="tabbars">', *bars, "</div>"]
     else:
-        parts += _controls(controls, toggles)
+        parts += _controls(controls, toggles, "top")
+    parts.append('<div class="body right">' if right else '<div class="body">')
+    parts.append('<div class="figures">')
     for s, found in zip(shown, readouts, strict=True):
         alt = html.escape(f"{title}: {s.name}" if tabbed else title)
         heading = f"<h2>{html.escape(str(s.name))}</h2>" if tabbed else ""
@@ -568,7 +646,8 @@ def write(
                 name += html.escape(" (" + ", ".join(n for _, n in s.views[i].choices) + ")")
             figure = f'<img alt="{name}" src="data:image/svg+xml;base64,{image}">'
             if v.slices:
-                figure = _stack(v.slices, name, toggles)
+                figure = _stack(v.slices, name, items)
+            figure += _key_boxes(v.svg, v.boxes, items)
             if data is not None:
                 figure = (
                     f"{figure}<script "
@@ -576,6 +655,7 @@ def write(
                 )
             classes = ["figure"] if data is not None else []
             classes += ["stack"] if v.slices else []
+            classes += ["boxed"] if v.boxes else []
             attributes = ""
             if s.views:
                 classes.append("view")
@@ -585,7 +665,7 @@ def write(
                 figure = f'<div class="{" ".join(classes)}"{attributes}>{figure}</div>'
             figures.append(figure)
         parts.append(f"<section{where}>{heading}{''.join(figures)}</section>")
-    parts.append("</main>")
+    parts += ["</div>", *right, "</div>", *_controls(controls, toggles, "bottom"), "</main>"]
     if tabbed:
         parts.append(f"<script>{_SCRIPT}</script>")
     if any(any(r) for r in readouts):
@@ -611,45 +691,98 @@ def _view_key(v: Viewed, controls: tuple[Control, ...]) -> str:
     return " ".join(f"{by_name[c][0]}-{by_name[c][1].views.index(n)}" for c, n in v.choices)
 
 
-def _controls(controls: tuple[Control, ...], toggles: tuple[Toggle, ...] = ()) -> list[str]:
-    """The controls: each a dropdown, or radio buttons, after its label; then the toggles'
-    checkboxes."""
-    if not controls and not toggles:
+def _controls(controls: tuple[Control, ...], toggles: Toggles | None, position: str) -> list[str]:
+    """The controls at a position (top, bottom or right): each a dropdown, or radio buttons,
+    after or under its label; then the toggles' checkboxes not in a key."""
+    here = [(i, c) for i, c in enumerate(controls) if c.position == position]
+    listed = []
+    if toggles is not None and toggles.position == position:
+        listed = [(i, t) for i, t in enumerate(toggles.items) if not t.in_key]
+    if not here and not listed:
         return []
-    out = ['<div class="controls">']
-    for i, c in enumerate(controls):
+    out = [f'<div class="controls {position}">']
+    for i, c in here:
         cid = f"view{i}"
         label = html.escape(c.label) if c.label else ""
-        named = f' aria-label="{label}"' if label else ""
+        style = _text_style(c.text)
         if c.kind == "radio":
-            out.append(f'<span class="control" data-control="{i}" role="radiogroup"{named}>')
+            named = f' aria-label="{label}"' if label else ""
+            out.append(f'<span class="control" data-control="{i}"{style} role="radiogroup"{named}>')
             if label:
                 out.append(f"<span>{label}</span>")
+            out.append('<span class="options">')
             for j, v in enumerate(c.views):
                 checked = " checked" if j == 0 else ""
                 out.append(
                     f'<label><input type="radio" name="{cid}" id="{cid}-{j}" value="{j}"'
                     f"{checked}>{html.escape(v)}</label>"
                 )
+            out.append("</span>")
         else:
-            out.append(f'<span class="control" data-control="{i}">')
+            out.append(f'<span class="control" data-control="{i}"{style}>')
             if label:
                 out.append(f'<label for="{cid}">{label}</label>')
             out.append(f'<select id="{cid}">')
             out += [f'<option value="{j}">{html.escape(v)}</option>' for j, v in enumerate(c.views)]
             out.append("</select>")
         out.append("</span>")
-    if toggles:
-        out.append('<span class="control toggles" role="group" aria-label="Show">')
-        for i, t in enumerate(toggles):
+    if listed and toggles is not None:
+        label = html.escape(toggles.label) if toggles.label else ""
+        named = f' aria-label="{label}"' if label else ""
+        style = _text_style(toggles.text)
+        out.append(f'<span class="control toggles"{style} role="group"{named}>')
+        if label:
+            out.append(f"<span>{label}</span>")
+        out.append('<span class="options">')
+        for i, t in listed:
             checked = "" if t.hidden else " checked"
             out.append(
                 f'<label class="toggle" data-toggle="{i}"><input type="checkbox" '
                 f'id="toggle{i}"{checked}>{html.escape(t.name)}</label>'
             )
-        out.append("</span>")
+        out.append("</span></span>")
     out.append("</div>")
     return out
+
+
+def _text_style(text: Text | None) -> str:
+    """A control's text as an inline style: its font, its gap and its alignment."""
+    if text is None:
+        return ' style="--gap: 0.5em; --align: flex-start"'
+    align = {"left": "flex-start", "center": "center", "right": "flex-end"}[text.alignment]
+    return (
+        f' style="font-family: {html.escape(json.dumps(text.family))}; '
+        f"font-size: {text.size:g}pt; font-weight: {text.weight}; color: {text.color}; "
+        f'--gap: {text.gap:g}pt; --align: {align}"'
+    )
+
+
+def _font_face(family: str, weight: int, font: Path) -> str:
+    """An @font-face embedding a font."""
+    data = base64.b64encode(font.read_bytes()).decode("ascii")
+    kind = "opentype" if font.suffix.lower() == ".otf" else "truetype"
+    return (
+        f"@font-face {{ font-family: {json.dumps(family)}; font-weight: {weight}; "
+        f'src: url("data:font/{"otf" if kind == "opentype" else "ttf"};base64,{data}") '
+        f'format("{kind}"); }}'
+    )
+
+
+def _key_boxes(svg: bytes, boxes: tuple[KeyBox, ...], items: tuple[Toggle, ...]) -> str:
+    """The checkboxes in a figure's keys: each a label for its item's checkbox, placed by
+    its share of the image as shown (its SVG's view box)."""
+    left, top, width, height = view_box(svg) if boxes else (0.0, 0.0, 1.0, 1.0)
+    number = {t.name: i for i, t in enumerate(items)}
+    out = []
+    for b in boxes:
+        if b.item not in number:
+            continue
+        x, y, side = (b.x - left) / width * 100, (b.y - top) / height * 100, b.side / width * 100
+        out.append(
+            f'<label class="keybox" for="toggle{number[b.item]}" title="{html.escape(b.item)}" '
+            f'style="left: {x:.3f}%; top: {y:.3f}%; width: {side:.3f}%"></label>'
+        )
+    return "".join(out)
 
 
 def _chosen(controls: tuple[Control, ...], name: str, view: str) -> str:
@@ -690,12 +823,20 @@ def _stack(slices: tuple[Slice, ...], alt: str, toggles: tuple[Toggle, ...]) -> 
     return "".join(out)
 
 
-def _toggle_rules(toggles: tuple[Toggle, ...]) -> str:
-    """The rules that hide each image whose items include one switched off."""
-    rules = [
-        f'  main:has(#toggle{i}:not(:checked)) .slice[data-items~="{i}"] {{ display: none; }}'
-        for i in range(len(toggles))
-    ]
+def _toggle_rules(toggles: tuple[Toggle, ...], on: str) -> str:
+    """The rules that hide each image whose items include one switched off, and that tick a
+    key's checkbox for an item switched on, in on, the toggles' text color."""
+    rules = [f"  .keybox {{ --on: {on}; }}"]
+    for i in range(len(toggles)):
+        rules += [
+            f'  main:has(#toggle{i}:not(:checked)) .slice[data-items~="{i}"] {{ display: none; }}',
+            f'  main:has(#toggle{i}:checked) .keybox[for="toggle{i}"] {{ background: {on}; }}',
+            f'  main:has(#toggle{i}:checked) .keybox[for="toggle{i}"]::after {{ content: ""; '
+            "position: absolute; left: 33%; top: 12%; width: 26%; height: 52%; "
+            "border: solid #FFFFFF; border-width: 0 2px 2px 0; transform: rotate(45deg); }",
+            f'  main:has(#toggle{i}:focus-visible) .keybox[for="toggle{i}"] '
+            f"{{ outline: 2px solid {on}; outline-offset: 1px; }}",
+        ]
     return "\n".join(["@supports selector(:has(a)) {", *rules, "}"])
 
 
@@ -846,12 +987,12 @@ def _tab_choices(
         for c in choices
     ]
     if controls:
-        rules.append("  .controls .control { display: none; }")
+        rules.append("  .controls .control[data-control] { display: none; }")
         for s in shown:
             used = sorted({_control_id(controls, c) for v in s.views for c, _ in v.choices})
             rules += [
                 f'  .tabs{picked(s.path)} .control[data-control="{u.removeprefix("view")}"] '
-                "{ display: inline-flex; }"
+                "{ display: flex; }"
                 for u in used
             ]
     if toggles:

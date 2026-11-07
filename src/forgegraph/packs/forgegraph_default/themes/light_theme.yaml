@@ -136,6 +136,10 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
             size: 0.8          # [float > 0]; The size, × base size.
             color: "#404040"          # [hex color]; The color.
             gap: 0.5          # [float ≥ 0]; The gap between the text and whatever is around it, × base size.
+        choice:          # [text style]; A choice layer's label and its views' names on an HTML page. Its gap is between the label and the control.
+            alignment: left          # [left, center, right]; The text alignment.
+        toggle:          # [text style]; A toggle layer's label and its items' names on an HTML page. Its gap is between the label and the checkboxes.
+            alignment: left          # [left, center, right]; The text alignment.
     watermark:          # [text style]; The watermark drawn on non-standard graphs.
         weight: bold          # [light, regular, medium, semibold, bold]; The weight.
         color: "#CC0000"          # [hex color]; The color.

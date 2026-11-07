@@ -104,6 +104,8 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                 color: "#808080"          # [None, series, hex color]; The fill color. series uses the series' color. If None, there is no fill.
                 opacity: 0.15          # [0-1]; The fill opacity.
         note:          # [text style]; The notes.
+        choice:          # [text style]; A choice layer's label and its views' names on an HTML page. Its gap is between the label and the control.
+        toggle:          # [text style]; A toggle layer's label and its items' names on an HTML page. Its gap is between the label and the checkboxes.
     watermark:          # [text style]; The watermark drawn on non-standard graphs.
         text: NON-STANDARD          # [text]; The watermark's text.
         opacity: 0.18          # [0-1]; The watermark's opacity.

@@ -93,10 +93,19 @@ def stale() -> list[str]:
             found.append(name)
     for name, frame in data().items():
         theirs = SKILL / name
-        if not theirs.exists() or not pd.read_parquet(theirs).equals(frame):
+        if not theirs.exists() or not _same(pd.read_parquet(theirs), frame):
             found.append(name)
     found += sorted(p.name for p in SKILL.iterdir() if p.name not in wanted)
     return found
+
+
+def _same(a: pd.DataFrame, b: pd.DataFrame) -> bool:
+    """The same values, whatever unit each pandas version keeps its dates in."""
+    try:
+        pd.testing.assert_frame_equal(a, b, check_dtype=False)
+    except AssertionError:
+        return False
+    return True
 
 
 def write() -> None:

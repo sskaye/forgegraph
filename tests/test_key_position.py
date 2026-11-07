@@ -257,6 +257,34 @@ def test_a_key_and_a_note_keep_clear_of_a_band_and_its_lines_in_a_scatter():
     assert note.get_window_extent().y0 > band_top
 
 
+def test_a_bands_labels_may_sit_on_its_fill_and_direct_labels_on_any_fill():
+    x = np.arange(0.0, 10.0)
+    df = pd.DataFrame({"x": x, "up": 1.0 + 0.1 * x, "down": 1.6 - 0.1 * x})
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "x",
+            "axis.y.title": "v",
+            "legend.method": "direct",
+            "legend.key.title.text": "None",
+            "series": {"up": {}, "down": {}},
+        },
+    )
+    lines = {
+        "line_1": {"value": 1.0, "label": {"text": "Low", "position": "center_above"}},
+        "line_2": {"value": 1.6, "label": {"text": "High", "position": "center_below"}},
+    }
+    d["parameters"]["layers"] = {"band": {"type": "reference", "axis": "y", **lines}}
+    g = fg.render(d, df)  # the band fills the plot: its labels and the series' are on it
+    assert sorted(t.get_text() for t in g.axes.texts if t.get_text()) == [
+        "High",
+        "Low",
+        "down",
+        "up",
+    ]
+
+
 def test_ticks_continue_into_the_part_of_an_axis_extended_for_a_key():
     g = _covered()
     ticks = [float(v) for v in g.axes.get_yticks() if v <= g.axes.get_ylim()[1]]

@@ -60,6 +60,7 @@ from forgegraph.spec.parameters import as_date, is_none
 NOTE = "forgegraph-note"
 REFERENCE = "forgegraph-reference-line"
 ERROR_BAR = "forgegraph-error-bar"
+BAND_OF = "_forgegraph_band_of"  # on a band's fill: its layer's name
 GIDS = (REFERENCE, ERROR_BAR, NOTE)  # every artist a layer draws has one of these
 NAMES = {
     "mean": "Mean",
@@ -505,18 +506,28 @@ def _band(
             gid=REFERENCE,
         )
         ax.add_collection(fill, autolim=False)
+        setattr(fill, BAND_OF, layer["name"])
         return
     if pa is None and pb is None:
         span = ax.axhspan if layer["axis"] == "y" else ax.axvspan
-        span(min(a, b), max(a, b), facecolor=face, alpha=alpha, linewidth=0, zorder=1.4,
-             gid=REFERENCE)  # fmt: skip
+        drawn = span(min(a, b), max(a, b), facecolor=face, alpha=alpha, linewidth=0,
+                     zorder=1.4, gid=REFERENCE)  # fmt: skip
+        setattr(drawn, BAND_OF, layer["name"])
         return
     places = pa[0] if pa is not None else cast(Any, pb)[0]
     lo = np.full(len(places), a) if pa is None else pa[1]
     hi = np.full(len(places), b) if pb is None else np.interp(places, pb[0], pb[1])
     between = ax.fill_between if roles.base == "x" else ax.fill_betweenx
-    between(places, lo, hi, facecolor=face, alpha=alpha, linewidth=0, zorder=1.4,
-            gid=REFERENCE)  # fmt: skip
+    drawn = between(places, lo, hi, facecolor=face, alpha=alpha, linewidth=0, zorder=1.4,
+                    gid=REFERENCE)  # fmt: skip
+    setattr(drawn, BAND_OF, layer["name"])
+
+
+def _own(ax: Axes, line: RefLine) -> tuple[Any, ...]:
+    """What a line's label may sit on: its own line, if drawn from an equation, and its
+    layer's band's fill, which lies along its line."""
+    fills = [a for a in [*ax.collections, *ax.patches] if getattr(a, BAND_OF, None) == line.name]
+    return (*([line.artist] if line.artist is not None else []), *fills)
 
 
 def _named(how: str, multiplier: float, percentile: float) -> str:
@@ -728,9 +739,9 @@ def label_lines(
                 and box.y1 <= plot.y1 + 0.5
             )
             clear = (
-                labels.box_clear(ax, box, with_lines, keys=keys)
+                labels.box_clear(ax, box, with_lines, keys=keys, ignore=_own(ax, line))
                 if line.artist is None
-                else labels.label_clear(ax, a, with_lines, keys=keys, ignore=line.artist)
+                else labels.label_clear(ax, a, with_lines, keys=keys, ignore=_own(ax, line))
             )
             found = "clear" if inside and clear else "covers" if inside else "outside"
             if found == "outside" and not auto and keep:  # past the plot's edge: widen to it
@@ -747,7 +758,7 @@ def label_lines(
             measure(ax.figure)
             box, plot = a.get_window_extent(), ax.get_window_extent()
             pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-            hits = labels.Obstacles.of(ax, lines=with_lines, keys=keys, ignore=line.artist).hits(
+            hits = labels.Obstacles.of(ax, lines=with_lines, keys=keys, ignore=_own(ax, line)).hits(
                 box, pad
             )
             a.remove()

@@ -22,11 +22,12 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
 import numpy as np
+from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from matplotlib.path import Path
@@ -151,16 +152,16 @@ def _overlap(a: tuple, b: tuple, pad: float) -> bool:
 
 
 def _drawn_points(
-    ax: Axes, lines: bool, ignore: Line2D | None = None
+    ax: Axes, lines: bool, ignore: Sequence[Artist] = (), fills: bool = True
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """(dense line samples, marker centres) of everything drawn but keys and the line to
+    """(dense line samples, marker centres) of everything drawn but keys and the artists to
     ignore, in display px: along every line drawn with a line style, a series' or a layer's.
-    A bar is sampled across its whole width, and a reference band across its fill. lines is
-    kept for callers, and no longer changes what counts."""
+    A bar is sampled across its whole width, and, with fills, a reference band across its
+    fill. lines is kept for callers, and no longer changes what counts."""
     del lines
     dense, centres = [], []
     for line in ax.get_lines():
-        if line.get_gid() == KEY or line is ignore:  # a key's own samples aren't data
+        if line.get_gid() == KEY or any(line is a for a in ignore):  # a key's samples aren't data
             continue
         if not line.get_visible():
             continue
@@ -175,12 +176,19 @@ def _drawn_points(
             dense += [_bar_samples(box) for box in bars.rectangles()]
         elif hasattr(bars, CELL_POINTS):  # the corners and centres of a filled grid
             centres.append(ax.transData.transform(getattr(bars, CELL_POINTS)))
-        elif bars.get_gid() == REFERENCE_GID and bars.get_visible():  # a band's fill
+        elif bars.get_gid() == REFERENCE_GID:
+            if not fills or not bars.get_visible() or bars in ignore:
+                continue
             dense += [
                 _fill_samples(ax, p.transformed(bars.get_transform())) for p in bars.get_paths()
             ]
     for patch in ax.patches:
-        if patch.get_gid() == REFERENCE_GID and patch.get_visible():  # a band from axhspan
+        if (
+            fills
+            and patch.get_gid() == REFERENCE_GID
+            and patch.get_visible()
+            and patch not in ignore
+        ):
             dense.append(_fill_samples(ax, patch.get_path().transformed(patch.get_transform())))
     return dense, centres
 
@@ -222,14 +230,17 @@ class Obstacles:
         lines: bool,
         keys: bool,
         renderer: Any = None,
-        ignore: Line2D | None = None,
+        ignore: Sequence[Artist] = (),
+        fills: bool = True,
     ) -> Obstacles:
         """What's drawn inside the plot: every marker and bar, every line drawn with a line
         style (a series', a reference line, an error bar's stem) and a band's fill; the
         plot's text (value labels, notes, a reference line's label, direct labels); with
-        keys, the keys' frames. A key's own lines and text never count, nor the line to
-        ignore: a box around a label set along a sloped line holds some of its own line."""
-        dense, centres = _drawn_points(ax, lines, ignore)
+        keys, the keys' frames. A key's own lines and text never count, nor the artists to
+        ignore: a box around a label set along a sloped line holds some of its own line, and
+        a band's line's label may sit on the band's own fill. Without fills, bands' fills
+        don't count either."""
+        dense, centres = _drawn_points(ax, lines, ignore, fills)
         texts = [
             (t, t.get_window_extent(renderer))
             for t in ax.texts
@@ -304,7 +315,8 @@ def place_interior(ax: Axes, groups: list[Labelled], style: Style, draw: bool = 
 
     own_paths = [[ax.transData.transform(p) for p in g.paths] for g in groups]
     own_dense = [np.vstack([_densify(p, 1.5) for p in paths]) for paths in own_paths]
-    drawn = Obstacles.of(ax, lines=True, keys=False, renderer=renderer)
+    # A band's fill doesn't count: a series' label lies beside it, and the band often holds it.
+    drawn = Obstacles.of(ax, lines=True, keys=False, renderer=renderer, fills=False)
     every_line = np.vstack(drawn.dense) if drawn.dense else np.empty((0, 2))
     every_marker = np.vstack(drawn.centres) if drawn.centres else np.empty((0, 2))
     box = ax.get_window_extent(renderer)
@@ -515,7 +527,7 @@ def keys_clear(ax: Axes, lines: bool) -> bool:
 
 
 def box_clear(
-    ax: Axes, bbox: Bbox, lines: bool, keys: bool = False, ignore: Line2D | None = None
+    ax: Axes, bbox: Bbox, lines: bool, keys: bool = False, ignore: Sequence[Artist] = ()
 ) -> bool:
     """Whether a box, in display px, keeps 2 pt clear of what's drawn inside the plot, and
     off its other text (with keys, its keys too): see Obstacles.of."""
@@ -524,7 +536,7 @@ def box_clear(
 
 
 def label_clear(
-    ax: Axes, label: Text, lines: bool, keys: bool = False, ignore: Line2D | None = None
+    ax: Axes, label: Text, lines: bool, keys: bool = False, ignore: Sequence[Artist] = ()
 ) -> bool:
     """box_clear for a label turned along its line, which keeps clear of its own line by its
     gap."""

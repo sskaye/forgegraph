@@ -36,7 +36,7 @@ from forgegraph.drawing.layers import Y_VALUE
 from forgegraph.drawing.lint import Issue
 from forgegraph.drawing.markup import literal, markup
 from forgegraph.drawing.style import LINE_STYLES, MARKERS, Style, made_of_lines, unset
-from forgegraph.spec.parameters import as_date
+from forgegraph.spec.parameters import as_date, iqr_rule
 
 SERIES = "__forgegraph_series__"  # the series a long-form row belongs to
 COLUMN_NAME = "column_name"
@@ -982,11 +982,13 @@ def _axes(
     axis reaches every reference line."""
     ax.set_xscale(gt["axis.x.scale"])
     ax.set_yscale(gt["axis.y.scale"])
+    fenced: dict[str, np.ndarray] = {}
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
         along = [np.asarray(_as_xy(r, s.x, s.y)[0 if name == "x" else 1]) for s in series]
         values = axis_data.numbers(np.concatenate(along)) if along else np.array([])
         kind = drawn.kinds[name]
         axis_data.ticks_and_labels(ax, name, kind, gt, style, drawn.categories.get(name), values)
+        fenced[name] = values
         if kind == "categorical":
             if not (unset(gt[f"axis.{name}.min"]) and unset(gt[f"axis.{name}.max"])):
                 raise DrawError(
@@ -1016,6 +1018,7 @@ def _axes(
         ends = ends[~np.isnan(ends)]
         if len(ends) and not limits.outside(ends, floor, max(ends.max(), floor), log)[0].any():
             put(floor, get()[1])
+    _fences(ax, gt, fenced)
     layers.include(ax, lines, gt, drawn.warnings)
 
 
@@ -1116,7 +1119,7 @@ def _name_series(ax: Axes, drawn: Drawn, gt: dict[str, Any], style: Style) -> bo
         "positions": tuple(gt["legend.key.positions"]),
         "inside": bool(gt["legend.key.inside"]),
     }
-    extendable = tuple(end for end in ("max", "min") if unset(gt[f"axis.y.{end}"]))
+    extendable = tuple(end for end in ("max", "min") if limits.automatic(gt[f"axis.y.{end}"]))
     title = gt["legend.key.title.text"]
     one_title = not (unset(title) or title == COLUMN_NAME)  # a text: it can title one key
 
@@ -1284,15 +1287,37 @@ def _limits(ax: Axes, gt: dict[str, Any], kinds: dict[str, str]) -> None:
     """Each axis's set min and max: numbers, or dates on a date axis (axes.on_axis)."""
     for axis in ("x", "y"):
         lo, hi = gt[f"axis.{axis}.min"], gt[f"axis.{axis}.max"]
-        if unset(lo) and unset(hi):
+        if limits.automatic(lo) and limits.automatic(hi):
             continue
         get = ax.get_xlim if axis == "x" else ax.get_ylim
         put = ax.set_xlim if axis == "x" else ax.set_ylim
         at = [
-            now if unset(v) else axis_data.on_axis(v, axis, kinds[axis], f"axis.{axis}.{end}")
+            now
+            if limits.automatic(v)
+            else axis_data.on_axis(v, axis, kinds[axis], f"axis.{axis}.{end}")
             for end, v, now in zip(("min", "max"), (lo, hi), get(), strict=True)
         ]
         put(*at)
+
+
+def _fences(ax: Axes, gt: dict[str, Any], values: dict[str, np.ndarray]) -> None:
+    """Each axis end set to an IQR rule, such as 3IQR: the automatic range narrowed to the
+    quartile beyond it plus k times the interquartile range of the values drawn along it, where
+    that's nearer; never widened."""
+    for axis in ("x", "y"):
+        get = ax.get_xlim if axis == "x" else ax.get_ylim
+        put = ax.set_xlim if axis == "x" else ax.set_ylim
+        log = gt[f"axis.{axis}.scale"] == "log"
+        lo, hi = get()
+        for end in ("min", "max"):
+            k = iqr_rule(gt[f"axis.{axis}.{end}"])
+            if k is None:
+                continue
+            at = limits.fence(values[axis], k, end, log)
+            if not np.isfinite(at):
+                continue
+            lo, hi = (max(lo, at), hi) if end == "min" else (lo, min(hi, at))
+        put(lo, hi)
 
 
 def _box_and_ticks(ax: Axes, style: Style) -> None:

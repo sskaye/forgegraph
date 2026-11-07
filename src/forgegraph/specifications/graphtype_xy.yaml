@@ -14,8 +14,8 @@ parameters: !var          # !var/!fix sets whether a GraphSpec may change a prop
                     direction: ascending          # [ascending, descending]; The direction of the category order.
             title: column_name          # [None, column_name, text]; The axis title. column_name uses the name of data.column if it's the base_axis or the series' column if it's not. With several series, use text or None.
             scale: linear          # [linear, log]; The axis scale.
-            min: None          # [None, float, date]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range.
-            max: None          # [None, float, date]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range.
+            min: None          # [None, float, date, IQR rule]; The axis minimum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the lowest value minus plot_area.gap × the data's range. 3IQR moves it in to the lower quartile minus 3 × the interquartile range.
+            max: None          # [None, float, date, IQR rule]; The axis maximum. On a datetime axis, it's a date, e.g. 2025-08-25 or "2025-08-25T06:00". If None, it's the highest value plus plot_area.gap × the data's range. 3IQR moves it in to the upper quartile plus 3 × the interquartile range.
             tick:
                 algorithm: auto          # [auto, all, manual, none]; How the ticks are placed. auto uses the theme's algorithm, or on dates, the boundaries of one calendar unit. all places a tick at every value. manual places one every tick.step. none draws no ticks or tick labels.
                 step: None          # [None, float > 0, text]; The distance between ticks when algorithm is manual, e.g. 5 or "2 week". On a log axis, it's a factor.

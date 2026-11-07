@@ -25,7 +25,14 @@ from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.spec.access import packs_used, use_fonts
 from forgegraph.spec.explain import Explained
 from forgegraph.spec.loaded import load_document
-from forgegraph.spec.parameters import NONE, PARAMETERS, is_none, series_definitions, tree_set
+from forgegraph.spec.parameters import (
+    NONE,
+    PARAMETERS,
+    iqr_rule,
+    is_none,
+    series_definitions,
+    tree_set,
+)
 from forgegraph.spec.provenance import DataRecord, graph_fields, record, used
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Values, chain
@@ -293,8 +300,11 @@ def fixed_limits(gt: dict[str, Any]) -> dict[str, tuple[float | None, float | No
     return {a: (_limit(gt.get(f"axis.{a}.min")), _limit(gt.get(f"axis.{a}.max"))) for a in "xy"}
 
 
-def _limit(value: Any) -> float | None:
-    return None if is_none(value) else value_number(value)
+def _limit(value: Any) -> float | str | None:
+    """A set limit as a number; an IQR rule as "view", the end where the rule put it."""
+    if is_none(value):
+        return None
+    return "view" if iqr_rule(value) is not None else value_number(value)
 
 
 def xy(

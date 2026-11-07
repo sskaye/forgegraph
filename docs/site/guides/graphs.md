@@ -16,7 +16,7 @@ These are the polarization curves of three fuel cells, from `cell_polarization.c
 - **extends** is the GraphSpec this one builds on. With `None`, the file lists every parameter it sets, and `!var` on `parameters` lets a GraphSpec that extends it change any of them (see [Building on a GraphSpec](#building-on-a-graphspec)).
 - **specifications** names the graph type, the theme and the format. The theme sets the look and the format sets the size and the file types. Both come from a [pack](themes-formats-packs.md), and are named `pack/name`.
 - **data.file** is the Parquet file holding the DataFrame, as a path from the GraphSpec's folder. `data.preprocessing` says where the code that made it is; it's recorded in the saved files and never read.
-- **axis.x.data.column** is the column along the x-axis. Each axis can also set its `title`, `scale` (`linear` or `log`), `min` and `max`, its ticks and their label format.
+- **axis.x.data.column** is the column along the x-axis. Each axis can also set its `title`, `scale` (`linear` or `log`), `min` and `max`, its ticks and their label format. `max: 3IQR` keeps a few far outliers from squashing the data: the axis stops at the upper quartile plus 3 × the interquartile range, where that's nearer than it would be, and lint counts the points beyond it.
 - **series** lists what's drawn against it, each under its name. A series draws the column with its name unless it sets `column`, and `color: cell` gives each cell its own color. The [Series guide](series.md) covers the rest.
 
 Titles are written in label markup: `^2` or `^{...}` makes a superscript and `_{...}` a subscript, so `A/cm^2` draws as A/cm². A column's name is always drawn as it's written.

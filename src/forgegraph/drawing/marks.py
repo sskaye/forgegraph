@@ -39,6 +39,7 @@ from matplotlib.colors import to_rgb, to_rgba
 from matplotlib.text import Annotation
 from matplotlib.transforms import Bbox, IdentityTransform, Transform
 
+from forgegraph.drawing import limits
 from forgegraph.drawing.axes import number_text, numbers, on_axis
 from forgegraph.drawing.errors import DrawError
 from forgegraph.drawing.style import Style, TextStyle, unset
@@ -793,7 +794,7 @@ def grow_to_fit(
         new_lo = lo if lo_px >= low - 0.5 else lo - (data(low) - data(lo_px))
         new_hi = hi if hi_px <= high + 0.5 else hi + (data(hi_px) - data(high))
     for end, old, new in (("min", lo, new_lo), ("max", hi, new_hi)):
-        if new != old and not unset(gt[f"axis.{value_axis}.{end}"]):
+        if new != old and not limits.automatic(gt[f"axis.{value_axis}.{end}"]):
             raise DrawError(
                 f"axis.{value_axis}.{end}: {what} reach past it; widen the axis, or leave its "
                 "limit automatic"

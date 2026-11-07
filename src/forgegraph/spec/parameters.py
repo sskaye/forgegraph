@@ -80,6 +80,7 @@ TYPE_WORDS = (
     "hex colors", "two hex colors",
     "column", "columns", "graph type", "theme", "format", "graphspec", "layer type",
     "layer types", "layout", "schedule", "texts", "floats > 0", "text grid", "value format",
+    "IQR rule",
 )  # fmt: skip
 NAME_TYPES = {
     "graph type": "graph_type",
@@ -156,6 +157,7 @@ _TYPE_TEXT = {
     "float ≥ 0": "a number, 0 or more",
     "float > 0": "a number above 0",
     "date": 'a date, e.g. 2025-08-25 or "2025-08-25T06:00"',
+    "IQR rule": "a number of interquartile ranges beyond the quartiles, e.g. 3IQR",
     "hex color": "a hex color code such as #4C78A8",
     "hex colors": "a list of hex color codes",
     "two hex colors": "a list of two hex color codes",
@@ -329,6 +331,16 @@ def as_date(value: Any) -> datetime | None:
     return None
 
 
+_IQR = re.compile(r"^(\d+(?:\.\d+)?)IQR$")
+
+
+def iqr_rule(value: Any) -> float | None:
+    """The number of interquartile ranges an axis limit's rule names, e.g. 3 for 3IQR, or
+    None if the value isn't one."""
+    m = _IQR.match(value) if isinstance(value, str) else None
+    return float(m.group(1)) if m else None
+
+
 def check_value(value: Any, rng: Range, names: dict[str, set[str]] | None = None) -> str | None:
     """Return why `value` is outside `rng`, or None if it's inside."""
     names = names or {}
@@ -358,6 +370,8 @@ def _type_ok(t: str, value: Any, names: dict[str, set[str]]) -> bool:
             return _is_number(value) and value > 0
         case "date":
             return as_date(value) is not None
+        case "IQR rule":
+            return iqr_rule(value) is not None
         case "hex color":
             return isinstance(value, str) and bool(_HEX.match(value))
         case "hex colors":

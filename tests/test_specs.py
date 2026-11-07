@@ -392,6 +392,7 @@ SAMPLES = {
     "layer types": ([["note", "error_bar"], "note"], [[], ["pie"]]),
     "texts": ([["a.yaml"], ["prog", "-x"]], [[], [7], "a.yaml"]),
     "value format": ([",.0f", "%b %-d"], [7]),
+    "IQR rule": (["3IQR", "1.5IQR"], ["3 IQR", "IQR", "3iqr", 3]),
 }
 
 

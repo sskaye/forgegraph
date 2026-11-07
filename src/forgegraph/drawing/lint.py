@@ -212,8 +212,8 @@ def _limits(ax: Axes, fixed: dict[str, tuple[Any, Any]]) -> list[Issue]:
         start, end = sorted(view.get_view_interval())  # an automatic end: where it is
         low, high = limits.outside(
             _points(ax, axis),
-            start if lo is None else lo,
-            end if hi is None else hi,
+            start if lo in (None, "view") else lo,
+            end if hi in (None, "view") else hi,
             view.get_scale() == "log",
         )
         below = int(low.sum()) if lo is not None else 0

@@ -449,14 +449,29 @@ def finish[T](plots: Sequence[Plot], lay_out: Callable[[], T]) -> T:
     PLACE_PASSES times), then label each plot. A key outside a plot box needs room, and an
     axis grown for a key, note or label has more tick labels, which may be wider, so if
     there is either, all of that again, laid out around them; then check that no key outside
-    runs into anything. Returns what the last lay_out returned."""
+    runs into anything. Laid out again, a plot box may be smaller, so an axis may grow a
+    little more: while it does, all of that again, up to GROW_PASSES times, and if it still
+    grew, a last lay_out around its tick labels. Returns what the last lay_out returned."""
     laid_out = _place_and_label(plots, lay_out)
     grown = any(getattr(p.ax, GROWN, False) for p in plots)
     if grown or any(k.outside for p in plots for k in keys(p.ax)):
-        laid_out = _place_and_label(plots, lay_out)
+        for _ in range(GROW_PASSES):
+            before = _limits(plots)
+            laid_out = _place_and_label(plots, lay_out)
+            if _limits(plots) == before:
+                break
+        else:
+            laid_out = lay_out()
         for p in plots:
             p.call(check_outside, p.ax)
     return laid_out
+
+
+GROW_PASSES = 3
+
+
+def _limits(plots: Sequence[Plot]) -> list[tuple[float, ...]]:
+    return [(*p.ax.get_xlim(), *p.ax.get_ylim()) for p in plots]
 
 
 def _place_and_label[T](plots: Sequence[Plot], lay_out: Callable[[], T]) -> T:

@@ -272,8 +272,8 @@ def test_a_bands_labels_may_sit_on_its_fill_and_direct_labels_on_any_fill():
         },
     )
     lines = {
-        "line_1": {"value": 1.0, "label": {"text": "Low", "position": "center_above"}},
-        "line_2": {"value": 1.6, "label": {"text": "High", "position": "center_below"}},
+        "line_1": {"value": 1.0, "label": {"text": "Low", "position": "end_above"}},
+        "line_2": {"value": 1.6, "label": {"text": "High", "position": "end_below"}},
     }
     d["parameters"]["layers"] = {"band": {"type": "reference", "axis": "y", **lines}}
     g = fg.render(d, df)  # the band fills the plot: its labels and the series' are on it
@@ -318,3 +318,36 @@ def test_an_axis_grown_a_long_way_chooses_its_ticks_again_and_is_laid_out_around
     ticks = [float(v) for v in g.axes.get_yticks() if v <= g.axes.get_ylim()[1]]
     assert ticks[-1] > 100 and np.allclose(np.diff(ticks), ticks[1] - ticks[0])
     assert not [i for i in g.issues if i.check == "clipped-text"]
+
+
+def test_a_key_keeps_clear_of_a_markers_edge_not_only_its_centre():
+    for seed in (4, 5, 8):  # each put its key over a marker's edge when centres alone counted
+        rng = np.random.default_rng(seed)
+        df = pd.DataFrame(
+            {
+                "x": rng.uniform(0, 10, 40),
+                "y": rng.uniform(0, 10, 40),
+                "g": [f"g{i % 2}" for i in range(40)],
+            }
+        )
+        g = fg.xy(
+            df,
+            "x",
+            "y",
+            color="g",
+            parameters={
+                "legend.method": "key",
+                "series.line.show": False,
+                "series.marker.size": 1.5,
+            },
+        )
+        assert not [i for i in g.issues if i.check == "key-over-data"], seed
+
+
+def test_a_box_runs_into_a_marker_at_its_edge():
+    from forgegraph.drawing import labels
+
+    obstacles = labels.Obstacles(centres=[np.array([[0.0, 0.0]])], radii=[6.0])
+    near = labels.Bbox.from_extents(4.0, -1.0, 20.0, 1.0)  # 4 px from the centre: on the edge
+    assert obstacles.hits(near) == ["the data"]
+    assert obstacles.hits(labels.Bbox.from_extents(7.0, -1.0, 20.0, 1.0)) == []

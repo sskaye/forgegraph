@@ -51,4 +51,5 @@ baselines:          *# Generic scenarios, each the baseline with one o
         axis.y.data.column: Cell\
         axis.x.data.column: None\
         series: {"Temperature (°C)": {color: series, split: None, aggregation: {function: max}, line: {show: false}}}\
-    dated: {data.file: dated.parquet, axis.x.data.column: Date}          *# \[parameters and their values, or non-standard\]; Daily dates on x.*
+    dated: {data.file: dated.parquet, axis.x.data.column: Date}          *# \[parameters and their values, or non-standard\]; Daily dates on x.*\
+    temperature_key_outside: {series.color: "Temperature (°C)", legend.key.inside: false}          *# \[parameters and their values, or non-standard\]; A numeric color column with any key outside the plot area, so a key of each temperature fits.*

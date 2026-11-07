@@ -77,6 +77,10 @@ def _densify(pts: np.ndarray, step: float) -> np.ndarray:
     return np.vstack(out)
 
 
+def _padded(box: Bbox, pad: float) -> tuple[float, float, float, float]:
+    return (box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad)
+
+
 def _rect_dist(points: np.ndarray, box: tuple[float, float, float, float]) -> float:
     if len(points) == 0:
         return float("inf")
@@ -153,13 +157,15 @@ def _overlap(a: tuple, b: tuple, pad: float) -> bool:
 
 def _drawn_points(
     ax: Axes, lines: bool, ignore: Sequence[Artist] = (), fills: bool = True
-) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """(dense line samples, marker centres) of everything drawn but keys and the artists to
-    ignore, in display px: along every line drawn with a line style, a series' or a layer's.
+) -> tuple[list[np.ndarray], list[np.ndarray], list[float]]:
+    """(dense line samples, marker centres, each set of centres' marker radius) of everything
+    drawn but keys and the artists to ignore, in display px: along every line drawn with a
+    line style, a series' or a layer's.
     A bar is sampled across its whole width, and, with fills, a reference band across its
     fill. lines is kept for callers, and no longer changes what counts."""
     del lines
-    dense, centres = [], []
+    dense, centres, radii = [], [], []
+    px = ax.figure.dpi / 72  # type: ignore[union-attr]
     for line in ax.get_lines():
         if line.get_gid() == KEY or any(line is a for a in ignore):  # a key's samples aren't data
             continue
@@ -171,11 +177,13 @@ def _drawn_points(
             dense.append(_densify(xy, 1.5))
         if line.get_marker() not in ("None", "none", None, ""):
             centres.append(xy)
+            radii.append(line.get_markersize() / 2 * px)
     for bars in ax.collections:
         if isinstance(bars, Bars):
             dense += [_bar_samples(box) for box in bars.rectangles()]
         elif hasattr(bars, CELL_POINTS):  # the corners and centres of a filled grid
             centres.append(ax.transData.transform(getattr(bars, CELL_POINTS)))
+            radii.append(0.0)  # a cell's corners and centre
         elif bars.get_gid() == REFERENCE_GID:
             if not fills or not bars.get_visible() or bars in ignore:
                 continue
@@ -190,7 +198,7 @@ def _drawn_points(
             and patch not in ignore
         ):
             dense.append(_fill_samples(ax, patch.get_path().transformed(patch.get_transform())))
-    return dense, centres
+    return dense, centres, radii
 
 
 def _fill_samples(ax: Axes, path: Path) -> np.ndarray:
@@ -215,10 +223,11 @@ def _bar_samples(box: Bbox) -> np.ndarray:
 @dataclass
 class Obstacles:
     """What a box placed on a plot must keep clear of, in display px: points along lines and
-    filling bars, markers' centres, texts, and named boxes (keys, color bars)."""
+    filling bars, markers' centres and radii, texts, and named boxes (keys, color bars)."""
 
     dense: list[np.ndarray] = field(default_factory=list)
     centres: list[np.ndarray] = field(default_factory=list)
+    radii: list[float] = field(default_factory=list)  # each set of centres' marker radius
     texts: list[tuple[Text, Bbox]] = field(default_factory=list)
     boxes: list[tuple[str, Bbox | None]] = field(default_factory=list)  # what each is, its box
 
@@ -240,7 +249,7 @@ class Obstacles:
         ignore: a box around a label set along a sloped line holds some of its own line, and
         a band's line's label may sit on the band's own fill. Without fills, bands' fills
         don't count either."""
-        dense, centres = _drawn_points(ax, lines, ignore, fills)
+        dense, centres, radii = _drawn_points(ax, lines, ignore, fills)
         texts = [
             (t, t.get_window_extent(renderer))
             for t in ax.texts
@@ -249,15 +258,17 @@ class Obstacles:
         boxes: list[tuple[str, Bbox | None]] = (
             [(f"the key at {k.position}", k.bbox()) for k in keys_of(ax)] if keys else []
         )
-        return cls(dense, centres, texts, boxes)
+        return cls(dense, centres, radii, texts, boxes)
 
     def hits(self, box: Bbox, pad: float = 0.0) -> list[str]:
-        """What box runs into, in order: "the data" if a point comes within pad px of it,
-        then each text and named box it overlaps. One with exactly box's bounds is box
-        itself, being placed, and doesn't count."""
-        padded = (box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad)
+        """What box runs into, in order: "the data" if a line comes within pad px of it, or
+        a marker's edge does, then each text and named box it overlaps. One with exactly
+        box's bounds is box itself, being placed, and doesn't count."""
         found = []
-        if not all(_rect_dist(pts, padded) > 0 for pts in [*self.dense, *self.centres]):
+        if not all(_rect_dist(pts, _padded(box, pad)) > 0 for pts in self.dense) or not all(
+            _rect_dist(pts, _padded(box, pad + r)) > 0
+            for pts, r in zip(self.centres, self.radii, strict=True)
+        ):
             found.append("the data")
         found += [
             repr(t.get_text()) for t, b in self.texts if b.overlaps(box) and b.bounds != box.bounds
@@ -284,12 +295,13 @@ class Obstacles:
         label.set_rotation(0)
         flat = label.get_window_extent()
         label.set_rotation(rotation)
-        half = (flat.width / 2 + pad, flat.height / 2 + pad)
-        frame = (-half[0], -half[1], half[0], half[1])
-        for points in [*self.dense, *self.centres]:
+        sets = [*((p, 0.0) for p in self.dense), *zip(self.centres, self.radii, strict=True)]
+        for points, radius in sets:
+            half = (flat.width / 2 + pad + radius, flat.height / 2 + pad + radius)
+            frame = (-half[0], -half[1], half[0], half[1])
             if len(points) and not _rect_dist((points - centre) @ turn.T, frame) > 0:
                 return False
-        rest = Obstacles([], [], self.texts, self.boxes)
+        rest = Obstacles([], [], [], self.texts, self.boxes)
         return not rest.hits(box, 0.0)
 
 

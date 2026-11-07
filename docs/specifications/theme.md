@@ -107,10 +107,27 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             fill:          *# The fill between the lines of a band.*\
                 color: "#808080"          *# \[None, series, hex color\]; The fill color. series uses the series' color. If None, there is no fill.*\
                 opacity: 0.15          *# \[0-1\]; The fill opacity.*\
-        note:          *# \[text style\]; The notes.*\
+        <!-- fmc:1 -->note:          *# \[text style\]; The notes.*<!-- /fmc:1 -->\
     watermark:          *# \[text style\]; The watermark drawn on non-standard graphs.*\
         text: NON-STANDARD          *# \[text\]; The watermark's text.*\
         opacity: 0.18          *# \[0-1\]; The watermark's opacity.*\
         angle: 30          *# \[-90-90\]; The watermark's angle, in degrees counterclockwise.*\
         span: 0.8          *# \[0-1\]; The fraction of the plot area's width or height that the watermark spans, whichever it reaches first.*\
     footnote:          *# \[text style\]; The footnotes below the figure.*
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "note: # [text style]; The notes."
+  context_before: "If None, there is no fill. opacity: 0.15 # [0-1]; The fill opacity."
+  context_after: "watermark: # [text style]; The watermark drawn on non-standard graphs."
+  author: Claude
+  timestamp: 2026-11-07T20:57:53Z
+  resolved: false
+  body: |
+    Proposed addition, for the choice and toggle layers' text (see the comments on layer_choice.md and layer_toggle.md): after note,
+    
+            choice:          # [text style]; A choice layer's label and its views' names on an HTML page. Its gap is between the label and the control.
+            toggle:          # [text style]; A toggle layer's label and its items' names on an HTML page. Its gap is between the label and the checkboxes.
+    
+    Each takes the general text's values unless a theme sets its own, as note does. These draw nothing in a figure, so the catalog shows no card for them, as for title.max_wrap.
+-->

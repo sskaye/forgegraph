@@ -207,6 +207,6 @@ def test_items_sharing_a_button_start_hidden_in_every_tile_or_none(tmp_path, mon
         fg.layout(_layout(tmp_path, tabs))
     assert e.value.problems == [
         "tabs.Both.tiles.b (b.yaml): layers.t: 'cell_voltage' is shown at first, and not in "
-        "tabs.Both.tiles.a (a.yaml); items of the same name share one button, so they start "
+        "tabs.Both.tiles.a (a.yaml); items of the same name share one checkbox, so they start "
         "hidden in every tile or in none"
     ]

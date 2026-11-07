@@ -12,7 +12,7 @@ ForgeGraph is a library and agent skill for making high-quality graphs quickly a
 - **Graph type**: the type of graph, e.g. xy drawn with lines, markers, or bars.
 - **Theme**: the look: fixed styles (fonts, palettes, spines, ticks, legend style), plus defaults for options.
 - **Format**: destination-specific features: figure size, base font size, file type, dpi, etc.
-- **Layers**: <!-- fmc:1 -->overlays on a graph: reference lines and bands, error bars, notes.<!-- /fmc:1 -->
+- **Layers**: <!-- fmc:1 -->overlays on a graph: reference lines and bands, error bars, notes, controls that switch between views or show and hide series and layers.<!-- /fmc:1 -->
 - **Layout**: multiple GraphSpecs can be arranged in one figure: for multi-panel figures, dashboards.
 
 The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec's `data.file`.
@@ -47,6 +47,7 @@ Every command takes `--help`.
 - [examples/bars.yaml](examples/bars.yaml): each group's peak value as a bar, with its value.
 - [examples/layers.yaml](examples/layers.yaml): the mean of each group's runs with error bars, a reference line and a note.
 - [examples/heat_map.yaml](<!-- fmc:2 -->examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).<!-- /fmc:2 -->
+- [examples/controls.yaml](examples/controls.yaml): HTML controls: a dropdown that switches views, and checkboxes that show or hide series and layers.
 - [examples/figure.layout.yaml](examples/figure.layout.yaml): a layout of xy.yaml above bars.yaml.
 - [examples/figure.schedule.yaml](examples/figure.schedule.yaml): figure.layout.yaml rendered every weekday at 06:00.
 
@@ -63,6 +64,14 @@ Every command takes `--help`.
   suggested_edit:
     from: "overlays on a graph: reference lines and bands, error bars, notes."
     to: "overlays on a graph: reference lines and bands, error bars, notes; and controls on its HTML page that switch between views or show and hide series and layers."
+  replies:
+    - author: Steven
+      timestamp: "2026-11-07T21:57:43.904Z"
+      body: "overlays on a graph: reference lines and bands, error bars, notes, controls that switch between views or show and hide series and layers."
+    - author: Claude
+      timestamp: 2026-11-07T22:00:15Z
+      body: |
+        Done: the line is now your wording.
 - id: 2
   anchor_text: "examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (marker.shape: grid_cell)."
   context_before: "[examples/heat_map.yaml]("
@@ -77,4 +86,30 @@ Every command takes `--help`.
     to: |-
       examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).
       - [examples/controls.yaml](examples/controls.yaml): an HTML page with a dropdown that switches the current axis between linear and log, and checkboxes that show or hide the series, error bars and target line.
+  replies:
+    - author: Steven
+      timestamp: "2026-11-07T21:59:18.947Z"
+      body: |-
+        This is rendering funny, but I’m fine with these in the same style as the other examples.
+        
+        Question: Should we keep bundling examples in the skill or now that we have docs, should these be links to the relevant doc page. If it’s not inefficient for the agent to read the doc page, that gives us a single source to maintain and has a lot more detail on it.
+    - author: Claude
+      timestamp: 2026-11-07T22:00:15Z
+      body: |
+        Done: the line now reads "HTML controls: a dropdown that switches views, and checkboxes that show or hide series and layers", in the style of the others.
+        
+        On bundling the examples or linking to the docs:
+        
+        What I found:
+        1. The skill is installed from the package (forgegraph skill install), so its examples always match the installed version, and they're read from disk with no network. The published docs follow the latest release, so an agent using an older ForgeGraph would read examples for features it doesn't have.
+        2. Reading a docs page needs web access, which a sandboxed agent may not have, and in Claude Code a permission prompt the first time. A fetched page also usually comes back summarized, and a summary can lose the exact YAML.
+        3. Size: the Layers guide is 84 KB as a web page (7.6 KB as Markdown), and an example file is 0.5 to 1.2 KB. The guide has more detail, but the agent mostly needs a working GraphSpec, and forgegraph schema already gives every parameter's description.
+        4. The tests render every skill example, in the default pack and in acme's theme and format, so a broken example is caught. The docs examples are checked when the docs are built.
+        
+        Options:
+        1. Keep bundling, as now. The two sets of examples stay separate to maintain.
+        2. Link to the docs pages. One source, with more detail, but it needs web access, it may not match the installed version, and it costs the agent far more to read.
+        3. Keep bundling, from one source: the package build copies the examples the skill lists from docs/examples, with their data, so the agent reads local, version-matched YAML and we maintain one set. The docs examples use the sample datasets, so the skill would bundle those few Parquet files instead of xy.parquet.
+        
+        Recommendation: 3. It keeps what makes the bundled examples work for agents, offline, small and version-matched, and gives us the single source you're after. I'd make it a separate change after this one.
 -->

@@ -14,6 +14,8 @@ from typing import Any
 
 import numpy as np
 
+from forgegraph.spec.parameters import iqr_rule, is_none
+
 TOLERANCE = 1e-9  # of the span from one limit to the other
 
 
@@ -48,3 +50,22 @@ def ticks_in_view(axis: Any, ticks: list[Any]) -> list[Any]:
     """The Axis's ticks within its view (in_view)."""
     drawn = in_view(axis, [t.get_loc() for t in ticks])
     return [t for t, d in zip(ticks, drawn, strict=True) if d]
+
+
+def automatic(value: Any) -> bool:
+    """Whether an axis limit's value leaves that end automatic, so it can grow for a key, a
+    note or a label: None, or an IQR rule, which only narrows the automatic range."""
+    return is_none(value) or iqr_rule(value) is not None
+
+
+def fence(values: Any, k: float, end: str, log: bool = False) -> float:
+    """The IQR rule's limit at an end: the lower quartile minus k times the interquartile range,
+    or the upper quartile plus it; worked on powers of ten on a log axis."""
+    v = np.asarray(values, dtype=float)
+    v = v[np.isfinite(v) & (v > 0)] if log else v[np.isfinite(v)]
+    if not len(v):
+        return float("nan")
+    w = np.log10(v) if log else v
+    q1, q3 = np.percentile(w, [25, 75])
+    at = q1 - k * (q3 - q1) if end == "min" else q3 + k * (q3 - q1)
+    return float(10**at) if log else float(at)

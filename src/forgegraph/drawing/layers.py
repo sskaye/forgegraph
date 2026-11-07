@@ -755,7 +755,7 @@ def label_lines(
             """Grow the axis along the line at its start or end until the label is clear."""
             along = position.split("_")[0]
             other, end = ("x" if line.axis == "y" else "y"), ("max" if along == "end" else "min")
-            if along not in ("start", "end") or not unset(gt[f"axis.{other}.{end}"]):
+            if along not in ("start", "end") or not limits.automatic(gt[f"axis.{other}.{end}"]):
                 return False
             return labels.grow_until(
                 ax,
@@ -1160,7 +1160,7 @@ def notes_inside(
         box = next((b for p in tries if (b := attempt(layer, p, keep=True)) is not None), None)
         for position in tries if box is None else []:  # make room at the top or bottom
             end = "max" if position.startswith("top") else "min"
-            if not unset(gt[f"axis.y.{end}"]):
+            if not limits.automatic(gt[f"axis.y.{end}"]):
                 continue  # a set limit stays where it is
 
             def fits(layer: dict[str, Any] = layer, position: str = position) -> bool:

@@ -625,3 +625,32 @@ def test_auto_ticks_on_a_number_axis_thin_until_their_labels_fit():
 def test_a_categorical_axis_with_crowded_labels_is_still_an_error():
     with pytest.raises(fg.SpecError, match="their labels run together"):
         graph(COMPOUNDS, "compound", "value", **{"axis.x.data.type": "categorical"})
+
+
+def _outlying() -> pd.DataFrame:
+    rng = np.random.default_rng(3)
+    y = rng.normal(10.0, 1.0, 40)
+    y[0] = 400.0
+    return pd.DataFrame({"x": np.arange(40.0), "y": y})
+
+
+def test_an_iqr_rule_narrows_the_automatic_range_to_the_fence():
+    df = _outlying()
+    q1, q3 = np.percentile(df["y"], [25, 75])
+    g = graph(df, "x", "y", **{"axis.y.max": "3IQR", "series.line.show": False})
+    assert g.axes.get_ylim()[1] == pytest.approx(q3 + 3 * (q3 - q1))
+    assert [i.message for i in g.issues if i.check == "outside-limits"] == [
+        "1 above axis.y.max: those points aren't drawn"
+    ]
+
+
+def test_an_iqr_rule_never_widens_the_range():
+    df = _outlying().assign(y=lambda d: d["y"].clip(upper=12.0))
+    auto = graph(df, "x", "y", **{"series.line.show": False}).axes.get_ylim()
+    fenced = graph(df, "x", "y", **{"axis.y.max": "20IQR", "series.line.show": False})
+    assert fenced.axes.get_ylim() == pytest.approx(auto)
+
+
+def test_an_iqr_rule_must_be_a_number_and_iqr():
+    with pytest.raises(fg.SpecError, match=r"axis\.y\.max: must be"):
+        graph(_outlying(), "x", "y", **{"axis.y.max": "3 IQR"})

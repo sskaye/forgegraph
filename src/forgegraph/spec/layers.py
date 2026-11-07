@@ -21,6 +21,7 @@ from ruamel.yaml import YAML
 
 from forgegraph.spec.common import suggest
 from forgegraph.spec.parameters import (
+    COLLECTIONS,
     PARAMETERS,
     Notes,
     category_notes,
@@ -34,6 +35,9 @@ from forgegraph.spec.parameters import (
 from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, chain, named, resolve
 from forgegraph.spec.tags import Tagged, TaggedMap, status_at, untag
+
+CONTROLS = ("choice",)  # layer types drawn as controls on an HTML page, not in the figure
+VIEW_LIMITS = ("specifications", "data", "output", "provenance")  # categories a view can't set
 
 
 @cache
@@ -64,6 +68,8 @@ def looks_in(path: Path) -> dict[str, str]:
 
     def walk(node: Any, prefix: str) -> None:
         for key in node if hasattr(node, "items") else []:
+            if not prefix and key in COLLECTIONS["layer"]:
+                continue  # a collection, not a category (spec/views.py)
             here = f"{prefix}.{key}" if prefix else str(key)
             found = category_notes(node, key, f"{path.name}: {here}")
             if found is not None and found.same is not None:  # a sibling's, under its own name
@@ -213,7 +219,10 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
             continue
         defs, looks = definitions("layer", str(kind)), look_paths(str(kind))
         theme_defs = definitions("theme")
-        for path, value in flatten({k: v for k, v in entry.items() if k != "type"}).items():
+        own = {k: v for k, v in entry.items() if k != "type"}
+        if kind in CONTROLS:
+            errors += _views_problems(where, own.pop("views", None), doc, reg)
+        for path, value in flatten(own).items():
             p = defs.get(path) or (theme_defs[looks[path]] if path in looks else None)
             if p is None:
                 known = [*defs, *looks]
@@ -226,4 +235,29 @@ def layer_problems(doc: dict[str, Any], reg: Registry) -> list[str]:
                 continue
             for suffix, message in check_parameter(p, value, names):
                 errors.append(f"{where}.{path}{suffix}: {message}")
+    return errors
+
+
+def _views_problems(where: str, views: Any, doc: dict[str, Any], reg: Registry) -> list[str]:
+    """Problems with the views a choice layer lists, as written: each view's changes are
+    checked with the GraphSpec (spec/views.py)."""
+    where = f"{where}.views"
+    if views is None:
+        return []
+    if not isinstance(views, dict) or not views:
+        return [f"{where}: must be views keyed by name, each a mapping of parameters and values"]
+    choices = [n for n, r in resolve_layers(doc, reg).items() if r.value.get("type") in CONTROLS]
+    errors = []
+    for name, view in views.items():
+        if is_none(view) or view == {}:
+            continue
+        if not isinstance(view, dict):
+            errors.append(f"{where}.{name}: must be parameters and their values, or {{}}")
+            continue
+        for path in flatten(view):
+            top, _, rest = path.partition(".")
+            if top in VIEW_LIMITS:
+                errors.append(f"{where}.{name}.{path}: a view can't set {top}")
+            elif top == "layers" and rest.partition(".")[0] in choices:
+                errors.append(f"{where}.{name}.{path}: a view can't set a choice layer")
     return errors

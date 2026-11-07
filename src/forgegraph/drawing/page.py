@@ -32,6 +32,13 @@ short script compares them with the viewer's clock and shows a banner at the top
 data is older: a job that stopped can't look current. It works where the page's scripts run;
 the "data as of" footnote in each figure is what always shows.
 
+A graph with choice layers (spec/views.py) has an image for each view, and the page shows a
+control for each choice layer, above the figures and under the tab bars: a dropdown, or a
+row of radio buttons, after the layer's label, in the tab bar's font (a graph's theme's
+general text). The page's style shows the image of the views chosen, so the controls work
+where its scripts don't run; a control a tab doesn't use is hidden while it's showing. In a
+browser too old for the style, there are no controls, and each figure shows its first view.
+
 Each figure's data points have readouts (drawing/readout.py): pointing at a point, or tapping
 it, shows its values in a box above it, with a ring around the point. The page carries each
 figure's points beside its image, as JSON, with a script that finds the point under the
@@ -120,6 +127,28 @@ class Shown:
     svg: bytes
     path: tuple[str, ...] = ()
     marks: tuple[Mark, ...] = ()  # its data points, for their readouts
+    views: tuple[Viewed, ...] = ()  # with choice layers, every view's image, the first first
+
+
+@dataclass(frozen=True)
+class Viewed:
+    """One view's image of a figure: the view chosen at each control it uses, as (the
+    control's name, the view's name), its SVG and its data points."""
+
+    choices: tuple[tuple[str, str], ...]
+    svg: bytes
+    marks: tuple[Mark, ...] = ()
+
+
+@dataclass(frozen=True)
+class Control:
+    """A control on a page: a choice layer's name, the text before it, dropdown or radio,
+    and its views' names."""
+
+    name: str
+    label: str | None
+    kind: str
+    views: tuple[str, ...]
 
 
 _STYLE = """
@@ -136,8 +165,8 @@ img { display: block; width: 100%%; height: auto; }
   pointer-events: none; }
 nav { display: flex; flex-wrap: wrap; justify-content: %(justify)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
-nav a, nav label, h2 { font-family: %(family)s; font-size: %(size)s; font-weight: %(weight)s;
-  color: %(color)s; }
+nav a, nav label, h2, .controls { font-family: %(family)s; font-size: %(size)s;
+  font-weight: %(weight)s; color: %(color)s; }
 nav a, nav label { padding: %(gap)s; text-decoration: none; cursor: pointer;
   border-bottom: 3px solid transparent; margin-bottom: -%(rule_width)s; }
 #forgegraph-stale { margin-bottom: 12px; padding: 8px 12px; background: #FFF4CE;
@@ -145,8 +174,19 @@ nav a, nav label { padding: %(gap)s; text-decoration: none; cursor: pointer;
 section + section { margin-top: 24px; }
 h2 { margin: 0 0 %(under)s; padding-bottom: %(gap)s;
   border-bottom: %(rule_width)s %(rule_style)s %(rule)s; }
+.controls { display: none; flex-wrap: wrap; align-items: center; gap: %(gap)s 1.5em;
+  justify-content: %(justify)s; margin-bottom: 12px; }
+.tabbars .controls { margin: %(gap)s 0 0; }
+.control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25em 0.75em; }
+.control select { font: inherit; color: inherit; }
+.control label { cursor: pointer; }
+.control input { margin: 0 0.3em 0 0; }
+.view { display: none; }
+.view[data-first] { display: block; }
 @supports selector(:has(a)) {
   .tabbars { display: block; }
+  .controls { display: flex; }
+  main .view[data-first] { display: none; }
   .tabbars nav:not([data-under=""]) { display: none; }
   .tabs section { display: none; margin-top: 0; }
   .tabs h2 { display: none; }
@@ -183,7 +223,7 @@ _SCRIPT = (
   document.querySelectorAll(".tabbars nav").forEach(function (nav) {
     nav.setAttribute("role", "tablist");
   });
-  var links = Array.prototype.map.call(document.querySelectorAll(".tabbars label"),
+  var links = Array.prototype.map.call(document.querySelectorAll(".tabbars nav label"),
     function (label) {
       var a = document.createElement("a"), to = label.getAttribute("data-path");
       a.href = "#" + to;
@@ -426,14 +466,16 @@ def write(
     bar: TabBar | None = None,
     framed: bool = False,
     freshness: Freshness | None = None,
+    controls: tuple[Control, ...] = (),
 ) -> Path:
     """Write the page. background: behind the figures; bar: the tab bar's look, for several
-    tabs; framed: the figures are cropped to their border, so the tab bar's line is its top;
-    freshness: a scheduled run's, for the stale banner."""
+    tabs or for controls; framed: the figures are cropped to their border, so the tab bar's
+    line is its top; freshness: a scheduled run's, for the stale banner; controls: the
+    choice layers' controls, for figures with views."""
     tabbed = len(shown) > 1
-    if tabbed and bar is None:
-        raise ValueError("a page of several tabs needs its tab bar's look")
-    width = max(size(s.svg)[0] for s in shown)
+    if (tabbed or controls) and bar is None:
+        raise ValueError("a page of several tabs, or with controls, needs its tab bar's look")
+    width = max(size(v.svg)[0] for s in shown for v in _figures(s))
     parts = [
         "<!doctype html>",
         '<html lang="en">',
@@ -448,15 +490,22 @@ def write(
     look = {"background": background, "width": f"{width:g}pt", "under": "0" if framed else "12px"}
     look.update(_bar_look(bar) if bar is not None else _NO_BAR)
     parts.append(f"<style>{_STYLE % look}</style>")
-    readouts = [_readouts(s) for s in shown]
-    if any(readouts):
-        faces = {(m.look.family, m.look.weight): m.look for s in shown for m in s.marks}
+    readouts = [[_readouts(v) for v in _figures(s)] for s in shown]
+    if any(any(r) for r in readouts):
+        faces = {
+            (m.look.family, m.look.weight): m.look
+            for s in shown
+            for v in _figures(s)
+            for m in v.marks
+        }
         if bar is not None:
             faces.pop((bar.family, bar.weight), None)  # the tab bar's face is already there
         parts.append(f"<style>{''.join(_face(k) for k in faces.values())}{_READOUT_STYLE}</style>")
-    choices, rules = _tab_choices(shown, look["color"]) if tabbed else ([], "")
+    choices, rules = _tab_choices(shown, look["color"], controls) if tabbed else ([], "")
     if tabbed:
         parts.append(f"<style>{rules}</style>")
+    if controls:
+        parts.append(f"<style>{_view_rules(shown, controls)}</style>")
     parts += ["</head>", "<body>", '<main class="tabs">' if tabbed else "<main>", *choices]
     if freshness is not None:
         data = json.dumps(
@@ -470,25 +519,41 @@ def write(
         parts.append(f'<script type="application/json" id="{STALE_ID}-data">{data}</script>')
         parts.append(f'<script id="{STALE_ID}-script">{_STALE % {"id": STALE_ID}}</script>')
     if tabbed:
-        parts += ['<div class="tabbars">', *_tab_bars(shown), "</div>"]
-    for s, data in zip(shown, readouts, strict=True):
-        image = base64.b64encode(s.svg).decode("ascii")
+        parts += ['<div class="tabbars">', *_tab_bars(shown), *_controls(controls), "</div>"]
+    else:
+        parts += _controls(controls)
+    for s, found in zip(shown, readouts, strict=True):
         alt = html.escape(f"{title}: {s.name}" if tabbed else title)
         heading = f"<h2>{html.escape(str(s.name))}</h2>" if tabbed else ""
         where = f' id="{s.slug}"' if s.slug else ""
         if tabbed:
             where += f' data-choices="{" ".join(_choices(s.path))}"'
-        figure = f'<img alt="{alt}" src="data:image/svg+xml;base64,{image}">'
-        if data is not None:
-            figure = (
-                f'<div class="figure">{figure}<script type="application/json" '
-                f'class="{READOUTS}">{_json(data)}</script></div>'
-            )
-        parts.append(f"<section{where}>{heading}{figure}</section>")
+        figures = []
+        for i, (v, data) in enumerate(zip(_figures(s), found, strict=True)):
+            image = base64.b64encode(v.svg).decode("ascii")
+            name = alt
+            if s.views:
+                name += html.escape(" (" + ", ".join(n for _, n in s.views[i].choices) + ")")
+            figure = f'<img alt="{name}" src="data:image/svg+xml;base64,{image}">'
+            if data is not None:
+                figure = (
+                    f"{figure}<script "
+                    f'type="application/json" class="{READOUTS}">{_json(data)}</script>'
+                )
+            classes = ["figure"] if data is not None else []
+            attributes = ""
+            if s.views:
+                classes.append("view")
+                attributes = f' data-view="{_view_key(s.views[i], controls)}"'
+                attributes += " data-first" if i == 0 else ""
+            if classes:
+                figure = f'<div class="{" ".join(classes)}"{attributes}>{figure}</div>'
+            figures.append(figure)
+        parts.append(f"<section{where}>{heading}{''.join(figures)}</section>")
     parts.append("</main>")
     if tabbed:
         parts.append(f"<script>{_SCRIPT}</script>")
-    if any(readouts):
+    if any(any(r) for r in readouts):
         parts.append(f"<script>{_READOUT_SCRIPT % {'class': READOUTS}}</script>")
     parts += ["</body>", "</html>", ""]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -496,7 +561,73 @@ def write(
     return path
 
 
-def _readouts(s: Shown) -> dict[str, Any] | None:
+def _figures(s: Shown) -> tuple[Shown | Viewed, ...]:
+    """A figure's images: each view's, or its one."""
+    return s.views or (s,)
+
+
+def _control_id(controls: tuple[Control, ...], name: str) -> str:
+    return f"view{[c.name for c in controls].index(name)}"
+
+
+def _view_key(v: Viewed, controls: tuple[Control, ...]) -> str:
+    """A view's image's key: each control's and view's number, as 0-1 2-0."""
+    by_name = {c.name: (i, c) for i, c in enumerate(controls)}
+    return " ".join(f"{by_name[c][0]}-{by_name[c][1].views.index(n)}" for c, n in v.choices)
+
+
+def _controls(controls: tuple[Control, ...]) -> list[str]:
+    """The controls: each a dropdown, or radio buttons, after its label."""
+    if not controls:
+        return []
+    out = ['<div class="controls">']
+    for i, c in enumerate(controls):
+        cid = f"view{i}"
+        label = html.escape(c.label) if c.label else ""
+        named = f' aria-label="{label}"' if label else ""
+        if c.kind == "radio":
+            out.append(f'<span class="control" data-control="{i}" role="radiogroup"{named}>')
+            if label:
+                out.append(f"<span>{label}</span>")
+            for j, v in enumerate(c.views):
+                checked = " checked" if j == 0 else ""
+                out.append(
+                    f'<label><input type="radio" name="{cid}" id="{cid}-{j}" value="{j}"'
+                    f"{checked}>{html.escape(v)}</label>"
+                )
+        else:
+            out.append(f'<span class="control" data-control="{i}">')
+            if label:
+                out.append(f'<label for="{cid}">{label}</label>')
+            out.append(f'<select id="{cid}">')
+            out += [f'<option value="{j}">{html.escape(v)}</option>' for j, v in enumerate(c.views)]
+            out.append("</select>")
+        out.append("</span>")
+    out.append("</div>")
+    return out
+
+
+def _chosen(controls: tuple[Control, ...], name: str, view: str) -> str:
+    """The selector that holds when a control has a view chosen."""
+    i = [c.name for c in controls].index(name)
+    j = controls[i].views.index(view)
+    if controls[i].kind == "radio":
+        return f":has(#view{i}-{j}:checked)"
+    return f':has(#view{i} option[value="{j}"]:checked)'
+
+
+def _view_rules(shown: list[Shown], controls: tuple[Control, ...]) -> str:
+    """The rules that show each figure's image of the views chosen."""
+    rules = {}
+    for s in shown:
+        for v in s.views:
+            key = _view_key(v, controls)
+            picked = "".join(_chosen(controls, c, n) for c, n in v.choices)
+            rules[key] = f'  main{picked} .view[data-view="{key}"] {{ display: block; }}'
+    return "\n".join(["@supports selector(:has(a)) {", *rules.values(), "}"])
+
+
+def _readouts(s: Shown | Viewed) -> dict[str, Any] | None:
     """A figure's points for the page's script, in fractions of its image as shown (its SVG's
     view box): each [x, y, the marker's radius as a fraction of the width, the bar's box
     (left, top, right, bottom) or null, its ring's color, its look, and its lines, each
@@ -587,11 +718,13 @@ def _children(shown: list[Shown]) -> dict[tuple[str, ...], list[tuple[str, ...]]
     return out
 
 
-def _tab_choices(shown: list[Shown], color: str) -> tuple[list[str], str]:
+def _tab_choices(
+    shown: list[Shown], color: str, controls: tuple[Control, ...] = ()
+) -> tuple[list[str], str]:
     """The hidden choices, the first tab's checked, and the rules that show what they pick:
     at each level, the tab of the chosen name, or the group's first when it has none. The
-    rules show that tab, the tab bar of the tabs in it, the line under its name, and an
-    outline around a name whose choice the keyboard is on."""
+    rules show that tab, the tab bar of the tabs in it, the line under its name, the
+    controls its views use, and an outline around a name whose choice the keyboard is on."""
     from forgegraph.spec.layout import slug
 
     children = _children(shown)
@@ -634,6 +767,15 @@ def _tab_choices(shown: list[Shown], color: str) -> tuple[list[str], str]:
         f'  #{c}:focus-visible ~ .tabbars label[for="{c}"] {{ outline: 2px solid {color}; }}'
         for c in choices
     ]
+    if controls:
+        rules.append("  .controls .control { display: none; }")
+        for s in shown:
+            used = sorted({_control_id(controls, c) for v in s.views for c, _ in v.choices})
+            rules += [
+                f'  .tabs{picked(s.path)} .control[data-control="{u.removeprefix("view")}"] '
+                "{ display: inline-flex; }"
+                for u in used
+            ]
     return inputs, "\n".join(["@supports selector(:has(a)) {", *rules, "}"])
 
 

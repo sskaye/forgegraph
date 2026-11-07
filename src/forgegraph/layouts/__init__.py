@@ -13,9 +13,10 @@ it first checks whether it's still as ForgeGraph left it, and watermarks every t
 
 from __future__ import annotations
 
+import itertools
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import partial
 from pathlib import Path
 from typing import Any, cast
@@ -42,7 +43,7 @@ from forgegraph.drawing.readout import marks
 from forgegraph.drawing.style import LineStyle, Style, isolated
 from forgegraph.drawn import Inspected, Saved, SpecError
 from forgegraph.fonts import WEIGHTS, font_file, font_weights
-from forgegraph.graph import Graph, Prepared, prepare, render
+from forgegraph.graph import Graph, Prepared, page_controls, prepare, render
 from forgegraph.layouts.separators import (
     apply_separators,
     backgrounds,
@@ -59,6 +60,7 @@ from forgegraph.spec.registry import Registry
 from forgegraph.spec.resolve import Resolved, Values, resolve
 from forgegraph.spec.tags import to_json
 from forgegraph.spec.validate import named_problems, validate
+from forgegraph.spec.views import Control
 
 SUFFIX = ".layout.yaml"
 
@@ -138,6 +140,10 @@ class TabFigure(Inspected):
     _drawn: str = ""
     _held: bool = False  # inspected already, during one save (see Graph.inspected_once)
     _font_problems: list[str] = field(default_factory=list)
+    # The controls its tiles' choice layers share, by name, and every view by the names
+    # chosen, one for each: this tab is the first; the others are drawn for the HTML page.
+    controls: tuple[str, ...] = ()
+    views: dict[tuple[str, ...], TabFigure] = field(default_factory=dict, repr=False)
 
     @property
     def style(self) -> Style:
@@ -165,7 +171,41 @@ class TabFigure(Inspected):
             found = tile.prepared.plot_issues(tile.axes, tile.drawing)
             issues += [lint.Issue(i.check, f"tile '{tile.name}': {i.message}") for i in found]
         self.issues = issues
-        return issues
+        if self.views:
+            self.issues = self.with_views([t.check() for t in self.others()])
+        return self.issues
+
+    def others(self) -> list[TabFigure]:
+        return [t for t in self.views.values() if t is not self]
+
+    def with_views(self, others: list[list[lint.Issue]]) -> list[lint.Issue]:
+        """Its own issues, then each other view's, each naming its view."""
+        out = []
+        for names, issues in zip(self.views, [self.issues, *others], strict=True):
+            label = " / ".join(names)
+            out += [lint.Issue(i.check, f"view '{label}': {i.message}") for i in issues]
+        return out
+
+    def viewed(self, svg: bytes, dpi: int, framed: float | None) -> page.Shown:
+        """The tab on a page: its image, and every view's if it has views. framed: the
+        border's width, to crop each image to it."""
+
+        def image(t: TabFigure) -> bytes:
+            out = export.svg(t.figure, dpi)
+            return out if framed is None else _framed(t, out, framed)
+
+        shown = page.Shown(self.name, self.link, svg, self.path, tuple(marks(self.figure)))
+        if not self.views:
+            return shown
+        viewed = []
+        for names, t in self.views.items():
+            if t is self:
+                svg_, found = shown.svg, shown.marks
+            else:
+                with t.inspected_once():
+                    svg_, found = image(t), tuple(marks(t.figure))
+            viewed.append(page.Viewed(tuple(zip(self.controls, names, strict=True)), svg_, found))
+        return replace(shown, views=tuple(viewed))
 
     def record(self) -> dict[str, Any] | None:
         """The provenance record of files showing this tab."""
@@ -185,6 +225,7 @@ class Layout(Saved):
     freshness: page.Freshness | None = None  # a scheduled run's, for its HTML page
     nonstandard_packs: list[str] = field(default_factory=list)  # used, not in the main config
     _own_packs: list[str] = field(default_factory=list)  # the layout's own and its format's
+    controls: list[Control] = field(default_factory=list)  # its tiles' choice layers', by name
 
     @property
     def issues(self) -> list[lint.Issue]:
@@ -273,18 +314,15 @@ class Layout(Saved):
             framed = not one and look.visible and bool(self.values["separators.border.show"])
             bar = line_style(self.values, first, base, "tab_bar.line")
             with self.tabs[0].saving():
-                shown = [
-                    page.Shown(
-                        None if one else t.name,
-                        None if one else t.link,
-                        _framed(t, export.svg(t.figure, dpi), border)
-                        if framed
-                        else export.svg(t.figure, dpi),
-                        () if one else t.path,
-                        tuple(marks(t.figure)),
+                shown = []
+                for t in self.tabs:
+                    svg = export.svg(t.figure, dpi)
+                    viewed = t.viewed(
+                        _framed(t, svg, border) if framed else svg, dpi, border if framed else None
                     )
-                    for t in self.tabs
-                ]
+                    if one:
+                        viewed = replace(viewed, name=None, slug=None, path=())
+                    shown.append(viewed)
             color = gap_color(first)
             out.append(
                 page.write(
@@ -293,9 +331,10 @@ class Layout(Saved):
                     shown,
                     self.record(),
                     "transparent" if color == "none" else color,
-                    _tab_bar(self.values, first, base, bar) if not one else None,
+                    _tab_bar(self.values, first, base, bar) if not one or self.controls else None,
                     framed,
                     self.freshness,
+                    page_controls(self.controls),
                 )
             )
         elif kind == "pdf":  # in its settings: a PDF embeds its fonts as it closes
@@ -520,10 +559,80 @@ def render_layout(
                 problems += [f"{_where(tab, name)}: {p}" for p in e.problems]
     if problems:
         raise SpecError(problems)
+    layout.controls = _shared(listed, prepared)
     for tab in listed:
-        layout.tabs.append(_draw_tab(layout, tab, prepared[_key(tab)], footnote))
+        drawing = (files[_key(tab)], data, reg, fmt)
+        layout.tabs.append(_draw_views(layout, tab, prepared[_key(tab)], drawing, footnote))
     layout.nonstandard_packs = sorted({p for t in layout.tabs for p in t.nonstandard_packs})
     return layout
+
+
+def _shared(listed: list[Tab], prepared: dict[str, dict[str, Prepared]]) -> list[Control]:
+    """The page's controls: the tiles' choice layers, one for each name. Those of the same
+    name must have the same views, in the same order."""
+    found: dict[str, tuple[Control, str]] = {}
+    problems = []
+    for tab in listed:
+        for name, p in prepared[_key(tab)].items():
+            for c in p.controls:
+                if c.name not in found:
+                    found[c.name] = (c, _where(tab, name))
+                    continue
+                first, where = found[c.name]
+                if c.names != first.names:
+                    problems.append(
+                        f"{_where(tab, name)}: layers.{c.name}: its views ({', '.join(c.names)}) "
+                        f"aren't those of the choice layer of that name in {where} "
+                        f"({', '.join(first.names)}); choice layers of the same name share one "
+                        "control, so their views need the same names in the same order"
+                    )
+    if problems:
+        raise SpecError(problems)
+    return [c for c, _ in found.values()]
+
+
+def _draw_views(
+    layout: Layout,
+    tab: Tab,
+    prepared: dict[str, Prepared],
+    drawing: tuple[dict[str, Path], dict[str, pd.DataFrame], Registry, Values],
+    footnote: str | None,
+) -> TabFigure:
+    """Draw a tab; with choice layers in its tiles, every combination of the views they use,
+    each tile drawn with its own changes for the views chosen (spec/views.py). drawing: the
+    tiles' files, their DataFrames, and the registry and format they're drawn with."""
+    files, data, reg, fmt = drawing
+    used = [c for c in layout.controls if any(c.name in _names(p) for p in prepared.values())]
+    if not used:
+        return _draw_tab(layout, tab, prepared, footnote)
+    drawn: dict[tuple[str, ...], TabFigure] = {}
+    for picked in itertools.product(*(c.names for c in used)):
+        chosen = dict(zip((c.name for c in used), picked, strict=True))
+        tiles = {}
+        for name, p in prepared.items():
+            if not p.controls:
+                tiles[name] = p
+                continue
+            change: dict[str, Any] = {}
+            for c in p.controls:
+                change.update(dict(c.views)[chosen[c.name]])
+            try:
+                tiles[name] = prepare(files[name], data.get(name), reg, format=fmt, view=change)
+            except SpecError as e:
+                raise SpecError([f"{_where(tab, name)}: {m}" for m in e.problems]) from None
+        try:
+            drawn[picked] = _draw_tab(layout, tab, tiles, footnote)
+        except SpecError as e:
+            label = " / ".join(picked)
+            raise SpecError([f"view '{label}': {m}" for m in e.problems]) from None
+    first = next(iter(drawn.values()))
+    first.controls, first.views = tuple(c.name for c in used), drawn
+    first.issues = first.with_views([t.issues for t in first.others()])
+    return first
+
+
+def _names(p: Prepared) -> set[str]:
+    return {c.name for c in p.controls}
 
 
 def _draw_tab(

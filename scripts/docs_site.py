@@ -56,6 +56,7 @@ PACK = "docs/packs/forgegraph_default/"
 ORDER = [
     "graphspec_example",
     "graphtype_xy",
+    "layer_choice",
     "layer_error_bar",
     "layer_note",
     "layer_reference",
@@ -250,9 +251,10 @@ PREPARE = {
 def example_images() -> dict[str, bytes]:
     """Every example drawn, by its image's path in the site: images/<name>.png for each
     GraphSpec and layout in docs/examples and each of LAYOUTS, or for a layout of several
-    tabs, images/<name>-<tab>.png; and each layout in docs/examples as its HTML page,
-    pages/<name>.html. Each GraphSpec in docs/examples reads a sample dataset as
-    Parquet (data.file: <dataset>.parquet), written from examples/sample-data as it's drawn.
+    tabs, images/<name>-<tab>.png; and each layout in docs/examples, and each GraphSpec
+    there with views, as its HTML page, pages/<name>.html. Each GraphSpec in docs/examples
+    reads a sample dataset as Parquet (data.file: <dataset>.parquet), written from
+    examples/sample-data as it's drawn.
     An example that can't be drawn, is non-standard or has a lint issue other than rows left
     out is an error."""
     import forgegraph as fg
@@ -275,7 +277,8 @@ def example_images() -> dict[str, bytes]:
             name = spec.name.removesuffix(".yaml").removesuffix(".layout")
             for image in drawn._write(folder / "images" / name, ["png"]):
                 out[f"images/{image.name}"] = _narrowed(image.read_bytes())
-            if layout and spec.parent == work:  # its page, to try its tabs and readouts
+            if spec.parent == work and (layout or drawn.controls):  # to try its tabs, views
+                # and readouts
                 [page] = drawn._write(folder / "pages" / name, ["html"])
                 out[f"pages/{page.name}"] = page.read_bytes()
     return out

@@ -61,7 +61,11 @@ DENSITY = 1.5  # image pixels per CSS pixel: sharp on most screens, small enough
 COLORS = 64  # palette size: plenty for a graph's few colors and their anti-aliasing
 # Parameters that can't change a drawing: a format's saved files, and the layer types a
 # GraphSpec may list
-EXEMPT = {"format": ("output.", "provenance."), "graph_type": ("layer.types",)}
+EXEMPT = {  # parameters no card can show
+    "format": ("output.", "provenance."),
+    "graph_type": ("layer.types",),
+    "theme": ("title.max_wrap",),  # it changes only a title too wide to draw with its default, 0
+}
 SIZES = {"figure.height": "figure.width", "figure.width": "figure.height"}  # each from the other
 FORMATS = (".3f", "%b %-d")  # a format's candidates: for numbers, then for dates
 SAMPLE_TEXT = "Sample text"

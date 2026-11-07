@@ -1,0 +1,38 @@
+name: penguin_measures
+version: 0
+description: A penguin measurement against bill length for three species, the measurement chosen on the HTML page.
+extends: None
+parameters: !var
+    specifications:
+        graph_type: xy
+        theme: forgegraph_default/light_theme
+        format: forgegraph_default/compact_format
+    text:
+        title: Penguin measurements
+    data:
+        file: penguins.parquet
+        preprocessing: examples/sample-data/penguins.csv, unchanged
+    axis:
+        x:
+            data:
+                column: bill_length_mm
+            title: Bill length (mm)
+        y:
+            title: Bill depth (mm)
+    series:
+        measure:
+            column: bill_depth_mm
+            color: species
+            line:
+                show: false
+            marker:
+                shape: species
+                size: 0.3
+    layers:
+        measure:
+            type: choice
+            label: Measurement
+            views:
+                Bill depth: {}
+                Flipper length: {series.measure.column: flipper_length_mm, axis.y.title: Flipper length (mm)}
+                Body mass: {series.measure.column: body_mass_g, axis.y.title: Body mass (g)}

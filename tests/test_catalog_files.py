@@ -23,6 +23,7 @@ from forgegraph.catalog_build.cards import (
 )
 from forgegraph.catalog_build.files import Catalog, CatalogError, read
 from forgegraph.packs import read_pack
+from forgegraph.spec.layers import CONTROLS
 from forgegraph.spec.parameters import definitions, series_definitions
 from forgegraph.spec.registry import builtin
 
@@ -117,7 +118,8 @@ def test_builtin_catalogs_follow_the_rules():
             read(kind, name, builtin())
     read("graph_type", "xy", builtin())
     for name in builtin().docs["layer"]:
-        read("layer", name, builtin())
+        if name not in CONTROLS:  # drawn on an HTML page, not in a card's image
+            read("layer", name, builtin())
 
 
 def test_a_numbered_baseline_can_change_several_parameters():
@@ -147,7 +149,8 @@ def test_a_layer_catalogs_settings_are_on_every_card():
 def test_every_parameter_gets_a_card_and_the_page_shows_the_variable_ones():
     catalog = read("theme", "forgegraph_default/light_theme", builtin())
     carded = {p.path for p, _ in catalog.cards}
-    assert carded == {p.path for p in catalog.parameters}
+    assert carded == {p.path for p in catalog.parameters if gets_card("theme", p)}
+    assert "title.max_wrap" not in carded  # it can't change a drawable baseline (EXEMPT)
     assert "series.marker.size" in catalog.variable and "text.font" not in catalog.variable
     shown = [c.changes[-1].path for c in place(catalog, lambda s, c: True)[1:]]
     assert set(shown) == catalog.variable

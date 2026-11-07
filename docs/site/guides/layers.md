@@ -1,6 +1,6 @@
 # Layers
 
-Layers are drawn over a graph: reference lines and bands, error bars, and notes. A GraphSpec lists its layers under `layers`, each under a name it chooses, with its `type`. They're drawn in the order they're listed. The [layer specifications](../reference/specifications/layer_reference.md) list every parameter.
+Layers are drawn over a graph: reference lines and bands, error bars, and notes. A choice layer adds a control to the graph's HTML page instead. A GraphSpec lists its layers under `layers`, each under a name it chooses, with its `type`. They're drawn in the order they're listed. The [layer specifications](../reference/specifications/layer_reference.md) list every parameter.
 
 ## Reference lines and bands
 
@@ -53,6 +53,21 @@ A `note` layer writes a block of text in or around the plot. Its `text` is writt
 ```
 
 ![The mean response of three compounds at each dose, with error bars and the note Mean ± SD of 3 replicates in the lower right.](../images/dose_response.png){ width="480" }
+
+## Views
+
+A `choice` layer draws nothing on the graph. It lists views, and the graph's HTML page gets a control that switches between them. Each view is a set of the GraphSpec's parameters and their values, under the name the control shows, such as another column for a series and its axis title; `{}` changes nothing. ForgeGraph draws every view ahead of time, so the page needs no server. A png, pdf or svg file shows the first view.
+
+```yaml
+--8<-- "docs/examples/penguin_measures.yaml"
+```
+
+[Open its HTML page](../pages/penguin_measures.html) to choose the measurement.
+
+- **control** shows the views' names as a `dropdown`, or as a row of `radio` buttons, and **label** is the text before it.
+- A view can't change the data, the specifications, output or provenance. Each view is checked as the GraphSpec it makes, so a view can set a parameter only where the GraphSpec could.
+- Two choice layers, such as one for each axis, draw every combination of their views: four views each make 16 images. The page's size, and the time it takes to draw, grow with the number of images. Two choice layers can't set the same parameter.
+- In a layout, choice layers of the same name in several tiles share one control, which switches every tile that has it. Their views need the same names, in the same order.
 
 ## The layers' look
 

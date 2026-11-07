@@ -105,6 +105,7 @@ LAYER_REQUIRED = {
     "value.lower": 0.1,
     "value.upper": 0.1,
 }
+LAYER_COLLECTIONS = {"choice": {"views": {"First": {}, "Second": {}}}}  # a layer type's own
 
 
 def check(kind: str, p: Parameter, value) -> list[str]:
@@ -115,7 +116,7 @@ def check(kind: str, p: Parameter, value) -> list[str]:
         return validate("graphspec", doc, reg_with(("graphspec", doc)))
     if kind.startswith("layer:"):
         layer_type = kind.split(":", 1)[1]
-        entry: dict = {"type": layer_type}
+        entry: dict = {"type": layer_type, **LAYER_COLLECTIONS.get(layer_type, {})}
         for q in definitions("layer", layer_type).values():
             if q.required and q.path != p.path:
                 tree_set(entry, q.path, LAYER_REQUIRED[q.path])

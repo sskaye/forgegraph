@@ -611,3 +611,17 @@ def test_a_tick_length_of_0_draws_labels_without_marks():
     gap = g.style.pt("axis.tick.label.gap") * g.figure.dpi / 72
     letters = label.y1  # the label's box top; its letters sit a little lower
     assert g.axes.bbox.y0 - letters <= gap + 1  # no room kept for a mark
+
+
+def test_auto_ticks_on_a_number_axis_thin_until_their_labels_fit():
+    df = pd.DataFrame({"x": np.linspace(-150000, 160000, 8), "y": np.arange(8.0)})
+    g = graph(df, "x", "y")
+    shown = labels(g)
+    assert 2 <= len(shown) <= 5
+    steps = np.diff(ticks(g))
+    assert np.allclose(steps, steps[0])
+
+
+def test_a_categorical_axis_with_crowded_labels_is_still_an_error():
+    with pytest.raises(fg.SpecError, match="their labels run together"):
+        graph(COMPOUNDS, "compound", "value", **{"axis.x.data.type": "categorical"})

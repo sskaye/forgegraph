@@ -323,13 +323,15 @@ def target(axis: Any) -> int:
 
 class NiceTicks(Locator):
     """Major ticks from one of the published algorithms, by name; with integer, whole-number
-    steps only."""
+    steps only. most, when set, caps how many it's asked for, so that labels too wide for
+    the space can be thinned (axes.check_fit)."""
 
     def __init__(self, algorithm: str, integer: bool = False) -> None:
         if algorithm not in (*ALGORITHMS, "matplotlib"):
             raise ValueError(f"axis.tick.algorithm: unknown algorithm '{algorithm}'")
         self.algorithm = algorithm
         self.integer = integer
+        self.most: int | None = None
 
     def __call__(self) -> Any:
         axis = cast(Any, self.axis)
@@ -339,10 +341,12 @@ class NiceTicks(Locator):
     def tick_values(self, vmin: float, vmax: float) -> Any:
         lo, hi = sorted((vmin, vmax))
         if self.algorithm == "matplotlib":
-            fallback = MaxNLocator(nbins="auto", steps=[1, 2, 2.5, 5, 10], integer=self.integer)
+            bins: Any = "auto" if self.most is None else max(self.most - 1, 1)
+            fallback = MaxNLocator(nbins=bins, steps=[1, 2, 2.5, 5, 10], integer=self.integer)
             fallback.set_axis(cast(Any, self.axis))
             return fallback.tick_values(lo, hi)
-        ticks = ALGORITHMS[self.algorithm](lo, hi, target(self.axis), integer=self.integer)
+        m = target(self.axis) if self.most is None else min(target(self.axis), self.most)
+        ticks = ALGORITHMS[self.algorithm](lo, hi, m, integer=self.integer)
         if len(ticks) > 1:  # no 0.30000000000000004; ticks needn't be multiples of the step
             step = abs(ticks[1] - ticks[0])
             ticks = np.round(ticks, max(0, 3 - int(np.floor(np.log10(step)))))

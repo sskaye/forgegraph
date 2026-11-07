@@ -8,7 +8,8 @@
   axis's value (the total at each category), ascending or descending. Every value present is
   a category; each is labelled with its value.
 - **Ticks** (tick.algorithm): auto, the theme's algorithm (a categorical axis's positions are
-  whole numbers); all, a tick at every value; manual, a tick every tick.step: a number, a
+  whole numbers), asked for fewer ticks on a number axis until their labels fit; all, a tick at
+  every value; manual, a tick every tick.step: a number, a
   factor on a log axis (10: 10, 100, 1000), or a count and a unit on a date axis
   ("2 week"); none, no ticks or tick labels. Ticks from all and manual are never thinned.
   Labels that run together are an error with any algorithm (check_fit).
@@ -441,16 +442,28 @@ def _spacing(values: np.ndarray) -> float | None:
     return float(np.diff(distinct).min()) if len(distinct) > 1 else None
 
 
-def check_fit(ax: Axes, gt: dict[str, Any], style: Style) -> None:
+def check_fit(
+    ax: Axes, gt: dict[str, Any], style: Style, kinds: dict[str, str] | None = None
+) -> None:
     """Tick labels that run together, or come within the theme's tick label gap of each
     other (axis.x.tick.label.gap or axis.y's), are an error: all and manual are never
-    thinned, and auto's algorithms count labels by their height, not their width, so long
-    labels can still meet."""
+    thinned, nor a categorical axis, whose names would go unwritten. auto's algorithms count
+    labels by their height, not their width, so on a number axis (kinds), auto is asked for
+    one tick fewer until its labels fit, down to two."""
     for name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
         gap = style.pt(f"axis.{name}.tick.label.gap") * ax.figure.dpi / 72
         algorithm = gt[f"axis.{name}.tick.algorithm"]
         # get_majorticklabels updates the ticks first: before a draw they're stale
-        if _run_together([t for t in axis.get_majorticklabels() if t.get_text()], gap):
+        crowded = _run_together([t for t in axis.get_majorticklabels() if t.get_text()], gap)
+        locator = axis.get_major_locator()
+        numbers = (kinds or {}).get(name) in ("decimal", "integer")
+        while crowded and algorithm == "auto" and numbers and isinstance(locator, NiceTicks):
+            shown = [t for t in axis.get_majorticklabels() if t.get_text()]
+            if len(shown) <= 2:
+                break
+            locator.most = len(shown) - 1
+            crowded = _run_together([t for t in axis.get_majorticklabels() if t.get_text()], gap)
+        if crowded:
             what = {
                 "all": "a tick at every value",
                 "manual": "a tick every tick.step",

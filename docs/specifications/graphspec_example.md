@@ -116,7 +116,7 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             fill:\
                 color: "#808080"          *# \[None, series, hex color\]; The fill color. series uses the series' color. If None, there is no fill.*\
                 opacity: 0.15          *# \[0-1\]; The fill opacity.*\
-    layers:          *# The layers drawn on the graph, in this order, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.*\
+    layers:          *# <!-- fmc:1 -->The layers drawn on the graph, in this order<!-- /fmc:1 -->, each under a name the GraphSpec chooses. A layer may set the look its theme marks !var.*\
         target:\
             type: reference          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
             axis: y          *# \[x, y\]; The axis the values are on. y draws horizontal lines, and an equation then gives y in terms of x.*\
@@ -127,3 +127,27 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
         conditions:\
             type: note          *# \[layer type\]; The layer's type: one of the graph type's layer.types.*\
             text: "60 °C, 1 atm, H₂/air"          *# \[text\]; The note's text, in label markup. A line break starts a new line.*
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "The layers drawn on the graph, in this order"
+  context_before: "opacity: 0.15 # [0-1]; The fill opacity. layers: #"
+  context_after: ", each under a name the GraphSpec chooses."
+  author: Claude
+  timestamp: 2026-11-07T14:35:23Z
+  resolved: false
+  body: |
+    Proposed addition, for #116 and #118: two layers after conditions, so the example shows both new types.
+    
+            metric:
+                type: choice          # [layer type]; The layer's type: one of the graph type's layer.types.
+                label: Metric          # [None, text]; The text before the control, e.g. Metric. If None, there is none.
+                views:          # The views, each under the name the control shows. A GraphSpec lists two or more, and the page opens on the first.
+                    Voltage: {}          # [parameters and their values]; What the view changes, e.g. a series' column and the y-axis title. {} changes nothing.
+                    Power: {series.SERIES_1.column: Power Density (mW/cm²), axis.y.title: Power density (mW/cm²)}
+            hide:
+                type: toggle          # [layer type]; The layer's type: one of the graph type's layer.types.
+                items: [series, target]          # [series, layers, texts]; What can be hidden: series for all series, layers for all layers, or those named.
+    
+    The Power view assumes the example data has a power density column. If it doesn't, I'd pick another column it has when this is built.
+-->

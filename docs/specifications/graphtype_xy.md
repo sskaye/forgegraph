@@ -71,4 +71,18 @@ parameters: !var          *# !var/!fix sets whether a GraphSpec may ch
             title:\
                 text: column_name          *# \[None, column_name, text\]; The color bar's title. column_name uses the name of the series' color column. If None, there is no title.*\
     layer:\
-        types: !fix \[reference, note, error_bar\]          *# \[layer types\]; The layer types that a GraphSpec of this graph type may use.*
+        <!-- fmc:1 -->types: !fix \[reference, note, error_bar\]<!-- /fmc:1 -->          *# \[layer types\]; The layer types that a GraphSpec of this graph type may use.*
+
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "types: !fix [reference, note, error_bar]"
+  context_before: "If None, there is no title. layer:"
+  context_after: "# [layer types]; The layer types that a GraphSpec of this graph type may use."
+  author: Claude
+  timestamp: 2026-11-07T14:35:23Z
+  resolved: false
+  body: |
+    Proposed change, for #116 and #118: the xy graph type accepts the two new layer types, whose proposed specifications are review/issues/specs/layer_choice.md and layer_toggle.md.
+    
+    types: !fix [reference, note, error_bar, choice, toggle]          # [layer types]; The layer types that a GraphSpec of this graph type may use.
+-->

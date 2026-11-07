@@ -12,7 +12,7 @@ ForgeGraph is a library and agent skill for making high-quality graphs quickly a
 - **Graph type**: the type of graph, e.g. xy drawn with lines, markers, or bars.
 - **Theme**: the look: fixed styles (fonts, palettes, spines, ticks, legend style), plus defaults for options.
 - **Format**: destination-specific features: figure size, base font size, file type, dpi, etc.
-- **Layers**: overlays on a graph: reference lines and bands, error bars, notes.
+- **Layers**: <!-- fmc:1 -->overlays on a graph: reference lines and bands, error bars, notes.<!-- /fmc:1 -->
 - **Layout**: multiple GraphSpecs can be arranged in one figure: for multi-panel figures, dashboards.
 
 The input is a pandas DataFrame saved as a Parquet file, named by the GraphSpec's `data.file`.
@@ -46,7 +46,35 @@ Every command takes `--help`.
 - [examples/xy.yaml](examples/xy.yaml): an xy graph, one line per group.
 - [examples/bars.yaml](examples/bars.yaml): each group's peak value as a bar, with its value.
 - [examples/layers.yaml](examples/layers.yaml): the mean of each group's runs with error bars, a reference line and a note.
-- [examples/heat_map.yaml](examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).
+- [examples/heat_map.yaml](<!-- fmc:2 -->examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).<!-- /fmc:2 -->
 - [examples/figure.layout.yaml](examples/figure.layout.yaml): a layout of xy.yaml above bars.yaml.
 - [examples/figure.schedule.yaml](examples/figure.schedule.yaml): figure.layout.yaml rendered every weekday at 06:00.
 
+<!-- forgemark-comments
+- id: 1
+  anchor_text: "overlays on a graph: reference lines and bands, error bars, notes."
+  context_before: "Layers:"
+  context_after: "Layout: multiple GraphSpecs can be arranged in one figure: for multi-panel"
+  author: Claude
+  timestamp: 2026-11-07T21:55:26Z
+  resolved: false
+  body: |
+    Problem: the skill doesn't know about the choice and toggle layers, so an agent asked for a page where the reader picks a metric or hides a series won't look for them. The other new features (IQR limits, geometric functions, star and asterisk markers, title.max_wrap) are parameters that forgegraph schema already lists, so they need no skill text.
+  suggested_edit:
+    from: "overlays on a graph: reference lines and bands, error bars, notes."
+    to: "overlays on a graph: reference lines and bands, error bars, notes; and controls on its HTML page that switch between views or show and hide series and layers."
+- id: 2
+  anchor_text: "examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (marker.shape: grid_cell)."
+  context_before: "[examples/heat_map.yaml]("
+  context_after: "examples/figure.layout.yaml: a layout of xy.yaml above bars.yaml."
+  author: Claude
+  timestamp: 2026-11-07T21:55:26Z
+  resolved: false
+  body: |
+    Problem: there's no example of the new layers. Proposed: add examples/controls.yaml (on this branch; it renders without lint issues beyond the data's one missing row) to the list.
+  suggested_edit:
+    from: "examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`)."
+    to: |-
+      examples/heat_map.yaml): a heat map, as an xy graph whose markers fill the grid (`marker.shape: grid_cell`).
+      - [examples/controls.yaml](examples/controls.yaml): an HTML page with a dropdown that switches the current axis between linear and log, and checkboxes that show or hide the series, error bars and target line.
+-->

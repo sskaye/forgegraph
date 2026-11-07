@@ -1113,3 +1113,30 @@ def test_an_equation_needs_two_numeric_axes():
     }
     with pytest.raises(fg.SpecError, match=r"axis\.x isn't numbers"):
         fg.render(d, df)
+
+
+def test_an_auto_label_with_no_room_says_what_is_in_the_way_and_what_to_do():
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame({"x": rng.uniform(0, 10, 400), "y": rng.uniform(0, 10, 400)})
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings=with_series(
+            {"axis.x.data.column": "x", "axis.y.data.column": "y", "series.line.show": False}
+        ),
+    )
+    d["parameters"]["layers"] = {
+        "c": {
+            "type": "reference",
+            "axis": "y",
+            "line_1": {"value": 5.0, "label": {"text": "Baseline 2, mean of the controls"}},
+        }
+    }
+    with pytest.raises(fg.SpecError) as e:
+        fg.render(d, df)
+    message = str(e.value)
+    assert (
+        "none of the six positions beside the line is clear (end_above covers the data" in message
+    )
+    assert "trying them one at a time won't find another" in message
+    assert message.endswith("or leave the label out with label.text: None")

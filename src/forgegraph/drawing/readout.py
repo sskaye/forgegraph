@@ -2,7 +2,8 @@
 
 Drawing an xy graph attaches what its readouts need to its axes (attach). Once the figure is
 final, marks() finds each data point: a marker or a line's point, where it is in points from
-the figure's top left with its marker's radius, or a bar, as its box. Each comes with the
+the figure's top left with its marker's radius, or a bar, as its box, cut at the plot box;
+a point outside the plot box isn't drawn, so it has no readout. Each comes with the
 lines its readout shows, as (name, value) pairs of HTML:
 
 - the x and y axes': the axis's title, or with none, the point's column's name; and the
@@ -26,7 +27,7 @@ from __future__ import annotations
 
 import html
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
@@ -111,6 +112,13 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
     r = d.drawn.roles
     border = to_hex(ax.spines["left"].get_edgecolor())
     paper = ax.get_facecolor() if ax.patch.get_visible() else fig.get_facecolor()
+    plot = ax.get_window_extent()
+    inside = (  # the plot box, in points from the figure's top left
+        plot.x0 * to_pt - 0.5,
+        height - plot.y1 * to_pt - 0.5,
+        plot.x1 * to_pt + 0.5,
+        height - plot.y0 * to_pt + 0.5,
+    )
     out = []
     for s in d.drawn.series:
         lines = _lines(ax, s, d)
@@ -125,10 +133,9 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
                 np.c_[np.asarray(px, dtype=float), np.asarray(py, dtype=float)]
             )
             for i, (x, y) in enumerate(at):
-                if np.isfinite(x) and np.isfinite(y):
-                    out.append(
-                        Mark(x * to_pt, height - y * to_pt, radius, None, rings[i], look, lines[i])
-                    )
+                left, top = x * to_pt, height - y * to_pt
+                if inside[0] <= left <= inside[2] and inside[1] <= top <= inside[3]:
+                    out.append(Mark(left, top, radius, None, rings[i], look, lines[i]))
         if s.bars is not None:
             b = s.bars
             whole = np.isfinite(b.places) & np.isfinite(b.bottom) & np.isfinite(b.top)
@@ -137,7 +144,29 @@ def _of(ax: Axes, d: _Drawing) -> list[Mark]:
                 top, bottom = height - box.y1 * to_pt, height - box.y0 * to_pt
                 centre = ((left + right) / 2, (top + bottom) / 2)
                 out.append(Mark(*centre, 0.0, (left, top, right, bottom), rings[i], look, lines[i]))
-    return out
+    return [m for m in (_cut(m, inside) for m in out) if m is not None]
+
+
+def _cut(mark: Mark, plot: tuple[float, float, float, float]) -> Mark | None:
+    """A bar's or cell's mark with its box cut at the plot box, or None if none of it is
+    inside; any other mark as it is."""
+    if mark.box is None:
+        return mark
+    shown = _within(mark.box, plot)
+    if shown is None:
+        return None
+    centre = ((shown[0] + shown[2]) / 2, (shown[1] + shown[3]) / 2)
+    return replace(mark, x=centre[0], y=centre[1], box=shown)
+
+
+def _within(
+    box: tuple[float, float, float, float], plot: tuple[float, float, float, float]
+) -> tuple[float, float, float, float] | None:
+    """The part of a box (left, top, right, bottom) inside the plot box, or None if none
+    is: what's beyond an axis limit isn't drawn, so it has no readout."""
+    left, top = max(box[0], plot[0]), max(box[1], plot[1])
+    right, bottom = min(box[2], plot[2]), min(box[3], plot[3])
+    return (left, top, right, bottom) if left < right and top < bottom else None
 
 
 def _cell_marks(

@@ -2,6 +2,13 @@
 
 ForgeGraph follows [semantic versioning](https://semver.org). Before 1.0, a minor version may change how graphs look or how specs are written.
 
+## 0.8.1 (2026-11-08)
+
+### Bug Fixes
+
+- A reference line's label couldn't be placed when another reference layer's band surrounded the line, such as a mean line inside its ±1 SD band. A reference line's label may now sit on any band, as in 0.7.0. Keys and notes still keep clear of bands.
+- A band whose fill has an opacity of 0 still kept keys, notes and labels away, though it can't be seen. It no longer does.
+
 ## 0.8.0 (2026-11-07)
 
 ### New Features

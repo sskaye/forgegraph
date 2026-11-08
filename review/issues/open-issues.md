@@ -9,7 +9,7 @@ Last updated: 11/08/26
 - **Verification:** reproduced on 0.8.0 with the issue's GraphSpec: auto, `start_below` and `end_above` all fail. Without the band layer it draws. With the band's `fill.color: None` it draws too: its two edge lines are far enough from the label. With `fill.opacity: 0` it fails, so the issue's "band without fill" was likely made that way: a fill you can't see still counts.
 - **Root cause:** the #132 change. Keys, notes and reference labels keep clear of every band's fill. In 0.8.0 I let a reference label sit on its own layer's band, so a band's two lines could label inside it, but a band drawn as a separate layer, as here, still blocks the label. Separately, a fill with opacity 0 is still sampled as drawn content, for keys and notes as well as labels.
 - **Proposal:** one of:
-  1. A reference label ignores every band's fill; fills count only for keys and notes, as the #132 decision named first. A band's edge lines still count, as every line does. And a fill with opacity 0 counts for nothing.
+  1. A reference label ignores every band's fill; fills count only for keys and notes. This narrows the #132 decision, which named reference labels too. A band's edge lines still count, as every line does. And a fill with opacity 0 counts for nothing.
   2. A reference label ignores a band's fill only where its line lies inside that band, and keeps clear of bands it's outside of. The opacity fix as in 1.
 
   Recommendation: 1. A band is light by design (opacity 0.15), so a label on it reads well, and the line is what the label is about. 2 needs a rule for lines that cross a band's edge, for a case no one has asked for. Either way, it's a bug fix released as 0.8.1, with the issue's GraphSpec as a test, filled and at opacity 0.

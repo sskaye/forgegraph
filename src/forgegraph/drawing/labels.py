@@ -185,20 +185,23 @@ def _drawn_points(
             centres.append(ax.transData.transform(getattr(bars, CELL_POINTS)))
             radii.append(0.0)  # a cell's corners and centre
         elif bars.get_gid() == REFERENCE_GID:
-            if not fills or not bars.get_visible() or bars in ignore:
+            if not fills or not _seen(bars) or bars in ignore:
                 continue
             dense += [
                 _fill_samples(ax, p.transformed(bars.get_transform())) for p in bars.get_paths()
             ]
     for patch in ax.patches:
-        if (
-            fills
-            and patch.get_gid() == REFERENCE_GID
-            and patch.get_visible()
-            and patch not in ignore
-        ):
+        if fills and patch.get_gid() == REFERENCE_GID and _seen(patch) and patch not in ignore:
             dense.append(_fill_samples(ax, patch.get_path().transformed(patch.get_transform())))
     return dense, centres, radii
+
+
+def _seen(fill: Any) -> bool:
+    """Whether a band's fill can be seen: shown, and not fully transparent."""
+    if not fill.get_visible() or fill.get_alpha() == 0:
+        return False
+    colors = np.atleast_2d(np.asarray(fill.get_facecolor(), dtype=float))
+    return bool(colors.size) and bool((colors[:, 3] > 0).any())
 
 
 def _fill_samples(ax: Axes, path: Path) -> np.ndarray:
@@ -246,9 +249,9 @@ class Obstacles:
         style (a series', a reference line, an error bar's stem) and a band's fill; the
         plot's text (value labels, notes, a reference line's label, direct labels); with
         keys, the keys' frames. A key's own lines and text never count, nor the artists to
-        ignore: a box around a label set along a sloped line holds some of its own line, and
-        a band's line's label may sit on the band's own fill. Without fills, bands' fills
-        don't count either."""
+        ignore: a box around a label set along a sloped line holds some of its own line.
+        Without fills, bands' fills don't count either: a series' direct label and a reference
+        line's label may sit on a band. A fill that can't be seen never counts."""
         dense, centres, radii = _drawn_points(ax, lines, ignore, fills)
         texts = [
             (t, t.get_window_extent(renderer))
@@ -539,21 +542,33 @@ def keys_clear(ax: Axes, lines: bool) -> bool:
 
 
 def box_clear(
-    ax: Axes, bbox: Bbox, lines: bool, keys: bool = False, ignore: Sequence[Artist] = ()
+    ax: Axes,
+    bbox: Bbox,
+    lines: bool,
+    keys: bool = False,
+    ignore: Sequence[Artist] = (),
+    fills: bool = True,
 ) -> bool:
     """Whether a box, in display px, keeps 2 pt clear of what's drawn inside the plot, and
     off its other text (with keys, its keys too): see Obstacles.of."""
     pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-    return Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore).clear(bbox, pad)
+    found = Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore, fills=fills)
+    return found.clear(bbox, pad)
 
 
 def label_clear(
-    ax: Axes, label: Text, lines: bool, keys: bool = False, ignore: Sequence[Artist] = ()
+    ax: Axes,
+    label: Text,
+    lines: bool,
+    keys: bool = False,
+    ignore: Sequence[Artist] = (),
+    fills: bool = True,
 ) -> bool:
     """box_clear for a label turned along its line, which keeps clear of its own line by its
     gap."""
     pad = 2 * ax.figure.dpi / 72  # type: ignore[union-attr]
-    return Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore).clear_of_text_along(label, pad)
+    found = Obstacles.of(ax, lines=lines, keys=keys, ignore=ignore, fills=fills)
+    return found.clear_of_text_along(label, pad)
 
 
 def unplace(ax: Axes) -> None:

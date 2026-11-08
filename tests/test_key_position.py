@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -351,3 +353,65 @@ def test_a_box_runs_into_a_marker_at_its_edge():
     near = labels.Bbox.from_extents(4.0, -1.0, 20.0, 1.0)  # 4 px from the centre: on the edge
     assert obstacles.hits(near) == ["the data"]
     assert obstacles.hits(labels.Bbox.from_extents(7.0, -1.0, 20.0, 1.0)) == []
+
+
+def _band_around_the_mean(**fill: Any) -> dict[str, Any]:
+    """#142's GraphSpec: points, a ±1 SD band and, as a layer of its own, a labelled mean."""
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "Sample",
+            "axis.y.min": 0,
+            "axis.y.max": 100,
+            "series": {"Value": {"line": {"show": False}}},
+        },
+    )
+    mean = {"value": "Value", "aggregation": {"function": "mean"}}
+    sd = {"function": "stddev"}
+    d["parameters"]["layers"] = {
+        "band": {
+            "type": "reference",
+            "axis": "y",
+            "line_1": {**mean, "offset": {**sd, "multiplier": -1}},
+            "line_2": {**mean, "offset": sd},
+            **({"fill": fill} if fill else {}),
+        },
+        "mean": {"type": "reference", "axis": "y", "line_1": {**mean, "label": {"text": "value"}}},
+    }
+    return d
+
+
+SAMPLES = pd.DataFrame({"Sample": range(1, 9), "Value": [40, 75, 52, 88, 60, 45, 80, 58]})
+
+
+@pytest.mark.parametrize("fill", [{}, {"opacity": 0}], ids=["filled", "transparent"])
+def test_a_reference_lines_label_may_sit_on_another_layers_band(fill):
+    g = fg.render(_band_around_the_mean(**fill), SAMPLES)  # #142: it couldn't be placed
+    assert [t.get_text() for t in g.axes.texts if t.get_text()] == ["62.2"]
+
+
+def test_a_band_that_cant_be_seen_doesnt_keep_a_key_off():
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame({"x": np.arange(60.0), "y": rng.uniform(0, 30, 60)})
+    df["g"] = np.where(df["x"] < 30, "a", "b")
+    d = fg.graphspec(
+        "t",
+        "xy",
+        settings={
+            "axis.x.data.column": "x",
+            "legend.method": "key",
+            "legend.key.positions": ["top_left"],
+            "series": {"y": {"color": "g", "line": {"show": False}}},
+        },
+    )
+    edge = {"line": {"style": "None"}}  # the fill alone, over the whole plot
+    band = {"value": -5.0, **edge}, {"value": 35.0, **edge}
+    d["parameters"]["layers"] = {
+        "band": {"type": "reference", "axis": "y", "line_1": band[0], "line_2": band[1]},
+    }
+    with pytest.raises(fg.SpecError, match="top_left covers the data"):
+        fg.render(d, df)  # the band fills the top, where the key would go
+    d["parameters"]["layers"]["band"]["fill"] = {"opacity": 0}
+    [key] = keys(fg.render(d, df).axes)  # a band no one can see is no obstacle
+    assert key.position == "top_left"
